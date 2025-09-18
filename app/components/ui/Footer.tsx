@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Facebook, Twitter, Instagram, Shield} from 'lucide-react';
-import "../globals.css";
+import "../../globals.css";
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 

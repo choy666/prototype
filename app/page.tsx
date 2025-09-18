@@ -3,10 +3,14 @@ import logo from "@/assets/logo.svg";
 import logoDark from "@/assets/logo-dark.svg";
 import Link from "next/link";
 import arrow from "@/assets/arrow.svg";
-import { checkDbConnection } from "./db";
+import { checkDbConnection } from "./lib/db";
 
 export default async function Home() {
-  const result = await checkDbConnection();
+
+  const dbStatus = await checkDbConnection();
+  const isConnected = dbStatus.success;
+  const statusMessage = isConnected ? "Database connected" : dbStatus.message;
+
   return (
     <div className="flex min-h-screen flex-col">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 md:max-w-lg md:px-0 lg:max-w-xl">
@@ -62,15 +66,14 @@ export default async function Home() {
           </div>
           <span
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold mt-9 text-center ${
-              result === "Database connected"
+              isConnected
                 ? "border-[#00E599]/20 bg-[#00E599]/10 text-[#1a8c66] dark:bg-[#00E599]/10 dark:text-[#00E599]"
                 : "border-red-500/20 bg-red-500/10 text-red-500 dark:text-red-500"
             }`}
           >
-            {result}
+            {statusMessage}
           </span>
         </main>
-
       </div>
     </div>
   );

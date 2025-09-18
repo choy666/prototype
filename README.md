@@ -67,3 +67,7 @@ Commit and push your code changes to your GitHub repository to automatically tri
 _________________ resumen de cmds
 npm install
 npm run dev
+    "framer-motion": "^12.23.15",
+    "lucide-react": "^0.544.0",
+npm install drizzle-orm @neondatabase/serverless
+npm install -D drizzle-kit

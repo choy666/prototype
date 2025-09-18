@@ -1,11 +1,10 @@
-'use client';
-
+"use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { ShoppingCart, Menu, X , House} from 'lucide-react';
-import "../globals.css";
+import "../../globals.css";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -87,7 +86,7 @@ const Navbar = () => {
 
             {/* Mobile menu button */}
             <button
-              className="md:hidden p-2 text-gray-700 hover:text-green-500 focus:outline-none"
+              className="md:hidden p-2 text-gray-700 hover:text-[var(--color-page)] focus:outline-none"
               onClick={() => setIsOpen(!isOpen)}
             >
               {isOpen ? (
