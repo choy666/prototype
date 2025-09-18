@@ -3,8 +3,6 @@ import logo from "@/assets/logo.svg";
 import logoDark from "@/assets/logo-dark.svg";
 import Link from "next/link";
 import arrow from "@/assets/arrow.svg";
-import discord from "@/assets/discord.svg";
-import docs from "@/assets/docs.svg";
 import { checkDbConnection } from "./db";
 
 export default async function Home() {
@@ -62,41 +60,8 @@ export default async function Home() {
               />
             </Link>
           </div>
-        </main>
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E4E5E7] py-5 sm:gap-2 sm:gap-6 md:pb-12 md:pt-10 dark:border-[#303236]">
-          <ul className="flex items-center gap-4 sm:gap-6">
-            {[
-              {
-                text: "Docs",
-                href: "https://neon.tech/docs/",
-                icon: docs,
-              },
-              {
-                text: "Discord",
-                href: "https://discord.com/invite/92vNTzKDGp",
-                icon: discord,
-              },
-            ].map((link) => (
-              <Link
-                className="flex items-center gap-2 opacity-70 transition-opacity duration-200 hover:opacity-100"
-                key={link.text}
-                href={link.href}
-                target="_blank"
-              >
-                <Image
-                  className="dark:invert"
-                  src={link.icon}
-                  alt={link.text}
-                  width={16}
-                  height={16}
-                  priority
-                />
-                <span className="text-sm tracking-tight">{link.text}</span>
-              </Link>
-            ))}
-          </ul>
           <span
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold mt-9 text-center ${
               result === "Database connected"
                 ? "border-[#00E599]/20 bg-[#00E599]/10 text-[#1a8c66] dark:bg-[#00E599]/10 dark:text-[#00E599]"
                 : "border-red-500/20 bg-red-500/10 text-red-500 dark:text-red-500"
@@ -104,7 +69,8 @@ export default async function Home() {
           >
             {result}
           </span>
-        </footer>
+        </main>
+
       </div>
     </div>
   );

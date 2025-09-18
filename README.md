@@ -1,18 +1,7 @@
-![Vercel with Neon](./assets/home.png)
-
--> View demo: [vercel-marketplace-neon.vercel.app](https://vercel-marketplace-neon.vercel.app/)
 
 # Neon Postgres
 
 A minimal template for building full-stack React applications using Next.js, Vercel, and Neon.
-
-## Getting Started
-
-Click the "Deploy" button to clone this repo, create a new Vercel project, setup the Neon integration, and provision a new Neon database:
-
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fneondatabase-labs%2Fvercel-marketplace-neon%2Ftree%2Fmain&project-name=my-vercel-neon-app&repository-name=my-vercel-neon-app&products=[{%22type%22:%22integration%22,%22integrationSlug%22:%22neon%22,%22productSlug%22:%22neon%22,%22protocol%22:%22storage%22}])
-
-Once the process is complete, you can clone the newly created GitHub repository and start making changes locally.
 
 ## Local Setup
 
@@ -73,3 +62,8 @@ To learn more about Next.js, take a look at the following resources:
 ## Deploy on Vercel
 
 Commit and push your code changes to your GitHub repository to automatically trigger a new deployment.
+
+
+_________________ resumen de cmds
+npm install
+npm run dev
