@@ -1,15 +1,13 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background-page: #000000;
   --foreground: #ffffff;
   --color-page: #ff7b00;
-  --color-footer:#000000;
+  --color-footer: #000000;
 }
 
-
 body {
-
   background: var(--background-page);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
