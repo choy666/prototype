@@ -1,99 +1,201 @@
-// In app/(auth)/register/page.tsx
 'use client';
-
-import { useFormState, useFormStatus } from 'react-dom';
-import { registerUser } from '@/lib/actions/auth';
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      {pending ? 'Creando cuenta...' : 'Crear cuenta'}
-    </button>
-  );
-}
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { registerSchema, type RegisterFormValues } from '@/lib/validations/auth';
+import { registerUser } from '@/lib/actions/auth';
 
 export default function RegisterPage() {
-  const [state, formAction] = useFormState(registerUser, { error: null });
   const router = useRouter();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (state?.success) {
-      router.push('/dashboard');
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
+  const onSubmit = async (data: RegisterFormValues) => {
+    try {
+      setIsSubmitting(true);
+      const result = await registerUser(data);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al registrar el usuario');
+      }
+
+      // Mostrar mensaje de éxito
+      toast({
+        title: '¡Cuenta creada!',
+        description: 'Tu cuenta ha sido creada exitosamente.',
+      });
+
+      // Redirigir a la página de login
+      router.push('/login?registered=true');
+    } catch (error) {
+      setError('root', {
+        type: 'manual',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Error al crear la cuenta. Por favor, inténtalo de nuevo.',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [state, router]);
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Crear una cuenta
-          </h2>
-        </div>
-        <form action={formAction} className="mt-8 space-y-6">
-          {state?.error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-              <span className="block sm:inline">{state.error}</span>
-            </div>
-          )}
-          
-          {/* Rest of your form fields */}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Nombre
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Correo electrónico
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Contraseña
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-              />
-            </div>
-          </div>
+    <div className="flex min-h-[calc(100vh-200px)] w-full items-center justify-center bg-black">
+      <div className="grid w-full max-w-md gap-8">
+        <section className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-500">
+          <div className="m-2 rounded-xl border-8 border-transparent bg-white p-8 shadow-xl dark:bg-gray-900">
+            <h1 className="mb-8 cursor-default text-center text-4xl font-bold text-gray-900 dark:text-gray-300">
+              Crear cuenta
+            </h1>
 
-          <div>
-            <SubmitButton />
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {errors.root && (
+                <div className="rounded-md bg-red-50 p-4">
+                  <p className="text-sm text-red-600">{errors.root.message}</p>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="name"
+                  className="mb-2 block text-lg dark:text-gray-300"
+                >
+                  Nombre completo
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  placeholder="Tu nombre"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                    errors.name ? 'border-red-500' : ''
+                  }`}
+                  {...register('name')}
+                />
+                {errors.name && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-lg dark:text-gray-300"
+                >
+                  Correo electrónico
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                    errors.email ? 'border-red-500' : ''
+                  }`}
+                  {...register('email')}
+                />
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.email.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-2 block text-lg dark:text-gray-300"
+                >
+                  Contraseña
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                    errors.password ? 'border-red-500' : ''
+                  }`}
+                  {...register('password')}
+                />
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.password.message}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  La contraseña debe tener al menos 6 caracteres, incluyendo una
+                  mayúscula, una minúscula y un número.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="confirmPassword"
+                  className="mb-2 block text-lg dark:text-gray-300"
+                >
+                  Confirmar contraseña
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                    errors.confirmPassword ? 'border-red-500' : ''
+                  }`}
+                  {...register('confirmPassword')}
+                />
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.confirmPassword.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-3 text-lg font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
+                </button>
+              </div>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+              ¿Ya tienes una cuenta?{' '}
+              <Link
+                href="/login"
+                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Inicia sesión
+              </Link>
+            </p>
           </div>
-        </form>
+        </section>
       </div>
     </div>
   );

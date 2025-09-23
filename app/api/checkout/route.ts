@@ -1,6 +1,6 @@
 // app/api/checkout/route.ts
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth'; // Importamos el auth configurado
+import { auth } from '@/lib/actions/auth';
 import { mercadoPago } from '@/lib/mercadopago';
 import type { DefaultSession } from 'next-auth';
 import { UserRole } from '@/lib/schema';
@@ -16,7 +16,7 @@ declare module 'next-auth' {
 }
 
 export async function POST(request: Request) {
-  // Usamos auth() en lugar de getServerSession
+  // Usamos auth.auth() para obtener la sesión
   const session = await auth();
   
   if (!session?.user?.email) {

@@ -37,7 +37,7 @@ useCart.ts, useAuth.ts, useMercadoLibreAuth.ts
 
 [ESTÁNDARES Y BUENAS PRÁCTICAS]
 
-- **Lenguaje:** TypeScript + React Server Components (Next.js 13+ App Router).
+- **Lenguaje:** TypeScript + React Server Components (Next.js 15+ App Router).
 - **Estilo:** ESLint + Prettier, convenciones de nombres en camelCase para funciones/variables, PascalCase para componentes, kebab-case para rutas.
 - **Arquitectura:** Mantener separación clara entre UI (components), lógica de negocio (lib/actions, services), y datos (lib/db, lib/schema).
 - **API Routes:** Usar handlers async/await, validación de entrada (Zod o similar), manejo de errores consistente.

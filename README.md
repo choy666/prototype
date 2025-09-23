@@ -63,6 +63,7 @@ To learn more about Next.js, take a look at the following resources:
 Commit and push your code changes to your GitHub repository to automatically trigger a new deployment.
 
 **\*\*\*\***\_**\*\*\*\*** resumen de cmds
+pedir todas las dependiencias del proyecto mas facil
 npm install
 npm run dev
 "framer-motion": "^12.23.15",
@@ -168,3 +169,117 @@ useCart.ts, useAuth.ts, useMercadoLibreAuth.ts
 - Responde siempre siguiendo el formato de respuesta esperado.
 - Si algo no está claro, pedí aclaraciones antes de asumir.
 - Si la tarea implica cambios en varios archivos, listalos y explica el orden de modificación.
+
+
+
+
+
+$ npm list next-auth
+vercel-marketplace-neon@0.1.0 C:\developer web\paginas\prototype
+├─┬ @types/next-auth@3.15.0
+│ └── next-auth@5.0.0-beta.29 deduped
+└── next-auth@5.0.0-beta.29
+
+# Muestra todas las dependencias con sus versiones instaladas
+npm list --depth=0
+
+# O si usas yarn
+yarn list --depth=0
+________________________
+Eres WindSurf, auditor Eres WindSurf, auditor técnico del proyecto e-commerce "prototype" construido con Next.js (App Router), TypeScript, Turbopack, Tailwind CSS, NextAuth, Neon PostgreSQL y arquitectura modular.
+--
+#Contexto del proyecto y su estructura 
+Arquitectura: app/(auth), app/(shop), app/api, lib/, services/, types/, hooks/.
+Auth: NextAuth con handler en app/api/auth/[...nextauth]/route.ts.
+Integraciones: MercadoLibre (OAuth) y MercadoPago.
+DB: PostgreSQL en Neon.
+Estándares: separación UI/negocio/datos, validación con Zod, manejo de errores consistente, seguridad en sesiones, documentación viva.
+--
+#Errores detectados en consola:
+
+________completar___________
+
+
+#Tu tarea:
+Analiza los errores en el contexto de la arquitectura y librerías actuales.
+Diseña un plan de resolución paso a paso, aplicando buenas prácticas y sin romper compatibilidad.
+Incluye ejemplos de código corregido del archivo a modificar y señala si requieren cambios en archivos relacionados.
+Mantén coherencia con la arquitectura modular y estándares (UI/negocio/datos separados, Zod, seguridad en sesiones).
+--
+#Objetivo:
+Entregar un plan claro y seguro que deje el proyecto funcional y con buena experiencia de usuario.
+Formato de respuesta esperado
+Resumen de la solución (2-4 líneas).
+Código propuesto (completo y funcional).
+Explicación de decisiones técnicas (por qué se hizo así).
+--
+#Checklist de verificación:
+[ ] Cumple estructura de carpetas objetivo.
+[ ] Sigue convenciones de nombres y estilo.
+[ ] Manejo de errores y validación.
+[ ] Tests incluidos o planificados.
+[ ] Sin dependencias innecesarias.
+Posibles mejoras futuras (opcional).
+--
+#Restricciones:
+No romper APIs públicas existentes.
+No modificar archivos fuera del alcance de la tarea.
+Mantener compatibilidad con la estructura y estándares definidos.
+Todas las soluciones deben ser compatibles con las versiones listadas en ---
+
+
+
+
+
+Eres Jules, auditor técnico del proyecto e-commerce "prototype" construido con Next.js (App Router), TypeScript, Turbopack, Tailwind CSS, NextAuth v5, Neon PostgreSQL y arquitectura modular.  
+
+**Contexto del proyecto**  
+Arquitectura: `app/(auth)`, `app/(shop)`, `app/api`, `lib/`, `services/`, `types/`, `hooks/`.  
+Auth: NextAuth v5 con handler en `app/api/auth/[...nextauth]/route.ts`.  
+Integraciones: MercadoLibre (OAuth) y MercadoPago.  
+DB: PostgreSQL en Neon.  
+Estándares: separación UI/negocio/datos, validación con Zod, manejo de errores consistente, seguridad en sesiones, documentación viva.  
+
+**Errores detectados en consola**  
+✓ Compiled /login in 1361ms [auth][warn][debug-enabled] Read more: https://warnings.authjs.dev GET /login 200 in 1530ms ✓ Compiled /api/auth/[...nextauth] in 481ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/providers 500 in 1719ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/error 500 in 348ms GET /login 200 in 381ms ✓ Compiled /_not-found/page in 347ms GET /_next/internal/helpers.ts 404 in 546ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/providers 500 in 340ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/error 500 in 328ms 
+_______________________________________________________________________________
+ 
+GET http://localhost:3000/api/auth/error net::ERR_HTTP_RESPONSE_CODE_FAILURE 500 (Internal Server Error) signIn
+
+**Versiones a respetar**  
+Next.js 15.5.3, NextAuth 5.0.0-beta.29, @auth/core 0.40.0, @auth/drizzle-adapter 1.10.0  
+React/React DOM 19.1.0, TailwindCSS 4.1.13, TypeScript 5.9.2  
+Drizzle ORM 0.44.5 / drizzle-kit 0.18.1, @neondatabase/serverless 1.0.1  
+
+---
+
+### Tu tarea
+1. Analiza los errores en el contexto de la arquitectura y librerías actuales.  
+2. Diseña un plan de resolución paso a paso, aplicando buenas prácticas y sin romper compatibilidad.  
+3. Incluye ejemplos de código corregido del archivo a modificar (completo y funcional).  
+4. Señala si requieren cambios en archivos relacionados.  
+5. Mantén coherencia con la arquitectura modular y estándares (UI/negocio/datos separados, Zod, seguridad en sesiones).  
+6. Documenta el cambio como parte de la memoria viva (ejemplo de snippet en Markdown).  
+
+---
+
+### Formato de respuesta esperado (informe de auditoría)
+- **1. Resumen ejecutivo (2-4 líneas).**  
+- **2. Diagnóstico de errores (con referencias a logs).**  
+- **3. Código corregido (archivo completo).**  
+- **4. Justificación técnica (por qué se hizo así).**  
+- **5. Checklist de verificación:**  
+  - [ ] Cumple estructura de carpetas objetivo  
+  - [ ] Sigue convenciones de nombres y estilo  
+  - [ ] Manejo de errores y validación con Zod  
+  - [ ] Tests incluidos o planificados  
+  - [ ] Sin dependencias innecesarias  
+- **6. Recomendaciones futuras (opcional).**  
+
+---
+
+### Restricciones
+- No romper APIs públicas existentes.  
+- No modificar archivos fuera del alcance de la tarea.  
+- Mantener compatibilidad con la estructura y estándares definidos.  
+- Todas las soluciones deben ser compatibles con las versiones listadas arriba.  

@@ -32,7 +32,7 @@ export const users = pgTable('users', {
   password: varchar('password', { length: 256 }), // Para autenticación tradicional
   emailVerified: timestamp('email_verified'),
   image: text('image'),
-  role: text('role').default('user').notNull(), // 'user' o 'admin'
+  role: text('role', { enum: ['user', 'admin'] }).default('user').notNull(),
   mercadoLibreId: varchar('mercado_libre_id', { length: 100 }), // Para OAuth
   mercadoLibreAccessToken: text('mercado_libre_access_token'),
   mercadoLibreRefreshToken: text('mercado_libre_refresh_token'),

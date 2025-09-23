@@ -1,5 +1,4 @@
-// app/api/auth/[...nextauth]/route.ts
-import NextAuth from "next-auth";
+// app/api/auth/[...nextauth]/config.ts
 import type { NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
@@ -7,8 +6,7 @@ import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { UserRole } from "@/types";
 
-// Configuración de NextAuth
-const authOptions: NextAuthConfig = {
+export const authConfig: NextAuthConfig = {
   adapter: DrizzleAdapter(db),
   providers: [
     CredentialsProvider({
@@ -27,7 +25,7 @@ const authOptions: NextAuthConfig = {
             eq(users.email, credentials.email as string),
         });
 
-        if (!user || !user.password) {
+        if (!user?.password) {
           throw new Error("Credenciales inválidas");
         }
 
@@ -75,7 +73,3 @@ const authOptions: NextAuthConfig = {
   debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
 };
-
-// Exportar los manejadores HTTP
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
