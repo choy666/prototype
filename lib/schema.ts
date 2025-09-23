@@ -82,7 +82,9 @@ export const orderItems = pgTable('order_items', {
 });
 
 // Tipos TypeScript
-export type User = typeof users.$inferSelect;
+export type User = typeof users.$inferSelect & {
+  id: string; // Forzamos el tipo string para compatibilidad con NextAuth
+};
 export type NewUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;

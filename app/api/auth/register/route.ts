@@ -2,30 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
 import { hash } from 'bcryptjs';
-import { z } from 'zod';
-
-// Esquema de validación mejorado
-const registerSchema = z.object({
-  name: z.string()
-    .min(2, 'El nombre debe tener al menos 2 caracteres')
-    .max(100, 'El nombre no puede exceder los 100 caracteres')
-    .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El nombre solo puede contener letras y espacios'),
-  
-  email: z.string()
-    .email('Por favor ingresa un correo electrónico válido')
-    .min(5, 'El correo electrónico es demasiado corto')
-    .max(100, 'El correo electrónico es demasiado largo')
-    .toLowerCase()
-    .trim(),
-    
-  password: z.string()
-    .min(8, 'La contraseña debe tener al menos 8 caracteres')
-    .max(100, 'La contraseña no puede exceder los 100 caracteres')
-    .regex(/[A-Z]/, 'Debe contener al menos una letra mayúscula')
-    .regex(/[a-z]/, 'Debe contener al menos una letra minúscula')
-    .regex(/[0-9]/, 'Debe contener al menos un número')
-    .regex(/[^A-Za-z0-9]/, 'Debe contener al menos un carácter especial'),
-});
+import { registerSchema } from '@/lib/validations/auth';
 
 export async function POST(request: Request) {
   try {
@@ -58,21 +35,20 @@ export async function POST(request: Request) {
     // Validar datos con Zod
     const validation = registerSchema.safeParse(body);
     
-    // Por esta otra:
     if (!validation.success) {
-        const errors = validation.error.issues.map(issue => ({
+      const errors = validation.error.issues.map(issue => ({
         field: issue.path.join('.'),
         message: issue.message
-        }));
-        
-        return NextResponse.json(
+      }));
+      
+      return NextResponse.json(
         { 
-            success: false,
-            error: 'Error de validación',
-            details: errors 
+          success: false,
+          error: 'Error de validación',
+          details: errors 
         },
         { status: 400 }
-        );
+      );
     }
 
     const { name, email, password } = validation.data;
@@ -88,9 +64,9 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { 
             success: false,
-            error: 'Ya existe una cuenta con este correo electrónico. ¿Olvidaste tu contraseña?' 
+            error: 'Ya existe una cuenta con este correo electrónico' 
           },
-          { status: 409 } // 409 Conflict es más apropiado para recursos duplicados
+          { status: 409 }
         );
       }
     } catch (dbError) {
@@ -98,7 +74,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           success: false,
-          error: 'Error al procesar la solicitud. Por favor, inténtalo de nuevo más tarde.' 
+          error: 'Error al procesar la solicitud' 
         },
         { status: 500 }
       );
@@ -113,7 +89,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           success: false,
-          error: 'Error al procesar la contraseña. Por favor, inténtalo de nuevo.' 
+          error: 'Error al procesar la contraseña' 
         },
         { status: 500 }
       );
@@ -132,98 +108,35 @@ export async function POST(request: Request) {
           createdAt: new Date(),
           updatedAt: new Date(),
         })
-        .returning({
-          id: users.id,
-          name: users.name,
-          email: users.email,
-          role: users.role,
-          emailVerified: users.emailVerified,
-          createdAt: users.createdAt,
-          updatedAt: users.updatedAt
-        });
-
-      // Enviar correo de verificación (ejemplo, implementar según necesidad)
-      // await sendVerificationEmail(newUser.email, newUser.name);
+        .returning({ id: users.id, email: users.email, name: users.name });
 
       return NextResponse.json(
         { 
           success: true,
           data: {
-            user: newUser,
-            message: '¡Registro exitoso! Por favor verifica tu correo electrónico.'
+            id: newUser.id,
+            email: newUser.email,
+            name: newUser.name
           }
         },
         { status: 201 }
       );
-    } catch (dbError) {
-      console.error('Error al crear el usuario:', dbError);
+    } catch (error) {
+      console.error('Error al crear el usuario:', error);
       return NextResponse.json(
         { 
           success: false,
-          error: 'Error al crear la cuenta. Por favor, inténtalo de nuevo.' 
+          error: 'Error al crear el usuario' 
         },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error inesperado en el registro:', error);
+    console.error('Error inesperado:', error);
     return NextResponse.json(
       { 
         success: false,
-        error: 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo más tarde.' 
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// Opcional: Endpoint para verificar si un correo ya está registrado
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email');
-
-    if (!email) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Se requiere un correo electrónico' 
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validar formato de email
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Por favor ingresa un correo electrónico válido' 
-        },
-        { status: 400 }
-      );
-    }
-
-    const existingUser = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.email, email),
-      columns: { id: true }
-    });
-
-    return NextResponse.json({ 
-      success: true,
-      data: { 
-        exists: !!existingUser,
-        message: existingUser 
-          ? 'Este correo electrónico ya está registrado' 
-          : 'Correo electrónico disponible'
-      }
-    });
-  } catch (error) {
-    console.error('Error al verificar el correo:', error);
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Error al verificar el correo electrónico. Por favor, inténtalo de nuevo.' 
+        error: 'Error interno del servidor' 
       },
       { status: 500 }
     );

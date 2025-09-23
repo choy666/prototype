@@ -283,3 +283,13 @@ Drizzle ORM 0.44.5 / drizzle-kit 0.18.1, @neondatabase/serverless 1.0.1
 - No modificar archivos fuera del alcance de la tarea.  
 - Mantener compatibilidad con la estructura y estándares definidos.  
 - Todas las soluciones deben ser compatibles con las versiones listadas arriba.  
+
+
+cambiar estetica del form d elogin como el de register
+_
+agregar boton de cierre de sesion
+_
+corrija los themes
+_
+
+una vez terminado y gaurado en git, analizar con copilot, windsurf y jules en busca de mejoras

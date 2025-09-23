@@ -1,17 +1,16 @@
-'use client';
+"use client";
+
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
-import { useState } from 'react';
-import { useToast } from '@/components/ui/use-toast';
 import { registerSchema, type RegisterFormValues } from '@/lib/validations/auth';
-import { registerUser } from '@/lib/actions/auth';
+import { useState } from 'react';
+import { toast } from '@/components/ui/use-toast';
+import Link from 'next/link';
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
 
   const {
     register,
@@ -31,27 +30,56 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormValues) => {
     try {
       setIsSubmitting(true);
-      const result = await registerUser(data);
+      
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
 
-      if (!result.success) {
-        throw new Error(result.error || 'Error al registrar el usuario');
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        // Manejar errores de validación
+        if (response.status === 400 && responseData.details) {
+          // Mostrar el primer error de validación
+          const firstError = responseData.details[0];
+          return setError(firstError.field as keyof RegisterFormValues, {
+            type: 'manual',
+            message: firstError.message,
+          });
+        }
+        
+        throw new Error(
+          responseData.error || 'Error al registrar el usuario. Por favor, inténtalo de nuevo.'
+        );
       }
 
       // Mostrar mensaje de éxito
       toast({
         title: '¡Cuenta creada!',
-        description: 'Tu cuenta ha sido creada exitosamente.',
+        description: 'Tu cuenta ha sido creada exitosamente. Por favor inicia sesión.',
       });
 
-      // Redirigir a la página de login
-      router.push('/login?registered=true');
+      // Redirigir al login después de 1.5 segundos
+      setTimeout(() => {
+        router.push('/login');
+      }, 1500);
+
     } catch (error) {
+      // Mostrar error genérico
       setError('root', {
         type: 'manual',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Error al crear la cuenta. Por favor, inténtalo de nuevo.',
+        message: error instanceof Error ? error.message : 'Error al crear la cuenta',
+      });
+      
+      // Mostrar notificación de error
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear la cuenta. Por favor, verifica los datos e inténtalo de nuevo.',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -86,7 +114,7 @@ export default function RegisterPage() {
                   type="text"
                   placeholder="Tu nombre"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
                     errors.name ? 'border-red-500' : ''
                   }`}
                   {...register('name')}
@@ -110,7 +138,7 @@ export default function RegisterPage() {
                   type="email"
                   placeholder="tu@email.com"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
                     errors.email ? 'border-red-500' : ''
                   }`}
                   {...register('email')}
@@ -134,7 +162,7 @@ export default function RegisterPage() {
                   type="password"
                   placeholder="••••••••"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
                     errors.password ? 'border-red-500' : ''
                   }`}
                   {...register('password')}
@@ -145,8 +173,7 @@ export default function RegisterPage() {
                   </p>
                 )}
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  La contraseña debe tener al menos 6 caracteres, incluyendo una
-                  mayúscula, una minúscula y un número.
+                  Mínimo 8 caracteres, con mayúsculas, minúsculas, números y un carácter especial
                 </p>
               </div>
 
@@ -162,7 +189,7 @@ export default function RegisterPage() {
                   type="password"
                   placeholder="••••••••"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-indigo-700 dark:text-gray-300 ${
+                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
                     errors.confirmPassword ? 'border-red-500' : ''
                   }`}
                   {...register('confirmPassword')}
