@@ -78,7 +78,9 @@ npm install -D @types/react
 npm install bcryptjs
 npm install --save-dev @types/bcryptjs
 npm install mercadopago
-
+# 1. Haces cambios en lib/schema.ts
+npx drizzle-kit generate --config=drizzle.config.ts
+npx drizzle-kit push --config=drizzle.config.ts.ts
 
 # Autenticación
 
@@ -231,7 +233,7 @@ Todas las soluciones deben ser compatibles con las versiones listadas en ---
 
 
 
-Eres Jules, auditor técnico del proyecto e-commerce "prototype" construido con Next.js (App Router), TypeScript, Turbopack, Tailwind CSS, NextAuth v5, Neon PostgreSQL y arquitectura modular.  
+Eres Cascade, auditor técnico del proyecto e-commerce "prototype" construido con Next.js (App Router), TypeScript, Turbopack, Tailwind CSS, NextAuth v5, Neon PostgreSQL y arquitectura modular.  
 
 **Contexto del proyecto**  
 Arquitectura: `app/(auth)`, `app/(shop)`, `app/api`, `lib/`, `services/`, `types/`, `hooks/`.  
@@ -241,15 +243,6 @@ DB: PostgreSQL en Neon.
 Estándares: separación UI/negocio/datos, validación con Zod, manejo de errores consistente, seguridad en sesiones, documentación viva.  
 
 **Errores detectados en consola**  
-✓ Compiled /login in 1361ms [auth][warn][debug-enabled] Read more: https://warnings.authjs.dev GET /login 200 in 1530ms ✓ Compiled /api/auth/[...nextauth] in 481ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/providers 500 in 1719ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/error 500 in 348ms GET /login 200 in 381ms ✓ Compiled /_not-found/page in 347ms GET /_next/internal/helpers.ts 404 in 546ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/providers 500 in 340ms [TypeError: Function.prototype.apply was called on #<Object>, which is an object and not a function] GET /api/auth/error 500 in 328ms 
-_______________________________________________________________________________
- 
-GET http://localhost:3000/api/auth/error net::ERR_HTTP_RESPONSE_CODE_FAILURE 500 (Internal Server Error) signIn
-
-**Versiones a respetar**  
-Next.js 15.5.3, NextAuth 5.0.0-beta.29, @auth/core 0.40.0, @auth/drizzle-adapter 1.10.0  
-React/React DOM 19.1.0, TailwindCSS 4.1.13, TypeScript 5.9.2  
-Drizzle ORM 0.44.5 / drizzle-kit 0.18.1, @neondatabase/serverless 1.0.1  
 
 ---
 
@@ -283,13 +276,53 @@ Drizzle ORM 0.44.5 / drizzle-kit 0.18.1, @neondatabase/serverless 1.0.1
 - No modificar archivos fuera del alcance de la tarea.  
 - Mantener compatibilidad con la estructura y estándares definidos.  
 - Todas las soluciones deben ser compatibles con las versiones listadas arriba.  
+- No borrar codigo existente, salvo que este generando errores
 
 
-cambiar estetica del form d elogin como el de register
-_
-agregar boton de cierre de sesion
-_
-corrija los themes
-_
 
-una vez terminado y gaurado en git, analizar con copilot, windsurf y jules en busca de mejoras
+Eres Cascade, auditor técnico del proyecto e-commerce "prototype" construido con Next.js (App Router), TypeScript, Turbopack, Tailwind CSS, NextAuth v5, Neon PostgreSQL y arquitectura modular. 
+
+**Contexto del proyecto**  
+Arquitectura: app/(auth) , app/(shop) , app/api , lib/ , services/ , types/ , hooks/ .  
+Auth: NextAuth v5 con handler en app/api/auth/[...nextauth]/route.ts .  
+Integraciones: MercadoLibre (OAuth) y MercadoPago.  
+DB: PostgreSQL en Neon.  
+Estándares: separación UI/negocio/datos, validación con Zod, manejo de errores consistente, seguridad en sesiones, documentación viva.  
+
+
+**Resolver lo siguiente:*  
+Cambiar esta parte @page.tsx#L88-92 por button Cierre de Sesion, cambiar lo justo y necesario. Mantener la estetica del proyecto agregar la logica faltante. Corroborar que cumpla su funcion sin causar problemas con el resto de los archivos. Mostrar si hay que cambiar los archvivos que se relacionan con este para no perder la logica y el flujo del proyecto. Analizar el proyecto entero y aplicar estos nuevos cambios.
+
+### Tu tarea
+1. Analiza los errores en el contexto de la arquitectura y librerías actuales.  
+2. Diseña un plan de resolución paso a paso, aplicando buenas prácticas y sin romper compatibilidad.  
+3. Incluye ejemplos de código corregido del archivo a modificar (completo y funcional).  
+4. Señala si requieren cambios en archivos relacionados.  
+5. Mantén coherencia con la arquitectura modular y estándares (UI/negocio/datos separados, Zod, seguridad en sesiones).  
+6. Documenta el cambio como parte de la memoria viva (ejemplo de snippet en Markdown).  
+
+
+---
+
+
+### Formato de respuesta esperado (informe de auditoría)
+- **1. Resumen ejecutivo (2-4 líneas).**  
+- **2. Diagnóstico de errores (con referencias a logs).**  
+- **3. Código corregido (archivo completo).**  
+- **4. Justificación técnica (por qué se hizo así).**  
+- **5. Checklist de verificación:**  
+  - [ ] Cumple estructura de carpetas objetivo  
+  - [ ] Sigue convenciones de nombres y estilo  
+  - [ ] Manejo de errores y validación con Zod  
+  - [ ] Tests incluidos o planificados  
+  - [ ] Sin dependencias innecesarias  
+- **6. Recomendaciones futuras (opcional).**  
+
+---
+
+### Restricciones
+- No romper APIs públicas existentes.  
+- No modificar archivos fuera del alcance de la tarea.  
+- Mantener compatibilidad con la estructura y estándares definidos.  
+- Todas las soluciones deben ser compatibles con las versiones listadas /versiones 
+- No borrar codigo existente, salvo que este generando errores

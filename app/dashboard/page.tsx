@@ -1,34 +1,69 @@
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
+'use client';
 
-export default async function DashboardPage() {
-  const session = await auth();
-  
+import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { LogOut } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Si no hay sesión o está cargando, mostrar un estado de carga
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   // Si no hay sesión, redirigir al login
   if (!session?.user) {
-    redirect('/login?callbackUrl=/dashboard');
+    router.push('/login?callbackUrl=/dashboard');
+    return null;
   }
 
   // Si el usuario no tiene el rol adecuado, redirigir
   if (session.user.role !== 'admin' && session.user.role !== 'user') {
-    redirect('/unauthorized');
+    router.push('/unauthorized');
+    return null;
   }
 
+  const handleSignOut = async () => {
+    try {
+      await signOut({ 
+        redirect: false,
+        callbackUrl: '/login'
+      });
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
 
-  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-          Panel de Control
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Panel de Control
+          </h1>
+          <button 
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-800/30 rounded-lg border border-red-200 dark:border-red-800 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
         
         <div className="mb-6">
           <p className="text-gray-600 dark:text-gray-300">
             ¡Bienvenido de vuelta, <span className="font-semibold">{session.user.name || 'Usuario'}</span>!
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {session.user.role}
+            {session.user.role === 'admin' ? 'Administrador' : 'Usuario'}
           </p>
         </div>
         
@@ -85,9 +120,12 @@ export default async function DashboardPage() {
                 Mis Pedidos
               </span>
             </button>
-            <button className="bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-center">
-              <span className="block text-sm font-medium text-gray-900 dark:text-white">
-                Soporte
+            <button 
+              className="bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-center"
+              onClick={handleSignOut}
+            >
+              <span className="block text-sm font-medium text-red-600 dark:text-red-400">
+                Cerrar Sesión
               </span>
             </button>
           </div>

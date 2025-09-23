@@ -1,4 +1,3 @@
-// drizzle.config.ts
 import type { Config } from 'drizzle-kit';
 import * as dotenv from 'dotenv';
 import { parse } from 'pg-connection-string';
@@ -15,11 +14,11 @@ export default {
   out: './drizzle',
   dbCredentials: {
     host: host || 'localhost',
-    port: port ? parseInt(port as string) : 5432,
-    user: user || 'postgres',
+    port: port ? parseInt(port) : 5432,
+    user: user || '',
     password: password || '',
     database: database || '',
-    ssl: 'require'
+    ssl: 'require'  // Important for Neon and other cloud providers
   },
-  dialect: 'postgresql'
+  dialect: 'postgresql',
 } satisfies Config;
