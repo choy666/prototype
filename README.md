@@ -326,3 +326,139 @@ Cambiar esta parte @page.tsx#L88-92 por button Cierre de Sesion, cambiar lo just
 - Mantener compatibilidad con la estructura y estándares definidos.  
 - Todas las soluciones deben ser compatibles con las versiones listadas /versiones 
 - No borrar codigo existente, salvo que este generando errores
+
+
+
+
+
+
+# Prompt de Auditoría Técnica - Proyecto Prototype E-commerce
+
+## 🚀 Contexto del Proyecto
+**Nombre:** Prototype E-commerce  
+**Stack Principal:** Next.js 15 (App Router), TypeScript 5.9, Turbopack, Tailwind CSS 4.1, NextAuth v5, Neon PostgreSQL  
+**Arquitectura:** Modular con separación clara de responsabilidades  
+**Repositorio:** [choy666/prototype](https://github.com/choy666/prototype)  
+
+## 📦 Dependencias Clave
+```json
+{
+  "next": "15.5.3",
+  "react": "19.1.0",
+  "typescript": "5.9.2",
+  "next-auth": "^5.0.0-beta.29",
+  "@auth/drizzle-adapter": "^1.10.0",
+  "@neondatabase/serverless": "1.0.1",
+  "drizzle-orm": "0.31.4",
+  "drizzle-kit": "^0.31.4",
+  "tailwindcss": "4.1.13",
+  "zod": "3.22.4"
+}
+```
+
+## 🏗️ Estructura de Directorios
+```
+app/
+├── (auth)/             # Rutas de autenticación
+│   ├── login/
+│   ├── register/
+├── (dashboard)/           
+│   └── page.tsx/      # Dashboard de usuario
+├── api/                # Endpoints de API
+│   └── auth/[...nextauth]/
+│   │    └── route.ts    # Configuración NextAuth
+│   ├── layout.tsx/         # Layout de la aplicación
+│   └── page.tsx/           # Página principal
+Components/             # Componentes reutilizables
+│   ├── auth-provider.tsx  # Proveedor de autenticación
+│   └── theme-provider.tsx # Proveedor de tema
+│
+lib/                    # Utilidades generales
+├── db/                 # Configuración de base de datos
+├── auth/               # Utilidades de autenticación
+├── validations/        # Esquemas de validación Zod
+└── utils/              # Utilidades generales
+```
+
+## 🎯 Objetivos de la Auditoría
+
+### 1. Seguridad
+- [ ] Validar implementación de NextAuth v5 con proveedores Credentials
+- [ ] Revisar manejo seguro de sesiones JWT (configuración de cookies, expiración)
+- [ ] Verificar protección de rutas y middlewares de autenticación
+- [ ] Auditoría de manejo de secretos y variables de entorno
+
+### 2. Calidad de Código
+- [ ] Revisar tipos TypeScript y cobertura de tipos
+- [ ] Validar estructura modular y separación de responsabilidades
+- [ ] Verificar manejo consistente de errores y validaciones
+- [ ] Revisar implementación de Drizzle ORM con Neon PostgreSQL
+
+### 3. Rendimiento
+- [ ] Optimización de consultas a la base de datos
+- [ ] Uso eficiente de Server Components y Streaming
+- [ ] Análisis de bundle size y dependencias
+- [ ] Implementación de lazy loading donde sea aplicable
+
+## 🔍 Áreas de Enfoque
+
+### Autenticación y Autorización
+- [ ] Flujo completo de registro/inicio de sesión
+- [ ] Manejo de sesiones y renovación de tokens
+- [ ] Control de acceso basado en roles
+
+### Base de Datos
+- [ ] Esquema de base de datos y migraciones
+- [ ] Rendimiento de consultas
+- [ ] Manejo de transacciones
+- [ ] Estrategias de respaldo y recuperación
+
+### UI/UX
+- [ ] Consistencia en la interfaz de usuario
+- [ ] Manejo de estados de carga y errores
+- [ ] Accesibilidad (a11y)
+- [ ] Experiencia móvil
+
+## 📋 Entregables Esperados
+
+1. **Informe de Auditoría** con:
+   - Hallazgos detallados
+   - Nivel de criticidad (Alto/Medio/Bajo)
+   - Recomendaciones específicas
+   - Fragmentos de código problemáticos
+
+2. **Plan de Acción** priorizado:
+   - Correcciones críticas de seguridad
+   - Mejoras de rendimiento
+   - Refactorizaciones recomendadas
+
+3. **Documentación** actualizada:
+   - Guía de implementación de características
+   - Estándares de código
+   - Procedimientos de despliegue seguros
+
+## ⚠️ Consideraciones Especiales
+- Compatibilidad con SSR/SSG
+- Manejo de estado global (si aplica)
+- Estrategias de caché
+- Monitoreo y logging
+
+## 🔄 Proceso de Revisión
+1. Análisis estático de código
+2. Pruebas manuales de flujos críticos
+3. Revisión de configuraciones de seguridad
+4. Análisis de rendimiento
+5. Revisión de documentación
+
+## 📝 Notas Adicionales
+- Priorizar correcciones de seguridad sobre mejoras de características
+- Documentar cualquier dependencia obsoleta que requiera actualización
+- Incluir métricas de rendimiento antes/después de las optimizaciones
+- Proporcionar ejemplos de código para las correcciones propuestas
+
+## 🛠️ Herramientas Recomendadas
+- ESLint + plugins de seguridad
+- TypeScript strict mode
+- Pruebas con Jest/React Testing Library
+- Análisis de paquetes con Bundle Analyzer
+- Auditoría de seguridad con `npm audit` y dependabot

@@ -109,7 +109,7 @@ export const authConfig = {
     
       if (user) {
         // Convertir el ID a número si es necesario
-        token.id = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
+        token.id = (user as any).id;
         token.role = (user as any).role;
       }
       return token;
@@ -117,7 +117,7 @@ export const authConfig = {
     async session({ session, token }): Promise<Session> {
       if (session.user) {
         // Asegurar que el ID sea string para la sesión
-        session.user.id = token.id.toString();
+        session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
       }
       return session;

@@ -1,36 +1,7 @@
-import type { NextConfig } from 'next'
+import type { NextConfig } from 'next';
 
-const nextConfig: NextConfig = {
-  // Configuración para imágenes
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**', // Permite todas las imágenes HTTPS
-      },
-    ],
-  },
-  
-
-  // Configuración de cabeceras de seguridad
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: securityHeaders,
-      },
-    ];
-  },
-  //recursos
-  reactStrictMode: true,
-  
-  // Configuración para entornos de desarrollo
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
-  },
-}
+// Determinar si estamos usando Turbopack
+const isTurbopack = process.env.TURBOPACK === '1';
 
 // Cabeceras de seguridad recomendadas
 const securityHeaders = [
@@ -47,5 +18,89 @@ const securityHeaders = [
     value: '1; mode=block'
   }
 ];
+
+// Configuración base
+const baseConfig: NextConfig = {
+  // Configuración para imágenes
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**', // Permite todas las imágenes HTTPS
+      },
+    ],
+  },
+  
+  // Configuración de cabeceras de seguridad
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+    ];
+  },
+  
+  // Configuración experimental
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '8mb',
+      allowedOrigins: ['localhost:3000', 'https://prototype-ten-dun.vercel.app']
+    },
+  },
+
+  // Configuración de compilación
+  compiler: {
+    styledComponents: true,
+  },
+  
+  // Configuración de tipos
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  
+  // Configuración para entornos de desarrollo
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  }
+};
+
+// Configuración específica para Webpack (solo cuando no se usa Turbopack)
+const webpackConfig: Partial<NextConfig> = !isTurbopack ? {
+  webpack: (config, { isServer, webpack }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        crypto: false,
+        stream: false,
+        http: false,
+        https: false,
+        zlib: false,
+        path: false,
+        os: false,
+        net: false,
+        tls: false,
+      };
+    }
+
+    config.plugins.push(
+      new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+      })
+    );
+
+    return config;
+  },
+  transpilePackages: ['bcryptjs'],
+} : {};
+
+// Combinar configuraciones
+const nextConfig: NextConfig = {
+  ...baseConfig,
+  ...webpackConfig,
+};
 
 export default nextConfig;

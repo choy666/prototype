@@ -5,19 +5,19 @@ import { UserRole } from "./index";
 declare module "next-auth" {
   interface Session {
     user: {
-      id: number;
-      role?: UserRole;
+      id: string;
+      role: UserRole;
     } & DefaultSession["user"];
   }
 
   interface User extends DefaultUser {
-    role?: UserRole;
+    role: UserRole;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id: number;
+    id: string;
     role?: UserRole;
   }
 }

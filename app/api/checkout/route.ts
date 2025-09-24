@@ -1,22 +1,22 @@
 // app/api/checkout/route.ts
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/actions/auth';
 import { mercadoPago } from '@/lib/mercadopago';
 import type { DefaultSession } from 'next-auth';
 import { UserRole } from '@/lib/schema';
+import { auth } from '@/auth'; // Asegurate que '@/auth' exporte `auth` desde tu configuración
 
 // Extendemos el tipo de sesión para incluir campos personalizados
 declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      role?: UserRole;
+      role: UserRole;
     } & DefaultSession['user'];
   }
 }
 
 export async function POST(request: Request) {
-  // Usamos auth.auth() para obtener la sesión
+  
   const session = await auth();
   
   if (!session?.user?.email) {

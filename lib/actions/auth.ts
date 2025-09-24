@@ -18,9 +18,7 @@ export interface AuthResponse<T = unknown> {
 export async function registerUser(
   formData: z.infer<typeof registerSchema>
 ) {
-  try {
-    // Validar datos de entrada
-    
+  try {    
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword: _, ...userData } = registerSchema.parse(formData);
 
@@ -89,3 +87,5 @@ export async function requireAuth() {
   }
   return session.user;
 }
+
+export { auth };

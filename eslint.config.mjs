@@ -1,13 +1,28 @@
+// eslint.config.mjs
 import js from '@eslint/js';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import globals from 'globals';
+import nextPlugin from '@next/eslint-plugin-next';
 import prettierConfig from 'eslint-config-prettier';
 
 export default [
+  // Ignorar archivos
   {
-    ignores: ['.next/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js'],
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      '**/*.d.ts',
+      '**/*.config.js',
+      '**/.vercel/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/public/**',
+    ],
   },
+
+  // Configuración base de JavaScript/TypeScript
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
@@ -15,16 +30,9 @@ export default [
         ...globals.browser,
         ...globals.node,
         ...globals.es2021,
-        process: 'readonly',
-        URL: 'readonly',
-        Request: 'readonly',
-        Response: 'readonly',
-        HTMLButtonElement: 'readonly',
-        console: 'readonly',
-        window: 'readonly',
         React: 'readonly',
-        NextRequest: 'readonly',
-        NextResponse: 'readonly',
+        JSX: 'readonly',
+        NodeJS: 'readonly',
       },
       parser: tsParser,
       parserOptions: {
@@ -33,17 +41,61 @@ export default [
         ecmaFeatures: {
           jsx: true,
         },
+        project: './tsconfig.json',
+      },
+    },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+      next: {
+        rootDir: ['./'],
       },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
+      '@next/next': nextPlugin,
     },
     rules: {
+      // Reglas base
       ...js.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      
+      // Reglas de TypeScript
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/ban-ts-comment': 'warn',
+      
+      // Reglas de React/Next.js
       'react/react-in-jsx-scope': 'off',
-      'no-unused-vars': 'off',
+      'react/prop-types': 'off',
+      '@next/next/no-html-link-for-pages': 'error',
+      '@next/next/no-img-element': 'warn',
+      '@next/next/no-sync-scripts': 'error',
+      
+      // Reglas de JavaScript
+      'no-unused-vars': 'off', // Desactivada en favor de @typescript-eslint/no-unused-vars
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
-  prettierConfig,
+
+  // Reglas específicas para archivos de configuración
+  {
+    files: ['**/*.config.{js,ts}'],
+    rules: {
+      '@typescript-eslint/no-var-requires': 'off',
+    },
+  },
+
+  // Aplicar configuración de Prettier al final
+  {
+    ...prettierConfig,
+    rules: {
+      ...prettierConfig.rules,
+      // Sobrescribir reglas específicas de Prettier si es necesario
+    },
+  },
 ];
