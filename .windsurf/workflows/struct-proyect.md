@@ -12,9 +12,6 @@ prototype/
 │   │   │   └── page.tsx
 │   │   └── layout.tsx
 │   ├── api/
-│   │   ├── auth/
-│   │   │   └── [...nextauth]/
-│   │   │       └── route.ts
 │   │   ├── register/
 │   │   │   └── route.ts
 │   │   ├── checkout/

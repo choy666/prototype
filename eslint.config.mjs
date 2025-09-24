@@ -44,58 +44,18 @@ export default [
         project: './tsconfig.json',
       },
     },
-    settings: {
-      react: {
-        version: 'detect',
-      },
-      next: {
-        rootDir: ['./'],
-      },
-    },
     plugins: {
       '@typescript-eslint': tsPlugin,
       '@next/next': nextPlugin,
     },
     rules: {
-      // Reglas base
       ...js.configs.recommended.rules,
-      
-      // Reglas de TypeScript
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/ban-ts-comment': 'warn',
-      
-      // Reglas de React/Next.js
-      'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off',
-      '@next/next/no-html-link-for-pages': 'error',
-      '@next/next/no-img-element': 'warn',
-      '@next/next/no-sync-scripts': 'error',
-      
-      // Reglas de JavaScript
-      'no-unused-vars': 'off', // Desactivada en favor de @typescript-eslint/no-unused-vars
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      ...tsPlugin.configs.recommended.rules,
+      ...nextPlugin.configs.recommended.rules,
+      // Agrega tus reglas personalizadas aquí
     },
   },
 
-  // Reglas específicas para archivos de configuración
-  {
-    files: ['**/*.config.{js,ts}'],
-    rules: {
-      '@typescript-eslint/no-var-requires': 'off',
-    },
-  },
-
-  // Aplicar configuración de Prettier al final
-  {
-    ...prettierConfig,
-    rules: {
-      ...prettierConfig.rules,
-      // Sobrescribir reglas específicas de Prettier si es necesario
-    },
-  },
+  // Aplicar configuración de Prettier al final para sobrescribir reglas de formato
+  prettierConfig,
 ];
