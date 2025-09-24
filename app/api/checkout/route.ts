@@ -1,4 +1,4 @@
-// app/api/checkout/route.ts
+/*
 import { NextResponse } from 'next/server';
 import { mercadoPago } from '@/lib/mercadopago';
 import type { DefaultSession } from 'next-auth';
@@ -66,3 +66,4 @@ export async function POST(request: Request) {
     );
   }
 }
+*/
