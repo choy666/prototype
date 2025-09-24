@@ -1,3 +1,7 @@
+
+// Forzar el uso de Node.js Runtime para esta ruta
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { getToken } from '@/lib/mercadolibre';
 import { cookies } from 'next/headers';

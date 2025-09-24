@@ -28,7 +28,6 @@ function executeCommand(command) {
       if (stderr) {
         console.error(`stderr: ${stderr}`);
       }
-      console.log(`stdout: ${stdout}`);
       resolve(stdout);
     });
   });
@@ -47,8 +46,7 @@ async function createBackup() {
 
     // Conectar a la base de datos
     await client.connect();
-    console.log('🔄 Conectado a la base de datos...');
-
+    
     // Obtener lista de tablas
     const res = await client.query(`
       SELECT table_name 
@@ -56,19 +54,14 @@ async function createBackup() {
       WHERE table_schema = 'public'
     `);
     
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const tables = res.rows.map(row => row.table_name);
-    console.log('📋 Tablas encontradas:', tables.join(', '));
-
-    // Crear respaldo
-    console.log('💾 Creando respaldo...');
     
     // Usar pg_dump si está disponible
     try {
       const pgDumpCommand = `pg_dump ${process.env.DATABASE_URL} > "${backupFile}"`;
       await executeCommand(pgDumpCommand);
-      console.log(`✅ Respaldo creado en: ${backupFile}`);
     } catch (e) {
-      console.log('ℹ️ pg_dump no disponible, usando método alternativo...');
       
       // Método alternativo: exportar cada tabla
       let backupSQL = '';
@@ -132,12 +125,12 @@ async function createBackup() {
       
       // Guardar en archivo
       fs.writeFileSync(backupFile, backupSQL);
-      console.log(`✅ Respaldo creado en: ${backupFile} (método alternativo)`);
     }
     
     await client.end();
     process.exit(0);
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('❌ Error al crear el respaldo:', error);
     process.exit(1);
   }

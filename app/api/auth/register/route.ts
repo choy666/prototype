@@ -1,3 +1,6 @@
+// Forzar el uso de Node.js Runtime para esta ruta
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';

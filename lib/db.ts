@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
@@ -17,7 +18,6 @@ export async function checkDbConnection() {
 
   try {
     const result = await sql`SELECT version()`;
-    console.log('Database version:', result);
     return {
       success: true,
       message: 'Database connected',

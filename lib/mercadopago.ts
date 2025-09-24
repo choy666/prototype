@@ -1,3 +1,6 @@
+// Forzar el uso de Node.js Runtime para esta ruta
+export const runtime = 'nodejs';
+
 // En lib/mercadopago.ts
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 

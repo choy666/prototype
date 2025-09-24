@@ -21,13 +21,12 @@ if (files.length === 0) {
 }
 
 const latestBackup = path.join(backupDir, files[0]);
-console.log(`🔍 Archivo de respaldo seleccionado: ${files[0]}`);
 
 // Función para ejecutar consultas
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function executeQuery(client, query) {
   try {
     await client.query(query);
-    console.log('✅ Consulta ejecutada correctamente');
   } catch (error) {
     console.error('❌ Error al ejecutar consulta:', error.message);
   }
@@ -45,17 +44,17 @@ async function restoreBackup() {
   try {
     // Conectar a la base de datos
     await client.connect();
-    console.log('🔄 Conectado a la base de datos...');
 
     // Leer archivo SQL
     const sql = fs.readFileSync(latestBackup, 'utf8');
     
     // Ejecutar el script SQL
-    console.log('🔄 Restaurando base de datos...');
     await client.query(sql);
     
+    // eslint-disable-next-line no-console
     console.log('✅ Base de datos restaurada correctamente');
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('❌ Error al restaurar la base de datos:', error);
   } finally {
     await client.end();
