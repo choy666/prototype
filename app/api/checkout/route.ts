@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { mercadoPago } from '@/lib/mercadopago';
 import type { DefaultSession } from 'next-auth';
 import { UserRole } from '@/lib/schema';
-import { auth } from '@/auth'; // Asegurate que '@/auth' exporte `auth` desde tu configuración
+import { auth } from '@/lib/actions/auth';
 
 // Extendemos el tipo de sesión para incluir campos personalizados
 declare module 'next-auth' {

@@ -15,9 +15,11 @@ prototype/
 │   │   ├── auth/
 │   │   │   └── [...nextauth]/
 │   │   │       └── route.ts
+│   │   ├── register/
+│   │   │   └── route.ts
 │   │   ├── checkout/
 │   │   │   └── route.ts
-│   │   └── products/
+│   │   └── callback/mercadolibre/
 │   │       └── route.ts
 │   ├── dashboard/
 │   │   └── page.tsx
@@ -29,6 +31,8 @@ prototype/
 │   ├── actions/
 │   │   ├── auth.ts
 │   │   └── products.ts
+│   ├── utils/
+│   │   └── coockies.ts
 │   ├── validations/
 │   │   └── auth.ts
 │   ├── db.ts
@@ -47,6 +51,8 @@ prototype/
 │   ├── images/
 │   └── favicon.ico
 │
+├── drizzle.config.ts
+├── eslint.config.ts
 ├── middleware.ts
 ├── next.config.ts
 ├── tailwind.config.ts

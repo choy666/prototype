@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "typeRoots": ["./node_modules/@types", "./types"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ],
     "jsx": "preserve",
     "lib": [
       "dom",
@@ -19,9 +22,9 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@/lib/*": ["./lib/*"],
+      "@/components/*": ["./components/*"]
     },
     "allowJs": true,
     "incremental": true,
@@ -34,6 +37,7 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "**/*.js",
     "next-env.d.ts",
     ".next/types/**/*.ts"
   ],

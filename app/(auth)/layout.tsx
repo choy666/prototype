@@ -1,5 +1,5 @@
 // app/(auth)/layout.tsx
-import { auth } from "@/auth";  // Updated import path
+import { auth } from "@/lib/actions/auth";
 import { redirect } from "next/navigation";
 
 export default async function AuthLayout({

@@ -1,91 +1,149 @@
-// lib/actions/auth.ts
+import NextAuth from 'next-auth';
+import type { NextAuthConfig, User as AuthUser, Session, DefaultSession } from 'next-auth';
+import { DrizzleAdapter } from '@auth/drizzle-adapter';
+import Credentials from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
-import bcrypt from 'bcryptjs';
-import { registerSchema } from '@/lib/validations/auth';
-import { z } from 'zod';
-import { auth } from '../../auth';
+import { UserRole } from '@/types';
 
-// Tipos
-export interface AuthResponse<T = unknown> {
-  success: boolean;
-  error?: string;
-  data?: T;
+// Extender tipos de next-auth
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+      role: UserRole;
+    } & DefaultSession['user'];
+  }
+
+  interface User {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  }
+
+  interface JWT {
+    id: string;
+    role: UserRole;
+    [key: string]: unknown;
+  }
 }
 
-// Función para registro de usuarios
-export async function registerUser(
-  formData: z.infer<typeof registerSchema>
-) {
-  try {    
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { confirmPassword: _, ...userData } = registerSchema.parse(formData);
+interface CredentialsType {
+  email: string;
+  password: string;
+}
 
-    // Verificar si el usuario ya existe
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, userData.email),
-    });
+export const authConfig = {
+  adapter: DrizzleAdapter(db),
+  providers: [
+    Credentials({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Contraseña', type: 'password' }
+      },
+      async authorize(credentials): Promise<AuthUser | null> {
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error('Credenciales incompletas');
+          }
 
-    if (existingUser) {
-      return {
-        success: false,
-        error: 'Ya existe un usuario con este correo electrónico',
-      };
-    }
+          const { email, password } = credentials as CredentialsType;
 
-    // Hashear la contraseña
-    const hashedPassword = await bcrypt.hash(userData.password, 12);
+          const user = await db.query.users.findFirst({
+            where: eq(users.email, email),
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              password: true,
+              role: true,
+              emailVerified: true
+            }
+          });
+          
+          if (!user) {
+            throw new Error('Usuario no encontrado');
+          }
 
-    // Crear el usuario en la base de datos
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        ...userData,
-        password: hashedPassword,
-        role: 'user',
-        emailVerified: new Date(),
-      })
-      .returning();
+          if (!user.password) {
+            throw new Error('Este usuario no tiene contraseña configurada');
+          }
 
-    // No devolver la contraseña
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = newUser;
+          const isValid = await bcrypt.compare(password, user.password);
 
-    return {
-      success: true,
-      data: userWithoutPassword,
-    };
-  } catch (error) {
-    console.error('Error en registerUser:', error);
+          if (!isValid) {
+            throw new Error('Contraseña incorrecta');
+          }
+
+          return {
+            id: user.id.toString(),
+            name: user.name,
+            email: user.email,
+            role: user.role as UserRole,
+          };
+        } catch (error) {
+          console.error('Error durante la autenticación:', error);
+          throw new Error('Error en la autenticación');
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 días
+    updateAge: 24 * 60 * 60, // Actualiza la sesión cada 24 horas
+  },
+  pages: {
+    signIn: '/login',
+    signOut: '/login',
+    error: '/login',
+  },
+  callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === 'update' && session) {
+        return { ...token, ...session.user };
+      }
     
-    if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        error: error.issues[0]?.message || 'Datos de entrada inválidos',
-      };
+      if (user) {
+        // Convertir el ID a número si es necesario
+        token.id = user.id;
+        token.role = (user as AuthUser & { role?: UserRole }).role;
+      }
+      return token;
+    },
+    async session({ session, token }): Promise<Session> {
+      if (session.user) {
+        // Asegurar que el ID sea string para la sesión
+        session.user.id = token.id as string;
+        session.user.role = token.role as UserRole;
+      }
+      return session;
+    },
+    redirect({ url, baseUrl }) {
+      if (!url) return baseUrl;
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      
+      try {
+        const redirectUrl = new URL(url);
+        if (redirectUrl.origin === baseUrl) return url;
+      } catch {
+        return baseUrl;
+      }
+      
+      return baseUrl;
     }
+  },
+  debug: process.env.NODE_ENV === 'development',
+  secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true,
+} satisfies NextAuthConfig;
 
-    return {
-      success: false,
-      error: 'Error al crear la cuenta. Por favor, inténtalo de nuevo.',
-    };
-  }
-}
-
-// Función para obtener el usuario actual
-export async function getCurrentUser() {
-  const session = await auth();
-  return session?.user;
-}
-
-// Función para requerir autenticación
-export async function requireAuth() {
-  const session = await auth();
-  if (!session?.user) {
-    throw new Error('No autenticado');
-  }
-  return session.user;
-}
-
-export { auth };
+export const { 
+  handlers: { GET, POST }, 
+  auth, 
+  signIn, 
+  signOut 
+} = NextAuth(authConfig);

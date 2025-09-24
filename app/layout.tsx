@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/components/auth-provider';
 import Navbar from '../components/ui/Navbar';
 import Footer from '../components/ui/Footer';
-import { auth } from '@/auth'; // Cambiado a importación desde '@/auth'
+import { auth } from '@/lib/actions/auth';
 
 const inter = Inter({ subsets: ['latin'] });
 
