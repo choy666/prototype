@@ -33,7 +33,7 @@ app/
 │ │ └── [id]/route.ts // PUT/DELETE item carrito
 │ ├── checkout/
 │ │ ├── route.ts // Crea preferencia de pago MP
-│ │ └── webhook/route.ts // Webhook confirmación pago MP
+│ │ └── web/route.ts // Web confirmación pago MP
 │ └── orders/
 │ ├── route.ts // GET/POST pedidos
 │ └── [id]/route.ts // GET detalle pedido
@@ -67,7 +67,7 @@ types/
 │ ├── cart.ts
 │ └── user.ts
 │
-hooks/
+s/
 │ ├── useCart.ts // Estado global carrito
 │ ├── useAuth.ts
 │ └── useMercadoLibreAuth.ts // Manejo de login con ML
