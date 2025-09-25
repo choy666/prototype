@@ -8,7 +8,7 @@ import { checkDbConnection } from '../lib/db';
 export default async function Home() {
   const dbStatus = await checkDbConnection();
   const isConnected = dbStatus.success;
-  const statusMessage = isConnected ? 'Database connected' : dbStatus.message;
+  const statusMessage = dbStatus.message;
 
   return (
     <div className='flex min-h-screen flex-col'>

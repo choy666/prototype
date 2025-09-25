@@ -1,20 +1,22 @@
-const { Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
-const { exec } = require('child_process');
-
-// Cargar variables de entorno
-dotenv.config({ path: '.env.local' });
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { Client } from 'pg';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { exec } from 'child_process';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+// Obtener __dirname en módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Configuración
-const backupDir = path.join(__dirname, '../backups');
+const backupDir = join(__dirname, '../backups');
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-const backupFile = path.join(backupDir, `backup-${timestamp}.sql`);
+const backupFile = join(backupDir, `backup-${timestamp}.sql`);
 
 // Crear directorio de respaldos
-if (!fs.existsSync(backupDir)) {
-  fs.mkdirSync(backupDir, { recursive: true });
+if (!existsSync(backupDir)) {
+  mkdirSync(backupDir, { recursive: true });
 }
 
 // Función para ejecutar comandos
@@ -35,7 +37,10 @@ function executeCommand(command) {
 
 // Función principal
 async function createBackup() {
+  console.log('Creando respaldo...');
+  console.log('Backup file:', backupFile);
   try {
+    console.log('Conectando a la base de datos...');
     // Obtener la configuración de conexión
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
@@ -61,8 +66,8 @@ async function createBackup() {
     try {
       const pgDumpCommand = `pg_dump ${process.env.DATABASE_URL} > "${backupFile}"`;
       await executeCommand(pgDumpCommand);
-    } catch (e) {
-      
+    } catch (pgDumpError) {
+      console.error(`Error al crear el respaldo con pg_dump: ${pgDumpError.message}`);
       // Método alternativo: exportar cada tabla
       let backupSQL = '';
       
@@ -124,15 +129,19 @@ async function createBackup() {
       }
       
       // Guardar en archivo
-      fs.writeFileSync(backupFile, backupSQL);
+      console.log('💾 Guardando respaldo...');
+      writeFileSync(backupFile, backupSQL);
+      console.log('✅ Respaldo guardado correctamente');
     }
     
     await client.end();
     process.exit(0);
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('❌ Error al crear el respaldo:', error);
+    console.error('❌ Error al crear el respaldo:');
+    console.error(error);
     process.exit(1);
+  } finally {
+    console.log('🏁 Proceso finalizado');
   }
 }
 

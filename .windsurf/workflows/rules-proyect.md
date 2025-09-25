@@ -3,7 +3,7 @@ description: # Estructura gral y convenciones del proyecto prototype
 auto_execution_mode: 1
 ---
 
-[FORMATO DE RESPUESTA ESPERADO]
+[FORMATO DE RESPUESTA ESPERADO EN ESPAÑOL]
 
 1. **Resumen de la solución** (2-4 líneas).
 2. **Código propuesto** (completo y funcional).

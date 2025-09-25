@@ -1,7 +1,7 @@
 🚀 Guía Paso a Paso para el E-commerce
 🛠️ Fase 1: Configuración Inicial
 🔧 Estructura Base:
-Next.js 14 + TypeScript
+Next.js 15 + TypeScript
 ESLint + Prettier
 Tailwind CSS
 Drizzle ORM + Neon Postgres

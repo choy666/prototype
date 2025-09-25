@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     let body;
     try {
       body = await request.json();
-    } catch (error) {
+    } catch{
       return NextResponse.json(
         { 
           success: false,

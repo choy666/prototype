@@ -121,9 +121,9 @@ const Navbar = () => {
                   href={item.href}
                   className={`block px-3 py-2 rounded-md text-base font-medium ${
                     pathname === item.href
-                      ? 'bg-gray-100 text-[var(--color-page)]'
-                      : 'text-gray-700 hover:text-[var(--color-page)]'
-                  }`}
+                    ? 'text-[var(--color-page)] font-semibold'
+                    : 'text-gray-600 hover:text-[var(--color-page)] dark:text-gray-300 dark:hover:text-white'
+                } transition-colors`}
                   onClick={() => setIsOpen(false)}
                 >
                   {item.name}

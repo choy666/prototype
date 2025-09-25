@@ -1,4 +1,3 @@
-
 // Forzar el uso de Node.js Runtime para esta ruta
 export const runtime = 'nodejs';
 
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
       path: '/',
     });
     return NextResponse.redirect(new URL('/dashboard', request.url));
-  } catch (error) {
+  } catch{
     return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
   }
 }
