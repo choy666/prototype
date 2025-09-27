@@ -1,32 +1,38 @@
-// Forzar el uso de Node.js Runtime para esta ruta
-export const runtime = 'nodejs';
-
 import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   
-  // Obtener la URL base según el entorno
+  // Obtener la URL base de la solicitud actual
+  const requestUrl = new URL(request.url);
   let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL;
   
-  // Si estamos en desarrollo, forzar localhost
-  if (process.env.NODE_ENV === 'development') {
-    baseUrl = 'http://localhost:3000';
-  } 
-  // Si estamos en producción y no hay URL configurada, usar Vercel URL
-  else if (!baseUrl && process.env.VERCEL_URL) {
-    baseUrl = `https://${process.env.VERCEL_URL}`;
+  // Si no hay URL base configurada, usar la URL de la solicitud
+  if (!baseUrl) {
+    const protocol = requestUrl.protocol;
+    const host = (await headers()).get('host') || requestUrl.host;
+    baseUrl = `${protocol}//${host}`;
   }
 
-  // Asegurarse de que la URL base termine con /
-  if (baseUrl && !baseUrl.endsWith('/')) {
-    baseUrl = `${baseUrl}/`;
+  // Validar que la URL base sea segura
+  if (!baseUrl || baseUrl.includes('localhost')) {
+    console.error('URL base no válida o no configurada:', baseUrl);
+    // Usar la URL de producción como último recurso
+    baseUrl = 'https://prototype-ten-dun.vercel.app';
   }
-  
-  // Crear la URL de redirección
-  const redirectUrl = new URL(callbackUrl, baseUrl || 'http://localhost:3000');
-  
-  // Redirigir a la URL de retorno
-  return NextResponse.redirect(redirectUrl);
+
+  // Asegurar que la URL base no termine con /
+  baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+  try {
+    // Crear la URL de redirección
+    const redirectUrl = new URL(callbackUrl.startsWith('/') ? callbackUrl : `/${callbackUrl}`, baseUrl);
+    return NextResponse.redirect(redirectUrl);
+  } catch (error) {
+    console.error('Error al construir la URL de redirección:', error);
+    // Redirigir a la página de inicio como último recurso
+    return NextResponse.redirect(new URL('/', baseUrl));
+  }
 }
