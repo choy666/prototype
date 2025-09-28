@@ -1,5 +1,5 @@
 import NextAuth from 'next-auth';
-import type { NextAuthConfig, User as AuthUser, Session, DefaultSession } from 'next-auth';
+import type { NextAuthConfig, Session, DefaultSession, User } from 'next-auth';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
@@ -10,7 +10,7 @@ import { UserRole } from '@/types';
 
 // Extender tipos de next-auth
 declare module 'next-auth' {
-  interface Session {
+  interface Session extends DefaultSession {
     user: {
       id: string;
       role: UserRole;
@@ -20,7 +20,8 @@ declare module 'next-auth' {
   interface User {
     id: string;
     name?: string | null;
-    email?: string | null;
+    email: string;
+    role: UserRole;
   }
 
   interface JWT {
@@ -35,6 +36,45 @@ interface CredentialsType {
   password: string;
 }
 
+// Validación de credenciales
+async function validateCredentials(credentials: CredentialsType) {
+  if (!credentials?.email || !credentials?.password) {
+    throw new Error('Credenciales incompletas');
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, credentials.email),
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      password: true,
+      role: true,
+      emailVerified: true
+    }
+  });
+  
+  if (!user) {
+    throw new Error('Usuario no encontrado');
+  }
+
+  if (!user.password) {
+    throw new Error('Este usuario no tiene contraseña configurada');
+  }
+
+  const isValid = await bcrypt.compare(credentials.password, user.password);
+  if (!isValid) {
+    throw new Error('Contraseña incorrecta');
+  }
+
+  return {
+    id: user.id.toString(),
+    name: user.name,
+    email: user.email,
+    role: user.role as UserRole,
+  };
+}
+
 export const authConfig = {
   adapter: DrizzleAdapter(db),
   providers: [
@@ -44,49 +84,15 @@ export const authConfig = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Contraseña', type: 'password' }
       },
-      async authorize(credentials): Promise<AuthUser | null> {
+      async authorize(credentials): Promise<User | null> {
         try {
-          if (!credentials?.email || !credentials?.password) {
-            throw new Error('Credenciales incompletas');
-          }
-
-          const { email, password } = credentials as CredentialsType;
-
-          const user = await db.query.users.findFirst({
-            where: eq(users.email, email),
-            columns: {
-              id: true,
-              name: true,
-              email: true,
-              password: true,
-              role: true,
-              emailVerified: true
-            }
-          });
-          
-          if (!user) {
-            throw new Error('Usuario no encontrado');
-          }
-
-          if (!user.password) {
-            throw new Error('Este usuario no tiene contraseña configurada');
-          }
-
-          const isValid = await bcrypt.compare(password, user.password);
-
-          if (!isValid) {
-            throw new Error('Contraseña incorrecta');
-          }
-
-          return {
-            id: user.id.toString(),
-            name: user.name,
-            email: user.email,
-            role: user.role as UserRole,
-          };
+          return await validateCredentials(credentials as CredentialsType);
         } catch (error) {
-          console.error('Error durante la autenticación:', error);
-          throw new Error('Error en la autenticación');
+          console.error('Error en autorización:', error);
+          // No exponer detalles del error al cliente
+          throw new Error(
+            error instanceof Error ? error.message : 'Error en la autenticación'
+          );
         }
       },
     }),
@@ -108,15 +114,13 @@ export const authConfig = {
       }
     
       if (user) {
-        // Convertir el ID a número si es necesario
         token.id = user.id;
-        token.role = (user as AuthUser & { role?: UserRole }).role;
+        token.role = (user as User).role;
       }
       return token;
     },
     async session({ session, token }): Promise<Session> {
       if (session.user) {
-        // Asegurar que el ID sea string para la sesión
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
       }
@@ -129,11 +133,10 @@ export const authConfig = {
       try {
         const redirectUrl = new URL(url);
         if (redirectUrl.origin === baseUrl) return url;
+        return baseUrl;
       } catch {
         return baseUrl;
       }
-      
-      return baseUrl;
     }
   },
   debug: process.env.NODE_ENV === 'development',
@@ -141,9 +144,11 @@ export const authConfig = {
   trustHost: true,
 } satisfies NextAuthConfig;
 
-export const { 
-  handlers: { GET, POST }, 
-  auth, 
-  signIn, 
-  signOut 
-} = NextAuth(authConfig);
+// Inicializar NextAuth
+const auth = NextAuth(authConfig);
+
+// Exportar handlers para la API route
+export const handlers = auth.handlers;
+
+// Exportar métodos de autenticación
+export const { auth: getServerSession, signIn, signOut } = auth;
