@@ -31,24 +31,6 @@ const baseConfig: NextConfig = {
     ],
   },
   
-  // Configuración de cabeceras de seguridad
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: securityHeaders,
-      },
-    ];
-  },
-  
-  // Configuración experimental
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '8mb',
-      allowedOrigins: ['localhost:3000', 'https://prototype-ten-dun.vercel.app']
-    },
-  },
-
   // Configuración de compilación
   compiler: {
     styledComponents: true,
@@ -64,7 +46,33 @@ const baseConfig: NextConfig = {
     fetches: {
       fullUrl: true,
     },
-  }
+  },
+  
+  // Configuración de caché para rutas de autenticación
+  async headers() {
+    return [
+      // Aplicar cabeceras de seguridad globales
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+      // Deshabilitar caché para rutas de autenticación
+      {
+        source: '/api/auth/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, max-age=0' },
+        ],
+      },
+    ];
+  },
+
+  // Configuración experimental
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '8mb',
+      allowedOrigins: ['localhost:3000', 'https://prototype-ten-dun.vercel.app']
+    },
+  },
 };
 
 // Configuración específica para Webpack (solo cuando no se usa Turbopack)

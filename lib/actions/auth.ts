@@ -126,29 +126,48 @@ export const authConfig = {
       }
       return session;
     },
-    redirect({ url, baseUrl }) {
-      if (!url) return baseUrl;
-      if (url.startsWith('/')) return `${baseUrl}${url}`;
-      
-      try {
-        const redirectUrl = new URL(url);
-        if (redirectUrl.origin === baseUrl) return url;
-        return baseUrl;
-      } catch {
-        return baseUrl;
+
+    async redirect({ url, baseUrl }) {
+      // Permite URLs de callback relativas
+      if (url.startsWith('/')) {
+        // Evita bucles de redirección
+        if (url.startsWith('/login') || url.startsWith('/api/auth')) {
+          return baseUrl;
+        }
+        return `${baseUrl}${url}`;
       }
+      // Permite URLs de callback en el mismo origen
+      else if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      // Redirige a la página de inicio por defecto
+      return baseUrl;
     }
+
   },
   debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
   trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        domain: process.env.NODE_ENV === 'production' ? process.env.NEXTAUTH_COOKIE_DOMAIN : undefined
+      }
+    }
+  }
 } satisfies NextAuthConfig;
 
 // Inicializar NextAuth
-const auth = NextAuth(authConfig);
+export const auth = NextAuth(authConfig);
 
 // Exportar handlers para la API route
 export const handlers = auth.handlers;
 
 // Exportar métodos de autenticación
 export const { auth: getServerSession, signIn, signOut } = auth;
+
