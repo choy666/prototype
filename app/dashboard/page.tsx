@@ -4,12 +4,23 @@ import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useEffect } from 'react';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  // Si no hay sesión o está cargando, mostrar un estado de carga
+  // Efecto para manejar redirecciones
+  useEffect(() => {
+    // Solo ejecutar en el cliente
+    if (typeof window === 'undefined') return;
+
+    if (status === 'unauthenticated') {
+      router.push('/login?callbackUrl=/dashboard');
+    }
+  }, [status, router]);
+
+  // Estado de carga
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -18,16 +29,23 @@ export default function DashboardPage() {
     );
   }
 
-  // Si no hay sesión, redirigir al login
+  // Si no hay sesión, mostrar solo el loader (ya que se redirigirá)
   if (!session?.user) {
-    router.push('/login?callbackUrl=/dashboard');
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   // Si el usuario no tiene el rol adecuado, redirigir
   if (session.user.role !== 'admin' && session.user.role !== 'user') {
     router.push('/unauthorized');
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   const handleSignOut = async () => {
@@ -42,7 +60,7 @@ export default function DashboardPage() {
       console.error('Error al cerrar sesión:', error);
     }
   };
-
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
