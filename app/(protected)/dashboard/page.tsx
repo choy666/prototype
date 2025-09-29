@@ -10,27 +10,29 @@ export default function DashboardPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
+  // Función para cerrar sesión
+  const handleSignOut = async () => {
+    try {
+      await signOut({ 
+        redirect: false,
+        callbackUrl: '/'
+      });
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
+
   // Efecto para manejar redirecciones
   useEffect(() => {
-    // Solo ejecutar en el cliente
-    if (typeof window === 'undefined') return;
-
     if (status === 'unauthenticated') {
       router.push('/login?callbackUrl=/dashboard');
     }
   }, [status, router]);
 
   // Estado de carga
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  // Si no hay sesión, mostrar solo el loader (ya que se redirigirá)
-  if (!session?.user) {
+  if (status === 'loading' || !session?.user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -41,25 +43,8 @@ export default function DashboardPage() {
   // Si el usuario no tiene el rol adecuado, redirigir
   if (session.user.role !== 'admin' && session.user.role !== 'user') {
     router.push('/unauthorized');
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return null;
   }
-
-  const handleSignOut = async () => {
-    try {
-      await signOut({ 
-        redirect: false,
-        callbackUrl: '/login'
-      });
-      router.push('/login');
-      router.refresh();
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-    }
-  };
   
   return (
     <div className="container mx-auto px-4 py-8">

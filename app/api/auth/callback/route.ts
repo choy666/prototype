@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { getServerSession  } from '@/lib/actions/auth';
+import { auth } from '@/lib/actions/auth';
 
 export async function GET(request: Request) {
   try {
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 
     // Validar sesión del usuario
-    const session = await getServerSession();
+    const session = await auth();
     if (!session) {
       const loginUrl = new URL('/login', baseUrl);
 

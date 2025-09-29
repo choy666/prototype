@@ -1,20 +1,21 @@
-import NextAuth from 'next-auth';
-import type { NextAuthConfig, Session, DefaultSession, User } from 'next-auth';
-import { DrizzleAdapter } from '@auth/drizzle-adapter';
-import Credentials from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { users } from '@/lib/schema';
-import { UserRole } from '@/types';
+// lib/auth.ts
+import NextAuth from "next-auth";
+import type { NextAuthConfig, Session, DefaultSession, User } from "next-auth";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users } from "@/lib/schema";
+import { UserRole } from "@/types";
 
-// Extender tipos de next-auth
-declare module 'next-auth' {
+// 🔧 Extender tipos de NextAuth
+declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
       role: UserRole;
-    } & DefaultSession['user'];
+    } & DefaultSession["user"];
   }
 
   interface User {
@@ -36,10 +37,10 @@ interface CredentialsType {
   password: string;
 }
 
-// Validación de credenciales
+// 🔐 Validación de credenciales
 async function validateCredentials(credentials: CredentialsType) {
   if (!credentials?.email || !credentials?.password) {
-    throw new Error('Credenciales incompletas');
+    throw new Error("Credenciales incompletas");
   }
 
   const user = await db.query.users.findFirst({
@@ -50,22 +51,15 @@ async function validateCredentials(credentials: CredentialsType) {
       email: true,
       password: true,
       role: true,
-      emailVerified: true
-    }
+      emailVerified: true,
+    },
   });
-  
-  if (!user) {
-    throw new Error('Usuario no encontrado');
-  }
 
-  if (!user.password) {
-    throw new Error('Este usuario no tiene contraseña configurada');
-  }
+  if (!user) throw new Error("Usuario no encontrado");
+  if (!user.password) throw new Error("Este usuario no tiene contraseña configurada");
 
   const isValid = await bcrypt.compare(credentials.password, user.password);
-  if (!isValid) {
-    throw new Error('Contraseña incorrecta');
-  }
+  if (!isValid) throw new Error("Contraseña incorrecta");
 
   return {
     id: user.id.toString(),
@@ -75,44 +69,36 @@ async function validateCredentials(credentials: CredentialsType) {
   };
 }
 
+// ⚙️ Configuración de NextAuth
 export const authConfig = {
   adapter: DrizzleAdapter(db),
   providers: [
     Credentials({
-      name: 'credentials',
+      name: "credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Contraseña', type: 'password' }
+        email: { label: "Email", type: "email" },
+        password: { label: "Contraseña", type: "password" },
       },
       async authorize(credentials): Promise<User | null> {
-        try {
-          return await validateCredentials(credentials as CredentialsType);
-        } catch (error) {
-          console.error('Error en autorización:', error);
-          // No exponer detalles del error al cliente
-          throw new Error(
-            error instanceof Error ? error.message : 'Error en la autenticación'
-          );
-        }
+        return await validateCredentials(credentials as CredentialsType);
       },
     }),
   ],
   session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 días
-    updateAge: 24 * 60 * 60, // Actualiza la sesión cada 24 horas
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
   },
   pages: {
-    signIn: '/login',
-    signOut: '/login',
-    error: '/login',
+    signIn: "/login",
+    signOut: "/login",
+    error: "/login",
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      if (trigger === 'update' && session) {
+      if (trigger === "update" && session) {
         return { ...token, ...session.user };
       }
-    
       if (user) {
         token.id = user.id;
         token.role = (user as User).role;
@@ -126,26 +112,19 @@ export const authConfig = {
       }
       return session;
     },
-
     async redirect({ url, baseUrl }) {
-      // Permite URLs de callback relativas
-      if (url.startsWith('/')) {
-        // Evita bucles de redirección
-        if (url.startsWith('/login') || url.startsWith('/api/auth')) {
+      if (url.startsWith("/")) {
+        if (url.startsWith("/login") || url.startsWith("/api/auth")) {
           return baseUrl;
         }
         return `${baseUrl}${url}`;
-      }
-      // Permite URLs de callback en el mismo origen
-      else if (new URL(url).origin === baseUrl) {
+      } else if (new URL(url).origin === baseUrl) {
         return url;
       }
-      // Redirige a la página de inicio por defecto
       return baseUrl;
-    }
-
+    },
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: process.env.NODE_ENV === "development",
   secret: process.env.NEXTAUTH_SECRET,
   trustHost: true,
   cookies: {
@@ -153,21 +132,17 @@ export const authConfig = {
       name: `__Secure-next-auth.session-token`,
       options: {
         httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        domain: process.env.NODE_ENV === 'production' ? process.env.NEXTAUTH_COOKIE_DOMAIN : undefined
-      }
-    }
-  }
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.NEXTAUTH_COOKIE_DOMAIN
+            : undefined,
+      },
+    },
+  },
 } satisfies NextAuthConfig;
 
-// Inicializar NextAuth
-export const auth = NextAuth(authConfig);
-
-// Exportar handlers para la API route
-export const handlers = auth.handlers;
-
-// Exportar métodos de autenticación
-export const { auth: getServerSession, signIn, signOut } = auth;
-
+// 🚀 Inicializar NextAuth
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

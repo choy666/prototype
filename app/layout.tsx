@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/components/auth-provider'
 import Navbar from '@/components/ui/Navbar'
 import Footer from '@/components/ui/Footer'
-import { getServerSession } from '@/lib/actions/auth'
+import { auth } from '@/lib/actions/auth'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,7 +22,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await getServerSession()
+  const session = await auth()
 
   return (
     <html lang="es" suppressHydrationWarning>

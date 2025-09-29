@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signIn } from 'next-auth/react';
@@ -11,7 +11,6 @@ import { loginSchema, type LoginFormValues } from '@/lib/validations/auth';
 import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -65,8 +64,9 @@ export default function LoginPage() {
         throw new Error('Credenciales inválidas');
       }
 
+      // Redirigir manualmente para evitar problemas con Next.js
       if (result?.url) {
-        router.push(result.url);
+        window.location.href = result.url;
         return;
       }
 
