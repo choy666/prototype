@@ -21,17 +21,6 @@ if (files.length === 0) {
 }
 
 const latestBackup = path.join(backupDir, files[0]);
-
-// Función para ejecutar consultas
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function executeQuery(client, query) {
-  try {
-    await client.query(query);
-  } catch (error) {
-    console.error('❌ Error al ejecutar consulta:', error.message);
-  }
-}
-
 // Función principal
 async function restoreBackup() {
   const client = new Client({

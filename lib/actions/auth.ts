@@ -1,4 +1,7 @@
 // lib/auth.ts
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error("❌ Error crítico: La variable de entorno NEXTAUTH_SECRET no está definida.");
+}
 import NextAuth from "next-auth";
 import type { NextAuthConfig, Session, DefaultSession, User } from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
@@ -8,6 +11,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { UserRole } from "@/types";
+
+
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error("❌ Error crítico: La variable de entorno NEXTAUTH_SECRET no está definida.");
+}
 
 // 🔧 Extender tipos de NextAuth
 declare module "next-auth" {
@@ -80,7 +88,16 @@ export const authConfig = {
         password: { label: "Contraseña", type: "password" },
       },
       async authorize(credentials): Promise<User | null> {
-        return await validateCredentials(credentials as CredentialsType);
+        console.log("\n[Authorize Callback] 🕵️‍♂️ Validando credenciales:", credentials);
+        try {
+          const user = await validateCredentials(credentials as CredentialsType);
+          console.log("[Authorize Callback] ✅ Usuario validado:", user);
+          return user;
+        } catch (error) {
+          console.error("[Authorize Callback] ❌ Error de validación:", error);
+          // Retornar null para que NextAuth maneje el error
+          return null;
+        }
       },
     }),
   ],
@@ -96,20 +113,33 @@ export const authConfig = {
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      console.log("\n[JWT Callback] 🔄 Ejecutando...");
+      console.log("[JWT Callback] 🕵️‍♂️ Token de entrada:", token);
+      console.log("[JWT Callback] 🕵️‍♂️ Usuario de entrada (si es login):", user);
+
       if (trigger === "update" && session) {
+        console.log("[JWT Callback] ✨ Trigger es 'update'. Actualizando token con:", session.user);
         return { ...token, ...session.user };
       }
       if (user) {
+        console.log("[JWT Callback] ✨ Usuario existe (login). Inyectando datos al token.");
         token.id = user.id;
         token.role = (user as User).role;
       }
+      console.log("[JWT Callback] ✅ Token de salida:", token);
       return token;
     },
     async session({ session, token }): Promise<Session> {
-      if (session.user) {
+      console.log("\n[Session Callback] 🔄 Ejecutando...");
+      console.log("[Session Callback] 🕵️‍♂️ Sesión de entrada:", session);
+      console.log("[Session Callback] 🕵️‍♂️ Token de entrada:", token);
+
+      if (session.user && token) {
+        console.log("[Session Callback] ✨ Inyectando datos del token a la sesión.");
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
       }
+      console.log("[Session Callback] ✅ Sesión de salida:", session);
       return session;
     },
     async redirect({ url, baseUrl }) {
@@ -129,7 +159,9 @@ export const authConfig = {
   trustHost: true,
   cookies: {
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: process.env.NODE_ENV === "production" 
+          ? `__Secure-next-auth.session-token`
+          : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",

@@ -53,14 +53,11 @@ async function createBackup() {
     await client.connect();
     
     // Obtener lista de tablas
-    const res = await client.query(`
+    await client.query(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public'
     `);
-    
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const tables = res.rows.map(row => row.table_name);
     
     // Usar pg_dump si está disponible
     try {

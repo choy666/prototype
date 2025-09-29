@@ -24,7 +24,7 @@ export default [
 
   // Configuración base de JavaScript/TypeScript
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -52,10 +52,53 @@ export default [
       ...js.configs.recommended.rules,
       ...tsPlugin.configs.recommended.rules,
       ...nextPlugin.configs.recommended.rules,
-      // Agrega tus reglas personalizadas aquí
+      'no-unused-vars': 'off', // Desactivar la regla base
+      '@typescript-eslint/no-unused-vars': [
+        'error', 
+        { 
+          'argsIgnorePattern': '^_',
+          'caughtErrorsIgnorePattern': '^_',
+        }
+      ],
     },
   },
 
+  // Configuración para archivos JavaScript (sin chequeo de tipos)
+  {
+    files: ['**/*.{js,jsx,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        ...globals.es2021,
+      },
+      parser: tsParser, // ts-parser puede manejar JS
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        ecmaFeatures: {
+          jsx: true,
+        },
+        // Clave: Sin la propiedad 'project' para archivos JS
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+      '@next/next': nextPlugin,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...nextPlugin.configs.recommended.rules,
+      'no-unused-vars': 'off', // Desactivar la regla base
+      '@typescript-eslint/no-unused-vars': [
+        'error', 
+        { 
+          'argsIgnorePattern': '^_',
+          'caughtErrorsIgnorePattern': '^_',
+        }
+      ],
+    },
+  },  
   // Aplicar configuración de Prettier al final para sobrescribir reglas de formato
   prettierConfig,
 ];
