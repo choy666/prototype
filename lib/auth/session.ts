@@ -1,4 +1,4 @@
-// lib/auth/server.ts
+// lib/auth/sesion.ts
 import { auth } from "@/lib/actions/auth"; // ✅ importar la función auth
 
 export async function getCurrentUser() {

@@ -18,7 +18,6 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    setError,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -47,46 +46,24 @@ export default function LoginPage() {
         description: 'Has cerrado sesión correctamente',
       });
     }
-  }, [searchParams, toast]);
-
-  const onSubmit = async (data: LoginFormValues) => {
-    try {
-      setIsLoading(true);
-      
-      const result = await signIn('credentials', {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-        callbackUrl,
-      });
-
-      if (result?.error) {
-        throw new Error('Credenciales inválidas');
-      }
-
-      // Redirigir manualmente para evitar problemas con Next.js
-      if (result?.url) {
-        window.location.href = result.url;
-        return;
-      }
-
-      throw new Error('Error al iniciar sesión');
-    } catch (error) {
-      setError('root', {
-        type: 'manual',
-        message: error instanceof Error ? error.message : 'Error al iniciar sesión',
-      });
-      
+    const error = searchParams?.get('error');
+    if (error) {
       toast({
         title: 'Error',
         description: 'No se pudo iniciar sesión. Verifica tus credenciales e inténtalo de nuevo.',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [searchParams, toast]);
 
+  const onSubmit = (data: LoginFormValues) => {
+      setIsLoading(true);
+      signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        callbackUrl,
+      });
+    };
   return (
     <div className="flex min-h-[calc(100vh-200px)] w-full items-center justify-center bg-black">
       <div className="grid w-full max-w-md gap-8">

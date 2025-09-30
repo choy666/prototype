@@ -3,10 +3,10 @@ import logo from '@/assets/logo.svg';
 import logoDark from '@/assets/logo-dark.svg';
 import Link from 'next/link';
 import arrow from '@/assets/arrow.svg';
-import { checkDbConnection } from '../lib/db';
+import { checkDatabaseConnection } from '@/lib/db';
 
 export default async function Home() {
-  const dbStatus = await checkDbConnection();
+  const dbStatus = await checkDatabaseConnection();
   const isConnected = dbStatus.success;
   const statusMessage = dbStatus.message;
 

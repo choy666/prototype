@@ -1,4 +1,4 @@
-// Asegurarte de que la ruta de importación sea correcta
+//app/api/auth/[...nextauth]/route.ts
 import { handlers } from '@/lib/actions/auth';
 
 export const { GET, POST } = handlers;
