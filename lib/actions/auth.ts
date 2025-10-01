@@ -1,7 +1,8 @@
-// lib/auth.ts
+// lib/actions/auth.ts
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error("❌ Error crítico: La variable de entorno NEXTAUTH_SECRET no está definida.");
 }
+
 import NextAuth from "next-auth";
 import type { NextAuthConfig, Session, DefaultSession, User } from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
@@ -11,11 +12,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { UserRole } from "@/types";
-
-
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error("❌ Error crítico: La variable de entorno NEXTAUTH_SECRET no está definida.");
-}
 
 // 🔧 Extender tipos de NextAuth
 declare module "next-auth" {
@@ -95,8 +91,7 @@ export const authConfig = {
           return user;
         } catch (error) {
           console.error("[Authorize Callback] ❌ Error de validación:", error);
-          // Retornar null para que NextAuth maneje el error
-          return null;
+          return null; // NextAuth maneja el error
         }
       },
     }),
@@ -159,14 +154,16 @@ export const authConfig = {
   trustHost: true,
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production" 
-          ? `__Secure-next-auth.session-token`
-          : `next-auth.session-token`,
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
+        // ⚠️ Importante: dominio puro, sin protocolo ni slash
         domain:
           process.env.NODE_ENV === "production"
             ? process.env.NEXTAUTH_COOKIE_DOMAIN

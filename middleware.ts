@@ -5,7 +5,6 @@ import type { NextRequest } from "next/server";
 // Rutas protegidas (requieren sesión activa)
 const protectedRoutes = [
   '/dashboard',
-  '/cart',
   '/checkout',
   '/profile',
   '/orders',
