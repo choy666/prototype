@@ -1,5 +1,3 @@
-// Tipos para el proyecto
-
 export interface User {
   id: string;
   name: string | null;
@@ -89,4 +87,28 @@ export interface ApiResponse<T = unknown> {
   errors?: Record<string, string[]>;
   created_at?: Date | string;
   updated_at?: Date | string;
+}
+
+// Tipos para páginas
+export interface PageParams {
+  params: {
+    id: string;
+  };
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
+
+export interface PageProps {
+  params: {
+    [key: string]: string | string[] | undefined;
+  };
+  searchParams?: {
+    [key: string]: string | string[] | undefined;
+  };
+}
+// Para páginas de producto
+export interface ProductPageProps extends Omit<PageProps, 'params'> {
+  params: {
+    id: string;
+    [key: string]: string | string[] | undefined;
+  };
 }
