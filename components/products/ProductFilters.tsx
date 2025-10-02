@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getCategories } from '@/lib/actions/products';
-import { ProductFilters as ProductFiltersType } from '@/hooks/useProducts';
+import { ProductFilters as ProductFiltersType } from '@/types';
 
 interface ProductFiltersProps {
   filters: ProductFiltersType;

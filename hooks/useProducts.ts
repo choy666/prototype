@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { z } from 'zod';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { getProducts as fetchProducts } from '@/lib/actions/products';
 
 // Esquema de validación para los productos
@@ -11,7 +11,7 @@ export const productSchema = z.object({
   id: z.number(),
   name: z.string(),
   description: z.string().nullable().optional(),
-  price: z.string(), // La base de datos devuelve el precio como string
+  price: z.string(),
   image: z.string().nullable().optional(),
   category: z.string(),
   stock: z.number(),
@@ -50,6 +50,9 @@ type UseProductsReturn = {
 
 export function useProducts(initialFilters: Partial<ProductFilters> = {}): UseProductsReturn {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [state, setState] = useState<{
     products: Product[];
     isLoading: boolean;
@@ -84,6 +87,32 @@ export function useProducts(initialFilters: Partial<ProductFilters> = {}): UsePr
     },
   });
 
+  const updateFilters = useCallback((newFilters: Partial<ProductFilters>) => {
+    setState(prev => {
+      const updatedFilters = { ...prev.filters, ...newFilters, page: 1 }; // Reset to page 1 on filter change
+      
+      // Actualizar la URL
+      const params = new URLSearchParams();
+      Object.entries(updatedFilters).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          params.set(key, String(value));
+        }
+      });
+      
+      // Usar el router de Next.js para actualizar la URL sin recargar
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      
+      return { 
+        ...prev, 
+        filters: updatedFilters,
+        pagination: {
+          ...prev.pagination,
+          page: 1 // Resetear a la primera página al cambiar filtros
+        }
+      };
+    });
+  }, [router, pathname]);
+
   const fetchProductsData = useCallback(async (filters: ProductFilters) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -101,7 +130,6 @@ export function useProducts(initialFilters: Partial<ProductFilters> = {}): UsePr
         }
       );
 
-      // Validar los datos con Zod
       const validatedProducts = data.map(product => productSchema.parse(product));
 
       setState(prev => ({
@@ -126,38 +154,14 @@ export function useProducts(initialFilters: Partial<ProductFilters> = {}): UsePr
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    await fetchProductsData(state.filters);
-  }, [fetchProductsData, state.filters]);
-
-  const updateFilters = useCallback((newFilters: Partial<ProductFilters>) => {
-    setState(prev => {
-      const updatedFilters = { ...prev.filters, ...newFilters, page: 1 }; // Reset to first page on filter change
-      return {
-        ...prev,
-        filters: updatedFilters,
-      };
-    });
-  }, []);
-
   // Efecto para cargar productos cuando cambian los filtros
   useEffect(() => {
     fetchProductsData(state.filters);
-  }, [state.filters, fetchProductsData]);
+  }, [fetchProductsData, state.filters]);
 
-  // Sincronizar con la URL
-  useEffect(() => {
-    const params = new URLSearchParams();
-    
-    Object.entries(state.filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        params.set(key, String(value));
-      }
-    });
-
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.pushState({}, '', newUrl);
-  }, [state.filters]);
+  const refresh = useCallback(async () => {
+    await fetchProductsData(state.filters);
+  }, [fetchProductsData, state.filters]);
 
   return {
     products: state.products,
@@ -168,33 +172,4 @@ export function useProducts(initialFilters: Partial<ProductFilters> = {}): UsePr
     refresh,
     updateFilters,
   };
-}
-
-// Hook para obtener las categorías
-export function useCategories() {
-  const [categories, setCategories] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const response = await fetch('/api/categories');
-        if (!response.ok) {
-          throw new Error('Error al cargar las categorías');
-        }
-        const data = await response.json();
-        setCategories(data);
-      } catch (err) {
-        console.error('Error loading categories:', err);
-        setError(err instanceof Error ? err : new Error('Error desconocido'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadCategories();
-  }, []);
-
-  return { categories, isLoading, error };
 }

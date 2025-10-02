@@ -8,6 +8,20 @@
       "when": 1758635487315,
       "tag": "0000_aspiring_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1759366461272,
+      "tag": "0001_fair_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759366535098,
+      "tag": "0002_sharp_aqueduct",
+      "breakpoints": true
     }
   ]
 }

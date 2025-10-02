@@ -81,19 +81,15 @@ export const orderItems = pgTable('order_items', {
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
-
 // Tipos TypeScript
 export type User = typeof users.$inferSelect & {
-  id: string; // Forzamos el tipo string para compatibilidad con NextAuth
+  id: string;
 };
-export type NewUser = typeof users.$inferInsert;
+
 export type Product = typeof products.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 export type NewProduct = typeof products.$inferInsert;
 export type Cart = typeof carts.$inferSelect;
 export type NewCart = typeof carts.$inferInsert;
 export type CartItem = typeof cartItems.$inferSelect;
 export type NewCartItem = typeof cartItems.$inferInsert;
-export type Order = typeof orders.$inferSelect;
-export type NewOrder = typeof orders.$inferInsert;
-export type OrderItem = typeof orderItems.$inferSelect;
-export type NewOrderItem = typeof orderItems.$inferInsert;
