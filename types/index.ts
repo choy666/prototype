@@ -1,3 +1,4 @@
+// app/types/index.ts
 export interface User {
   id: string;
   name: string | null;
@@ -12,7 +13,7 @@ export interface Product {
   name: string;
   description?: string | null;
   price: string;
-  image?: string | string[] | null;  // Allow null
+  image?: string | string[] | null;
   category: string;
   destacado: boolean;
   stock: number;
@@ -22,7 +23,10 @@ export interface Product {
 
 export type UserRole = 'user' | 'admin';
 
-
+export interface PageProps {
+  params?: { [key: string]: string | string[] | undefined };
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
 
 // Filtros y paginación
 export interface ProductFilters {
@@ -89,29 +93,9 @@ export interface ApiResponse<T = unknown> {
   updated_at?: Date | string;
 }
 
-// Tipos para páginas
-export interface PageParams {
-  params: Promise<{
-    [key: string]: string | string[] | undefined;
-  }>;
+export interface ProductPageProps extends PageProps {
+  params: { id: string };
   searchParams?: { [key: string]: string | string[] | undefined };
-}
-
-export interface PageProps {
-  params: Promise<{
-    [key: string]: string | string[] | undefined;
-  }>;
-  searchParams?: {
-    [key: string]: string | string[] | undefined;
-  };
-}
-
-// Para páginas de producto
-export interface ProductPageProps extends Omit<PageProps, 'params'> {
-  params: Promise<{
-    id: string;
-    [key: string]: string | string[] | undefined;
-  }>;
 }
 
 // Tipo para el hook useParams

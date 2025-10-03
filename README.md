@@ -114,6 +114,8 @@ npm list --depth=0
 
 
 promt final
+
+
 ## 🚀 Contexto del Proyecto
 **Nombre:** Prototype E-commerce  
 **Stack Principal:** Next.js 15 (App Router), TypeScript 5.9, Turbopack, Tailwind CSS 4.1, NextAuth v5, Neon PostgreSQL
