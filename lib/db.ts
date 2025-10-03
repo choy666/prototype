@@ -21,7 +21,6 @@ if (!env.success) {
 
 // 2. Tipos y declaraciones globales
 declare global {
-  // eslint-disable-next-line no-var
   var drizzleClient: NeonHttpDatabase<typeof schema> | undefined;
 }
 

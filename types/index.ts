@@ -24,8 +24,12 @@ export interface Product {
 export type UserRole = 'user' | 'admin';
 
 export interface PageProps {
-  params?: { [key: string]: string | string[] | undefined };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params?: Promise<{ [key: string]: string | string[] | undefined }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export interface ProductPageProps extends PageProps {
+  params: Promise<{ id: string }>;
 }
 
 // Filtros y paginación
@@ -93,12 +97,7 @@ export interface ApiResponse<T = unknown> {
   updated_at?: Date | string;
 }
 
-export interface ProductPageProps extends PageProps {
-  params: { id: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
-
-// Tipo para el hook useParams
+// Hooks
 export type UseParamsResult<T = Record<string, string | string[] | undefined>> = {
   params: T;
   isLoading: boolean;

@@ -16,12 +16,11 @@ export default function ProductClient({ product }: { product: Product }) {
 
   // Procesar imágenes
   const productImages = useMemo<string[]>(() => {
-    if (!product?.image) return [];
-    if (Array.isArray(product.image)) {
-      return product.image.slice(0, 3);
-    }
-    return Array(3).fill(product.image);
+    if (!product?.image) return ['/placeholder-product.jpg'];
+    return Array.isArray(product.image) ? product.image.slice(0, 3) : [product.image];
   }, [product?.image]);
+
+  const price = useMemo(() => Number(product.price), [product.price]);
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true);
@@ -45,21 +44,21 @@ export default function ProductClient({ product }: { product: Product }) {
 
   const nextImage = () => {
     if (!productImages.length) return;
-    setCurrentImageIndex(prev => prev === productImages.length - 1 ? 0 : prev + 1);
+    setCurrentImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1));
   };
 
   const prevImage = () => {
     if (!productImages.length) return;
-    setCurrentImageIndex(prev => prev === 0 ? productImages.length - 1 : prev - 1);
+    setCurrentImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1));
   };
 
-  const currentImage = productImages[currentImageIndex % productImages.length] || '/placeholder-product.jpg';
+  const currentImage = productImages[currentImageIndex % productImages.length];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid md:grid-cols-2 gap-8">
-        {/* Sección de imágenes */}
-        <div className="space-y-4">
+    <div className="container max-w-4xl mx-auto px-8 sm:px-7 py-4 sm:py-6">
+      <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
+        {/* Imágenes */}
+        <div className="space-y-3 sm:space-y-4">
           <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100">
             <Image
               src={currentImage}
@@ -90,38 +89,44 @@ export default function ProductClient({ product }: { product: Product }) {
 
           {/* Miniaturas */}
           <div className="grid grid-cols-3 gap-2">
-            {productImages.map((img: string, index: number) => (
+            {Array.from({ length: 3 }).map((_, index) => {
+              const imgIndex = index % productImages.length;
+              const img = productImages[imgIndex];
+              const isActive = currentImageIndex % productImages.length === imgIndex;
+              
+              return (
               <button
                 key={index}
-                onClick={() => setCurrentImageIndex(index)}
+                  onClick={() => setCurrentImageIndex(imgIndex)}
                 className={`relative aspect-square overflow-hidden rounded-md border-2 transition-all ${
-                  currentImageIndex % productImages.length === index
+                    isActive
                     ? 'border-primary'
                     : 'border-transparent hover:border-gray-300'
                 }`}
-                aria-label={`Ver imagen ${index + 1}`}
+                aria-label={`Ver imagen ${imgIndex + 1}`}
               >
                 <Image
                   src={img}
-                  alt={`${product.name} - Vista ${index + 1}`}
+                    alt={`${product.name} - Vista ${imgIndex + 1}`}
                   fill
                   className="object-cover hover:opacity-90 transition-opacity"
                 />
               </button>
-            ))}
+            )
+          })}
           </div>
         </div>
 
         {/* Información del producto */}
-        <div>
-          <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
-          <p className="text-2xl font-semibold text-primary mb-4">
-            {formatPrice(parseFloat(product.price))}
+        <div className="space-y-4 sm:space-y-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">{product.name}</h1>
+          <p className="text-2xl sm:text-2xl font-semibold text-primary">
+            {formatPrice(price)}
           </p>
           
-          <p className="text-gray-600 mb-6">{product.description}</p>
+          <p className="text-gray-600">{product.description}</p>
 
-          <div className="flex items-center space-x-4 mb-6">
+          <div className="flex items-center space-x-4">
             <div className="flex items-center border rounded-md">
               <button
                 onClick={() => setQuantity(prev => Math.max(1, prev - 1))}

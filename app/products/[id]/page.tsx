@@ -6,7 +6,7 @@ import type { ProductPageProps } from '@/types';
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     if (!id || isNaN(Number(id))) {
       notFound();
