@@ -12,7 +12,7 @@ export interface Product {
   name: string;
   description?: string | null;
   price: string;
-  image?: string | null;
+  image?: string | string[] | null;  // Allow null
   category: string;
   destacado: boolean;
   stock: number;
@@ -91,24 +91,38 @@ export interface ApiResponse<T = unknown> {
 
 // Tipos para páginas
 export interface PageParams {
-  params: {
-    id: string;
-  };
+  params: Promise<{
+    [key: string]: string | string[] | undefined;
+  }>;
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export interface PageProps {
-  params: {
+  params: Promise<{
     [key: string]: string | string[] | undefined;
-  };
+  }>;
   searchParams?: {
     [key: string]: string | string[] | undefined;
   };
 }
+
 // Para páginas de producto
 export interface ProductPageProps extends Omit<PageProps, 'params'> {
-  params: {
+  params: Promise<{
     id: string;
     [key: string]: string | string[] | undefined;
-  };
+  }>;
 }
+
+// Tipo para el hook useParams
+export type UseParamsResult<T = Record<string, string | string[] | undefined>> = {
+  params: T;
+  isLoading: boolean;
+  error: Error | null;
+};
+
+// Tipo para el hook useSearchParams
+export type UseSearchParamsResult = {
+  searchParams: URLSearchParams;
+  setSearchParams: (params: Record<string, string | string[] | undefined>) => void;
+};
