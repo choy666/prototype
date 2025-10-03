@@ -56,9 +56,9 @@ export default function ProductClient({ product }: { product: Product }) {
 
   return (
     <div className="container max-w-4xl mx-auto px-8 sm:px-7 py-4 sm:py-6">
-      <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid md:grid-cols-2 gap-4 sm:gap-6 justify-center">
         {/* Imágenes */}
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-3 sm:space-y-4 p-5 bg-black rounded-2xl">
           <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100">
             <Image
               src={currentImage}
@@ -119,7 +119,7 @@ export default function ProductClient({ product }: { product: Product }) {
 
         {/* Información del producto */}
         <div className="space-y-4 sm:space-y-6">
-          <h1 className="text-2xl sm:text-3xl font-bold">{product.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">{product.name}</h1>
           <p className="text-2xl sm:text-2xl font-semibold text-primary">
             {formatPrice(price)}
           </p>
