@@ -1,3 +1,4 @@
+// middleware.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/actions/auth";
 import type { NextRequest } from "next/server";
@@ -10,9 +11,9 @@ const protectedRoutes = [
   '/orders',
 ];
 
-export default auth(async function middleware(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const session = await auth();
+  const session = await auth(); // ✅ solo una vez
   const isLoggedIn = !!session?.user;
 
   // Excluir rutas técnicas (API, assets, favicon)
@@ -45,7 +46,7 @@ export default auth(async function middleware(request: NextRequest) {
 
   // Acceso permitido
   return NextResponse.next();
-});
+}
 
 // Configuración del matcher: excluye rutas técnicas
 export const config = {

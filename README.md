@@ -277,3 +277,9 @@ Next.js version: 15.5.3 (Turbopack)
 
 
 npx drizzle-kit push
+
+_____________________________________________________
+Analiza la siguiente guia @guia.md#L1-58.
+Analiza este proyecto activo.
+Indicar el avance del proyecto respecto a la guia. 
+_____________________________________________________

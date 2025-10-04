@@ -1,6 +1,5 @@
 /* Import Tailwind CSS */
 @import 'tailwindcss';
-
 /* Base styles */
 :root {
   --color-page: #ff7b00;
@@ -99,5 +98,19 @@ body {
   body {
     background-color: var(--background);
     color: var(--foreground);
+  }
+}
+@layer utilities {
+  @keyframes carousel {
+    0% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-carousel {
+    animation: carousel 30s linear infinite;
   }
 }

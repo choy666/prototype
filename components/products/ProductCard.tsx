@@ -76,13 +76,6 @@ export function ProductCard({
         </Link>
       </div>
 
-      {/* Badge de destacado */}
-      {product.destacado && (
-        <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">
-          Destacado
-        </span>
-      )}
-
       {/* Contenido de la tarjeta */}
       <div className="p-4">
         <div className="mb-2 flex items-center justify-between">

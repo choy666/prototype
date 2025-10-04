@@ -84,13 +84,19 @@ export const authConfig = {
         password: { label: "Contraseña", type: "password" },
       },
       async authorize(credentials): Promise<User | null> {
-        console.log("\n[Authorize Callback] 🕵️‍♂️ Validando credenciales:", credentials);
+        if (process.env.NODE_ENV === "development") {
+          console.log("\n[Authorize Callback] 🕵️‍♂️ Validando credenciales:", credentials);
+        }
         try {
           const user = await validateCredentials(credentials as CredentialsType);
-          console.log("[Authorize Callback] ✅ Usuario validado:", user);
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Authorize Callback] ✅ Usuario validado:", user);
+          }
           return user;
         } catch (error) {
-          console.error("[Authorize Callback] ❌ Error de validación:", error);
+          if (process.env.NODE_ENV === "development") {
+            console.error("[Authorize Callback] ❌ Error de validación:", error);
+          }
           return null; // NextAuth maneja el error
         }
       },
@@ -108,44 +114,48 @@ export const authConfig = {
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      console.log("\n[JWT Callback] 🔄 Ejecutando...");
-      console.log("[JWT Callback] 🕵️‍♂️ Token de entrada:", token);
-      console.log("[JWT Callback] 🕵️‍♂️ Usuario de entrada (si es login):", user);
+      if (process.env.NODE_ENV === "development") {
+        console.log("\n[JWT Callback] 🔄 Ejecutando...");
+        console.log("[JWT Callback] 🕵️‍♂️ Token de entrada:", token);
+        console.log("[JWT Callback] 🕵️‍♂️ Usuario de entrada (si es login):", user);
+      }
 
       if (trigger === "update" && session) {
-        console.log("[JWT Callback] ✨ Trigger es 'update'. Actualizando token con:", session.user);
+        if (process.env.NODE_ENV === "development") {
+          console.log("[JWT Callback] ✨ Trigger es 'update'. Actualizando token con:", session.user);
+        }
         return { ...token, ...session.user };
       }
       if (user) {
-        console.log("[JWT Callback] ✨ Usuario existe (login). Inyectando datos al token.");
         token.id = user.id;
         token.role = (user as User).role;
       }
-      console.log("[JWT Callback] ✅ Token de salida:", token);
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("[JWT Callback] ✅ Token de salida:", token);
+      }
       return token;
     },
     async session({ session, token }): Promise<Session> {
-      console.log("\n[Session Callback] 🔄 Ejecutando...");
-      console.log("[Session Callback] 🕵️‍♂️ Sesión de entrada:", session);
-      console.log("[Session Callback] 🕵️‍♂️ Token de entrada:", token);
+      if (process.env.NODE_ENV === "development") {
+        console.log("\n[Session Callback] 🔄 Ejecutando...");
+        console.log("[Session Callback] 🕵️‍♂️ Sesión de entrada:", session);
+        console.log("[Session Callback] 🕵️‍♂️ Token de entrada:", token);
+      }
 
       if (session.user && token) {
-        console.log("[Session Callback] ✨ Inyectando datos del token a la sesión.");
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
       }
-      console.log("[Session Callback] ✅ Sesión de salida:", session);
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Session Callback] ✅ Sesión de salida:", session);
+      }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) {
-        if (url.startsWith("/login") || url.startsWith("/api/auth")) {
-          return baseUrl;
-        }
-        return `${baseUrl}${url}`;
-      } else if (new URL(url).origin === baseUrl) {
-        return url;
-      }
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
   },
@@ -163,7 +173,6 @@ export const authConfig = {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        // ⚠️ Importante: dominio puro, sin protocolo ni slash
         domain:
           process.env.NODE_ENV === "production"
             ? process.env.NEXTAUTH_COOKIE_DOMAIN

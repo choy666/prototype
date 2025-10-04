@@ -21,6 +21,7 @@ if (!env.success) {
 
 // 2. Tipos y declaraciones globales
 declare global {
+  // Evitamos múltiples instancias en hot reload y producción
   var drizzleClient: NeonHttpDatabase<typeof schema> | undefined;
 }
 
@@ -33,16 +34,17 @@ const createDrizzleClient = () => {
 
     return drizzle(client, {
       schema,
-      logger: env.data.NODE_ENV === 'development' 
-        ? {
-            logQuery: (query, params) => {
-              console.log('📝 Query:', query);
-              if (params?.length) {
-                console.log('   Params:', params);
-              }
-            },
-          }
-        : false,
+      logger:
+        env.data.NODE_ENV === 'development'
+          ? {
+              logQuery: (query, params) => {
+                console.log('📝 Query:', query);
+                if (params?.length) {
+                  console.log('   Params:', params);
+                }
+              },
+            }
+          : false,
     });
   } catch (error) {
     console.error('❌ Error al crear el cliente de base de datos:', error);
@@ -50,23 +52,16 @@ const createDrizzleClient = () => {
   }
 };
 
-// 4. Función para obtener el cliente de base de datos
+// 4. Singleton unificado (dev y prod)
 const getDrizzleClient = (): NeonHttpDatabase<typeof schema> => {
-  // En desarrollo, usamos global.drizzleClient para evitar múltiples conexiones
-  if (env.data.NODE_ENV === 'development') {
-    if (!globalThis.drizzleClient) {
-      console.log('🔌 Creando nueva conexión a la base de datos para desarrollo...');
-      globalThis.drizzleClient = createDrizzleClient();
-    }
-    return globalThis.drizzleClient;
-  }
-
-  // En producción, creamos una nueva instancia cada vez
   if (!globalThis.drizzleClient) {
-    console.log('🚀 Inicializando cliente de base de datos en producción...');
+    console.log(
+      env.data.NODE_ENV === 'development'
+        ? '🔌 Creando nueva conexión a la base de datos para desarrollo...'
+        : '🚀 Inicializando cliente de base de datos en producción...'
+    );
     globalThis.drizzleClient = createDrizzleClient();
   }
-
   return globalThis.drizzleClient;
 };
 
@@ -100,10 +95,10 @@ export async function checkDatabaseConnection() {
     return { success: true, message: '✅ Conexión a la base de datos exitosa' };
   } catch (error) {
     console.error('❌ Error al conectar a la base de datos:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       message: 'Error al conectar a la base de datos',
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
