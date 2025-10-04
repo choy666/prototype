@@ -3,7 +3,6 @@ import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import globals from 'globals';
 import nextPlugin from '@next/eslint-plugin-next';
-import prettierConfig from 'eslint-config-prettier';
 
 export default [
   {
@@ -16,17 +15,32 @@ export default [
       '**/build/**',
       '**/coverage/**',
       '**/public/**',
-      'app/fonts.js', // evitar error de parser si no quieres tiparlo
+      'app/fonts.js',
     ],
   },
+  // Base config for JavaScript files (including .mjs)
   {
-    files: ['**/*.{ts,tsx,js,jsx,mjs}'],
+    files: ['**/*.{js,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        ...globals.es2021,
+      },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+    },
+  },
+  // TypeScript config
+  {
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
-        project: './tsconfig.json', // quítalo si no necesitas typed linting
+        project: './tsconfig.json',
       },
       globals: {
         ...globals.browser,
@@ -51,5 +65,4 @@ export default [
       ],
     },
   },
-  prettierConfig,
 ];

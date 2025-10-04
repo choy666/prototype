@@ -283,3 +283,49 @@ Analiza la siguiente guia @guia.md#L1-58.
 Analiza este proyecto activo.
 Indicar el avance del proyecto respecto a la guia. 
 _____________________________________________________
+
+
+
+# 🧠 Auditoría con Copilot
+## 🚀 Contexto del Proyecto
+*Nombre:* Prototype E-commerce  
+*Stack Principal:* Next.js 15 (App Router), TypeScript 5.9, Turbopack, Tailwind CSS 4.1, NextAuth v5, Neon PostgreSQL  
+*Arquitectura:* Modular con separación clara de responsabilidades  
+*Repositorio:* [choy666/prototype](https://github.com/choy666/prototype)  
+
+## 📦 Dependencias Clave
+json
+{
+  "next": "15.5.3",
+  "react": "19.1.0",
+  "typescript": "5.9.2",
+  "next-auth": "^5.0.0-beta.29",
+  "@auth/drizzle-adapter": "^1.10.0",
+  "@neondatabase/serverless": "1.0.1",
+  "drizzle-orm": "0.31.4",
+  "drizzle-kit": "^0.31.4",
+  "tailwindcss": "4.1.13",
+  "zod": "3.22.4"
+}
+
+
+📋 Reglas de Auditoría
+
+1. Críticas (bloqueantes o que rompen lógica/SSR/seguridad):• Siempre devolver el archivo completo corregido con la solución aplicada.
+• Ejemplos: validación de cantidades negativas, errores de SSR, imports rotos, funciones inexistentes, etc.
+
+2. Opcionales (performance, estilo, mejoras UX):• Enumerarlas en lista numerada al final de la auditoría.
+• No aplicarlas directamente, salvo que se pidan explícitamente.
+
+3. Consistencia entre archivos:• Si un cambio en un archivo rompe la lógica en otro, mencionarlo explícitamente.
+• En ese caso, devolver todos los archivos afectados completos y corregidos juntos.
+
+4. Formato de entrega:• Siempre devolver el archivo entero, no snippets.
+• Si hay varios archivos afectados, entregarlos todos en bloque, cada uno con su ruta clara (// app/..., // lib/...).
+
+
+✅ Flujo de Trabajo
+
+• Paso 1: Envio archivo para auditar.
+• Paso 2: Copilot audita y comenta explicando ayudando a entender el archivo y aplica las reglas de auditoria mencionadas
+• Paso 3: Si el cambio afecta otros archivos → Copilot los menciona y devuelve todos sincronizados.

@@ -12,9 +12,8 @@ import { auth } from '@/lib/actions/auth'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Mi Aplicación',
-  description: 'Sistema de gestión de contenido',
-  // viewport y themeColor se han movido a app/viewport.ts
+  title: 'Mi Tienda',
+  description: 'Tu tienda en línea favorita',
 }
 
 export default async function RootLayout({

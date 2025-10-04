@@ -7,15 +7,18 @@ import { useSession, signOut } from 'next-auth/react';
 
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import '../../app/globals.css';
+import { useCartStore, selectTotalItems } from '@/lib/stores/useCartStore';
 
 const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
   const { data: session, status } = useSession();
 
-  // Efecto para manejar el scroll
+  // ✅ Traemos el total de items del carrito
+  const totalItems = useCartStore(selectTotalItems);
+
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
@@ -71,6 +74,7 @@ const Navbar = () => {
               <Link
                 key={item.name}
                 href={item.href}
+                aria-current={pathname === item.href ? 'page' : undefined}
                 className={cn(
                   'text-sm font-medium transition-colors',
                   pathname === item.href
@@ -91,33 +95,39 @@ const Navbar = () => {
               aria-label="Carrito de compras"
             >
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                0
-              </span>
+              {totalItems > 0 && (
+                <span 
+                  className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center"
+                  aria-live="polite"
+                >
+                  {totalItems}
+                </span>
+              )}
             </Link>
 
             {/* Menú de usuario autenticado */}
             {status === 'authenticated' ? (
-              <div className="hidden md:block relative group">
+              <div className="hidden md:block relative">
                 <button
                   className="flex items-center space-x-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                   aria-haspopup="true"
-                  aria-expanded={isOpen}
-                  onClick={() => setIsOpen(!isOpen)}
+                  aria-expanded={isUserMenuOpen}
+                  aria-controls="user-menu"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 >
-                
-                <User className="cursor-pointer h-6 w-6 transition-all duration-300 hover:scale-105 active:scale-95 " />
-                
+                  <User className="cursor-pointer h-6 w-6 transition-all duration-300 hover:scale-105 active:scale-95 " />
                 </button>
-                {isOpen && (
+                {isUserMenuOpen && (
                   <div 
+                    id="user-menu"
+                    role="menu"
                     className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-popover border border-border py-1 z-50"
-                    onMouseLeave={() => setIsOpen(false)}
+                    onMouseLeave={() => setIsUserMenuOpen(false)}
                   >
                     <Link
                       href="/dashboard"
                       className="block px-4 py-2 text-sm text-foreground hover:bg-accent"
-                      onClick={() => setIsOpen(false)}
+                      onClick={() => setIsUserMenuOpen(false)}
                     >
                       Mi Cuenta
                     </Link>
@@ -132,19 +142,10 @@ const Navbar = () => {
               </div>
             ) : (
               <div className="hidden md:flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  asChild
-                  className="text-sm"
-                >
+                <Button variant="outline" size="sm" asChild className="text-sm">
                   <Link href="/login">Iniciar Sesión</Link>
                 </Button>
-                <Button 
-                  size="sm"
-                  asChild
-                  className="text-sm"
-                >
+                <Button size="sm" asChild className="text-sm">
                   <Link href="/register">Registrarse</Link>
                 </Button>
               </div>
@@ -153,20 +154,18 @@ const Navbar = () => {
             {/* Mobile menu button */}
             <button
               className="md:hidden p-2 text-foreground hover:text-primary focus:outline-none"
-              onClick={() => setIsOpen(!isOpen)}
-              aria-expanded={isOpen}
+              onClick={() => setIsMobileOpen(!isMobileOpen)}
+              aria-expanded={isMobileOpen}
               aria-label="Menú de navegación"
             >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
 
         {/* Mobile menu */}
-        {isOpen && (
+        {isMobileOpen && (
           <div className="md:hidden pt-2 pb-4 space-y-4">
-
-            {/* Mobile Navigation Links */}
             <div className="px-2 space-y-1">
               {navItems.map((item) => (
                 <Link
@@ -178,20 +177,20 @@ const Navbar = () => {
                       ? 'bg-accent text-accent-foreground'
                       : 'text-foreground hover:bg-accent hover:text-accent-foreground'
                   )}
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => setIsMobileOpen(false)}
                 >
                   {item.name}
                 </Link>
               ))}
 
               {/* Auth Links */}
-              {authItems.map((item) => (
+              {authItems.map((item) =>
                 item.href ? (
                   <Link
                     key={item.name}
                     href={item.href}
                     className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => setIsMobileOpen(false)}
                   >
                     {item.name}
                   </Link>
@@ -200,14 +199,14 @@ const Navbar = () => {
                     key={item.name}
                     onClick={() => {
                       item.onClick?.();
-                      setIsOpen(false);
+                      setIsMobileOpen(false);
                     }}
                     className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     {item.name}
                   </button>
                 )
-              ))}
+              )}
             </div>
           </div>
         )}
