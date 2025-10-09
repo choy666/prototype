@@ -108,7 +108,7 @@ export default function CartPage() {
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
-            <Button className="w-full mt-6" size="lg">
+            <Button className="w-full mt-6 font-bold" size="lg">
               Proceder al pago
             </Button>
             <div className="text-gray-600 text-center text-sm mt-4">

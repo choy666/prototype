@@ -1,41 +1,31 @@
+// components/ui/HeroSlider.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/lib/schema";
 import { useEffect, useState } from "react";
-import { getFeaturedProducts } from "@/lib/actions/products";
+import { getAllProducts } from "@/lib/actions/products"; // 🔥 ahora trae todos
 
 export default function HeroSlider() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchFeatured() {
-      const featured = await getFeaturedProducts(5);
-      let adjusted: Product[] = featured;
-
-      // mínimo 3
-      if (featured.length > 0 && featured.length < 3) {
-        while (adjusted.length < 3) {
-          adjusted = [...adjusted, ...featured].slice(0, 3);
-        }
-      }
-
-      // máximo 5
-      adjusted = adjusted.slice(0, 5);
-      setProducts(adjusted);
+    async function fetchProducts() {
+      const all = await getAllProducts(); // 🔥 sin filtros
+      setProducts(all);
       setLoading(false);
     }
 
-    fetchFeatured();
+    fetchProducts();
   }, []);
 
-  // 🌀 Estado de carga visual
+  // 🌀 Estado de carga visual - skeleton
   if (loading) {
     return (
-      <div className="bg-black p-6 rounded-lg overflow-hidden">
-        <ul className="inline-flex gap-6 whitespace-nowrap w-[200%] animate-pulse">
+      <div className="bg-black p-6 rounded-lg overflow-x-auto">
+        <ul className="inline-flex gap-6 whitespace-nowrap animate-pulse">
           {Array.from({ length: 5 }).map((_, idx) => (
             <li
               key={`skeleton-${idx}`}
@@ -57,20 +47,30 @@ export default function HeroSlider() {
   if (products.length === 0) {
     return (
       <div className="w-full h-64 flex items-center justify-center bg-muted rounded-lg">
-        <p className="text-muted-foreground">No hay productos destacados</p>
+        <p className="text-muted-foreground">No hay productos disponibles</p>
       </div>
     );
   }
 
-  // 🔁 Duplicamos productos para loop infinito
-  const loopProducts = [...products, ...products];
+  // ⚡ Duración proporcional: más productos = más tiempo
+  const baseDuration = products.length; //
+  const mobileDuration = `${baseDuration}s`;
+  const desktopDuration = `${baseDuration}s`;
 
   return (
-    <div className="bg-black p-6 rounded-lg overflow-hidden">
-      <ul className="inline-flex animate-carousel gap-6 whitespace-nowrap w-[200%]">
-        {loopProducts.map((product, idx) => (
+    <div className="group bg-black p-6 rounded-lg overflow-x-hidden">
+      <ul
+        className={`
+          inline-flex gap-6 whitespace-nowrap w-max
+          animate-carousel
+          [animation-duration:${mobileDuration}]
+          md:[animation-duration:${desktopDuration}]
+          group-hover:[animation-play-state:paused]
+        `}
+      >
+        {products.map((product) => (
           <li
-            key={`${product.id}-${idx}`}
+            key={product.id}
             className="relative flex-none w-2/3 md:w-1/3 max-w-[400px] aspect-[4/3] rounded-lg overflow-hidden border"
           >
             <Link href={`/products/${product.id}`}>

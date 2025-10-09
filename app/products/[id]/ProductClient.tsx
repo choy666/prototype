@@ -121,7 +121,7 @@ export default function ProductClient({ product }: { product: Product }) {
 
             <AddToCartButton
               product={{
-                id: String(product.id),
+                id: product.id,
                 name: product.name,
                 price: price,
                 image: productImages[0] || '/placeholder-product.jpg',

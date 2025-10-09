@@ -187,3 +187,15 @@ export async function getFeaturedProducts(limit: number = 5): Promise<Product[]>
     throw new Error('No se pudieron obtener los productos destacados');
   }
 }
+// Obtener todos los productos (sin filtros, sin límite)
+export async function getAllProducts(): Promise<Product[]> {
+  try {
+    return await db
+      .select()
+      .from(products)
+      .orderBy(desc(products.created_at)); // 🔥 ordenados por fecha de creación (más recientes primero)
+  } catch (error) {
+    console.error('Error fetching all products:', error);
+    throw new Error('No se pudieron obtener todos los productos');
+  }
+}

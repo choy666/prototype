@@ -329,3 +329,5 @@ json
 • Paso 1: Envio archivo para auditar.
 • Paso 2: Copilot audita y comenta explicando ayudando a entender el archivo y aplica las reglas de auditoria mencionadas
 • Paso 3: Si el cambio afecta otros archivos → Copilot los menciona y devuelve todos sincronizados.
+
+npx eslint . --ext .js,.jsx,.ts,.tsx --format=codeframe

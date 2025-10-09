@@ -1,3 +1,5 @@
+/* app/globals.css */
+
 /* Import Tailwind CSS */
 @import 'tailwindcss';
 /* Base styles */
@@ -103,14 +105,18 @@ body {
 @layer utilities {
   @keyframes carousel {
     0% {
-      transform: translateX(0%);
+      transform: translateX(0);
     }
     100% {
-      transform: translateX(-50%);
+      /* Se desplaza todo el ancho de la lista hasta ocultar el último producto */
+      transform: translateX(-100%);
     }
   }
-
+  
   .animate-carousel {
-    animation: carousel 30s linear infinite;
+    animation-name: carousel;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite; /* vuelve a empezar automáticamente */
+    animation-duration: 60s;
   }
 }

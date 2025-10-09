@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/Button'
 import { useCartStore } from '@/lib/stores/useCartStore'
 import { useState, useEffect, useRef } from 'react'
 import { ShoppingCart } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
 
 type AddToCartButtonProps = {
   product: {
-    id: string | number
+    id: number          // 🔄 ahora number
     name: string
     price: number
     image: string | null
@@ -20,11 +21,13 @@ type AddToCartButtonProps = {
 export function AddToCartButton({
   product,
   quantity = 1,
-  className
+  className,
 }: AddToCartButtonProps) {
   const [isAdding, setIsAdding] = useState(false)
   const addItem = useCartStore(state => state.addItem)
   const cartItems = useCartStore(state => state.items)
+  const error = useCartStore(state => state.error)
+  const { toast } = useToast()
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const cartItem = cartItems.find(item => item.id === product.id)
@@ -34,24 +37,43 @@ export function AddToCartButton({
 
   const handleAddToCart = () => {
     if (!product?.id || product.price <= 0 || isOutOfStock || isMaxedOut) {
-      console.error('Producto inválido o sin stock, no se puede agregar al carrito:', product)
+      toast({
+        title: 'Error',
+        description: 'Producto inválido o sin stock',
+        variant: 'destructive',
+      })
       return
     }
 
     setIsAdding(true)
 
     addItem({
-      id: String(product.id),
+      id: product.id,   // 🔄 ya no se castea a string
       name: product.name,
       price: product.price,
       image: product.image || undefined,
-      quantity
+      quantity,
+      stock: product.stock,
     })
 
     timeoutRef.current = setTimeout(() => {
       setIsAdding(false)
     }, 1000)
   }
+
+// En AddToCartButton.tsx
+useEffect(() => {
+  if (error) {
+    const errorMessage = typeof error === 'string' ? error : error?.message || 'Error desconocido';
+    toast({
+      title: 'Error',
+      description: errorMessage,
+      variant: 'destructive',
+    });
+    // Limpiar el error después de mostrarlo
+    useCartStore.getState().clearError();
+  }
+}, [error, toast]);
 
   useEffect(() => {
     return () => {

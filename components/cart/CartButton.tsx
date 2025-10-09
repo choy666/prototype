@@ -3,7 +3,7 @@
 
 import { ShoppingCart } from 'lucide-react'
 import Link from 'next/link'
-import { useCartStore, selectTotalItems } from '@/lib/stores/useCartStore'
+import { useCartStore } from '@/lib/stores/useCartStore'
 
 /**
  * 🛒 CartButton
@@ -13,14 +13,16 @@ import { useCartStore, selectTotalItems } from '@/lib/stores/useCartStore'
  * - Incluye mejoras de accesibilidad y animación
  */
 export function CartButton() {
-  // ✅ Usamos el selector centralizado para obtener el total de ítems
-  const totalItems = useCartStore(selectTotalItems)
+  // Usamos el selector para obtener el total de ítems
+  const totalItems = useCartStore((state) =>
+    state.items.reduce((total, item) => total + item.quantity, 0)
+  )
 
   return (
     <Link
       href="/cart"
-      aria-label="Carrito de compras" // ♿ Mejora de accesibilidad
-      className="relative"
+      aria-label={`Carrito de compras (${totalItems} ${totalItems === 1 ? 'ítem' : 'ítems'})`}
+      className="relative inline-block p-2 hover:bg-gray-100 rounded-full transition-colors"
     >
       {/* Ícono del carrito */}
       <ShoppingCart className="h-6 w-6" />
@@ -29,7 +31,7 @@ export function CartButton() {
       {totalItems > 0 && (
         <span
           className="
-            absolute -top-2 -right-2 
+            absolute -top-1 -right-1 
             bg-primary text-white text-xs 
             rounded-full h-5 w-5 
             flex items-center justify-center
@@ -37,8 +39,9 @@ export function CartButton() {
             hover:scale-110
             animate-bounce
           "
+          aria-hidden="true"
         >
-          {totalItems}
+          {totalItems > 9 ? '9+' : totalItems}
         </span>
       )}
     </Link>
