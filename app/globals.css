@@ -1,5 +1,8 @@
 /* app/globals.css */
 
+/* Import Keen Slider CSS */
+@import 'keen-slider/keen-slider.min.css';
+
 /* Import Tailwind CSS */
 @import 'tailwindcss';
 /* Base styles */
@@ -100,23 +103,5 @@ body {
   body {
     background-color: var(--background);
     color: var(--foreground);
-  }
-}
-@layer utilities {
-  @keyframes carousel {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      /* Se desplaza todo el ancho de la lista hasta ocultar el último producto */
-      transform: translateX(-100%);
-    }
-  }
-  
-  .animate-carousel {
-    animation-name: carousel;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite; /* vuelve a empezar automáticamente */
-    animation-duration: 60s;
   }
 }

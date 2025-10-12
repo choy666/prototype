@@ -33,15 +33,25 @@ export interface ProductPageProps extends PageProps {
 }
 
 // Filtros y paginación
+// types/index.ts
+
 export interface ProductFilters {
   category?: string;
   minPrice?: number;
   maxPrice?: number;
   search?: string;
-  sortBy?: 'name' | 'price' | 'category' | 'created_at' | 'updated_at' | 'stock';
+  sortBy?: 
+    | 'name' 
+    | 'price' 
+    | 'category' 
+    | 'created_at' 
+    | 'updated_at' 
+    | 'stock' 
+    | 'discount'; // 🔥 agregado para soportar orden por descuento
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  minDiscount?: number; // 🔥 agregado para la categoría OFERTAS
 }
 
 export interface Pagination {

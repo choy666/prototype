@@ -35,7 +35,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "0.44.5",
-    "framer-motion": "12.23.16",
+    "framer-motion": "^12.23.22",
     "google-auth-library": "10.3.0",
     "jsonwebtoken": "9.0.2",
     "keen-slider": "^6.8.6",
@@ -53,6 +53,7 @@
     "react-hot-toast": "^2.6.0",
     "react-icons": "5.5.0",
     "tailwind-merge": "^3.3.1",
+    "tailwind-scrollbar": "^4.0.2",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^4.1.11",
     "zustand": "^5.0.8"

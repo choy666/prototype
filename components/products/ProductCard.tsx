@@ -1,4 +1,3 @@
-// components/products/ProductCard.tsx
 'use client';
 
 import Image from 'next/image';
@@ -8,6 +7,8 @@ import { Product } from '@/lib/schema';
 import { formatPrice } from '@/lib/utils';
 import { ShoppingCart, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DiscountBadge } from '@/components/ui/DiscountBadge';
+import { getDiscountedPrice } from '@/lib/utils/pricing';
 
 interface ProductCardProps {
   product: Product;
@@ -19,7 +20,7 @@ interface ProductCardProps {
 // Componente Skeleton
 export function ProductCardSkeleton({ className = '' }: { className?: string }) {
   return (
-    <div 
+    <div
       className={cn(
         'overflow-hidden rounded-lg border bg-card shadow-sm',
         'animate-pulse',
@@ -41,8 +42,8 @@ export function ProductCardSkeleton({ className = '' }: { className?: string }) 
   );
 }
 
-export function ProductCard({ 
-  product, 
+export function ProductCard({
+  product,
   className = '',
   isLoading = false,
   onAddToCart
@@ -50,21 +51,26 @@ export function ProductCard({
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onAddToCart?.(String(product.id)); // Aseguramos que el ID sea string
+    onAddToCart?.(String(product.id));
   };
 
   if (isLoading) {
     return <ProductCardSkeleton />;
   }
 
+  const hasDiscount = product.discount && product.discount > 0;
+  const finalPrice = getDiscountedPrice(product);
+
   return (
-    <div className={cn(
-      'group relative overflow-hidden rounded-lg border bg-card text-card-foreground',
-      'shadow-sm transition-all hover:shadow-md',
-      className
-    )}>
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-lg border bg-card text-card-foreground',
+        'shadow-sm transition-all hover:shadow-md',
+        className
+      )}
+    >
       {/* Imagen del producto */}
-      <div className="aspect-square overflow-hidden">
+      <div className="aspect-square overflow-hidden relative">
         <Link href={`/products/${product.id}`} className="block h-full w-full">
           <Image
             src={product.image || '/placeholder-product.jpg'}
@@ -74,6 +80,9 @@ export function ProductCard({
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         </Link>
+
+        {/* Badge de descuento */}
+        <DiscountBadge discount={product.discount} />
       </div>
 
       {/* Contenido de la tarjeta */}
@@ -84,9 +93,22 @@ export function ProductCard({
               {product.name}
             </Link>
           </h3>
-          <span className="font-bold text-primary">
-            {formatPrice(Number(product.price))}
-          </span>
+          <div className="text-right">
+            {hasDiscount ? (
+              <>
+                <div className="text-xs text-muted-foreground line-through">
+                  {formatPrice(Number(product.price))}
+                </div>
+                <div className="font-bold text-primary">
+                  {formatPrice(finalPrice)}
+                </div>
+              </>
+            ) : (
+              <span className="font-bold text-primary">
+                {formatPrice(Number(product.price))}
+              </span>
+            )}
+          </div>
         </div>
 
         <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
@@ -94,8 +116,8 @@ export function ProductCard({
         </p>
 
         <div className="flex items-center justify-between gap-2">
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="w-full"
             onClick={handleAddToCart}
             disabled={product.stock <= 0}
@@ -109,9 +131,9 @@ export function ProductCard({
               'Sin stock'
             )}
           </Button>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             size="icon"
             className="h-9 w-9 shrink-0"
             asChild

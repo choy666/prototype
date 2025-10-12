@@ -1,35 +1,44 @@
-// En lib/actions/products.ts
 'use server';
+
 import { db } from '../db';
 import { products } from '../schema';
 import { and, eq, desc, sql, gte, lte, like, asc } from 'drizzle-orm';
 import type { NewProduct, Product } from '../schema';
 import { revalidatePath } from 'next/cache';
-
-
 import { z } from 'zod';
+import type { ProductFilters } from '@/types';
 
-// Esquema de validación para los filtros de productos
+// ✅ Esquema de validación para los filtros de productos
 const productFiltersSchema = z.object({
-  category: z.string().optional(),
-  minPrice: z.coerce.number().min(0).optional(),
-  maxPrice: z.coerce.number().min(0).optional(),
+  category: z
+    .string()
+    .optional()
+    .refine(val => val !== 'all', {
+      message: 'El valor "all" no es válido como categoría',
+    }),
+  minPrice: z.preprocess(
+    v => (v === '' || v === null ? undefined : v),
+    z.coerce.number().min(0).optional()
+  ),
+  maxPrice: z.preprocess(
+    v => (v === '' || v === null ? undefined : v),
+    z.coerce.number().min(0).optional()
+  ),
+  minDiscount: z.coerce.number().min(0).max(100).optional(),
   search: z.string().optional(),
   sortBy: z
-    .enum(['name', 'price', 'category', 'created_at', 'updated_at', 'stock'])
+    .enum(['name', 'price', 'category', 'created_at', 'updated_at', 'stock', 'discount'])
     .default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
-type ProductFilters = z.infer<typeof productFiltersSchema>;
-// Obtener productos con paginación y filtros
+// ✅ Obtener productos con paginación y filtros
 export async function getProducts(
-  page = 1, 
+  page = 1,
   limit = 10,
   filters: Partial<ProductFilters> = {}
-  ) {
-    try {
-    // 1. Validar y sanitizar los parámetros de entrada
+) {
+  try {
     const validatedPage = z.coerce.number().int().min(1).default(1).parse(page);
     const validatedLimit = z.coerce.number().int().min(1).default(10).parse(limit);
     const validatedFilters = productFiltersSchema.parse(filters);
@@ -39,54 +48,67 @@ export async function getProducts(
       category,
       minPrice,
       maxPrice,
+      minDiscount,
       search,
       sortBy,
       sortOrder,
     } = validatedFilters;
-    
+
     // Construir condiciones de filtro
     const conditions = [];
-    if (category) conditions.push(eq(products.category, category));
-    if (minPrice !== undefined)
-      conditions.push(gte(products.price, minPrice.toString()));
-    if (maxPrice !== undefined)
-      conditions.push(lte(products.price, maxPrice.toString()));
-    if (search) conditions.push(like(products.name, `%${search}%`));
+    if (category) {
+      conditions.push(eq(products.category, category));
+    }
+    if (typeof minPrice === 'number') {
+      conditions.push(gte(products.price, String(minPrice)));
+    }
+    if (typeof maxPrice === 'number') {
+      conditions.push(lte(products.price, String(maxPrice)));
+    }
+    if (typeof minDiscount === 'number') {
+      conditions.push(gte(products.discount, minDiscount));
+    }
+    if (search) {
+      conditions.push(like(products.name, `%${search}%`));
+    }
 
-    // 3. Obtener datos y conteo total en paralelo para eficiencia
+    // Obtener datos y conteo total en paralelo
     const [data, countResult] = await Promise.all([
-        db.query.products.findMany({
-          where: conditions.length > 0 ? and(...conditions) : undefined,
-          orderBy: (sortOrder === 'desc' ? desc : asc)(products[sortBy]),
-          limit: validatedLimit,
-          offset,
-        }),
-        db.select({ count: sql<number>`count(*)` })
-      .from(products)
-      .where(conditions.length > 0 ? and(...conditions) : undefined),
+      db.query.products.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+        orderBy: (sortOrder === 'desc' ? desc : asc)(products[sortBy]),
+        limit: validatedLimit,
+        offset,
+      }),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(products)
+        .where(conditions.length > 0 ? and(...conditions) : undefined),
     ]);
-    const count = countResult[0]?.count || 0;
+
+    const count = Number(countResult[0]?.count ?? 0);
+
     return {
       data,
       pagination: {
-        total: Number(count),
+        total: count,
         page: validatedPage,
         limit: validatedLimit,
-        totalPages: Math.ceil(Number(count) / validatedLimit),
+        totalPages: Math.ceil(count / validatedLimit),
       },
       filters: validatedFilters,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('Validation error:', error.issues);
-      throw new Error('Parametros de filtros invalidos');
+      throw new Error('Parámetros de filtros inválidos');
     }
     console.error('Error fetching products:', error);
     throw new Error('No se pudieron obtener los productos.');
   }
 }
 
-// Obtener un producto por ID
+// ✅ Obtener un producto por ID
 export async function getProductById(id: number): Promise<Product | null> {
   try {
     const [product] = await db.select().from(products).where(eq(products.id, id));
@@ -97,7 +119,7 @@ export async function getProductById(id: number): Promise<Product | null> {
   }
 }
 
-// Obtener categorías únicas
+// ✅ Obtener categorías únicas
 export async function getCategories(): Promise<string[]> {
   try {
     const result = await db
@@ -106,12 +128,12 @@ export async function getCategories(): Promise<string[]> {
       .groupBy(products.category);
     return result.map(r => r.category);
   } catch (error) {
-    console.error('No se pudieron encontraron los productos:', error);
+    console.error('No se pudieron encontrar los productos:', error);
     return [];
   }
 }
 
-// Crear un nuevo producto
+// ✅ Crear un nuevo producto
 export async function createProduct(
   productData: Omit<NewProduct, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Product> {
@@ -124,7 +146,7 @@ export async function createProduct(
         updated_at: new Date(),
       })
       .returning();
-    
+
     revalidatePath('/products');
     return newProduct;
   } catch (error) {
@@ -133,9 +155,9 @@ export async function createProduct(
   }
 }
 
-// Actualizar un producto
+// ✅ Actualizar un producto
 export async function updateProduct(
-  id: number, 
+  id: number,
   productData: Partial<Omit<NewProduct, 'id' | 'created_at'>>
 ): Promise<Product | null> {
   try {
@@ -147,7 +169,7 @@ export async function updateProduct(
       })
       .where(eq(products.id, id))
       .returning();
-    
+
     revalidatePath(`/products/${id}`);
     revalidatePath('/products');
     return updatedProduct || null;
@@ -157,14 +179,14 @@ export async function updateProduct(
   }
 }
 
-// Eliminar un producto
+// ✅ Eliminar un producto
 export async function deleteProduct(id: number): Promise<boolean> {
   try {
     const [deletedProduct] = await db
       .delete(products)
       .where(eq(products.id, id))
       .returning({ id: products.id });
-    
+
     revalidatePath('/products');
     return !!deletedProduct;
   } catch (error) {
@@ -173,7 +195,7 @@ export async function deleteProduct(id: number): Promise<boolean> {
   }
 }
 
-// Obtener productos destacados
+// ✅ Obtener productos destacados
 export async function getFeaturedProducts(limit: number = 5): Promise<Product[]> {
   try {
     return await db
@@ -187,13 +209,14 @@ export async function getFeaturedProducts(limit: number = 5): Promise<Product[]>
     throw new Error('No se pudieron obtener los productos destacados');
   }
 }
-// Obtener todos los productos (sin filtros, sin límite)
+
+// ✅ Obtener todos los productos (sin filtros, sin límite)
 export async function getAllProducts(): Promise<Product[]> {
   try {
     return await db
       .select()
       .from(products)
-      .orderBy(desc(products.created_at)); // 🔥 ordenados por fecha de creación (más recientes primero)
+      .orderBy(desc(products.created_at));
   } catch (error) {
     console.error('Error fetching all products:', error);
     throw new Error('No se pudieron obtener todos los productos');

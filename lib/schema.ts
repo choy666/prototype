@@ -22,6 +22,7 @@ export const products = pgTable('products', {
   category: text('category').notNull(),
   destacado: boolean('destacado').default(false).notNull(),
   stock: integer('stock').default(0).notNull(),
+  discount: integer('discount').default(0).notNull(), // porcentaje de descuento
   created_at: timestamp('created_at').defaultNow().notNull(),
   updated_at: timestamp('updated_at').defaultNow().notNull(),
 });

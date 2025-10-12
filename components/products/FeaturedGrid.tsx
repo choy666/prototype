@@ -1,6 +1,8 @@
 // components/products/FeaturedGrid.tsx
 import { Product } from "@/lib/schema";
 import { ProductCard } from "./ProductCard";
+import { DiscountBadge } from "@/components/ui/DiscountBadge";   // 🔥 nuevo
+import { getDiscountedPrice } from "@/lib/utils/pricing"; // 🔥 nuevo
 
 interface FeaturedGridProps {
   products: Product[];
@@ -11,20 +13,15 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
   const featured = products.filter((p) => p.destacado);
   const nonFeatured = products.filter((p) => !p.destacado);
 
-  // Producto grande: siempre destacado
   const mainFeatured = featured[0];
   if (!mainFeatured) return null;
 
-  // Producto recomendado (derecha arriba)
   const recommended = featured[1] || nonFeatured[0];
-
-  // Producto fallback (derecha abajo)
   const fallback =
     (featured[1] ? featured[2] : nonFeatured[1]) ||
     nonFeatured[1] ||
     null;
 
-  // Array final de secundarios
   const secondary: Product[] = [recommended, fallback].filter(Boolean) as Product[];
 
   return (
@@ -37,9 +34,24 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
           onAddToCart={onAddToCart}
           className="h-full w-full object-cover relative"
         />
+
+        {/* Badge de oferta */}
+        <DiscountBadge discount={mainFeatured.discount} />
+
         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">
           <h3 className="text-white text-2xl font-bold">{mainFeatured.name}</h3>
-          <p className="text-2xl font-bold">${mainFeatured.price}</p>
+          <p className="text-2xl font-bold">
+            {mainFeatured.discount > 0 ? (
+              <>
+                <span className="line-through text-gray-300 mr-2">
+                  ${mainFeatured.price}
+                </span>
+                <span>${getDiscountedPrice(mainFeatured).toFixed(2)}</span>
+              </>
+            ) : (
+              <>${mainFeatured.price}</>
+            )}
+          </p>
         </div>
       </div>
 
@@ -52,14 +64,28 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
               onAddToCart={onAddToCart}
               className="h-full w-full object-cover relative"
             />
+
+            {/* Badge de oferta */}
+            <DiscountBadge discount={product.discount} />
+
             <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3">
               <h3 className="text-white text-xl font-bold">{product.name}</h3>
-              <p className="font-bold">${product.price}</p>
+              <p className="font-bold">
+                {product.discount > 0 ? (
+                  <>
+                    <span className="line-through text-gray-300 mr-2">
+                      ${product.price}
+                    </span>
+                    <span>${getDiscountedPrice(product).toFixed(2)}</span>
+                  </>
+                ) : (
+                  <>${product.price}</>
+                )}
+              </p>
             </div>
           </div>
         ))}
 
-        {/* Si solo hay un secundario, reservamos espacio */}
         {secondary.length < 2 && (
           <div className="aspect-[4/3] md:aspect-auto md:h-[240px]" />
         )}

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getCategories } from '@/lib/actions/products';
-import { ProductFilters as ProductFiltersType } from '@/types';
+import type { ProductFilters as ProductFiltersType } from '@/types';
 
 interface ProductFiltersProps {
   filters: ProductFiltersType;
@@ -25,6 +25,7 @@ export function ProductFilters({
 }: ProductFiltersProps) {
   const [localFilters, setLocalFilters] = useState<Partial<ProductFiltersType>>(filters);
   const [categories, setCategories] = useState<string[]>([]);
+  const pendingUpdates = useRef<Partial<ProductFiltersType> | null>(null);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -42,14 +43,29 @@ export function ProductFilters({
     setLocalFilters(filters);
   }, [filters]);
 
+  // Notificar al padre después del render
+  useEffect(() => {
+    if (pendingUpdates.current) {
+      onFilterChange(pendingUpdates.current);
+      pendingUpdates.current = null;
+    }
+  }, [localFilters, onFilterChange]);
+
   const handleFilterChange = (updates: Partial<ProductFiltersType>) => {
-    const newFilters = { ...localFilters, ...updates };
-    setLocalFilters(newFilters);
-    onFilterChange(updates);
+    setLocalFilters(prev => ({ ...prev, ...updates }));
+    pendingUpdates.current = updates;
   };
 
   const handleCategoryChange = (value: string) => {
-    handleFilterChange({ category: value === 'all' ? undefined : value });
+    if (value === 'all') {
+      // ✅ "Todas las categorías" → category = undefined
+      handleFilterChange({ category: undefined, minDiscount: undefined });
+    } else if (value === 'OFERTAS') {
+      // ✅ Ofertas → sin categoría, pero con minDiscount
+      handleFilterChange({ category: undefined, minDiscount: 1 });
+    } else {
+      handleFilterChange({ category: value, minDiscount: undefined });
+    }
   };
 
   const handleSortChange = (type: 'sortBy' | 'sortOrder', value: string) => {
@@ -58,15 +74,16 @@ export function ProductFilters({
 
   const resetFilters = () => {
     const resetValues: Partial<ProductFiltersType> = {
-      category: undefined,
+      category: undefined, // ✅ nunca "all"
       minPrice: priceRange.min,
       maxPrice: priceRange.max,
       search: '',
       sortBy: 'name',
-      sortOrder: 'asc' as const
+      sortOrder: 'asc',
+      minDiscount: undefined,
     };
     setLocalFilters(resetValues);
-    onFilterChange(resetValues);
+    pendingUpdates.current = resetValues;
   };
 
   return (
@@ -85,7 +102,6 @@ export function ProductFilters({
         </div>
         
         <div className="space-y-3">
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="sortBy" className="text-xs text-muted-foreground mb-1 block">
@@ -102,6 +118,7 @@ export function ProductFilters({
                   <SelectItem value="name">Nombre</SelectItem>
                   <SelectItem value="price">Precio</SelectItem>
                   <SelectItem value="created_at">Recientes</SelectItem>
+                  <SelectItem value="discount">Descuento</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -130,7 +147,11 @@ export function ProductFilters({
               Categoría
             </Label>
             <Select
-              value={localFilters.category || 'all'}
+              value={
+                localFilters.minDiscount
+                  ? 'OFERTAS'
+                  : localFilters.category ?? 'all'
+              }
               onValueChange={handleCategoryChange}
             >
               <SelectTrigger className="h-9">
@@ -138,6 +159,7 @@ export function ProductFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las categorías</SelectItem>
+                <SelectItem value="OFERTAS">OFERTAS</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}

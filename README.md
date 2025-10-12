@@ -287,6 +287,7 @@ _____________________________________________________
 
 
 # 🧠 Auditoría con Copilot
+
 ## 🚀 Contexto del Proyecto
 *Nombre:* Prototype E-commerce  
 *Stack Principal:* Next.js 15 (App Router), TypeScript 5.9, Turbopack, Tailwind CSS 4.1, NextAuth v5, Neon PostgreSQL  
@@ -331,3 +332,12 @@ json
 • Paso 3: Si el cambio afecta otros archivos → Copilot los menciona y devuelve todos sincronizados.
 
 npx eslint . --ext .js,.jsx,.ts,.tsx --format=codeframe
+
+
+
+
+
+npx drizzle-kit generate
+- Esto crea un archivo de migración en tu carpeta de migraciones (drizzle/migrations o la que tengas configurada)
+npx drizzle-kit push
+- Esto conecta con tu DATABASE_URL (que ya está en .env.local) y aplica el ALTER TABLE.
