@@ -8,9 +8,10 @@ import { useToast } from '@/components/ui/use-toast'
 
 type AddToCartButtonProps = {
   product: {
-    id: number          // 🔄 ahora number
+    id: number
     name: string
-    price: number
+    price: number       // precio original
+    discount: number   // 👈 soporta descuento
     image: string | null
     stock: number
   }
@@ -48,9 +49,10 @@ export function AddToCartButton({
     setIsAdding(true)
 
     addItem({
-      id: product.id,   // 🔄 ya no se castea a string
+      id: product.id,
       name: product.name,
-      price: product.price,
+      price: product.price,               // precio original
+      discount: product.discount ?? 0,    // 👈 guardamos descuento
       image: product.image || undefined,
       quantity,
       stock: product.stock,
@@ -61,20 +63,21 @@ export function AddToCartButton({
     }, 1000)
   }
 
-// En AddToCartButton.tsx
-useEffect(() => {
-  if (error) {
-    const errorMessage = typeof error === 'string' ? error : error?.message || 'Error desconocido';
-    toast({
-      title: 'Error',
-      description: errorMessage,
-      variant: 'destructive',
-    });
-    // Limpiar el error después de mostrarlo
-    useCartStore.getState().clearError();
-  }
-}, [error, toast]);
+  // Manejo de errores del store
+  useEffect(() => {
+    if (error) {
+      const errorMessage =
+        typeof error === 'string' ? error : error?.message || 'Error desconocido'
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      })
+      useCartStore.getState().clearError()
+    }
+  }, [error, toast])
 
+  // Limpieza del timeout
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {

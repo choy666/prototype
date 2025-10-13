@@ -1,3 +1,4 @@
+// components/ui/skeleton
 'use client';
 
 import { cn } from '@/lib/utils';

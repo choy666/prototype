@@ -6,27 +6,55 @@ import { formatPrice } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Product } from '@/types';
 import { AddToCartButton } from '@/components/cart/AddToCartButton';
+import { DiscountBadge } from '@/components/ui/DiscountBadge';
+import { getDiscountedPrice } from '@/lib/utils/pricing';
 
 export default function ProductClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // Normalizamos imágenes para la galería
   const productImages = useMemo<string[]>(() => {
     if (!product?.image) return ['/placeholder-product.jpg'];
     return Array.isArray(product.image) ? product.image.slice(0, 3) : [product.image];
   }, [product?.image]);
 
-  const price = useMemo(() => Number(product.price), [product.price]);
+  // Precio original como number
+  const price = Number(product.price);
+
+  // Normalizamos para getDiscountedPrice
+  const normalizedProduct = {
+    ...product,
+    image: Array.isArray(product.image)
+      ? product.image[0] ?? null
+      : product.image ?? null,
+    created_at:
+      product.created_at instanceof Date
+        ? product.created_at
+        : new Date(product.created_at),
+    updated_at:
+      product.updated_at instanceof Date
+        ? product.updated_at
+        : new Date(product.updated_at),
+  };
+
+  const hasDiscount = (product.discount ?? 0) > 0;
+  const finalPrice = getDiscountedPrice(normalizedProduct);
+
   const currentImage = productImages[currentImageIndex % productImages.length];
 
   const nextImage = () => {
     if (!productImages.length) return;
-    setCurrentImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1));
+    setCurrentImageIndex(prev =>
+      prev === productImages.length - 1 ? 0 : prev + 1
+    );
   };
 
   const prevImage = () => {
     if (!productImages.length) return;
-    setCurrentImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1));
+    setCurrentImageIndex(prev =>
+      prev === 0 ? productImages.length - 1 : prev - 1
+    );
   };
 
   return (
@@ -42,6 +70,9 @@ export default function ProductClient({ product }: { product: Product }) {
               className="object-cover"
               priority
             />
+
+            {hasDiscount && <DiscountBadge discount={product.discount} />}
+
             {productImages.length > 1 && (
               <>
                 <button
@@ -67,7 +98,8 @@ export default function ProductClient({ product }: { product: Product }) {
             {Array.from({ length: 3 }).map((_, index) => {
               const imgIndex = index % productImages.length;
               const img = productImages[imgIndex];
-              const isActive = currentImageIndex % productImages.length === imgIndex;
+              const isActive =
+                currentImageIndex % productImages.length === imgIndex;
 
               return (
                 <button
@@ -94,10 +126,22 @@ export default function ProductClient({ product }: { product: Product }) {
 
         {/* Información del producto */}
         <div className="space-y-4 sm:space-y-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">{product.name}</h1>
-          <p className="text-2xl sm:text-2xl font-semibold text-primary">
-            {formatPrice(price)}
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">
+            {product.name}
+          </h1>
+
+          <div className="text-2xl sm:text-2xl font-semibold text-primary">
+            {hasDiscount ? (
+              <div className="flex flex-col">
+                <span className="text-sm text-gray-400 line-through">
+                  {formatPrice(price)}
+                </span>
+                <span>{formatPrice(finalPrice)}</span>
+              </div>
+            ) : (
+              <span>{formatPrice(price)}</span>
+            )}
+          </div>
 
           <p className="text-gray-600">{product.description}</p>
 
@@ -123,9 +167,10 @@ export default function ProductClient({ product }: { product: Product }) {
               product={{
                 id: product.id,
                 name: product.name,
-                price: price,
+                price: price,                  // guardamos precio original
+                discount: product.discount,    // 👈 pasamos descuento al carrito
                 image: productImages[0] || '/placeholder-product.jpg',
-                stock: product.stock
+                stock: product.stock,
               }}
               quantity={quantity}
               className="flex-1"

@@ -27,7 +27,7 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-7 bg-black rounded-lg">
       {/* Producto grande a la izquierda */}
-      <div className="relative aspect-[4/3] md:aspect-auto md:h-[500px] md:col-span-2">
+      <div className="relative aspect-[4/3] md:aspect-auto md:h-[470px] md:col-span-2 lg:h-[620px]">
         <ProductCard
           key={mainFeatured.id}
           product={mainFeatured}
@@ -39,8 +39,8 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
         <DiscountBadge discount={mainFeatured.discount} />
 
         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">
-          <h3 className="text-white text-2xl font-bold">{mainFeatured.name}</h3>
-          <p className="text-2xl font-bold">
+          <h3 className="text-white text-xl font-bold">{mainFeatured.name}</h3>
+          <p className="text-xl font-bold">
             {mainFeatured.discount > 0 ? (
               <>
                 <span className="line-through text-gray-300 mr-2">
@@ -58,7 +58,7 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
       {/* Columna derecha con 2 filas fijas */}
       <div className="grid grid-rows-2 gap-6">
         {secondary.map((product) => (
-          <div key={product.id} className="relative aspect-[4/3] md:aspect-auto md:h-[240px]">
+          <div key={product.id} className="relative aspect-[4/3] md:aspect-auto md:h-[230px] lg:h-[300px]">
             <ProductCard
               product={product}
               onAddToCart={onAddToCart}

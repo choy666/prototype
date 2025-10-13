@@ -1,11 +1,11 @@
-// lib/stores/useCartStore.ts
 import { create } from 'zustand'
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware'
 
 export interface CartItem {
   id: number
   name: string
-  price: number
+  price: number            // precio original
+  discount: number        // porcentaje de descuento
   image?: string
   quantity: number
   stock: number
@@ -40,7 +40,6 @@ const storage: StateStorage = {
       localStorage.setItem(name, value);
     } catch (error) {
       console.error('Error guardando en almacenamiento local:', error);
-      // Opcional: Podrías implementar un fallback a sessionStorage o memoria
     }
   },
   removeItem: (name: string): void => {
@@ -128,25 +127,13 @@ export const useCartStore = create<CartState>()(
         }),
       addItem: (newItem) =>
         set((state) => {
-          const existing = state.items.find((i) => i.id === newItem.id)
+          const existing = state.items.find((i) => i.id === newItem.id);
 
           if (existing) {
-            const newQty = existing.quantity + newItem.quantity
+            const newQty = existing.quantity + newItem.quantity;
 
             if (newQty > existing.stock) {
-              const adjustedQty = Math.min(newQty, existing.stock)
-              const addedQty = adjustedQty - existing.quantity
-
-              if (addedQty <= 0) {
-                return {
-                  ...state,
-                  error: {
-                    type: 'adjusted',
-                    message: `Cantidad ajustada al stock disponible`,
-                  },
-                }
-              }
-
+              const adjustedQty = Math.min(newQty, existing.stock);
               return {
                 items: state.items.map((i) =>
                   i.id === newItem.id ? { ...i, quantity: adjustedQty } : i
@@ -155,15 +142,14 @@ export const useCartStore = create<CartState>()(
                   type: 'adjusted',
                   message: `Cantidad ajustada al stock disponible`,
                 },
-              }
+              };
             }
 
             return {
-              items: [
-                ...state.items,
-                { ...newItem, quantity: Math.min(newItem.quantity, newItem.stock) },
-              ],
-            }
+              items: state.items.map((i) =>
+                i.id === newItem.id ? { ...i, quantity: newQty } : i
+              ),
+            };
           }
 
           if (newItem.stock === 0) {
@@ -173,7 +159,7 @@ export const useCartStore = create<CartState>()(
                 type: 'outOfStock',
                 message: `Este producto no tiene stock disponible`,
               },
-            }
+            };
           }
 
           return {
@@ -181,8 +167,8 @@ export const useCartStore = create<CartState>()(
               ...state.items,
               { ...newItem, quantity: Math.min(newItem.quantity, newItem.stock) },
             ],
-          }
-        }),
+          };
+      }),
       removeItem: (id) =>
         set((state) => ({
           items: state.items.filter((i) => i.id !== id),
@@ -202,7 +188,12 @@ export const useCartStore = create<CartState>()(
         })),
       clearCart: () => set({ items: [] }),
       totalPrice: () =>
-        get().items.reduce((acc, i) => acc + i.price * i.quantity, 0),
+        get().items.reduce((acc, i) => {
+          const finalPrice = i.discount && i.discount > 0
+            ? i.price * (1 - i.discount / 100)
+            : i.price
+          return acc + finalPrice * i.quantity
+        }, 0),
     }),
     {
       name: 'cart-storage',
@@ -210,7 +201,6 @@ export const useCartStore = create<CartState>()(
       partialize: (state) => ({ items: state.items }), // Solo persiste los items
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Aquí podrías hacer validaciones adicionales al hidratar
           console.log('Carrito hidratado', state.items.length, 'productos')
         }
       },

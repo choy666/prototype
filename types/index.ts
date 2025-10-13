@@ -9,9 +9,10 @@ export interface User {
 }
 
 export interface Product {
+  discount: number;
   id: number;
   name: string;
-  description?: string | null;
+  description: string | null;
   price: string;
   image?: string | string[] | null;
   category: string;
