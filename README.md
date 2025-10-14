@@ -126,14 +126,16 @@ promt final
 {
   "next": "15.5.3",
   "react": "19.1.0",
+  "react-dom": "19.1.0",
   "typescript": "5.9.2",
-  "next-auth": "^5.0.0-beta.29",
-  "@auth/drizzle-adapter": "^1.10.0",
+  "next-auth": "5.0.0-beta.29",
+  "@auth/core": "0.40.0",
+  "@auth/drizzle-adapter": "1.11.0",
   "@neondatabase/serverless": "1.0.1",
-  "drizzle-orm": "0.31.4",
-  "drizzle-kit": "^0.31.4",
+  "drizzle-orm": "0.44.5",
+  "drizzle-kit": "0.31.5",
   "tailwindcss": "4.1.13",
-  "zod": "3.22.4"
+  "zod": "4.1.12"
 }
 
 ## 🏗️ Estructura de Directorios
@@ -331,13 +333,97 @@ json
 • Paso 2: Copilot audita y comenta explicando ayudando a entender el archivo y aplica las reglas de auditoria mencionadas
 • Paso 3: Si el cambio afecta otros archivos → Copilot los menciona y devuelve todos sincronizados.
 
-npx eslint . --ext .js,.jsx,.ts,.tsx --format=codeframe
+
+
+
+
+-------------------------------------------------------
+# 🛠️ Prototype E-commerce – Guía Completa
+## 📦 Instalación y dependencias
+# Instalar dependencias exactas (recomendado en CI/CD)
+npm ci
+# Instalar dependencias en local (desarrollo)
+npm install
+-------------------------------------------------------
+## 🚀 Desarrollo
+# Levantar el servidor local con Turbopack
+npm run dev
+-------------------------------------------------------
+## 🏗️ Build y Producción
+# Generar build optimizado
+npm run build
+# Iniciar servidor en modo producción
+npm run start
+-------------------------------------------------------
+## ✅ Calidad de Código
+# Linter (detectar errores de estilo y reglas)
+npm run lint
+# Linter con autofix
+npm run lint:fix
+# Chequeo de tipos con TypeScript
+npm run typecheck
+-------------------------------------------------------
+## 🗄️ Base de Datos (Drizzle + Neon)
+# Generar migraciones
+npm run db:generate
+# Aplicar migraciones
+npm run db:push
+# Abrir Drizzle Studio
+npm run db:studio
+# Validar migraciones en dry-run (auditoría)
+npm run db:check
+# Backup y restore de la base
+npm run db:backup
+npm run db:restore
+-------------------------------------------------------
+## 🧪 Testing
+# Ejecutar tests unitarios
+npm run test
+-------------------------------------------------------
+### Inicialización Neon + Drizzle
+// lib/db.ts
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+const sql = neon(process.env.DATABASE_URL!);
+export const db = drizzle(sql);
+-------------------------------------------------------
+## 📊 Flujo de CI/CD (resumen)
+1. **Checkout** del repo  
+2. **Setup Node.js** (v20)  
+3. **Instalar dependencias** con `npm ci`  
+4. **Lint** (`npm run lint`)  
+5. **Typecheck** (`npm run typecheck`)  
+6. **Auditoría DB** (`npm run db:check`)  
+7. **Build** (`npm run build`)  
 
 
 
 
 
-npx drizzle-kit generate
-- Esto crea un archivo de migración en tu carpeta de migraciones (drizzle/migrations o la que tengas configurada)
-npx drizzle-kit push
-- Esto conecta con tu DATABASE_URL (que ya está en .env.local) y aplica el ALTER TABLE.
+## 🚀 Contexto del Proyecto
+**Nombre:** Prototype E-commerce  
+**Stack Principal:** Next.js 15 (App Router), TypeScript 5.9, Turbopack, Tailwind CSS 4.1, NextAuth v5, Neon PostgreSQL
+**Arquitectura:** Modular con separación clara de responsabilidades  
+**Repositorio:** [choy666/prototype](https://github.com/choy666/prototype)  
+
+## 📦 Dependencias Clave
+{
+  "next": "15.5.3",
+  "react": "19.1.0",
+  "react-dom": "19.1.0",
+  "typescript": "5.9.2",
+  "next-auth": "5.0.0-beta.29",
+  "@auth/core": "0.40.0",
+  "@auth/drizzle-adapter": "1.11.0",
+  "@neondatabase/serverless": "1.0.1",
+  "drizzle-orm": "0.44.5",
+  "drizzle-kit": "0.31.5",
+  "tailwindcss": "4.1.13",
+  "zod": "4.1.12"
+}
+
+
+
+####Tareas####
+##Auditar el siguiente archivo para solucionar el error.
+##Devolver el archivo completo con las cambios mencionados y el porque.

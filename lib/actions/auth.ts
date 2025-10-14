@@ -1,4 +1,3 @@
-// lib/actions/auth.ts
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error("❌ Error crítico: La variable de entorno NEXTAUTH_SECRET no está definida.");
 }
@@ -33,6 +32,13 @@ declare module "next-auth" {
     id: string;
     role: UserRole;
     [key: string]: unknown;
+  }
+}
+
+// 🔧 Extender AdapterUser para que el adapter y next-auth usen el mismo tipo
+declare module "@auth/core/adapters" {
+  interface AdapterUser {
+    role: UserRole;
   }
 }
 

@@ -2,7 +2,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useCartStore } from '@/lib/stores/useCartStore'
 import { Button } from '@/components/ui/Button'
@@ -50,7 +49,6 @@ const fields: FieldConfig[] = [
 
 export default function CheckoutPage() {
   const { data: session } = useSession()
-  const router = useRouter()
   const { items, totalPrice, clearCart } = useCartStore()
 
   const [shippingForm, setShippingForm] = useState<ShippingForm>({

@@ -15,7 +15,6 @@ export default function CartPage() {
     removeItem, 
     updateQuantity, 
     clearCart, 
-    totalPrice 
   } = useCartStore()
 
   if (items.length === 0) {

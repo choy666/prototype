@@ -1,4 +1,4 @@
-// app/checkout/route.ts
+// app/api/checkout/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { db } from '@/lib/db'
@@ -9,6 +9,16 @@ import { getDiscountedPrice } from '@/lib/utils/pricing'
 import { createPreference } from '@/lib/mercadopago/mercadopago'
 import { ShippingFormSchema } from '@/lib/mercadopago/validationsMP'
 
+// ✅ Tipo inferido de la tabla products
+type ProductRow = typeof products.$inferSelect
+
+// ✅ Tipo para items ya procesados
+interface ComputedItem extends CheckoutItem {
+  name: string
+  unitPrice: number
+  discount?: number // 👈 compatible con CheckoutItem
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -16,7 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       items: CheckoutItem[]
       shippingAddress: unknown
       total?: number | string
@@ -39,12 +49,12 @@ export async function POST(request: NextRequest) {
 
     // --- Recalcular precios desde DB ---
     const productIds = items.map(i => i.id)
-    const dbProducts = await db
+    const dbProducts: ProductRow[] = await db
       .select()
       .from(products)
       .where(inArray(products.id, productIds))
 
-    const byId = new Map<number, typeof dbProducts[number]>()
+    const byId = new Map<number, ProductRow>()
     for (const p of dbProducts) byId.set(p.id as number, p)
 
     for (const item of items) {
@@ -53,17 +63,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const computedItems = items.map(item => {
+    const computedItems: ComputedItem[] = items.map(item => {
       const p = byId.get(item.id)!
       const finalUnitPrice = getDiscountedPrice({
         price: p.price,
-        discount: p.discount,
+        discount: p.discount ?? undefined, // 👈 normalizamos null → undefined
       })
       return {
         ...item,
-        name: (p as any).name,
+        name: p.name,
         unitPrice: finalUnitPrice,
-        discount: p.discount,
+        discount: p.discount ?? undefined,
       }
     })
 

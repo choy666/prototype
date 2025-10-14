@@ -2,10 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 import { Product } from '@/lib/schema';
 import { formatPrice } from '@/lib/utils';
-import { ShoppingCart, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import { getDiscountedPrice } from '@/lib/utils/pricing';
@@ -15,14 +13,12 @@ interface ProductCardProps {
   product: Product;
   className?: string;
   isLoading?: boolean;
-  onAddToCart?: (productId: string) => void;
 }
 
 export function ProductCard({
   product,
   className = '',
   isLoading = false,
-  onAddToCart
 }: ProductCardProps) {
   if (isLoading) {
     return <ProductCardSkeleton className={className} />;
@@ -30,12 +26,6 @@ export function ProductCard({
 
   const hasDiscount = product.discount && product.discount > 0;
   const finalPrice = getDiscountedPrice(product);
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onAddToCart?.(String(product.id));
-  };
 
   return (
     <div

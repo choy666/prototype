@@ -6,10 +6,9 @@ import { getDiscountedPrice } from "@/lib/utils/pricing"; // 🔥 nuevo
 
 interface FeaturedGridProps {
   products: Product[];
-  onAddToCart?: (id: string) => void;
 }
 
-export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProps) {
+export default function FeaturedGrid({ products }: FeaturedGridProps) {
   const featured = products.filter((p) => p.destacado);
   const nonFeatured = products.filter((p) => !p.destacado);
 
@@ -31,7 +30,6 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
         <ProductCard
           key={mainFeatured.id}
           product={mainFeatured}
-          onAddToCart={onAddToCart}
           className="h-full w-full object-cover relative"
         />
 
@@ -61,7 +59,6 @@ export default function FeaturedGrid({ products, onAddToCart }: FeaturedGridProp
           <div key={product.id} className="relative aspect-[4/3] md:aspect-auto md:h-[230px] lg:h-[300px]">
             <ProductCard
               product={product}
-              onAddToCart={onAddToCart}
               className="h-full w-full object-cover relative"
             />
 

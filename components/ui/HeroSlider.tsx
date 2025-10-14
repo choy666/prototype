@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Product } from "@/lib/schema";
 import { useEffect, useMemo, useState } from "react";
 import { getAllProducts } from "@/lib/actions/products";
-import { useKeenSlider } from "keen-slider/react";
+import { useKeenSlider, KeenSliderInstance } from "keen-slider/react"; // ✅ importamos el tipo
 import { usePathname } from "next/navigation";
 import "keen-slider/keen-slider.min.css";
 
@@ -13,7 +13,7 @@ import "keen-slider/keen-slider.min.css";
  * Plugin autoplay slide-a-slide con cleanup completo y pausa por visibilidad.
  */
 function AutoplaySlides(getInterval: () => number) {
-  return (slider: any) => {
+  return (slider: KeenSliderInstance) => { // ✅ tipado correcto
     let timeout: ReturnType<typeof setTimeout> | null = null;
     let mouseOver = false;
     let pageHidden = false;
@@ -126,13 +126,9 @@ export default function HeroSlider() {
     [AutoplaySlides(getInterval)]
   );
 
-  // Key de remount robusto: cambia cuando:
-  // - cambia la ruta
-  // - cambia el número de productos
-  // - cambia un "salt" que forzamos al volver (1 render en cliente)
+  // Key de remount robusto
   const [clientSalt, setClientSalt] = useState(0);
   useEffect(() => {
-    // Fuerza al menos un remount cuando el componente se monta en cliente
     setClientSalt((s) => s + 1);
   }, [pathname]);
 
@@ -164,7 +160,6 @@ export default function HeroSlider() {
     );
   }
 
-  // Handlers seguros: no llamar si la instancia aún no existe
   const handlePrev = () => {
     const inst = instanceRef.current;
     if (!inst) return;
