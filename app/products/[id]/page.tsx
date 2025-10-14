@@ -1,26 +1,42 @@
-// app/products/[id]/page.tsx
-import { notFound } from 'next/navigation';
-import { getProductById } from '@/lib/actions/products';
-import ProductClient from '@/app/products/[id]/ProductClient';
-import type { ProductPageProps } from '@/types';
+import { notFound } from 'next/navigation'
+import { getProductById } from '@/lib/actions/products'
+import ProductClient from '@/app/products/[id]/ProductClient'
+import { z } from 'zod'
 
-export default async function ProductDetailPage({ params }: ProductPageProps) {
+// ✅ Esquema de validación para params
+const paramsSchema = z.object({
+  id: z
+    .string()
+    .regex(/^\d+$/, 'El ID debe ser numérico')
+    .transform((val) => parseInt(val, 10)),
+})
+
+export default async function ProductDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   try {
-    const { id } = await params;
-    
-    if (!id || isNaN(Number(id))) {
-      notFound();
+    // 🔎 Resolver params primero
+    const rawParams = await params
+
+    // 🔎 Validar con Zod
+    const parsed = paramsSchema.safeParse(rawParams)
+    if (!parsed.success) {
+      return notFound()
     }
 
-    const product = await getProductById(Number(id));
+    const productId = parsed.data.id
+
+    const product = await getProductById(productId)
 
     if (!product) {
-      notFound();
+      return notFound()
     }
 
-    return <ProductClient product={product} />;
+    return <ProductClient product={product} />
   } catch (error) {
-    console.error('Error loading product:', error);
-    notFound();
+    console.error('Error loading product:', error)
+    return notFound()
   }
 }

@@ -24,18 +24,6 @@ export interface Product {
 
 export type UserRole = 'user' | 'admin';
 
-export interface PageProps {
-  params?: Promise<{ [key: string]: string | string[] | undefined }>;
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}
-
-export interface ProductPageProps extends PageProps {
-  params: Promise<{ id: string }>;
-}
-
-// Filtros y paginación
-// types/index.ts
-
 export interface ProductFilters {
   category?: string;
   minPrice?: number;
@@ -120,3 +108,23 @@ export type UseSearchParamsResult = {
   searchParams: URLSearchParams;
   setSearchParams: (params: Record<string, string | string[] | undefined>) => void;
 };
+// interface para el checkouts
+export interface ShippingForm {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  state: string
+  zipCode: string
+  country: string
+}
+// Tipos del payload entrante
+export interface CheckoutItem {
+  id: number
+  name: string
+  price: number | string // el cliente puede enviar números o strings, NO se confía en esto para el cálculo
+  discount?: number
+  quantity: number
+}

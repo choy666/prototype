@@ -136,7 +136,9 @@ export default function CartPage() {
               <span>{formatCurrency(total)}</span>
             </div>
             <Button className="w-full mt-6 font-bold" size="lg">
+              <Link rel="stylesheet" href="/checkout">
               Proceder al pago
+              </Link>
             </Button>
             <div className="text-gray-600 text-center text-sm mt-4">
               <Link href="/products" className=" hover:underline">
