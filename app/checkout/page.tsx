@@ -1,4 +1,3 @@
-// app/checkout/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,11 +10,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { getDiscountedPrice } from '@/lib/utils/pricing'
 import { z } from 'zod'
-
-// ✅ SDK de Mercado Pago
 import { initMercadoPago, Wallet } from '@mercadopago/sdk-react'
-
-// ✅ Reutilizamos el esquema base
 import { ShippingFormSchema } from '@/lib/mercadopago/validationsMP'
 
 const ExtendedShippingSchema = ShippingFormSchema.extend({
@@ -66,7 +61,6 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof ShippingForm, string>>>({})
   const [preferenceId, setPreferenceId] = useState<string | null>(null)
 
-  // ✅ Inicializamos Mercado Pago con la PUBLIC KEY
   useEffect(() => {
     initMercadoPago(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY!, { locale: 'es-AR' })
   }, [])
@@ -94,7 +88,6 @@ export default function CheckoutPage() {
     }
 
     try {
-      // ✅ Pedimos al backend que cree la preferencia
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,7 +109,7 @@ export default function CheckoutPage() {
       if (!response.ok) throw new Error('Error al crear preferencia')
 
       const { preferenceId } = await response.json()
-      setPreferenceId(preferenceId) // 👈 Guardamos el ID para renderizar el Wallet
+      setPreferenceId(preferenceId)
       clearCart()
     } catch (error) {
       console.error('Error:', error)
@@ -162,7 +155,6 @@ export default function CheckoutPage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">
-        {/* Formulario de envío */}
         <div>
           <h2 className="text-2xl font-bold mb-6">Información de Envío</h2>
           <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
@@ -194,7 +186,6 @@ export default function CheckoutPage() {
           </form>
         </div>
 
-        {/* Resumen del pedido + Mercado Pago */}
         <div>
           <h2 className="text-2xl font-bold mb-6">Resumen del Pedido</h2>
           <div className="bg-gray-50 p-6 rounded-lg">
@@ -224,7 +215,6 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* 👇 Renderizamos el Wallet solo si ya tenemos preferenceId */}
             {preferenceId && (
               <div className="mt-6">
                 <Wallet initialization={{ preferenceId }} />

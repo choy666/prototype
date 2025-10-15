@@ -9,14 +9,12 @@ import { getDiscountedPrice } from '@/lib/utils/pricing'
 import { createPreference } from '@/lib/mercadopago/mercadopago'
 import { ShippingFormSchema } from '@/lib/mercadopago/validationsMP'
 
-// ✅ Tipo inferido de la tabla products
 type ProductRow = typeof products.$inferSelect
 
-// ✅ Tipo para items ya procesados
 interface ComputedItem extends CheckoutItem {
   name: string
   unitPrice: number
-  discount?: number // 👈 compatible con CheckoutItem
+  discount?: number
 }
 
 export async function POST(request: NextRequest) {
@@ -38,7 +36,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Carrito vacío' }, { status: 400 })
     }
 
-    // ✅ Validar shippingAddress con Zod
     const parsedShipping = ShippingFormSchema.safeParse(shippingAddress)
     if (!parsedShipping.success) {
       return NextResponse.json(
@@ -47,7 +44,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // --- Recalcular precios desde DB ---
     const productIds = items.map(i => i.id)
     const dbProducts: ProductRow[] = await db
       .select()
@@ -67,7 +63,7 @@ export async function POST(request: NextRequest) {
       const p = byId.get(item.id)!
       const finalUnitPrice = getDiscountedPrice({
         price: p.price,
-        discount: p.discount ?? undefined, // 👈 normalizamos null → undefined
+        discount: p.discount ?? undefined,
       })
       return {
         ...item,
@@ -79,30 +75,28 @@ export async function POST(request: NextRequest) {
 
     const serverTotal = computedItems.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0)
 
-    // --- Crear orden en DB ---
-    const { orderId } = await db.transaction(async (tx) => {
-      const [order] = await tx.insert(orders).values({
-        userId: parseInt(session.user.id),
-        total: serverTotal.toFixed(2), // 👈 decimal espera string
-        status: 'pending',
-        shippingAddress: parsedShipping.data,
-      }).returning()
+    // Crear orden sin transacción (Neon HTTP no soporta transacciones)
+    const [order] = await db.insert(orders).values({
+      userId: parseInt(session.user.id),
+      total: serverTotal.toFixed(2),
+      status: 'pending',
+      shippingAddress: parsedShipping.data,
+    }).returning()
 
-      await Promise.all(
-        computedItems.map(ci =>
-          tx.insert(orderItems).values({
-            orderId: order.id,
-            productId: ci.id,
-            quantity: ci.quantity,
-            price: ci.unitPrice.toFixed(2), // 👈 decimal espera string
-          })
-        )
+    const orderId = order.id
+
+    // Insertar items de la orden
+    await Promise.all(
+      computedItems.map(ci =>
+        db.insert(orderItems).values({
+          orderId: orderId,
+          productId: ci.id,
+          quantity: ci.quantity,
+          price: ci.unitPrice.toFixed(2),
+        })
       )
+    )
 
-      return { orderId: order.id }
-    })
-
-    // --- Crear preferencia con helper ---
     const { preferenceId, mpId } = await createPreference({
       items: computedItems.map(ci => ({
         id: ci.id.toString(),
@@ -120,6 +114,7 @@ export async function POST(request: NextRequest) {
         failure: `${process.env.NEXTAUTH_URL}/checkout/failure`,
         pending: `${process.env.NEXTAUTH_URL}/checkout/pending`,
       },
+      auto_return: 'approved',
       external_reference: orderId.toString(),
     })
 
