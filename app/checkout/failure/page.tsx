@@ -1,3 +1,4 @@
+// app/checkout/failure/page.tsx
 'use client';
 
 import { useRouter } from 'next/navigation';

@@ -2,8 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { auth } from '@/lib/actions/auth';
 import { db } from '@/lib/db';
-import { orders, orderItems } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { orders, orderItems, products } from '@/lib/schema';
+import { eq, sql } from 'drizzle-orm';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
+
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  discount: number;
+  quantity: number;
+}
+
+interface DbProduct {
+  id: number;
+  name: string;
+  price: string;
+  discount: number;
+  stock: number;
+}
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
@@ -11,6 +29,12 @@ const client = new MercadoPagoConfig({
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar rate limiting
+    const rateLimitResponse = checkRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -20,7 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { items } = await request.json();
+    const { items }: { items: CartItem[] } = await request.json();
 
     if (!items || items.length === 0) {
       return NextResponse.json(
@@ -75,43 +99,155 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validar precios y stock contra la base de datos
+    const productIds = items.map((item: CartItem) => item.id);
+    const productsFromDb = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        price: products.price,
+        discount: products.discount,
+        stock: products.stock,
+      })
+      .from(products)
+      .where(sql`${products.id} = ANY(${productIds})`);
+
+    // Verificar que todos los productos existen
+    if (productsFromDb.length !== items.length) {
+      const foundIds = productsFromDb.map((p: DbProduct) => p.id);
+      const missingIds = productIds.filter((id: number) => !foundIds.includes(id));
+      logger.warn('Productos no encontrados en checkout', { missingIds, totalItems: items.length });
+      return NextResponse.json(
+        { error: 'Uno o más productos no existen' },
+        { status: 400 }
+      );
+    }
+
+    // Crear mapa de productos para validación rápida
+    const productMap = new Map(productsFromDb.map(p => [p.id, p]));
+
+    // Validar precios, descuentos y stock
+    const validationErrors: string[] = [];
+    for (const item of items) {
+      const dbProduct = productMap.get(item.id);
+      if (!dbProduct) continue;
+
+      // Validar precio
+      const dbPrice = parseFloat(dbProduct.price);
+      if (Math.abs(item.price - dbPrice) > 0.01) { // Tolerancia de 1 centavo
+        validationErrors.push(
+          `Precio manipulado para ${dbProduct.name}: cliente=${item.price}, BD=${dbPrice}`
+        );
+        logger.warn('Precio manipulado detectado', {
+          productId: item.id,
+          productName: dbProduct.name,
+          clientPrice: item.price,
+          dbPrice: dbPrice
+        });
+      }
+
+      // Validar descuento
+      if (item.discount !== dbProduct.discount) {
+        validationErrors.push(
+          `Descuento manipulado para ${dbProduct.name}: cliente=${item.discount}%, BD=${dbProduct.discount}%`
+        );
+        logger.warn('Descuento manipulado detectado', {
+          productId: item.id,
+          productName: dbProduct.name,
+          clientDiscount: item.discount,
+          dbDiscount: dbProduct.discount
+        });
+      }
+
+      // Validar stock
+      if (item.quantity > dbProduct.stock) {
+        validationErrors.push(
+          `Stock insuficiente para ${dbProduct.name}: solicitado=${item.quantity}, disponible=${dbProduct.stock}`
+        );
+        logger.warn('Stock insuficiente detectado', {
+          productId: item.id,
+          productName: dbProduct.name,
+          requestedQuantity: item.quantity,
+          availableStock: dbProduct.stock
+        });
+      }
+    }
+
+    // Si hay errores de validación, rechazar la orden
+    if (validationErrors.length > 0) {
+      logger.warn('Validación de checkout fallida', {
+        validationErrors,
+        itemCount: items.length,
+        userId: session.user.id
+      });
+      return NextResponse.json(
+        {
+          error: 'Datos de productos inválidos',
+          details: validationErrors
+        },
+        { status: 400 }
+      );
+    }
+
     // Calcular total
-    const total = items.reduce((acc: number, item: any) => {
+    const total = items.reduce((acc: number, item: CartItem) => {
       const finalPrice = item.discount && item.discount > 0
         ? item.price * (1 - item.discount / 100)
         : item.price;
       return acc + finalPrice * item.quantity;
     }, 0);
 
-    // Crear orden en la base de datos
-    const orderResult = await db
-      .insert(orders)
-      .values({
-        userId: parseInt(session.user.id),
-        total: total.toString(),
-        status: 'pending',
-      })
-      .returning();
+    // Usar transacción para asegurar atomicidad: crear orden, items y reservar stock
+    const order = await db.transaction(async (tx) => {
+      // Crear orden en la base de datos
+      const orderResult = await tx
+        .insert(orders)
+        .values({
+          userId: parseInt(session.user.id),
+          total: total.toString(),
+          status: 'pending',
+        })
+        .returning();
 
-    const order = orderResult[0];
+      const order = orderResult[0];
 
-    // Insertar items de la orden
-    await db.insert(orderItems).values(
-      items.map((item: any) => ({
+      // Insertar items de la orden
+      await tx.insert(orderItems).values(
+        items.map((item: CartItem) => ({
+          orderId: order.id,
+          productId: item.id,
+          quantity: item.quantity,
+          price: (item.discount && item.discount > 0
+            ? item.price * (1 - item.discount / 100)
+            : item.price).toString(),
+        }))
+      );
+
+      // Reservar stock: disminuir stock de productos
+      for (const item of items) {
+        await tx
+          .update(products)
+          .set({
+            stock: sql`${products.stock} - ${item.quantity}`,
+            updated_at: new Date(),
+          })
+          .where(eq(products.id, item.id));
+      }
+
+      logger.info('Stock reservado para orden', {
         orderId: order.id,
-        productId: item.id,
-        quantity: item.quantity,
-        price: (item.discount && item.discount > 0
-          ? item.price * (1 - item.discount / 100)
-          : item.price).toString(),
-      }))
-    );
+        itemCount: items.length,
+        totalStockReserved: items.reduce((sum, item) => sum + item.quantity, 0)
+      });
+
+      return order;
+    });
 
     // Crear preferencia de Mercado Pago
     const preference = new Preference(client);
 
     const preferenceData = {
-      items: items.map((item: any) => ({
+      items: items.map((item: CartItem) => ({
         id: item.id.toString(),
         title: item.name,
         quantity: item.quantity,
@@ -147,7 +283,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error creando preferencia de pago:', error);
+    logger.error('Error creando preferencia de pago', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

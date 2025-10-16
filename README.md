@@ -158,6 +158,7 @@ npm run start            # Inicia servidor de producción
 npm run lint             # Ejecuta ESLint
 npm run lint:fix         # Corrige errores de ESLint
 npm run typecheck        # Verifica tipos TypeScript
+npm run dev:tunnel       # Inicia servidores de desarrollo en port 3000 y en dominio fijo con tunnel 
 
 # Base de datos
 npm run db:generate      # Genera migraciones
@@ -168,6 +169,8 @@ npm run db:restore       # Restaura backup de BD
 
 # Testing
 npm run test             # Ejecuta tests
+node security-tests.js
+node csrf-tests.js
 ```
 
 ## 🌐 Despliegue
@@ -202,4 +205,3 @@ Si tienes preguntas o problemas, por favor abre un issue en el repositorio o con
 
 Desarrollado con ❤️ usando Next.js y TypeScript
 
-npm run dev:tunnel

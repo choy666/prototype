@@ -1,3 +1,4 @@
+// app/checkout/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,7 +12,7 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 
 export default function CheckoutPage() {
-  const { items, clearCart } = useCartStore();
+  const { items } = useCartStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();

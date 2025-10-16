@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
 import { hash } from 'bcryptjs';
 import { registerSchema } from '@/lib/validations/auth';
+import { validateCSRFToken } from '@/lib/utils/csrf';
 
 export async function POST(request: Request) {
   try {
@@ -35,20 +36,32 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validar token CSRF
+    const csrfToken = body.csrfToken;
+    if (!validateCSRFToken(csrfToken)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Token CSRF inválido o faltante'
+        },
+        { status: 403 }
+      );
+    }
+
     // Validar datos con Zod
     const validation = registerSchema.safeParse(body);
-    
+
     if (!validation.success) {
       const errors = validation.error.issues.map(issue => ({
         field: issue.path.join('.'),
         message: issue.message
       }));
-      
+
       return NextResponse.json(
-        { 
+        {
           success: false,
           error: 'Error de validación',
-          details: errors 
+          details: errors
         },
         { status: 400 }
       );

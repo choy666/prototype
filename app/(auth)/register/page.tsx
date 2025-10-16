@@ -4,13 +4,20 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterFormValues } from '@/lib/validations/auth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import Link from 'next/link';
+import { generateCSRFToken } from '@/lib/utils/csrf';
 
 export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [csrfToken, setCsrfToken] = useState<string>('');
   const router = useRouter();
+
+  // Generar token CSRF al montar el componente
+  useEffect(() => {
+    setCsrfToken(generateCSRFToken());
+  }, []);
 
   const {
     register,
@@ -30,13 +37,16 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormValues) => {
     try {
       setIsSubmitting(true);
-      
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          csrfToken,
+        }),
       });
 
       const responseData = await response.json();

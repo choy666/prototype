@@ -1,12 +1,11 @@
+// app/checkout/pending/page.tsx
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { Clock } from 'lucide-react';
 
 export default function CheckoutPendingPage() {
-  const router = useRouter();
 
   return (
     <div className="container mx-auto p-8 text-center max-w-2xl">

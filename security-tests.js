@@ -70,22 +70,26 @@ async function testRateLimiting() {
   console.log('🧪 Probando rate limiting...');
 
   const promises = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 15; i++) { // Aumentar a 15 para exceder el límite de 10
     promises.push(
       axios.post(`${BASE_URL}/api/checkout`, {
         items: [{ id: 1, name: "Test", price: 100, discount: 0, quantity: 1 }]
-      }).catch(() => ({})) // Ignorar errores
+      }).catch((error) => {
+        if (error.response && error.response.status === 429) {
+          return { rateLimited: true };
+        }
+        return {};
+      })
     );
   }
 
-  const start = Date.now();
-  await Promise.all(promises);
-  const duration = Date.now() - start;
+  const results = await Promise.all(promises);
+  const rateLimitedCount = results.filter(result => result.rateLimited).length;
 
-  if (duration < 1000) { // Si se procesaron muy rápido
-    console.log('⚠️  No hay rate limiting aparente');
+  if (rateLimitedCount > 0) {
+    console.log(`✅ Rate limiting activo - ${rateLimitedCount} requests bloqueadas`);
   } else {
-    console.log('✅ Rate limiting parece estar activo');
+    console.log('⚠️  No hay rate limiting aparente');
   }
 }
 
