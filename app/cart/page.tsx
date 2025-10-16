@@ -140,10 +140,18 @@ export default function CartPage() {
               <span>{formatCurrency(total)}</span>
             </div>
 
-            <div className="text-gray-600 text-center text-sm mt-4">
-              <Link href="/products" className=" hover:underline">
-                continuar comprando
+            <div className="space-y-4">
+              <Link href="/checkout">
+                <Button className="w-full" size="lg">
+                  Proceder al checkout
+                </Button>
               </Link>
+
+              <div className="text-gray-600 text-center text-sm">
+                <Link href="/products" className=" hover:underline">
+                  continuar comprando
+                </Link>
+              </div>
             </div>
           </div>
         </div>
