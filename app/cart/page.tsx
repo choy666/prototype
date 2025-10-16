@@ -1,42 +1,43 @@
-'use client'
+"use client";
 
-import { useCartStore } from '@/lib/stores/useCartStore'
-import { Button } from '@/components/ui/Button'
-import Link from 'next/link'
-import { Minus, Plus, X } from 'lucide-react'
-import Image from 'next/image'
+import { useCartStore } from "@/lib/stores/useCartStore";
+import { Button } from "@/components/ui/Button";
+import Link from "next/link";
+import { Minus, Plus, X } from "lucide-react";
+import Image from "next/image";
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value)
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(
+    value
+  );
 
 export default function CartPage() {
-  const { 
-    items, 
-    removeItem, 
-    updateQuantity, 
-    clearCart, 
-  } = useCartStore()
+  const { items, removeItem, updateQuantity, clearCart } = useCartStore();
+
 
   if (items.length === 0) {
     return (
       <div className="container mx-auto p-8 text-center">
         <h1 className="text-3xl font-bold mb-4">Tu carrito está vacío</h1>
-        <p className="mb-6">¡Explora nuestros productos y encuentra algo que te guste!</p>
+        <p className="mb-6">
+          ¡Explora nuestros productos y encuentra algo que te guste!
+        </p>
         <Link href="/products">
           <Button>Seguir comprando</Button>
         </Link>
       </div>
-    )
+    );
   }
 
-  // 👇 Ajustamos el cálculo del total para que use el precio con descuento
+  // Calcular total con descuentos
   const total = items.reduce((acc, item) => {
-    const basePrice = item.price
-    const finalPrice = item.discount && item.discount > 0
-      ? basePrice * (1 - item.discount / 100)
-      : basePrice
-    return acc + finalPrice * item.quantity
-  }, 0)
+    const basePrice = item.price;
+    const finalPrice =
+      item.discount && item.discount > 0
+        ? basePrice * (1 - item.discount / 100)
+        : basePrice;
+    return acc + finalPrice * item.quantity;
+  }, 0);
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -50,19 +51,19 @@ export default function CartPage() {
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-4">
           {items.map((item, index) => {
-            const basePrice = item.price
-            const hasDiscount = item.discount && item.discount > 0
+            const basePrice = item.price;
+            const hasDiscount = item.discount && item.discount > 0;
             const finalPrice = hasDiscount
               ? basePrice * (1 - item.discount / 100)
-              : basePrice
+              : basePrice;
 
             return (
-              <div 
-                key={`${item.id}-${index}`} 
+              <div
+                key={`${item.id}-${index}`}
                 className="flex flex-row items-center gap-4 p-4 border rounded-lg"
               >
                 <Image
-                  src={item.image || '/placeholder-product.jpg'}
+                  src={item.image || "/placeholder-product.jpg"}
                   alt={item.name}
                   width={80}
                   height={80}
@@ -81,7 +82,9 @@ export default function CartPage() {
                       </span>
                     </div>
                   ) : (
-                    <p className="text-gray-600">{formatCurrency(basePrice)}</p>
+                    <p className="text-gray-600">
+                      {formatCurrency(basePrice)}
+                    </p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -89,7 +92,9 @@ export default function CartPage() {
                     variant="outline"
                     size="icon"
                     aria-label="Disminuir cantidad"
-                    onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                    onClick={() =>
+                      updateQuantity(item.id, Math.max(1, item.quantity - 1))
+                    }
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -115,7 +120,7 @@ export default function CartPage() {
                   <X className="h-5 w-5" />
                 </Button>
               </div>
-            )
+            );
           })}
         </div>
 
@@ -134,11 +139,7 @@ export default function CartPage() {
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
-            <Button className="w-full mt-6 font-bold" size="lg">
-              <Link rel="stylesheet" href="/checkout">
-              Proceder al pago
-              </Link>
-            </Button>
+
             <div className="text-gray-600 text-center text-sm mt-4">
               <Link href="/products" className=" hover:underline">
                 continuar comprando
@@ -148,5 +149,5 @@ export default function CartPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
