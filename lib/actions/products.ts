@@ -104,7 +104,16 @@ export async function getProducts(
       throw new Error('Parámetros de filtros inválidos');
     }
     console.error('Error fetching products:', error);
-    throw new Error('No se pudieron obtener los productos.');
+    return {
+      data: [],
+      pagination: {
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      },
+      filters: {},
+    };
   }
 }
 

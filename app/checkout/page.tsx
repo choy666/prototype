@@ -1,20 +1,17 @@
 // app/checkout/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/lib/stores/useCartStore';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 
 export default function CheckoutPage() {
   const { items } = useCartStore();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   // Redirigir si no hay items en el carrito
@@ -31,34 +28,6 @@ export default function CheckoutPage() {
       : item.price;
     return acc + finalPrice * item.quantity;
   }, 0);
-
-  const handleCheckout = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al procesar el pago');
-      }
-
-      // Redirigir a Mercado Pago
-      window.location.href = data.initPoint;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (items.length === 0) {
     return null; // Redirigiendo...
@@ -117,29 +86,15 @@ export default function CheckoutPage() {
             <CardContent>
               <div className="space-y-4">
                 <p className="text-sm text-gray-600">
-                  Serás redirigido a Mercado Pago para completar tu pago de forma segura.
+                  La funcionalidad de pago se implementará próximamente.
                 </p>
 
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{error}</p>
-                  </div>
-                )}
-
                 <Button
-                  onClick={handleCheckout}
-                  disabled={isLoading}
+                  disabled={true}
                   className="w-full"
                   size="lg"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    `Pagar ${formatCurrency(total)}`
-                  )}
+                  Pagar {formatCurrency(total)}
                 </Button>
 
                 <Button
