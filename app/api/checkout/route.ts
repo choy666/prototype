@@ -23,13 +23,21 @@ interface DbProduct {
   stock: number;
 }
 
+interface SessionUser {
+  id: string;
+  email: string;
+}
+
+interface Session {
+  user: SessionUser;
+}
+
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
 
 export async function POST(request: NextRequest) {
-  let session: any = null;
-  let items: CartItem[] = [];
+  const items: CartItem[] = [];
 
   try {
     // Verificar rate limiting
@@ -38,7 +46,7 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    session = await auth();
+    const session = await auth() as Session | null;
 
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -293,9 +301,7 @@ export async function POST(request: NextRequest) {
 
     // Extraer variables del scope si están disponibles
     try {
-      if (typeof session !== 'undefined' && session?.user?.id) {
-        userId = session.user.id;
-      }
+      // session ya está definido arriba, pero puede no estar disponible en catch
       if (typeof items !== 'undefined') {
         itemCount = items.length;
       }

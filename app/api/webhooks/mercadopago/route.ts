@@ -7,15 +7,26 @@ import crypto from 'crypto';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
+interface MercadoPagoWebhookBody {
+  data: {
+    id: string;
+  };
+}
+
+interface MercadoPagoPaymentData {
+  external_reference: string;
+  status: string;
+}
+
 // Configurar Mercado Pago
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
 
 export async function POST(request: NextRequest) {
-  let body: any = null;
-  let userAgent = '';
-  let ip = 'unknown';
+  let body: MercadoPagoWebhookBody | null = null;
+  const userAgent = '';
+  const ip = 'unknown';
 
   try {
     // Verificar rate limiting para webhooks (más permisivo ya que vienen de MP)
@@ -25,8 +36,8 @@ export async function POST(request: NextRequest) {
     }
 
     body = await request.json();
-    userAgent = request.headers.get('user-agent') || '';
-    ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || '';
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
 
     // Verificar firma del webhook
     const signature = request.headers.get('x-signature');
@@ -78,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Obtener detalles del pago desde Mercado Pago
     const payment = new Payment(client);
-    const paymentData = await payment.get({ id: paymentId });
+    const paymentData = await payment.get({ id: paymentId }) as MercadoPagoPaymentData | null;
 
     if (!paymentData) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
@@ -184,12 +195,10 @@ export async function POST(request: NextRequest) {
     let statusCode = 500;
     let errorMessage = 'Error interno del servidor';
     let paymentId = 'unknown';
-    let ip = 'unknown';
-    let userAgent = '';
 
     // Extraer variables del scope si están disponibles
     try {
-      if (typeof body !== 'undefined' && body?.data?.id) {
+      if (typeof body !== 'undefined' && body && body.data && body.data.id) {
         paymentId = body.data.id;
       }
       // ip y userAgent ya están definidos en el try principal
