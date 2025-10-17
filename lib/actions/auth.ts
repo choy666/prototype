@@ -6,7 +6,7 @@ import NextAuth from "next-auth";
 import type { NextAuthConfig, Session, DefaultSession, User } from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt-edge";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
@@ -68,7 +68,7 @@ async function validateCredentials(credentials: CredentialsType) {
   if (!user) throw new Error("Usuario no encontrado");
   if (!user.password) throw new Error("Este usuario no tiene contraseña configurada");
 
-  const isValid = await bcrypt.compare(credentials.password, user.password);
+  const isValid = bcrypt.compareSync(credentials.password, user.password);
   if (!isValid) throw new Error("Contraseña incorrecta");
 
   return {

@@ -205,3 +205,13 @@ Si tienes preguntas o problemas, por favor abre un issue en el repositorio o con
 
 Desarrollado con ❤️ usando Next.js y TypeScript
 
+---
+vercel link → Vincular proyecto local.
+
+vercel env pull .env.local → Sincronizar variables.
+
+vercel dev → Correr local con el mismo entorno que producción.
+
+vercel → Deploy.
+
+vercel logs <url> → Debuggear errores en serverless.
