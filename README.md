@@ -206,12 +206,17 @@ Si tienes preguntas o problemas, por favor abre un issue en el repositorio o con
 Desarrollado con ❤️ usando Next.js y TypeScript
 
 ---
-vercel link → Vincular proyecto local.
+# Listar variables de entorno
+vercel env ls
 
-vercel env pull .env.local → Sincronizar variables.
+# Agregar una variable
+vercel env add NEXTAUTH_SECRET production
 
-vercel dev → Correr local con el mismo entorno que producción.
+# Eliminar una variable
+vercel env rm NEXTAUTH_SECRET production
 
-vercel → Deploy.
+# Descargar variables de Vercel a un archivo local
+vercel env pull .env.local
 
-vercel logs <url> → Debuggear errores en serverless.
+# Descargar variables de producción
+vercel env pull .env.local --environment=production
