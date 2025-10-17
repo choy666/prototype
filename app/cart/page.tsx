@@ -141,12 +141,6 @@ export default function CartPage() {
             </div>
 
             <div className="space-y-4">
-              <Link href="/checkout">
-                <Button className="w-full" size="lg">
-                  Proceder al checkout
-                </Button>
-              </Link>
-
               <div className="text-gray-600 text-center text-sm">
                 <Link href="/products" className=" hover:underline">
                   continuar comprando
