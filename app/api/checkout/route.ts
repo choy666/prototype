@@ -28,6 +28,9 @@ const client = new MercadoPagoConfig({
 });
 
 export async function POST(request: NextRequest) {
+  let session: any = null;
+  let items: CartItem[] = [];
+
   try {
     // Verificar rate limiting
     const rateLimitResponse = checkRateLimit(request);
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const session = await auth();
+    session = await auth();
 
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -110,7 +113,7 @@ export async function POST(request: NextRequest) {
         stock: products.stock,
       })
       .from(products)
-      .where(sql`${products.id} = ANY(${productIds})`);
+      .where(sql`${products.id} IN (${productIds.join(',')})`);
 
     // Verificar que todos los productos existen
     if (productsFromDb.length !== items.length) {
@@ -283,10 +286,48 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    logger.error('Error creando preferencia de pago', { error: error instanceof Error ? error.message : String(error) });
+    let errorMessage = 'Error interno del servidor';
+    let statusCode = 500;
+    let userId: string | undefined;
+    let itemCount: number | undefined;
+
+    // Extraer variables del scope si están disponibles
+    try {
+      if (typeof session !== 'undefined' && session?.user?.id) {
+        userId = session.user.id;
+      }
+      if (typeof items !== 'undefined') {
+        itemCount = items.length;
+      }
+    } catch {
+      // Variables no disponibles, usar defaults
+    }
+
+    if (error instanceof Error) {
+      if (error.message.includes('stock') || error.message.includes('insuficiente')) {
+        errorMessage = 'Stock insuficiente para completar la orden';
+        statusCode = 400;
+      } else if (error.message.includes('precio') || error.message.includes('manipulado')) {
+        errorMessage = 'Los datos del carrito han sido modificados. Por favor, recarga la página.';
+        statusCode = 400;
+      } else if (error.message.includes('autenticación') || error.message.includes('auth')) {
+        errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
+        statusCode = 401;
+      } else if (error.message.includes('rate limit') || error.message.includes('límite')) {
+        errorMessage = 'Demasiadas solicitudes. Por favor, espera un momento.';
+        statusCode = 429;
+      }
+    }
+
+    logger.error('Error creando preferencia de pago', {
+      error: error instanceof Error ? error.message : String(error),
+      userId,
+      itemCount
+    });
+
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 }

@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
         total: orders.total,
         mercadoPagoId: orders.mercadoPagoId,
         createdAt: orders.createdAt,
+        userId: orders.userId,
       })
       .from(orders)
       .where(eq(orders.id, parseInt(orderId)))
@@ -56,8 +57,17 @@ export async function GET(request: NextRequest) {
     const orderData = order[0];
 
     // Verificar que la orden pertenece al usuario actual
-    // Nota: Asumiendo que hay un campo userId en orders
-    // Si no existe, agregar validación adicional
+    if (orderData.userId !== parseInt(session.user.id)) {
+      logger.warn('Intento de acceso no autorizado a orden', {
+        orderId,
+        userId: session.user.id,
+        orderUserId: orderData.userId
+      });
+      return NextResponse.json(
+        { error: 'Acceso denegado a esta orden' },
+        { status: 403 }
+      );
+    }
 
     return NextResponse.json({
       orderId: orderData.id,

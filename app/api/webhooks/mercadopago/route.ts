@@ -13,6 +13,10 @@ const client = new MercadoPagoConfig({
 });
 
 export async function POST(request: NextRequest) {
+  let body: any = null;
+  let userAgent = '';
+  let ip = 'unknown';
+
   try {
     // Verificar rate limiting para webhooks (más permisivo ya que vienen de MP)
     const rateLimitResponse = checkRateLimit(request);
@@ -20,9 +24,9 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const body = await request.json();
-    const userAgent = request.headers.get('user-agent') || '';
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    body = await request.json();
+    userAgent = request.headers.get('user-agent') || '';
+    ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
 
     // Verificar firma del webhook
     const signature = request.headers.get('x-signature');
@@ -116,40 +120,119 @@ export async function POST(request: NextRequest) {
       // El stock ya fue reservado en checkout, no hacer nada adicional
       logger.info('Pago aprobado - stock ya reservado en checkout', { orderId });
     } else if (orderStatus === 'cancelled') {
-      // Rollback: devolver stock reservado
-      const orderItemsData = await db
-        .select({
-          productId: orderItems.productId,
-          quantity: orderItems.quantity,
-        })
-        .from(orderItems)
-        .where(eq(orderItems.orderId, parseInt(orderId)));
+      // Rollback: devolver stock reservado con retry logic para errores temporales
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      // Incrementar stock de productos
-      for (const item of orderItemsData) {
-        await db
-          .update(products)
-          .set({
-            stock: sql`${products.stock} + ${item.quantity}`,
-            updated_at: new Date(),
-          })
-          .where(eq(products.id, item.productId));
+      while (retryCount < maxRetries) {
+        try {
+          const orderItemsData = await db
+            .select({
+              productId: orderItems.productId,
+              quantity: orderItems.quantity,
+            })
+            .from(orderItems)
+            .where(eq(orderItems.orderId, parseInt(orderId)));
+
+          // Incrementar stock de productos en transacción
+          await db.transaction(async (tx) => {
+            for (const item of orderItemsData) {
+              await tx
+                .update(products)
+                .set({
+                  stock: sql`${products.stock} + ${item.quantity}`,
+                  updated_at: new Date(),
+                })
+                .where(eq(products.id, item.productId));
+            }
+          });
+
+          logger.info('Stock devuelto por pago cancelado', {
+            orderId,
+            itemCount: orderItemsData.length,
+            totalStockReturned: orderItemsData.reduce((sum, item) => sum + item.quantity, 0),
+            retryCount
+          });
+          break; // Éxito, salir del loop
+
+        } catch (error) {
+          retryCount++;
+          logger.warn(`Error en rollback de stock (intento ${retryCount}/${maxRetries})`, {
+            orderId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+
+          if (retryCount >= maxRetries) {
+            logger.error('Rollback de stock falló después de todos los reintentos', {
+              orderId,
+              error: error instanceof Error ? error.message : String(error)
+            });
+            // Podríamos enviar alerta aquí para intervención manual
+          } else {
+            // Esperar antes del siguiente retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+          }
+        }
       }
-
-      logger.info('Stock devuelto por pago cancelado', {
-        orderId,
-        itemCount: orderItemsData.length,
-        totalStockReturned: orderItemsData.reduce((sum, item) => sum + item.quantity, 0)
-      });
     }
 
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    logger.error('Error procesando webhook de Mercado Pago', { error: error instanceof Error ? error.message : String(error) });
+    // Categorizar errores para mejor debugging
+    let errorType = 'unknown';
+    let statusCode = 500;
+    let errorMessage = 'Error interno del servidor';
+    let paymentId = 'unknown';
+    let ip = 'unknown';
+    let userAgent = '';
+
+    // Extraer variables del scope si están disponibles
+    try {
+      if (typeof body !== 'undefined' && body?.data?.id) {
+        paymentId = body.data.id;
+      }
+      // ip y userAgent ya están definidos en el try principal
+    } catch {
+      // Variables no disponibles, usar defaults
+    }
+
+    if (error instanceof Error) {
+      if (error.message.includes('signature') || error.message.includes('timestamp')) {
+        errorType = 'security';
+        statusCode = 401;
+        errorMessage = 'Error de seguridad en webhook';
+      } else if (error.message.includes('Payment not found') || error.message.includes('No order reference')) {
+        errorType = 'validation';
+        statusCode = 400;
+        errorMessage = 'Datos de pago inválidos';
+      } else if (error.message.includes('database') || error.message.includes('connection')) {
+        errorType = 'database';
+        statusCode = 500;
+        errorMessage = 'Error de base de datos';
+      } else {
+        errorType = 'processing';
+      }
+
+      logger.error('Error procesando webhook de Mercado Pago', {
+        errorType,
+        error: error.message,
+        stack: error.stack,
+        paymentId,
+        ip,
+        userAgent
+      });
+    } else {
+      logger.error('Error desconocido en webhook MP', {
+        error: String(error),
+        paymentId,
+        ip
+      });
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 }

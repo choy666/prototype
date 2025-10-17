@@ -11,7 +11,7 @@ import { z } from 'zod'
 
 // 1. Validación de variables de entorno
 const envSchema = z.object({
-  DATABASE_URL: z.string().url('DATABASE_URL debe ser una URL válida'),
+  DATABASE_URL: z.string().url('DATABASE_URL debe ser una URL válida').optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
@@ -33,7 +33,11 @@ export {}
 // 3. Configuración de la conexión
 const createDrizzleClient = (): NeonHttpDatabase<typeof schema> => {
   try {
-    const client = neon(env.data.DATABASE_URL) // 👈 sin { fullResults: true }
+    const databaseUrl = env.data.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL no está definida');
+    }
+    const client = neon(databaseUrl) // 👈 sin { fullResults: true }
 
     return drizzle(client, {
       schema,

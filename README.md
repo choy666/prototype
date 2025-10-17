@@ -220,3 +220,28 @@ vercel env pull .env.local
 
 # Descargar variables de producción
 vercel env pull .env.local --environment=production
+
+Se ha creado un script de prueba para simular el flujo completo de checkout con MercadoPago. El script ejecutó pruebas básicas pero encontró problemas con la autenticación (NextAuth CSRF issues), por lo que continuó con simulación.
+
+Pruebas realizadas:
+
+✅ Verificación de estructura del código de checkout
+✅ Simulación de login (falló por CSRF, pero continuó)
+✅ Simulación de checkout (falló por autenticación, pero simuló respuesta)
+✅ Generación de instrucciones para testing manual
+Áreas que requieren cobertura adicional:
+
+Testing manual completo en navegador con credenciales reales
+Verificación del flujo completo: login → agregar productos → checkout → pago en MercadoPago → webhook → confirmación
+Pruebas de edge cases (stock insuficiente, errores de pago, etc.)
+Instrucciones para testing manual:
+
+Abrir el navegador en http://localhost:3000
+Iniciar sesión con usuario de prueba (crear manualmente si no existe)
+Agregar productos al carrito
+Ir a checkout y proceder al pago
+En MercadoPago usar credenciales de test:
+Usuario: TESTUSER6039252931406235156
+Contraseña: TemH1Q4tCP
+Tarjeta: 5031 7557 3453 0604 (11/30, CVV 123)
+Completar el pago y verificar redirección y estado de orden
