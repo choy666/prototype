@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { Minus, Plus, X } from "lucide-react";
 import Image from "next/image";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(
@@ -13,7 +15,31 @@ const formatCurrency = (value: number) =>
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, clearCart } = useCartStore();
+  const { data: session } = useSession();
+  const [isLoading, setIsLoading] = useState(false);
 
+  const handleCheckout = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ items, userId: session?.user?.id }),
+      });
+
+      const data = await response.json();
+
+      if (data.init_point) {
+        window.location.href = data.init_point;
+      }
+    } catch (error) {
+      console.error("Error during checkout:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (items.length === 0) {
     return (
@@ -139,6 +165,14 @@ export default function CartPage() {
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
+
+            <Button
+              onClick={handleCheckout}
+              disabled={isLoading}
+              className="w-full"
+            >
+              {isLoading ? "Procesando..." : "Pagar con Mercado Pago"}
+            </Button>
 
             <div className="space-y-4">
               <div className="text-gray-600 text-center text-sm">
