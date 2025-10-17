@@ -1,3 +1,4 @@
+// app/api/checkout/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { auth } from '@/lib/actions/auth';
@@ -6,14 +7,8 @@ import { orders, orderItems, products } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
-
-interface CartItem {
-  id: number;
-  name: string;
-  price: number;
-  discount: number;
-  quantity: number;
-}
+import { checkoutRequestSchema, type CartItem } from '@/lib/validations/checkout';
+import { ZodIssue } from 'zod';
 
 interface DbProduct {
   id: number;
@@ -32,83 +27,90 @@ interface Session {
   user: SessionUser;
 }
 
+// Verificar variables de entorno críticas al inicio
+function validateEnvironmentVariables() {
+  const requiredEnvVars = [
+    'MERCADO_PAGO_ACCESS_TOKEN',
+    'NEXT_PUBLIC_APP_URL',
+    'DATABASE_URL',
+  ];
+
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    logger.error('Variables de entorno faltantes', { missingVars });
+    throw new Error(`Variables de entorno faltantes: ${missingVars.join(', ')}`);
+  }
+
+  logger.info('Variables de entorno validadas correctamente');
+}
+
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
 
 export async function POST(request: NextRequest) {
-  const items: CartItem[] = [];
+  let items: CartItem[] = [];
+  let session: Session | null = null;
+  let orderId: number | null = null;
 
   try {
+    // Verificar variables de entorno al inicio
+    validateEnvironmentVariables();
+
     // Verificar rate limiting
     const rateLimitResponse = checkRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
-    const session = await auth() as Session | null;
+    session = await auth() as Session | null;
 
     if (!session?.user?.id) {
+      logger.warn('Intento de checkout sin autenticación', {
+        ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+        userAgent: request.headers.get('user-agent'),
+      });
       return NextResponse.json(
         { error: 'Usuario no autenticado' },
         { status: 401 }
       );
     }
 
-    const { items }: { items: CartItem[] } = await request.json();
-
-    if (!items || items.length === 0) {
+    // Validar payload con Zod
+    let requestBody: unknown;
+    try {
+      requestBody = await request.json();
+    } catch (parseError) {
+      logger.warn('Payload JSON inválido en checkout', {
+        userId: session.user.id,
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+      });
       return NextResponse.json(
-        { error: 'No hay items en el carrito' },
+        { error: 'Payload JSON inválido' },
         { status: 400 }
       );
     }
 
-    // Validaciones de seguridad adicionales
-    if (items.length > 50) {
+    const validationResult = checkoutRequestSchema.safeParse(requestBody);
+    if (!validationResult.success) {
+      logger.warn('Validación Zod fallida en checkout', {
+        userId: session.user.id,
+        errors: validationResult.error.issues.map((e: ZodIssue) => ({
+          path: e.path.join('.'),
+          message: e.message,
+        })),
+      });
       return NextResponse.json(
-        { error: 'Demasiados items en el carrito' },
+        {
+          error: 'Datos del carrito inválidos',
+          details: validationResult.error.issues.map((e: ZodIssue) => `${e.path.join('.')}: ${e.message}`),
+        },
         { status: 400 }
       );
     }
 
-    // Validar estructura de cada item
-    for (const item of items) {
-      if (!item.id || typeof item.id !== 'number' || item.id <= 0) {
-        return NextResponse.json(
-          { error: 'ID de producto inválido' },
-          { status: 400 }
-        );
-      }
-
-      if (!item.name || typeof item.name !== 'string' || item.name.length > 255) {
-        return NextResponse.json(
-          { error: 'Nombre de producto inválido' },
-          { status: 400 }
-        );
-      }
-
-      if (typeof item.price !== 'number' || item.price < 0 || item.price > 999999) {
-        return NextResponse.json(
-          { error: 'Precio inválido' },
-          { status: 400 }
-        );
-      }
-
-      if (typeof item.discount !== 'number' || item.discount < 0 || item.discount > 100) {
-        return NextResponse.json(
-          { error: 'Descuento inválido' },
-          { status: 400 }
-        );
-      }
-
-      if (!item.quantity || typeof item.quantity !== 'number' || item.quantity <= 0 || item.quantity > 99) {
-        return NextResponse.json(
-          { error: 'Cantidad inválida' },
-          { status: 400 }
-        );
-      }
-    }
+    items = validationResult.data.items;
 
     // Validar precios y stock contra la base de datos
     const productIds = items.map((item: CartItem) => item.id);
@@ -214,13 +216,14 @@ export async function POST(request: NextRequest) {
       const orderResult = await tx
         .insert(orders)
         .values({
-          userId: parseInt(session.user.id),
+          userId: parseInt(session!.user.id),
           total: total.toString(),
           status: 'pending',
         })
         .returning();
 
       const order = orderResult[0];
+      orderId = order.id;
 
       // Insertar items de la orden
       await tx.insert(orderItems).values(
@@ -254,44 +257,90 @@ export async function POST(request: NextRequest) {
       return order;
     });
 
-    // Crear preferencia de Mercado Pago
-    const preference = new Preference(client);
+    try {
+      // Crear preferencia de Mercado Pago
+      const preference = new Preference(client);
 
-    const preferenceData = {
-      items: items.map((item: CartItem) => ({
-        id: item.id.toString(),
-        title: item.name,
-        quantity: item.quantity,
-        currency_id: 'ARS',
-        unit_price: item.discount && item.discount > 0
-          ? item.price * (1 - item.discount / 100)
-          : item.price,
-      })),
-      payer: {
-        email: session.user.email,
-      },
-      back_urls: {
-        success: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?order_id=${order.id}`,
-        failure: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/failure?order_id=${order.id}`,
-        pending: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/pending?order_id=${order.id}`,
-      },
-      auto_return: 'approved',
-      external_reference: order.id.toString(),
-      notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`,
-    };
+      const preferenceData = {
+        items: items.map((item: CartItem) => ({
+          id: item.id.toString(),
+          title: item.name,
+          quantity: item.quantity,
+          currency_id: 'ARS',
+          unit_price: item.discount && item.discount > 0
+            ? item.price * (1 - item.discount / 100)
+            : item.price,
+        })),
+        payer: {
+          email: session!.user.email,
+        },
+        back_urls: {
+          success: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?order_id=${order.id}`,
+          failure: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/failure?order_id=${order.id}`,
+          pending: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/pending?order_id=${order.id}`,
+        },
+        auto_return: 'approved',
+        external_reference: order.id.toString(),
+        notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`,
+      };
 
-    const response = await preference.create({ body: preferenceData });
+      const response = await preference.create({ body: preferenceData });
 
-    // Actualizar orden con ID de Mercado Pago
-    await db
-      .update(orders)
-      .set({ mercadoPagoId: response.id })
-      .where(eq(orders.id, order.id));
+      // Actualizar orden con ID de Mercado Pago
+      await db
+        .update(orders)
+        .set({ mercadoPagoId: response.id })
+        .where(eq(orders.id, order.id));
 
-    return NextResponse.json({
-      preferenceId: response.id,
-      initPoint: response.init_point,
-    });
+      logger.info('Preferencia de Mercado Pago creada exitosamente', {
+        orderId: order.id,
+        preferenceId: response.id,
+        userId: session!.user.id,
+        itemCount: items.length,
+      });
+
+      return NextResponse.json({
+        preferenceId: response.id,
+        initPoint: response.init_point,
+      });
+    } catch (mercadoPagoError) {
+      // Si falla Mercado Pago, hacer rollback del stock y orden
+      logger.error('Error creando preferencia de Mercado Pago, realizando rollback', {
+        orderId,
+        userId: session!.user.id,
+        itemCount: items.length,
+        error: mercadoPagoError instanceof Error ? mercadoPagoError.message : String(mercadoPagoError),
+      });
+
+      // Rollback: eliminar orden y restaurar stock
+      if (orderId) {
+        await db.transaction(async (tx) => {
+          // Restaurar stock
+          for (const item of items) {
+            await tx
+              .update(products)
+              .set({
+                stock: sql`${products.stock} + ${item.quantity}`,
+                updated_at: new Date(),
+              })
+              .where(eq(products.id, item.id));
+          }
+
+          // Eliminar items de la orden
+          await tx.delete(orderItems).where(eq(orderItems.orderId, orderId!));
+
+          // Eliminar orden
+          await tx.delete(orders).where(eq(orders.id, orderId!));
+
+          logger.info('Rollback completado: orden eliminada y stock restaurado', {
+            orderId,
+            itemCount: items.length,
+          });
+        });
+      }
+
+      throw mercadoPagoError; // Re-throw para que sea manejado por el catch general
+    }
 
   } catch (error) {
     let errorMessage = 'Error interno del servidor';
@@ -301,8 +350,10 @@ export async function POST(request: NextRequest) {
 
     // Extraer variables del scope si están disponibles
     try {
-      // session ya está definido arriba, pero puede no estar disponible en catch
-      if (typeof items !== 'undefined') {
+      if (session?.user?.id) {
+        userId = session.user.id;
+      }
+      if (items && items.length > 0) {
         itemCount = items.length;
       }
     } catch {
@@ -322,13 +373,18 @@ export async function POST(request: NextRequest) {
       } else if (error.message.includes('rate limit') || error.message.includes('límite')) {
         errorMessage = 'Demasiadas solicitudes. Por favor, espera un momento.';
         statusCode = 429;
+      } else if (error.message.includes('Variables de entorno faltantes')) {
+        errorMessage = 'Configuración del servidor incompleta. Contacte al administrador.';
+        statusCode = 500;
       }
     }
 
-    logger.error('Error creando preferencia de pago', {
+    logger.error('Error en proceso de checkout', {
       error: error instanceof Error ? error.message : String(error),
       userId,
-      itemCount
+      itemCount,
+      orderId,
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return NextResponse.json(
