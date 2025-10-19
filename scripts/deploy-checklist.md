@@ -16,14 +16,14 @@ Todas las variables críticas han sido validadas exitosamente:
 ### 1. Aplicación en MercadoPago
 - **Tipo**: Producción
 - **URL de retorno**: `https://prototype-ten-dun.vercel.app`
-- **URL de notificaciones**: `https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago`
+- **URL de notificaciones**: `https://prototype-ten-dun.vercel.app/api/webhooks/mercado-pago`
 
 ### 2. Credenciales de Producción
 - **Access Token**: `APP_USR-4139456255448018-101508-30747435c7ebba43879b7e69055d3e14-2926966384`
 - **Public Key**: `APP_USR-2880d7a3-8d60-4ec8-ba83-c57f3c8da89e`
 
 ### 3. Webhooks Configurados
-- **URL**: `https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago`
+- **URL**: `https://prototype-ten-dun.vercel.app/api/webhooks/mercado-pago`
 - **Eventos**:
   - `payment.created`
   - `payment.updated`
@@ -36,15 +36,15 @@ Todas las variables críticas han sido validadas exitosamente:
 ### Back URLs (configuradas correctamente)
 ```typescript
 back_urls: {
-  success: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?order_id=${order.id}`,
-  failure: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/failure?order_id=${order.id}`,
-  pending: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/pending?order_id=${order.id}`,
+  success: `${process.env.APP_URL}/payment-success`,
+  failure: `${process.env.APP_URL}/payment-failure`,
+  pending: `${process.env.APP_URL}/payment-pending`,
 }
 ```
 
 ### Notification URL
 ```typescript
-notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`
+notification_url: `${process.env.MERCADO_PAGO_NOTIFICATION_URL}`
 ```
 
 ## 📋 Pasos para Deploy
@@ -72,7 +72,7 @@ vercel env add MERCADO_PAGO_WEBHOOK_SECRET production
 1. Ir a [MercadoPago Developers](https://www.mercadopago.com.ar/developers/panel)
 2. Seleccionar aplicación de producción
 3. Ir a "Webhooks"
-4. Crear webhook con URL: `https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago`
+4. Crear webhook con URL: `https://prototype-ten-dun.vercel.app/api/webhooks/mercado-pago`
 5. Seleccionar eventos de pago
 
 ### 4. Probar en Producción
@@ -96,7 +96,7 @@ npm run check:env
 ### Endpoints a Probar
 - `GET /api/auth/csrf` - Debe retornar token CSRF
 - `POST /api/checkout` - Debe crear preferencia de MP
-- `POST /api/webhooks/mercadopago` - Debe procesar webhooks
+- `POST /api/webhooks/mercado-pago` - Debe procesar webhooks
 - `GET /api/order-status?order_id=123` - Debe retornar estado
 
 ## ⚠️ Consideraciones Importantes

@@ -16,9 +16,10 @@
     "db:restore": "node scripts/restore.js",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "check:env": "ts-node scripts/check-env.ts",
+    "verify:checkout": "node scripts/verify-checkout.js",
     "tunnel": "lt --port 3000 --subdomain prototypev3",
-    "dev:tunnel": "concurrently \"npm run dev\" \"npm run tunnel\"",
-    "check:env": "ts-node scripts/check-env.ts"
+    "dev:tunnel": "concurrently \"npm run dev\" \"npm run tunnel\""
   },
   "dependencies": {
     "@auth/core": "0.40.0",
