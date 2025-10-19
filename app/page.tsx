@@ -5,16 +5,15 @@ import logoDark from '@/assets/logo-dark.svg';
 import Link from 'next/link';
 import arrow from '@/assets/arrow.svg';
 import { checkDatabaseConnection } from '@/lib/db';
-import FeaturedGrid from "@/components/products/FeaturedGrid";
+import FeaturedGrid from '@/components/products/FeaturedGrid';
 import { getFeaturedProducts } from '@/lib/actions/products';
-import HeroSlider from "@/components/ui/HeroSlider";
+import HeroSlider from '@/components/ui/HeroSlider';
 
 export default async function Home() {
   const dbStatus = await checkDatabaseConnection();
   const isConnected = dbStatus.success;
   const statusMessage = dbStatus.message;
   const featured = await getFeaturedProducts(5);
- 
   return (
     <div className='flex min-h-screen flex-col'>
       <div className='mx-auto flex w-full max-w-md flex-1 flex-col px-5 md:max-w-lg md:px-0 lg:max-w-xl'>
@@ -79,15 +78,15 @@ export default async function Home() {
           </span>
         </main>
       </div>
-      <div className="flex min-h-screen flex-col">
-        <main className="flex flex-1 flex-col">
-          <section className="mx-auto w-full max-w-6xl px-5 py-10">
-            <h2 className="text-2xl font-semibold mb-6">Destacados</h2>
+      <div className='flex min-h-screen flex-col'>
+        <main className='flex flex-1 flex-col'>
+          <section className='mx-auto w-full max-w-6xl px-5 py-10'>
+            <h2 className='text-2xl font-semibold mb-6'>Destacados</h2>
             <FeaturedGrid products={featured} />
           </section>
-  
-          <section className="mx-auto w-full max-w-6xl px-5 py-10">
-            <h2 className="text-2xl font-semibold mb-6">Más productos</h2>
+
+          <section className='mx-auto w-full max-w-6xl px-5 py-10'>
+            <h2 className='text-2xl font-semibold mb-6'>Más productos</h2>
             <HeroSlider />
           </section>
         </main>

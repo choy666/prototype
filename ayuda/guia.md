@@ -56,7 +56,8 @@ Carga diferida (lazy loading)
 Vercel: configuración y variables de entorno
 CI/CD automatizado
 fin.
-________________________________________________________
+
+---
 
 🚀 Guía Paso a Paso para el E-commerce
 🛠️ Fase 1: Configuración Inicial
@@ -92,7 +93,7 @@ Resumen de compra
 🧭 Proceso de Compra
 Formulario de envío
 Resumen del pedido
-Integración con Mercado Pago
+Integración con Mercado Pagoa
 📦 Gestión de Órdenes
 Confirmación de pedido
 Historial de compras
