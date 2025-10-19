@@ -1,21 +1,26 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
 
-export default function PaymentSuccessPage() {
-  return (
-    <div className="container mx-auto p-8 text-center">
-      <h1 className="text-3xl font-bold text-green-600 mb-4">
-        ¡Pago exitoso!
-      </h1>
-      <p className="mb-6">
-        Gracias por tu compra. Hemos recibido tu pago y estamos procesando tu
-        pedido.
-      </p>
-      <Link href="/products">
-        <Button>Seguir comprando</Button>
-      </Link>
-    </div>
-  );
+export default function PaymentSuccess() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    const paymentId = searchParams.get("payment_id");
+    const merchantOrderId = searchParams.get("merchant_order_id");
+
+    if (status === "approved") {
+      // Redirigir al dashboard o mostrar un mensaje de éxito
+      router.push(`/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}`);
+    } else {
+      // Manejar otros estados de pago
+      router.push("/payment-failure");
+    }
+  }, [searchParams, router]);
+
+  return <div>Procesando el pago...</div>;
 }
