@@ -9,15 +9,18 @@ export default function PaymentSuccess() {
   const router = useRouter();
 
   useEffect(() => {
-    const status = searchParams.get("status");
+    const collectionStatus = searchParams.get("collection_status");
     const paymentId = searchParams.get("payment_id");
     const merchantOrderId = searchParams.get("merchant_order_id");
 
-    if (status === "approved") {
+    if (collectionStatus === "approved") {
       // Redirigir al dashboard o mostrar un mensaje de éxito
       router.push(`/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}`);
+    } else if (collectionStatus === "pending") {
+      // Redirigir a la página de pago pendiente
+      router.push("/payment-pending");
     } else {
-      // Manejar otros estados de pago
+      // Redirigir a la página de fallo de pago
       router.push("/payment-failure");
     }
   }, [searchParams, router]);
