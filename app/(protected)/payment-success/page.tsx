@@ -1,24 +1,31 @@
 'use client';
 
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 
 export default function PaymentSuccess() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(true);
 
-  useEffect(() => {
-    const collectionStatus = searchParams.get('collection_status');
-    const paymentId = searchParams.get('payment_id');
-    const merchantOrderId = searchParams.get('merchant_order_id');
-    const status = searchParams.get('status');
-    const paymentType = searchParams.get('payment_type');
+  // Usar el hook personalizado para manejar la limpieza del carrito
+  const { paymentInfo, isPaymentSuccessful, cleanUrlParams } = useCartClearOnSuccess({
+    autoClean: true,
+    onSuccess: (info) => {
+      console.log('✅ Pago exitoso procesado:', info);
+    },
+    onCartCleared: () => {
+      console.log('🛒 Carrito limpiado exitosamente en payment-success');
+    },
+  });
 
+  useEffect(() => {
     // Dar tiempo para mostrar el estado antes de redirigir
     const timer = setTimeout(() => {
       setIsProcessing(false);
+
+      const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
 
       if (collectionStatus === 'approved' || status === 'approved') {
         // Redirigir al dashboard con información del pago
@@ -35,12 +42,10 @@ export default function PaymentSuccess() {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [searchParams, router]);
+  }, [paymentInfo, router]);
 
   const getStatusInfo = () => {
-    const collectionStatus = searchParams.get('collection_status');
-    const status = searchParams.get('status');
-    const paymentType = searchParams.get('payment_type');
+    const { collectionStatus, status, paymentType } = paymentInfo;
 
     if (collectionStatus === 'approved' || status === 'approved') {
       return {
@@ -70,8 +75,7 @@ export default function PaymentSuccess() {
   };
 
   const statusInfo = getStatusInfo();
-  const paymentId = searchParams.get('payment_id');
-  const merchantOrderId = searchParams.get('merchant_order_id');
+  const { paymentId, merchantOrderId } = paymentInfo;
 
   return (
     <div className='min-h-screen flex items-center justify-center bg-gray-100 p-4'>
