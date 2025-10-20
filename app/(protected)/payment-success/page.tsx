@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 
 export default function PaymentSuccess() {
@@ -10,7 +10,7 @@ export default function PaymentSuccess() {
   const [isProcessing, setIsProcessing] = useState(true);
 
   // Usar el hook personalizado para manejar la limpieza del carrito
-  const { paymentInfo, isPaymentSuccessful, cleanUrlParams } = useCartClearOnSuccess({
+  const { paymentInfo } = useCartClearOnSuccess({
     autoClean: true,
     onSuccess: (info) => {
       console.log('✅ Pago exitoso procesado:', info);
@@ -45,7 +45,7 @@ export default function PaymentSuccess() {
   }, [paymentInfo, router]);
 
   const getStatusInfo = () => {
-    const { collectionStatus, status, paymentType } = paymentInfo;
+    const { collectionStatus, status } = paymentInfo;
 
     if (collectionStatus === 'approved' || status === 'approved') {
       return {
