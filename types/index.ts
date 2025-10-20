@@ -109,3 +109,38 @@ export type UseSearchParamsResult = {
   setSearchParams: (params: Record<string, string | string[] | undefined>) => void;
 };
 
+// Tipos para Checkout y Envío
+export interface ShippingAddress {
+  nombre: string;
+  direccion: string;
+  ciudad: string;
+  provincia: string;
+  codigoPostal: string;
+  telefono: string;
+}
+
+export interface CheckoutData {
+  items: Array<{
+    id: number;
+    name: string;
+    price: number;
+    quantity: number;
+    image?: string;
+    discount?: number;
+  }>;
+  shippingAddress: ShippingAddress;
+  userId?: string;
+}
+
+export interface Order {
+  id: number;
+  userId: number;
+  total: string;
+  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  paymentId?: string | null;
+  mercadoPagoId?: string | null;
+  shippingAddress?: ShippingAddress | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
