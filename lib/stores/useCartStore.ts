@@ -9,6 +9,7 @@ export interface CartItem {
   image?: string
   quantity: number
   stock: number
+  weight?: number | null   // peso en kg para cálculo de envío
 }
 
 interface CartState {

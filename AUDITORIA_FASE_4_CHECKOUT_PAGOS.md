@@ -445,24 +445,24 @@ TOTAL FASE 4:                   65% ⚠️
 **Duración:** 2-3 días
 
 **Tareas:**
-1. [ ] Crear tabla `addresses` en BD
+1. [x] Crear tabla `addresses` en BD
    ```sql
    CREATE TABLE addresses (...)
    ```
 
-2. [ ] Crear API endpoints
+2. [x] Crear API endpoints
    - `GET /api/addresses` - Listar direcciones del usuario
    - `POST /api/addresses` - Crear nueva dirección
    - `PUT /api/addresses/:id` - Actualizar dirección
    - `DELETE /api/addresses/:id` - Eliminar dirección
    - `PUT /api/addresses/:id/default` - Marcar como predeterminada
 
-3. [ ] Crear componente `AddressSelector.tsx`
+3. [x] Crear componente `AddressSelector.tsx`
    - Selector de direcciones guardadas
    - Opción "Usar nueva dirección"
    - Botón para editar/eliminar
 
-4. [ ] Integrar en checkout
+4. [x] Integrar en checkout
    - Mostrar direcciones guardadas
    - Opción de guardar nueva dirección
 

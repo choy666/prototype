@@ -93,8 +93,16 @@ export const addressSchema = z.object({
 });
 
 /**
+ * Schema para método de envío
+ */
+export const shippingMethodSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+});
+
+/**
  * Schema para el checkout completo
- * Incluye items del carrito y dirección de envío
+ * Incluye items del carrito, dirección de envío y método de envío
  */
 export const checkoutSchema = z.object({
   items: z.array(
@@ -105,10 +113,13 @@ export const checkoutSchema = z.object({
       quantity: z.number().min(1),
       image: z.string().optional(),
       discount: z.number().optional(),
+      weight: z.number().optional(),
     })
   ).min(1, 'El carrito debe tener al menos un producto'),
 
   shippingAddress: shippingAddressSchema,
+
+  shippingMethod: shippingMethodSchema,
 
   userId: z.string().optional(),
 });

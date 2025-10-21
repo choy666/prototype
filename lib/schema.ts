@@ -29,6 +29,7 @@ export const products = pgTable("products", {
   destacado: boolean("destacado").default(false).notNull(),
   stock: integer("stock").default(0).notNull(),
   discount: integer("discount").default(0).notNull(), // porcentaje de descuento
+  weight: decimal("weight", { precision: 5, scale: 2 }), // peso en kg, opcional para cálculo de envío
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -110,6 +111,21 @@ export const addresses = pgTable("addresses", {
 });
 
 // ======================
+// Métodos de envío
+// ======================
+export const shippingMethods = pgTable("shipping_methods", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // ej: "Envío Estándar", "Envío Express"
+  baseCost: decimal("base_cost", { precision: 10, scale: 2 }).notNull(), // costo base
+  weightMultiplier: decimal("weight_multiplier", { precision: 5, scale: 2 }).default("0").notNull(), // multiplicador por kg
+  zoneMultiplier: decimal("zone_multiplier", { precision: 5, scale: 2 }).default("1").notNull(), // multiplicador por zona
+  freeThreshold: decimal("free_threshold", { precision: 10, scale: 2 }), // monto mínimo para envío gratis
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ======================
 // Órdenes
 // ======================
 export const orders = pgTable("orders", {
@@ -120,6 +136,8 @@ export const orders = pgTable("orders", {
   paymentId: text("payment_id"),
   mercadoPagoId: text("mercado_pago_id"),
   shippingAddress: jsonb("shipping_address"),
+  shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -154,5 +172,7 @@ export type CartItem = typeof cartItems.$inferSelect;
 export type NewCartItem = typeof cartItems.$inferInsert;
 export type Address = typeof addresses.$inferSelect;
 export type NewAddress = typeof addresses.$inferInsert;
+export type ShippingMethod = typeof shippingMethods.$inferSelect;
+export type NewShippingMethod = typeof shippingMethods.$inferInsert;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;

@@ -1,19 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/lib/stores/useCartStore';
 import { ShippingForm } from '@/components/checkout/ShippingForm';
 import { AddressSelector } from '@/components/checkout/AddressSelector';
 import { AddressForm } from '@/components/checkout/AddressForm';
+import { ShippingMethodSelector } from '@/components/checkout/ShippingMethodSelector';
 import { CheckoutSummary } from '@/components/checkout/CheckoutSummary';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { ShippingFormData, Address as ValidationAddress } from '@/lib/validations/checkout';
-import { Address } from '@/lib/schema';
+import { Address, ShippingMethod } from '@/lib/schema';
+import { db } from '@/lib/db';
+import { shippingMethods } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 import { toast } from 'react-hot-toast';
 
-type CheckoutStep = 'address-selection' | 'shipping-form' | 'new-address-form';
+type CheckoutStep = 'address-selection' | 'shipping-form' | 'shipping-method' | 'new-address-form';
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
@@ -21,6 +25,24 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('address-selection');
   const [selectedAddress, setSelectedAddress] = useState<Address & { id: number } | null>(null);
+  const [shippingMethodsList, setShippingMethodsList] = useState<ShippingMethod[]>([]);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<ShippingMethod | null>(null);
+  const [shippingAddress, setShippingAddress] = useState<ShippingFormData | null>(null);
+
+  // Cargar métodos de envío al montar el componente
+  useEffect(() => {
+    const loadShippingMethods = async () => {
+      try {
+        const methods = await db.select().from(shippingMethods).where(eq(shippingMethods.isActive, true));
+        setShippingMethodsList(methods);
+      } catch (error) {
+        console.error('Error loading shipping methods:', error);
+        toast.error('Error al cargar métodos de envío');
+      }
+    };
+
+    loadShippingMethods();
+  }, []);
 
   // Verificar autenticación
   if (status === 'loading') {
@@ -97,6 +119,20 @@ export default function CheckoutPage() {
   };
 
   const handleShippingSubmit = async (shippingData: ShippingFormData) => {
+    setShippingAddress(shippingData);
+    setCurrentStep('shipping-method');
+  };
+
+  const handleShippingMethodSelect = (method: ShippingMethod) => {
+    setSelectedShippingMethod(method);
+  };
+
+  const handleCheckoutSubmit = async () => {
+    if (!shippingAddress || !selectedShippingMethod) {
+      toast.error('Faltan datos de envío o método de envío');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -109,8 +145,13 @@ export default function CheckoutPage() {
           quantity: item.quantity,
           image: item.image,
           discount: item.discount,
+          weight: item.weight,
         })),
-        shippingAddress: shippingData,
+        shippingAddress,
+        shippingMethod: {
+          id: selectedShippingMethod.id,
+          name: selectedShippingMethod.name,
+        },
         userId: session.user.id,
       };
 
@@ -183,11 +224,49 @@ export default function CheckoutPage() {
               } : undefined}
             />
           )}
+
+          {currentStep === 'shipping-method' && (
+            <div className="space-y-6">
+              <ShippingMethodSelector
+                shippingMethods={shippingMethodsList}
+                selectedMethod={selectedShippingMethod}
+                onMethodSelect={handleShippingMethodSelect}
+                items={items}
+                province={shippingAddress?.provincia || ''}
+                subtotal={items.reduce((acc, item) => {
+                  const basePrice = item.price;
+                  const finalPrice = item.discount && item.discount > 0
+                    ? basePrice * (1 - item.discount / 100)
+                    : basePrice;
+                  return acc + finalPrice * item.quantity;
+                }, 0)}
+              />
+
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep('shipping-form')}
+                  disabled={isProcessing}
+                >
+                  ← Volver
+                </Button>
+                <Button
+                  onClick={handleCheckoutSubmit}
+                  disabled={isProcessing || !selectedShippingMethod}
+                >
+                  {isProcessing ? 'Procesando...' : 'Continuar al Pago'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Resumen del pedido */}
         <div className="order-1 lg:order-2">
-          <CheckoutSummary />
+          <CheckoutSummary
+            selectedShippingMethod={selectedShippingMethod}
+            shippingAddress={shippingAddress}
+          />
         </div>
       </div>
     </div>

@@ -3,11 +3,20 @@
 import { useCartStore } from "@/lib/stores/useCartStore";
 import Link from "next/link";
 import Image from "next/image";
+import { ShippingMethod } from "@/lib/schema";
+import { calculateShippingCost, calculateTotalWeight } from "@/lib/utils/shipping";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 
-export function CheckoutSummary() {
+interface CheckoutSummaryProps {
+  selectedShippingMethod?: ShippingMethod | null;
+  shippingAddress?: {
+    provincia: string;
+  } | null;
+}
+
+export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: CheckoutSummaryProps) {
   const { items } = useCartStore();
 
   // Calcular total con descuentos
@@ -18,7 +27,18 @@ export function CheckoutSummary() {
     return acc + finalPrice * item.quantity;
   }, 0);
 
-  const shippingCost = 0; // Envío gratuito por ahora
+  // Calcular costo de envío
+  let shippingCost = 0;
+  if (selectedShippingMethod && shippingAddress) {
+    const totalWeight = calculateTotalWeight(items);
+    shippingCost = calculateShippingCost(
+      selectedShippingMethod,
+      totalWeight,
+      shippingAddress.provincia,
+      subtotal
+    );
+  }
+
   const total = subtotal + shippingCost;
 
   return (
