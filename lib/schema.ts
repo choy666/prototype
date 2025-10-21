@@ -91,6 +91,25 @@ export const orderStatusEnum = pgEnum("order_status", [
 ]);
 
 // ======================
+// Direcciones de envío
+// ======================
+export const addresses = pgTable("addresses", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  nombre: varchar("nombre", { length: 256 }).notNull(),
+  direccion: text("direccion").notNull(),
+  ciudad: varchar("ciudad", { length: 256 }).notNull(),
+  provincia: varchar("provincia", { length: 256 }).notNull(),
+  codigoPostal: varchar("codigo_postal", { length: 10 }).notNull(),
+  telefono: varchar("telefono", { length: 20 }).notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ======================
 // Órdenes
 // ======================
 export const orders = pgTable("orders", {
@@ -133,5 +152,7 @@ export type Cart = typeof carts.$inferSelect;
 export type NewCart = typeof carts.$inferInsert;
 export type CartItem = typeof cartItems.$inferSelect;
 export type NewCartItem = typeof cartItems.$inferInsert;
+export type Address = typeof addresses.$inferSelect;
+export type NewAddress = typeof addresses.$inferInsert;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;

@@ -402,7 +402,7 @@ TOTAL FASE 4:                   65% ⚠️
 
 ---
 
-## 🎯 PLAN DE ACCIÓN RECOMENDADO
+## 🎯 IMPLEMENTAR PLAN DE ACCIÓN RECOMENDADO
 
 ### 🔴 Fase 1: CRÍTICOS (1-2 semanas)
 
@@ -410,17 +410,17 @@ TOTAL FASE 4:                   65% ⚠️
 **Duración:** 3-5 días
 
 **Tareas:**
-1. [ ] Crear componente `ShippingForm.tsx`
+1. [X] Crear componente `ShippingForm.tsx`
    - Campos: nombre, dirección, ciudad, estado, CP, teléfono
    - Validación con Zod
    - Integración con React Hook Form
 
-2. [ ] Crear página `app/checkout/page.tsx`
+2. [X] Crear página `app/checkout/page.tsx`
    - Layout de 2 columnas (formulario + resumen)
    - Integración con carrito
    - Botón de proceder al pago
 
-3. [ ] Actualizar flujo de checkout
+3. [X] Actualizar flujo de checkout
    - Modificar `app/cart/page.tsx` para redirigir a `/checkout`
    - Actualizar `app/api/checkout/route.ts` para recibir datos de envío
    - Guardar `shippingAddress` en orden
@@ -432,11 +432,11 @@ TOTAL FASE 4:                   65% ⚠️
 **Archivos a Crear/Modificar:**
 ```
 ✏️ app/cart/page.tsx (modificar botón)
-📄 app/checkout/page.tsx (crear)
-📄 components/checkout/ShippingForm.tsx (crear)
-📄 components/checkout/CheckoutSummary.tsx (crear)
-✏️ app/api/checkout/route.ts (modificar)
-📄 lib/validations/checkout.ts (crear)
+📄 app/checkout/page.tsx (creados)
+📄 components/checkout/ShippingForm.tsx (creado)
+📄 components/checkout/CheckoutSummary.tsx (creado)
+✏️ app/api/checkout/route.ts (modificado)
+📄 lib/validations/checkout.ts (creado)
 ```
 
 ---

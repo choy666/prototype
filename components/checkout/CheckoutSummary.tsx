@@ -92,7 +92,7 @@ export function CheckoutSummary() {
         <div className="text-xs text-gray-500 space-y-1">
           <p>• Pago seguro con Mercado Pago</p>
           <p>• Envío gratuito en compras superiores a $5.000</p>
-          <p>• Tiempo de entrega: 3-5 días hábiles</p>
+          <p>• Tiempo de entrega: 7-10 días hábiles</p>
         </div>
 
         <div className="pt-3 border-t">

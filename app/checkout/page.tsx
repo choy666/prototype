@@ -4,16 +4,23 @@ import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/lib/stores/useCartStore';
 import { ShippingForm } from '@/components/checkout/ShippingForm';
+import { AddressSelector } from '@/components/checkout/AddressSelector';
+import { AddressForm } from '@/components/checkout/AddressForm';
 import { CheckoutSummary } from '@/components/checkout/CheckoutSummary';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { ShippingFormData } from '@/lib/validations/checkout';
+import { ShippingFormData, Address as ValidationAddress } from '@/lib/validations/checkout';
+import { Address } from '@/lib/schema';
 import { toast } from 'react-hot-toast';
+
+type CheckoutStep = 'address-selection' | 'shipping-form' | 'new-address-form';
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const { items } = useCartStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>('address-selection');
+  const [selectedAddress, setSelectedAddress] = useState<Address & { id: number } | null>(null);
 
   // Verificar autenticación
   if (status === 'loading') {
@@ -49,6 +56,45 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  const handleAddressSelect = (address: Address | null) => {
+    setSelectedAddress(address);
+    if (address) {
+      // Si selecciona una dirección guardada, ir al formulario de envío con datos pre-llenados
+      setCurrentStep('shipping-form');
+    } else {
+      // Si elige "usar dirección diferente", mostrar formulario vacío
+      setCurrentStep('shipping-form');
+    }
+  };
+
+  const handleNewAddress = () => {
+    setCurrentStep('new-address-form');
+  };
+
+  const handleAddressFormSubmit = async (addressData: ValidationAddress) => {
+    try {
+      const response = await fetch('/api/addresses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(addressData),
+      });
+
+      if (response.ok) {
+        const newAddress = await response.json();
+        setSelectedAddress(newAddress);
+        setCurrentStep('shipping-form');
+        toast.success('Dirección guardada correctamente');
+      } else {
+        toast.error('Error al guardar la dirección');
+      }
+    } catch (error) {
+      console.error('Error saving address:', error);
+      toast.error('Error al guardar la dirección');
+    }
+  };
 
   const handleShippingSubmit = async (shippingData: ShippingFormData) => {
     setIsProcessing(true);
@@ -107,10 +153,36 @@ export default function CheckoutPage() {
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Formulario de envío */}
         <div className="order-2 lg:order-1">
-          <ShippingForm
-            onSubmit={handleShippingSubmit}
-            isLoading={isProcessing}
-          />
+          {currentStep === 'address-selection' && (
+            <AddressSelector
+              onAddressSelect={handleAddressSelect}
+              onNewAddress={handleNewAddress}
+              selectedAddressId={selectedAddress?.id}
+            />
+          )}
+
+          {currentStep === 'new-address-form' && (
+            <AddressForm
+              onSubmit={handleAddressFormSubmit}
+              onCancel={() => setCurrentStep('address-selection')}
+              submitLabel="Guardar y Continuar"
+            />
+          )}
+
+          {currentStep === 'shipping-form' && (
+            <ShippingForm
+              onSubmit={handleShippingSubmit}
+              isLoading={isProcessing}
+              initialData={selectedAddress ? {
+                nombre: selectedAddress.nombre,
+                direccion: selectedAddress.direccion,
+                ciudad: selectedAddress.ciudad,
+                provincia: selectedAddress.provincia,
+                codigoPostal: selectedAddress.codigoPostal,
+                telefono: selectedAddress.telefono,
+              } : undefined}
+            />
+          )}
         </div>
 
         {/* Resumen del pedido */}

@@ -2,32 +2,42 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { shippingAddressSchema, type ShippingFormData } from '@/lib/validations/checkout';
+import { addressSchema, Address as ValidationAddress } from '@/lib/validations/checkout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 
-interface ShippingFormProps {
-  onSubmit: (data: ShippingFormData) => void;
+interface AddressFormProps {
+  onSubmit: (data: ValidationAddress) => void;
+  onCancel?: () => void;
+  initialData?: Partial<ValidationAddress>;
   isLoading?: boolean;
-  initialData?: Partial<ShippingFormData>;
+  submitLabel?: string;
+  showCancel?: boolean;
 }
 
-export function ShippingForm({ onSubmit, isLoading = false, initialData }: ShippingFormProps) {
+export function AddressForm({
+  onSubmit,
+  onCancel,
+  initialData,
+  isLoading = false,
+  submitLabel = 'Guardar Dirección',
+  showCancel = true
+}: AddressFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<ShippingFormData>({
-    resolver: zodResolver(shippingAddressSchema),
+  } = useForm<ValidationAddress>({
+    resolver: zodResolver(addressSchema),
     mode: 'onBlur',
     defaultValues: initialData,
   });
 
-  const handleFormSubmit = async (data: ShippingFormData) => {
+  const handleFormSubmit = async (data: ValidationAddress) => {
     setIsSubmitting(true);
     try {
       await onSubmit(data);
@@ -41,9 +51,9 @@ export function ShippingForm({ onSubmit, isLoading = false, initialData }: Shipp
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Información de Envío</h2>
+        <h3 className="text-lg font-semibold">Dirección de Envío</h3>
         <p className="text-sm text-muted-foreground">
-          Completa los datos para el envío de tu pedido
+          Completa los datos de envío
         </p>
       </div>
 
@@ -175,19 +185,29 @@ export function ShippingForm({ onSubmit, isLoading = false, initialData }: Shipp
         </div>
       </div>
 
-      {/* Botón de Submit */}
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={isFormLoading}
-        aria-busy={isFormLoading}
-      >
-        {isFormLoading ? 'Procesando...' : 'Continuar al Pago'}
-      </Button>
+      {/* Botones */}
+      <div className="flex gap-3">
+        <Button
+          type="submit"
+          className="flex-1"
+          disabled={isFormLoading}
+          aria-busy={isFormLoading}
+        >
+          {isFormLoading ? 'Guardando...' : submitLabel}
+        </Button>
 
-      <p className="text-xs text-muted-foreground text-center">
-        Al continuar, serás redirigido a Mercado Pago para completar el pago de forma segura.
-      </p>
+        {showCancel && onCancel && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isFormLoading}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
