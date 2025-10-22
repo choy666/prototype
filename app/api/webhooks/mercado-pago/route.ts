@@ -1,7 +1,7 @@
 // app/api/webhooks/mercado-pago/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { orders, orderItems, products } from '@/lib/schema';
+import { orders, orderItems, products, users, shippingMethods } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
 
@@ -44,109 +44,191 @@ export async function POST(req: Request) {
 }
 
 async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoMetadata }) {
+  const paymentId = data.id.toString();
+
   try {
-    logger.info('Procesando pago aprobado', { paymentId: data.id });
+    logger.info('Procesando pago aprobado', { paymentId });
 
     // Verificar que no hayamos procesado este pago antes
     const existingOrder = await db
       .select()
       .from(orders)
-      .where(eq(orders.mercadoPagoId, data.id.toString()))
+      .where(eq(orders.mercadoPagoId, paymentId))
       .limit(1);
 
     if (existingOrder.length > 0) {
-      logger.warn('Pago ya procesado anteriormente', { paymentId: data.id, orderId: existingOrder[0].id });
+      logger.warn('Pago ya procesado anteriormente', { paymentId, orderId: existingOrder[0].id });
       return;
     }
 
-    // Extraer metadata del pago
+    // Validar metadata del pago
     const metadata = data.metadata;
     if (!metadata) {
-      logger.error('Metadata faltante en pago aprobado', { paymentId: data.id });
-      return;
+      logger.error('Metadata faltante en pago aprobado', { paymentId });
+      throw new Error('Metadata faltante en pago aprobado');
     }
+
     const {
-      userId,
-      shippingAddress,
-      shippingMethodId,
+      userId: userIdStr,
+      shippingAddress: shippingAddressJson,
+      shippingMethodId: shippingMethodIdStr,
       items: itemsJson,
-      shippingCost
+      shippingCost: shippingCostStr
     } = metadata;
 
-    if (!userId || !itemsJson) {
-      logger.error('Metadata incompleta en pago aprobado', { paymentId: data.id, metadata });
-      return;
+    // Validaciones de campos requeridos
+    if (!userIdStr || !itemsJson) {
+      logger.error('Metadata incompleta en pago aprobado', { paymentId, metadata });
+      throw new Error('Metadata incompleta: faltan userId o items');
     }
 
-    // Parsear items
+    // Convertir y validar userId
+    const userId = parseInt(userIdStr);
+    if (isNaN(userId) || userId <= 0) {
+      logger.error('userId inválido en metadata', { paymentId, userIdStr });
+      throw new Error('userId inválido');
+    }
+
+    // Verificar que el usuario existe
+    const userExists = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (userExists.length === 0) {
+      logger.error('Usuario no encontrado', { paymentId, userId });
+      throw new Error('Usuario no encontrado');
+    }
+
+    // Parsear y validar items
     let items;
     try {
       items = JSON.parse(itemsJson);
+      if (!Array.isArray(items) || items.length === 0) {
+        throw new Error('Items debe ser un array no vacío');
+      }
     } catch (error) {
-      logger.error('Error parseando items del metadata', { paymentId: data.id, itemsJson, error });
-      return;
+      logger.error('Error parseando items del metadata', { paymentId, itemsJson, error });
+      throw new Error('Error parseando items del metadata');
     }
 
-    // Calcular total de items
-    const calculatedTotal = items.reduce((sum: number, item: unknown) => {
-      const itemData = item as { price: string; quantity: number };
-      return sum + (parseFloat(itemData.price) * itemData.quantity);
-    }, 0) + parseFloat((shippingCost as string) || '0');
-
-    // Crear la orden
-    const orderData = {
-      userId: parseInt(userId),
-      total: calculatedTotal.toString(),
-      status: 'paid' as const,
-      paymentId: data.id.toString(),
-      mercadoPagoId: data.id.toString(),
-      shippingAddress: shippingAddress ? JSON.parse(shippingAddress) : null,
-      shippingMethodId: shippingMethodId ? parseInt(shippingMethodId) : null,
-      shippingCost: (parseFloat(shippingCost || '0')).toString(),
-    };
-
-    logger.info('Creando orden', { orderData });
-
-    const newOrder = await db.insert(orders).values(orderData).returning();
-
-    if (newOrder.length === 0) {
-      throw new Error('No se pudo crear la orden');
-    }
-
-    const orderId = newOrder[0].id;
-    logger.info('Orden creada exitosamente', { orderId, paymentId: data.id });
-
-    // Crear los items de la orden
+    // Validar estructura de items
     for (const item of items) {
-      await db.insert(orderItems).values({
-        orderId: orderId,
-        productId: item.id,
-        quantity: item.quantity,
-        price: parseFloat(item.price).toString(),
-      });
-
-      // Actualizar stock del producto
-      await db.update(products)
-        .set({ stock: sql`${products.stock} - ${item.quantity}` })
-        .where(eq(products.id, item.id));
-
-      logger.info('Item de orden creado y stock actualizado', {
-        orderId,
-        productId: item.id,
-        quantity: item.quantity
-      });
+      if (!item.id || !item.price || !item.quantity) {
+        logger.error('Item inválido en metadata', { paymentId, item });
+        throw new Error('Item inválido: faltan campos requeridos');
+      }
+      if (typeof item.quantity !== 'number' || item.quantity <= 0) {
+        throw new Error('Cantidad inválida en item');
+      }
     }
+
+    // Parsear shippingAddress si existe
+    let shippingAddress = null;
+    if (shippingAddressJson) {
+      try {
+        shippingAddress = JSON.parse(shippingAddressJson);
+      } catch (error) {
+        logger.error('Error parseando shippingAddress', { paymentId, shippingAddressJson, error });
+        throw new Error('Error parseando shippingAddress');
+      }
+    }
+
+    // Convertir shippingMethodId si existe
+    let shippingMethodId = null;
+    if (shippingMethodIdStr) {
+      shippingMethodId = parseInt(shippingMethodIdStr);
+      if (isNaN(shippingMethodId) || shippingMethodId <= 0) {
+        logger.error('shippingMethodId inválido', { paymentId, shippingMethodIdStr });
+        throw new Error('shippingMethodId inválido');
+      }
+      // Verificar que el método de envío existe
+      const methodExists = await db.select().from(shippingMethods).where(eq(shippingMethods.id, shippingMethodId)).limit(1);
+      if (methodExists.length === 0) {
+        logger.error('Método de envío no encontrado', { paymentId, shippingMethodId });
+        throw new Error('Método de envío no encontrado');
+      }
+    }
+
+    // Calcular total de items con validación
+    const calculatedTotal = items.reduce((sum: number, item: { id: number; price: string; quantity: number }) => {
+      const price = parseFloat(item.price);
+      if (isNaN(price) || price < 0) {
+        throw new Error(`Precio inválido en item ${item.id}`);
+      }
+      return sum + (price * item.quantity);
+    }, 0);
+
+    const shippingCost = shippingCostStr ? parseFloat(shippingCostStr) : 0;
+    if (isNaN(shippingCost) || shippingCost < 0) {
+      logger.error('Costo de envío inválido', { paymentId, shippingCostStr });
+      throw new Error('Costo de envío inválido');
+    }
+
+    const finalTotal = calculatedTotal + shippingCost;
+
+    // Usar transacción para asegurar atomicidad
+    await db.transaction(async (tx) => {
+      // Crear la orden
+      const orderData = {
+        userId,
+        total: finalTotal.toString(),
+        status: 'paid' as const,
+        paymentId,
+        mercadoPagoId: paymentId,
+        shippingAddress,
+        shippingMethodId,
+        shippingCost: shippingCost.toString(),
+      };
+
+      logger.info('Creando orden', { orderData });
+
+      const newOrder = await tx.insert(orders).values(orderData).returning();
+
+      if (newOrder.length === 0) {
+        throw new Error('No se pudo crear la orden');
+      }
+
+      const orderId = newOrder[0].id;
+      logger.info('Orden creada exitosamente', { orderId, paymentId });
+
+      // Crear los items de la orden y actualizar stock
+      for (const item of items) {
+        // Verificar que el producto existe y tiene stock suficiente
+        const product = await tx.select().from(products).where(eq(products.id, item.id)).limit(1);
+        if (product.length === 0) {
+          throw new Error(`Producto ${item.id} no encontrado`);
+        }
+        if (product[0].stock < item.quantity) {
+          throw new Error(`Stock insuficiente para producto ${item.id}`);
+        }
+
+        // Crear item de orden
+        await tx.insert(orderItems).values({
+          orderId,
+          productId: item.id,
+          quantity: item.quantity,
+          price: parseFloat(item.price).toString(),
+        });
+
+        // Actualizar stock del producto
+        await tx.update(products)
+          .set({ stock: sql`${products.stock} - ${item.quantity}` })
+          .where(eq(products.id, item.id));
+
+        logger.info('Item de orden creado y stock actualizado', {
+          orderId,
+          productId: item.id,
+          quantity: item.quantity
+        });
+      }
+    });
 
     logger.info('Pago aprobado procesado completamente', {
-      paymentId: data.id,
-      orderId,
+      paymentId,
       itemCount: items.length,
-      total: calculatedTotal
+      total: finalTotal
     });
 
   } catch (error) {
     logger.error('Error procesando pago aprobado', {
-      paymentId: data.id,
+      paymentId,
       error: error instanceof Error ? error.message : String(error)
     });
     throw error;
