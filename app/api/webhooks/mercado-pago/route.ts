@@ -27,7 +27,14 @@ export async function POST(req: Request) {
     // Procesar el evento recibido
     const { action, data } = body;
 
-    logger.info('Webhook MercadoPago recibido', { action, dataId: data?.id });
+    logger.info('Webhook MercadoPago recibido', {
+      action,
+      dataId: data?.id,
+      status: data?.status,
+      hasMetadata: !!data?.metadata,
+      userAgent: req.headers.get('user-agent'),
+      ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip')
+    });
 
     if (action === 'payment.updated' && data?.status === 'approved') {
       await handlePaymentApproved(data as { id: string; metadata?: MercadoPagoMetadata });
@@ -47,7 +54,11 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
   const paymentId = data.id.toString();
 
   try {
-    logger.info('Procesando pago aprobado', { paymentId });
+    logger.info('Procesando pago aprobado', {
+      paymentId,
+      hasMetadata: !!data.metadata,
+      metadataKeys: data.metadata ? Object.keys(data.metadata) : []
+    });
 
     // Verificar que no hayamos procesado este pago antes
     const existingOrder = await db
@@ -64,7 +75,10 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
     // Validar metadata del pago
     const metadata = data.metadata;
     if (!metadata) {
-      logger.error('Metadata faltante en pago aprobado', { paymentId });
+      logger.error('Metadata faltante en pago aprobado', {
+        paymentId,
+        availableData: Object.keys(data)
+      });
       throw new Error('Metadata faltante en pago aprobado');
     }
 
@@ -78,7 +92,12 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
 
     // Validaciones de campos requeridos
     if (!userIdStr || !itemsJson) {
-      logger.error('Metadata incompleta en pago aprobado', { paymentId, metadata });
+      logger.error('Metadata incompleta en pago aprobado', {
+        paymentId,
+        hasUserId: !!userIdStr,
+        hasItems: !!itemsJson,
+        metadataKeys: Object.keys(metadata)
+      });
       throw new Error('Metadata incompleta: faltan userId o items');
     }
 
@@ -189,6 +208,7 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
       logger.info('Orden creada exitosamente', { orderId, paymentId });
 
       // Crear los items de la orden y actualizar stock
+      logger.info('Creando items de orden', { orderId, itemCount: items.length });
       for (const item of items) {
         // Verificar que el producto existe y tiene stock suficiente
         const product = await tx.select().from(products).where(eq(products.id, item.id)).limit(1);
@@ -223,7 +243,8 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
     logger.info('Pago aprobado procesado completamente', {
       paymentId,
       itemCount: items.length,
-      total: finalTotal
+      total: finalTotal,
+      userId
     });
 
   } catch (error) {

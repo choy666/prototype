@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
         auto_return: "approved",
         notification_url: `${process.env.MERCADO_PAGO_NOTIFICATION_URL}?source_news=webhooks&user_id=${userId}`,
         metadata: {
-          userId: userId,
+          userId: userId?.toString() || '',
           shippingAddress: JSON.stringify(shippingAddress),
           shippingMethodId: method.id.toString(),
           items: JSON.stringify(items),

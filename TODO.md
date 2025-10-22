@@ -1,27 +1,46 @@
-# TODO: Auditoría del Sistema de Órdenes
+# Investigación y Solución: Órdenes no se generan en producción después del checkout
 
-## Tareas Pendientes
-- [x] Mejorar manejo de errores en webhook de Mercado Pago con logging específico
-- [x] Agregar validación de metadata antes de procesar
-- [x] Verificar restricciones de base de datos y claves foráneas
-- [x] Probar webhook con datos de muestra
-- [x] Revisar configuración de webhook de Mercado Pago
-- [x] Agregar manejo de transacciones para creación de órdenes
-- [x] Verificar que los tipos de datos coincidan entre esquema y código
+## Información Recopilada
+- **Flujo del checkout**: Crea preferencia en MercadoPago con metadata, usuario paga, webhook procesa pago aprobado y crea orden.
+- **Archivos clave**:
+  - `app/api/checkout/route.ts`: Crea preferencia con metadata.
+  - `app/api/webhooks/mercado-pago/route.ts`: Procesa webhook y crea orden si pago aprobado.
+  - Scripts de validación: `scripts/validate-webhook-config.ts`, `scripts/test-webhook.ts`.
+- **Posibles causas**: Webhook no configurado, metadata inválida, errores en BD, problemas de red.
 
-## Progreso
-- [x] Analizar código del webhook (app/api/webhooks/mercado-pago/route.ts)
-- [x] Revisar esquema de base de datos (lib/schema.ts)
-- [x] Verificar conexión a BD (lib/db.ts)
-- [x] Examinar ruta de checkout (app/api/checkout/route.ts)
-- [x] Identificar problemas potenciales en el flujo de creación de órdenes
-- [x] Implementar validaciones robustas en webhook
-- [x] Agregar transacciones para atomicidad
-- [x] Verificar existencia de usuarios, productos y métodos de envío
-- [x] Mejorar logging con detalles específicos
-- [x] Corregir errores de TypeScript
-- [x] Compilación exitosa del proyecto
-- [x] Crear scripts de prueba para estructura de datos
-- [x] Crear script de validación de configuración de Mercado Pago
-- [x] Ejecutar pruebas de estructura de datos del webhook
-- [x] Validar casos de error simulados
+## Plan de Investigación y Solución
+
+### 1. Verificar configuración del webhook en MercadoPago
+- Ejecutar script de validación de configuración.
+- Verificar que la URL del webhook esté configurada correctamente en el dashboard de MP.
+- Confirmar que el evento `payment.updated` esté habilitado.
+
+### 2. Revisar logs en producción
+- Buscar logs de error en el webhook endpoint.
+- Verificar si se están recibiendo webhooks.
+- Identificar errores específicos en el procesamiento.
+
+### 3. Probar estructura de datos del webhook
+- Ejecutar script de prueba de estructura de datos.
+- Verificar que la metadata se esté enviando correctamente desde checkout.
+
+### 4. Verificar conectividad y estado de la base de datos
+- Ejecutar script de verificación de salud de BD.
+- Confirmar que las operaciones de inserción funcionen.
+
+### 5. Simular webhook manualmente
+- Crear un script para simular envío de webhook con datos de prueba.
+- Verificar que el procesamiento funcione correctamente.
+
+### 6. Implementar mejoras de robustez
+- Agregar más logging detallado.
+- Mejorar manejo de errores.
+- Agregar validaciones adicionales.
+
+### 7. Probar en staging/entorno controlado
+- Desplegar cambios en un entorno de prueba.
+- Realizar pruebas completas del flujo de checkout.
+
+### 8. Monitoreo y alertas
+- Configurar alertas para fallos en creación de órdenes.
+- Agregar métricas de éxito/fallo de webhooks.
