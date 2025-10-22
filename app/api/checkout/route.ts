@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
           userId: userId,
           shippingAddress: JSON.stringify(shippingAddress),
           shippingMethodId: method.id.toString(),
+          items: JSON.stringify(items),
           subtotal: subtotal.toString(),
           shippingCost: shippingCost.toString(),
           total: total.toString(),
