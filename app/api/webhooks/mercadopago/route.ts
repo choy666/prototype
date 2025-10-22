@@ -1,9 +1,11 @@
 // app/api/webhooks/mercado-pago/route.ts
 import { NextResponse } from 'next/server';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { db } from '@/lib/db';
 import { orders, orderItems, products, users, shippingMethods } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
+import { createHmac } from 'crypto';
 
 interface MercadoPagoMetadata {
   userId: string;
@@ -13,6 +15,10 @@ interface MercadoPagoMetadata {
   shippingCost?: string;
 }
 
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
+});
+
 export async function POST(req: Request) {
   try {
     logger.info('Webhook MercadoPago: Inicio de procesamiento', {
@@ -21,35 +27,38 @@ export async function POST(req: Request) {
       headers: Object.fromEntries(req.headers.entries())
     });
 
-    const body = await req.json();
+    const body = await req.text();
+    const signature = req.headers.get('x-signature');
+    const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
 
-    // Validación básica de headers
-    const requestId = req.headers.get('x-request-id');
-    if (!requestId) {
-      logger.warn('Webhook MercadoPago: Falta header x-request-id');
-      return NextResponse.json({ error: 'Faltan headers requeridos' }, { status: 400 });
+    // Validar firma si está configurada
+    if (secret && signature) {
+      const expectedSignature = createHmac('sha256', secret)
+        .update(body)
+        .digest('hex');
+
+      if (!signature.includes(`v1=${expectedSignature}`)) {
+        logger.warn('Webhook MercadoPago: Firma inválida');
+        return NextResponse.json({ error: 'Firma inválida' }, { status: 401 });
+      }
     }
 
-    // Procesar el evento recibido
-    const { action, data } = body;
+    const payload = JSON.parse(body);
+    const { action, data } = payload;
 
     logger.info('Webhook MercadoPago recibido', {
       action,
       dataId: data?.id,
       status: data?.status,
-      hasMetadata: !!data?.metadata,
       userAgent: req.headers.get('user-agent'),
       ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip')
     });
 
-    if (action === 'payment.updated' && data?.status === 'approved') {
-      logger.info('Procesando pago aprobado - llamando a handlePaymentApproved');
-      await handlePaymentApproved(data as { id: string; metadata?: MercadoPagoMetadata });
-    } else if (action === 'payment.created' || action === 'payment.updated') {
-      // Otros eventos de pago - solo logging por ahora
-      logger.info('Evento de pago procesado (no aprobado)', { action, status: data?.status });
+    if (action === 'payment.updated' && data?.id) {
+      logger.info('Procesando pago actualizado - consultando API de MercadoPago');
+      await handlePaymentUpdated(data.id.toString());
     } else {
-      logger.warn('Evento de webhook no reconocido', { action, status: data?.status });
+      logger.info('Evento de webhook no procesado', { action, status: data?.status });
     }
 
     return NextResponse.json({ success: true });
@@ -62,15 +71,30 @@ export async function POST(req: Request) {
   }
 }
 
-async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoMetadata }) {
-  const paymentId = data.id.toString();
-
+async function handlePaymentUpdated(paymentId: string) {
   try {
-    logger.info('handlePaymentApproved: Iniciando procesamiento', {
+    logger.info('handlePaymentUpdated: Consultando pago en MercadoPago API', { paymentId });
+
+    // Consultar el pago completo desde MercadoPago API
+    const payment = await new Payment(client).get({ id: paymentId });
+
+    if (!payment) {
+      logger.error('Pago no encontrado en MercadoPago API', { paymentId });
+      throw new Error('Pago no encontrado');
+    }
+
+    logger.info('Pago obtenido de MercadoPago API', {
       paymentId,
-      hasMetadata: !!data.metadata,
-      metadataKeys: data.metadata ? Object.keys(data.metadata) : []
+      status: payment.status,
+      hasMetadata: !!payment.metadata,
+      metadataKeys: payment.metadata ? Object.keys(payment.metadata) : []
     });
+
+    // Solo procesar si el pago está aprobado
+    if (payment.status !== 'approved') {
+      logger.info('Pago no aprobado, ignorando', { paymentId, status: payment.status });
+      return;
+    }
 
     // Verificar que no hayamos procesado este pago antes
     const existingOrder = await db
@@ -85,16 +109,13 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
     }
 
     // Validar metadata del pago
-    const metadata = data.metadata;
+    const metadata: MercadoPagoMetadata = payment.metadata;
     if (!metadata) {
-      logger.error('handlePaymentApproved: Metadata faltante en pago aprobado', {
-        paymentId,
-        availableData: Object.keys(data)
-      });
+      logger.error('handlePaymentUpdated: Metadata faltante en pago aprobado', { paymentId });
       throw new Error('Metadata faltante en pago aprobado');
     }
 
-    logger.info('handlePaymentApproved: Metadata encontrada', {
+    logger.info('handlePaymentUpdated: Metadata encontrada', {
       paymentId,
       metadataKeys: Object.keys(metadata),
       userId: metadata.userId,
@@ -276,7 +297,7 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
     });
 
   } catch (error) {
-    logger.error('Error procesando pago aprobado', {
+    logger.error('Error procesando pago actualizado', {
       paymentId,
       error: error instanceof Error ? error.message : String(error)
     });
