@@ -171,6 +171,8 @@ npm run db:restore       # Restaura backup de BD
 npm run test             # Ejecuta tests
 node security-tests.js
 node csrf-tests.js
+npx tsx --env-file=.env.local scripts/create-shipping-methods.ts
+
 ```
 
 ## 🌐 Despliegue

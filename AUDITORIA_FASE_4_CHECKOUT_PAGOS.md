@@ -483,13 +483,13 @@ TOTAL FASE 4:                   65% ⚠️
 **Duración:** 3-4 días
 
 **Tareas:**
-1. [ ] Crear tabla `shipping_methods`
-2. [ ] Implementar lógica de cálculo
+1. [x] Crear tabla `shipping_methods`
+2. [x] Implementar lógica de cálculo
    - Por peso
    - Por zona geográfica
    - Envío gratis por monto mínimo
-3. [ ] Crear selector de método de envío
-4. [ ] Integrar en checkout y resumen
+3. [x] Crear selector de método de envío
+4. [x] Integrar en checkout y resumen
 
 ---
 

@@ -12,9 +12,6 @@ import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { ShippingFormData, Address as ValidationAddress } from '@/lib/validations/checkout';
 import { Address, ShippingMethod } from '@/lib/schema';
-import { db } from '@/lib/db';
-import { shippingMethods } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
 import { toast } from 'react-hot-toast';
 
 type CheckoutStep = 'address-selection' | 'shipping-form' | 'shipping-method' | 'new-address-form';
@@ -33,8 +30,13 @@ export default function CheckoutPage() {
   useEffect(() => {
     const loadShippingMethods = async () => {
       try {
-        const methods = await db.select().from(shippingMethods).where(eq(shippingMethods.isActive, true));
-        setShippingMethodsList(methods);
+        const response = await fetch('/api/shipping-methods');
+        if (response.ok) {
+          const methods = await response.json();
+          setShippingMethodsList(methods);
+        } else {
+          throw new Error('Error al cargar métodos de envío');
+        }
       } catch (error) {
         console.error('Error loading shipping methods:', error);
         toast.error('Error al cargar métodos de envío');
