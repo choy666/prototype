@@ -26,7 +26,10 @@ function sanitizeObject(obj: unknown): unknown {
     const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       const lowerKey = key.toLowerCase();
-      if (SENSITIVE_KEYS.some(sensitive => lowerKey.includes(sensitive))) {
+      // No sanitizar errores de base de datos para diagnóstico
+      if (lowerKey.includes('error') && typeof value === 'object' && value !== null) {
+        sanitized[key] = value; // Mantener error completo
+      } else if (SENSITIVE_KEYS.some(sensitive => lowerKey.includes(sensitive))) {
         sanitized[key] = '[REDACTED]';
       } else {
         sanitized[key] = sanitizeObject(value);

@@ -113,3 +113,33 @@ export async function checkDatabaseConnection() {
     }
   }
 }
+
+// 9. Función para verificar existencia de tablas críticas
+export async function checkCriticalTables() {
+  try {
+    const tables = ['users', 'orders', 'order_items', 'products'];
+    const results: Record<string, { exists: boolean; count?: number; error?: string }> = {};
+
+    for (const table of tables) {
+      try {
+        const result = await db.execute(sql`SELECT COUNT(*) FROM ${sql.identifier(table)}`);
+        results[table] = { exists: true, count: Number(result.rows[0].count) };
+      } catch (tableError) {
+        results[table] = { exists: false, error: tableError instanceof Error ? tableError.message : String(tableError) };
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Verificación de tablas completada',
+      tables: results,
+    };
+  } catch (error) {
+    console.error('❌ Error al verificar tablas:', error);
+    return {
+      success: false,
+      message: 'Error al verificar tablas',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}

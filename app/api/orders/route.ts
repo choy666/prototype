@@ -13,40 +13,62 @@ export async function GET(request: Request) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 });
     }
 
-    logger.info('Obteniendo órdenes para el usuario', { userId: session.user.id });
+    // Validar y convertir userId
+    const userId = parseInt(session.user.id);
+    if (isNaN(userId)) {
+      logger.error('userId inválido en sesión', { sessionUserId: session.user.id });
+      return new Response(JSON.stringify({ error: 'ID de usuario inválido' }), { status: 400 });
+    }
 
-    const userOrders = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.userId, parseInt(session.user.id)))
-      .orderBy(desc(orders.createdAt));
+    logger.info('Obteniendo órdenes para el usuario', { userId: session.user.id, parsedUserId: userId });
 
-    const ordersWithItems = await Promise.all(
-      userOrders.map(async (order) => {
-        const items = await db
-          .select({
-            id: orderItems.id,
-            quantity: orderItems.quantity,
-            price: orderItems.price,
-            productId: orderItems.productId,
-            productName: products.name,
-            productImage: products.image,
-          })
-          .from(orderItems)
-          .leftJoin(products, eq(orderItems.productId, products.id))
-          .where(eq(orderItems.orderId, order.id));
+    let userOrders;
+    try {
+      userOrders = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.userId, userId))
+        .orderBy(desc(orders.createdAt));
+    } catch (dbError) {
+      logger.error('Error al consultar órdenes en base de datos', { error: dbError, userId });
+      console.error('Error detallado en consulta de órdenes:', dbError);
+      return new Response(JSON.stringify({ error: 'Error en la base de datos al obtener órdenes' }), { status: 500 });
+    }
 
-        const total = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+    let ordersWithItems;
+    try {
+      ordersWithItems = await Promise.all(
+        userOrders.map(async (order) => {
+          const items = await db
+            .select({
+              id: orderItems.id,
+              quantity: orderItems.quantity,
+              price: orderItems.price,
+              productId: orderItems.productId,
+              productName: products.name,
+              productImage: products.image,
+            })
+            .from(orderItems)
+            .leftJoin(products, eq(orderItems.productId, products.id))
+            .where(eq(orderItems.orderId, order.id));
 
-        return { ...order, items, total };
-      })
-    );
+          const total = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+
+          return { ...order, items, total };
+        })
+      );
+    } catch (itemsError) {
+      logger.error('Error al obtener items de órdenes', { error: itemsError, userId });
+      console.error('Error detallado en consulta de items:', itemsError);
+      return new Response(JSON.stringify({ error: 'Error al procesar los items de las órdenes' }), { status: 500 });
+    }
 
     logger.info('Órdenes obtenidas exitosamente', { userId: session.user.id, orderCount: ordersWithItems.length });
 
     return new Response(JSON.stringify(ordersWithItems), { status: 200 });
   } catch (error) {
-    logger.error('Error al obtener órdenes', { error });
+    logger.error('Error general al obtener órdenes', { error });
+    console.error('Error detallado general:', error);
     return new Response(JSON.stringify({ error: 'Error al obtener el historial de compras' }), { status: 500 });
   }
 }

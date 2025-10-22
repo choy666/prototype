@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env.test' }); // Fallback para testing
 
 import { db } from '../lib/db';
 import { users } from '../lib/schema';
