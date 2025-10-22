@@ -3,8 +3,9 @@ import { MercadoPagoConfig, Preference } from "mercadopago";
 import { checkoutSchema } from "@/lib/validations/checkout";
 import { calculateShippingCost, calculateTotalWeight } from "@/lib/utils/shipping";
 import { db } from "@/lib/db";
-import { shippingMethods } from "@/lib/schema";
+import { shippingMethods, users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { logger } from "@/lib/utils/logger";
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
@@ -27,6 +28,32 @@ export async function POST(req: NextRequest) {
     }
 
     const { items, shippingAddress, shippingMethod, userId } = validationResult.data;
+
+    // Verificar que el usuario existe
+    logger.info('Checkout: Verificando existencia de usuario', { userId });
+    const userExists = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, Number(userId)))
+      .limit(1);
+
+    if (userExists.length === 0) {
+      logger.error('Checkout: Usuario no encontrado', { userId });
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 400 }
+      );
+    }
+
+    logger.info('Checkout: Usuario verificado correctamente', { userId, userEmail: userExists[0].email });
+
+    // Log de metadata que se enviará
+    logger.info('Checkout: Metadata preparada para MercadoPago', {
+      userId: userId?.toString() || '',
+      itemCount: items.length,
+      shippingMethodId: shippingMethod.id,
+      hasShippingAddress: !!shippingAddress
+    });
 
     // Obtener método de envío de la BD
     const shippingMethodData = await db

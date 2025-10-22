@@ -42,7 +42,7 @@ async function simulateWebhook() {
   console.log(JSON.stringify(webhookPayload, null, 2));
 
   // URL del webhook local (ajusta según tu configuración)
-  const webhookUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL || 'http://localhost:3000/api/webhooks/mercado-pago';
+  const webhookUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL || 'http://localhost:3001/api/webhooks/mercado-pago';
 
   console.log(`\n2. Enviando a: ${webhookUrl}`);
 

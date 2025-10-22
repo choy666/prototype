@@ -15,6 +15,12 @@ interface MercadoPagoMetadata {
 
 export async function POST(req: Request) {
   try {
+    logger.info('Webhook MercadoPago: Inicio de procesamiento', {
+      method: req.method,
+      url: req.url,
+      headers: Object.fromEntries(req.headers.entries())
+    });
+
     const body = await req.json();
 
     // Validación básica de headers
@@ -37,15 +43,21 @@ export async function POST(req: Request) {
     });
 
     if (action === 'payment.updated' && data?.status === 'approved') {
+      logger.info('Procesando pago aprobado - llamando a handlePaymentApproved');
       await handlePaymentApproved(data as { id: string; metadata?: MercadoPagoMetadata });
     } else if (action === 'payment.created' || action === 'payment.updated') {
       // Otros eventos de pago - solo logging por ahora
       logger.info('Evento de pago procesado (no aprobado)', { action, status: data?.status });
+    } else {
+      logger.warn('Evento de webhook no reconocido', { action, status: data?.status });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error('Error procesando webhook MercadoPago', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Error procesando webhook MercadoPago', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }
@@ -54,7 +66,7 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
   const paymentId = data.id.toString();
 
   try {
-    logger.info('Procesando pago aprobado', {
+    logger.info('handlePaymentApproved: Iniciando procesamiento', {
       paymentId,
       hasMetadata: !!data.metadata,
       metadataKeys: data.metadata ? Object.keys(data.metadata) : []
@@ -75,12 +87,20 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
     // Validar metadata del pago
     const metadata = data.metadata;
     if (!metadata) {
-      logger.error('Metadata faltante en pago aprobado', {
+      logger.error('handlePaymentApproved: Metadata faltante en pago aprobado', {
         paymentId,
         availableData: Object.keys(data)
       });
       throw new Error('Metadata faltante en pago aprobado');
     }
+
+    logger.info('handlePaymentApproved: Metadata encontrada', {
+      paymentId,
+      metadataKeys: Object.keys(metadata),
+      userId: metadata.userId,
+      hasItems: !!metadata.items,
+      hasShippingAddress: !!metadata.shippingAddress
+    });
 
     const {
       userId: userIdStr,
@@ -164,6 +184,14 @@ async function handlePaymentApproved(data: { id: string; metadata?: MercadoPagoM
         throw new Error('Método de envío no encontrado');
       }
     }
+
+    logger.info('Validaciones de metadata completadas', {
+      paymentId,
+      userId,
+      itemCount: items.length,
+      hasShippingAddress: !!shippingAddress,
+      hasShippingMethod: !!shippingMethodId
+    });
 
     // Calcular total de items con validación
     const calculatedTotal = items.reduce((sum: number, item: { id: number; price: string; quantity: number }) => {
