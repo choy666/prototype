@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Eye, Calendar, Package } from 'lucide-react';
+import { Eye, Calendar, Package, AlertCircle } from 'lucide-react';
 
 type Order = {
   id: string;
@@ -25,6 +25,8 @@ export default function OrdersPage() {
   const { status } = useSession();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -34,11 +36,28 @@ export default function OrdersPage() {
 
     const fetchOrders = async () => {
       try {
+        setLoading(true);
+        setError(null);
         const res = await fetch('/api/orders');
-        const data: Order[] = await res.json();
+
+        if (!res.ok) {
+          throw new Error(`Error HTTP: ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // Validar que la respuesta sea un array
+        if (!Array.isArray(data)) {
+          throw new Error('La respuesta de la API no es un array válido');
+        }
+
         setOrders(data);
       } catch (error) {
         console.error('Error al cargar órdenes:', error);
+        setError(error instanceof Error ? error.message : 'Error desconocido al cargar órdenes');
+        setOrders([]); // Asegurar que orders sea un array vacío en caso de error
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -47,11 +66,33 @@ export default function OrdersPage() {
     }
   }, [status, router]);
 
-  if (status === 'loading') {
+  if (status === 'loading' || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Error al cargar órdenes
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            {error}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Reintentar
+          </button>
         </div>
       </div>
     );
