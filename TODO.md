@@ -1,15 +1,11 @@
-# TODO: Soluciones a problemas de compilación
+# TODO: Solucionar errores de compilación en npm run build
 
-## Problemas identificados:
-1. **Error de tipo en app/checkout/page.tsx:148** - `CartItem` no tiene propiedad `weight`
-2. **Warning ESLint en ShippingMethodSelector.tsx:6** - `Button` importado pero no usado
+## Pasos a completar:
 
-## Plan de solución:
-1. Agregar propiedad `weight` al tipo `CartItem` en `lib/stores/useCartStore.ts`
-2. Remover importación no usada de `Button` en `components/checkout/ShippingMethodSelector.tsx`
-3. Verificar que la compilación pase correctamente
-
-## Pasos a seguir:
-- [ ] Actualizar tipo `CartItem` para incluir `weight?: number | null`
-- [ ] Remover importación `Button` de `ShippingMethodSelector.tsx`
-- [ ] Ejecutar `npm run build` para verificar corrección
+- [x] Agregar import de Link en app/(protected)/dashboard/page.tsx
+- [x] Definir tipos específicos en app/(protected)/orders/[id]/page.tsx:
+  - [x] Tipo para shippingAddress
+  - [x] Usar useCallback para fetchOrderDetail y agregar a dependencias
+  - [x] Cambiar any en ordersData.find
+- [x] Cambiar any en updateData en app/api/orders/[id]/tracking/route.ts
+- [x] Ejecutar npm run build para verificar que se solucionaron los errores

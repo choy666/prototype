@@ -40,7 +40,12 @@ export async function GET(request: NextRequest) {
         status: orders.status,
         total: orders.total,
         mercadoPagoId: orders.mercadoPagoId,
+        shippingAddress: orders.shippingAddress,
+        shippingMethodId: orders.shippingMethodId,
+        shippingCost: orders.shippingCost,
+        trackingNumber: orders.trackingNumber,
         createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
         userId: orders.userId,
       })
       .from(orders)
@@ -70,11 +75,17 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      orderId: orderData.id,
+      id: orderData.id,
       status: orderData.status,
       total: orderData.total,
       mercadoPagoId: orderData.mercadoPagoId,
+      shippingAddress: orderData.shippingAddress,
+      shippingMethodId: orderData.shippingMethodId,
+      shippingCost: orderData.shippingCost,
+      trackingNumber: orderData.trackingNumber,
       createdAt: orderData.createdAt,
+      updatedAt: orderData.updatedAt,
+      userId: orderData.userId,
     });
 
   } catch (error) {

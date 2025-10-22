@@ -2,6 +2,7 @@
 
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { LogOut } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
@@ -132,11 +133,14 @@ export default function DashboardPage() {
                 Configuración
               </span>
             </button>
-            <button className='bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-center'>
+            <Link
+              href="/orders"
+              className='bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-center block transition-colors'
+            >
               <span className='block text-sm font-medium text-gray-900 dark:text-white'>
                 Mis Pedidos
               </span>
-            </button>
+            </Link>
             <button
               className='bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-center'
               onClick={handleSignOut}

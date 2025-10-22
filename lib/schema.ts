@@ -138,6 +138,7 @@ export const orders = pgTable("orders", {
   shippingAddress: jsonb("shipping_address"),
   shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0").notNull(),
+  trackingNumber: text("tracking_number"), // Número de seguimiento
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

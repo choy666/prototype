@@ -494,19 +494,18 @@ TOTAL FASE 4:                   65% ⚠️
 ---
 
 #### Sprint 4: UI de Seguimiento
-**Duración:** 3-4 días
 
 **Tareas:**
-1. [ ] Crear página de detalle de orden
+1. [x] Crear página de detalle de orden
    - `/orders/[id]`
-2. [ ] Componente de timeline de estados
-3. [ ] Integración con API de estado
-4. [ ] Agregar tracking number (opcional)
+2. [x] Componente de timeline de estados
+3. [x] Integración con API de estado
+4. [x] Agregar tracking number - id order
+5. [x] Vincular al dashboard 
 
 ---
 
 #### Sprint 5: Notificaciones
-**Duración:** 2-3 días
 
 **Tareas:**
 1. [ ] Configurar servicio de email (Resend, SendGrid)
