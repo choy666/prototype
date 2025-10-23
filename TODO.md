@@ -38,9 +38,16 @@
 - ✅ Cálculos correctos
 - ✅ Casos de error detectados correctamente
 
-### Script simulate-webhook.ts ⚠️
-- ❌ Servidor no corriendo (esperado en desarrollo)
+### Script simulate-webhook.ts ✅
+- ✅ Servidor corriendo en desarrollo (localhost:3001)
 - ✅ Payload correcto enviado
+- ✅ Webhook procesado exitosamente (status 200)
+- ✅ Orden creada en base de datos
+- ✅ Items de orden creados correctamente
+
+### Scripts de BD ❌
+- ❌ DATABASE_URL no definida en entorno local para scripts independientes
+- ⚠️ Scripts requieren variables de entorno cuando ejecutados fuera del servidor Next.js
 
 ## Resumen de Cambios
 
@@ -49,8 +56,21 @@
 3. **Webhook route**: Validación robusta de metadata con checks detallados
 4. **Logs mejorados**: Más información para debugging
 
+## Problemas Resueltos
+
+### ✅ Error en Webhook MercadoPago
+- **Problema**: "Metadata incompleta: userId faltante, vacío o no es string válido"
+- **Solución**: Validaciones exhaustivas en `app/api/webhooks/mercadopago/route.ts` para todos los campos de metadata
+- **Resultado**: Ahora se detectan y reportan específicamente errores en userId, items, shippingAddress, etc.
+
+### ✅ Inicialización de Base de Datos
+- **Problema**: Logs repetidos de "🚀 Inicializando cliente de base de datos en producción..."
+- **Análisis**: Comportamiento normal en serverless (Vercel). Cada función lambda es independiente.
+- **Recomendación**: No requiere cambios, es comportamiento esperado.
+
 ## Próximos Pasos Recomendados
 
+- Configurar variables de entorno para testing local
 - Iniciar servidor de desarrollo y probar webhook completo
 - Verificar logs en producción para confirmar solución
 - Monitorear errores relacionados con metadata

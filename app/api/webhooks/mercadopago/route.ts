@@ -150,8 +150,8 @@ async function createOrderFromPayment(payment: any) {
     });
 
     // Validación robusta de userId
-    if (!metadata.userId || typeof metadata.userId !== 'string' || metadata.userId.trim() === '') {
-      logger.error('Metadata incompleta: userId faltante, vacío o no es string válido', {
+    if (metadata.userId === undefined || metadata.userId === null) {
+      logger.error('Metadata incompleta: userId es undefined o null', {
         userId: metadata.userId,
         userIdType: typeof metadata.userId,
         metadataKeys: Object.keys(metadata)
@@ -159,20 +159,41 @@ async function createOrderFromPayment(payment: any) {
       return;
     }
 
-    const userId = parseInt(metadata.userId.trim());
+    if (typeof metadata.userId !== 'string') {
+      logger.error('Metadata incompleta: userId no es string', {
+        userId: metadata.userId,
+        userIdType: typeof metadata.userId,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    const trimmedUserId = metadata.userId.trim();
+    if (trimmedUserId === '') {
+      logger.error('Metadata incompleta: userId es string vacío', {
+        userId: metadata.userId,
+        trimmedUserId,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    const userId = parseInt(trimmedUserId, 10);
     if (isNaN(userId) || userId <= 0) {
       logger.error('Metadata incompleta: userId no es un número válido positivo', {
         userId: metadata.userId,
+        trimmedUserId,
         userIdParsed: userId,
         isNaN: isNaN(userId),
-        isPositive: userId > 0
+        isPositive: userId > 0,
+        metadataKeys: Object.keys(metadata)
       });
       return;
     }
 
     // Validación de items
-    if (!metadata.items || typeof metadata.items !== 'string' || metadata.items.trim() === '') {
-      logger.error('Metadata incompleta: items faltante o no es string válido', {
+    if (metadata.items === undefined || metadata.items === null) {
+      logger.error('Metadata incompleta: items es undefined o null', {
         items: metadata.items,
         itemsType: typeof metadata.items,
         metadataKeys: Object.keys(metadata)
@@ -180,31 +201,176 @@ async function createOrderFromPayment(payment: any) {
       return;
     }
 
+    if (typeof metadata.items !== 'string') {
+      logger.error('Metadata incompleta: items no es string', {
+        items: metadata.items,
+        itemsType: typeof metadata.items,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    const trimmedItems = metadata.items.trim();
+    if (trimmedItems === '') {
+      logger.error('Metadata incompleta: items es string vacío', {
+        items: metadata.items,
+        trimmedItems,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
     let parsedItems: any[];
     try {
-      parsedItems = JSON.parse(metadata.items);
+      parsedItems = JSON.parse(trimmedItems);
     } catch (error) {
       logger.error('Metadata incompleta: items no es JSON válido', {
         items: metadata.items,
-        parseError: error instanceof Error ? error.message : String(error)
+        trimmedItems,
+        parseError: error instanceof Error ? error.message : String(error),
+        metadataKeys: Object.keys(metadata)
       });
       return;
     }
 
-    if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
-      logger.error('Metadata incompleta: items no es array válido o está vacío', {
+    if (!Array.isArray(parsedItems)) {
+      logger.error('Metadata incompleta: items parseado no es array', {
+        itemsParsed: parsedItems,
+        itemsType: typeof parsedItems,
+        isArray: Array.isArray(parsedItems),
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    if (parsedItems.length === 0) {
+      logger.error('Metadata incompleta: items array está vacío', {
         itemsParsed: parsedItems,
         itemsCount: parsedItems.length,
-        isArray: Array.isArray(parsedItems)
+        metadataKeys: Object.keys(metadata)
       });
       return;
     }
 
-    const shippingAddress = metadata.shippingAddress ? JSON.parse(metadata.shippingAddress) : null;
-    const shippingMethodId = parseInt(metadata.shippingMethodId);
+    // Validación de shippingAddress
+    let shippingAddress = null;
+    if (metadata.shippingAddress) {
+      if (typeof metadata.shippingAddress !== 'string') {
+        logger.error('Metadata incompleta: shippingAddress no es string', {
+          shippingAddress: metadata.shippingAddress,
+          shippingAddressType: typeof metadata.shippingAddress,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+      const trimmedShippingAddress = metadata.shippingAddress.trim();
+      if (trimmedShippingAddress !== '') {
+        try {
+          shippingAddress = JSON.parse(trimmedShippingAddress);
+        } catch (error) {
+          logger.error('Metadata incompleta: shippingAddress no es JSON válido', {
+            shippingAddress: metadata.shippingAddress,
+            trimmedShippingAddress,
+            parseError: error instanceof Error ? error.message : String(error),
+            metadataKeys: Object.keys(metadata)
+          });
+          return;
+        }
+      }
+    }
+
+    // Validación de shippingMethodId
+    if (metadata.shippingMethodId === undefined || metadata.shippingMethodId === null) {
+      logger.error('Metadata incompleta: shippingMethodId es undefined o null', {
+        shippingMethodId: metadata.shippingMethodId,
+        shippingMethodIdType: typeof metadata.shippingMethodId,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    let shippingMethodId: number;
+    if (typeof metadata.shippingMethodId === 'string') {
+      const trimmedShippingMethodId = metadata.shippingMethodId.trim();
+      shippingMethodId = parseInt(trimmedShippingMethodId, 10);
+      if (isNaN(shippingMethodId) || shippingMethodId <= 0) {
+        logger.error('Metadata incompleta: shippingMethodId no es número válido', {
+          shippingMethodId: metadata.shippingMethodId,
+          trimmedShippingMethodId,
+          shippingMethodIdParsed: shippingMethodId,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+    } else if (typeof metadata.shippingMethodId === 'number') {
+      shippingMethodId = metadata.shippingMethodId;
+      if (shippingMethodId <= 0) {
+        logger.error('Metadata incompleta: shippingMethodId no es positivo', {
+          shippingMethodId,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+    } else {
+      logger.error('Metadata incompleta: shippingMethodId no es string ni number', {
+        shippingMethodId: metadata.shippingMethodId,
+        shippingMethodIdType: typeof metadata.shippingMethodId,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
     const items = parsedItems;
-    const shippingCost = parseFloat(metadata.shippingCost || '0');
-    const total = parseFloat(metadata.total || '0');
+
+    // Validación de shippingCost
+    let shippingCost = 0;
+    if (metadata.shippingCost !== undefined && metadata.shippingCost !== null) {
+      if (typeof metadata.shippingCost === 'string') {
+        shippingCost = parseFloat(metadata.shippingCost.trim());
+      } else if (typeof metadata.shippingCost === 'number') {
+        shippingCost = metadata.shippingCost;
+      } else {
+        logger.error('Metadata incompleta: shippingCost no es string ni number', {
+          shippingCost: metadata.shippingCost,
+          shippingCostType: typeof metadata.shippingCost,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+      if (isNaN(shippingCost)) {
+        logger.error('Metadata incompleta: shippingCost no es número válido', {
+          shippingCost: metadata.shippingCost,
+          shippingCostParsed: shippingCost,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+    }
+
+    // Validación de total
+    let total = 0;
+    if (metadata.total !== undefined && metadata.total !== null) {
+      if (typeof metadata.total === 'string') {
+        total = parseFloat(metadata.total.trim());
+      } else if (typeof metadata.total === 'number') {
+        total = metadata.total;
+      } else {
+        logger.error('Metadata incompleta: total no es string ni number', {
+          total: metadata.total,
+          totalType: typeof metadata.total,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+      if (isNaN(total) || total < 0) {
+        logger.error('Metadata incompleta: total no es número válido positivo', {
+          total: metadata.total,
+          totalParsed: total,
+          metadataKeys: Object.keys(metadata)
+        });
+        return;
+      }
+    }
 
     logger.info('Metadata validada correctamente', {
       userId,

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { checkDatabaseConnection, checkCriticalTables } from '../lib/db';
+import { checkDatabaseConnection, checkCriticalTables } from '../lib/db.js';
 
 async function main() {
   console.log('🔍 Verificando salud de la base de datos...\n');
