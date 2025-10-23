@@ -1,46 +1,23 @@
-# Investigación y Solución: Órdenes no se generan en producción después del checkout
+# TODO: Arreglar Creación de Órdenes en Webhook de MercadoPago
 
-## Información Recopilada
-- **Flujo del checkout**: Crea preferencia en MercadoPago con metadata, usuario paga, webhook procesa pago aprobado y crea orden.
-- **Archivos clave**:
-  - `app/api/checkout/route.ts`: Crea preferencia con metadata.
-  - `app/api/webhooks/mercado-pago/route.ts`: Procesa webhook y crea orden si pago aprobado.
-  - Scripts de validación: `scripts/validate-webhook-config.ts`, `scripts/test-webhook.ts`.
-- **Posibles causas**: Webhook no configurado, metadata inválida, errores en BD, problemas de red.
+## Problema Identificado
+- El webhook recibe eventos de MercadoPago pero no crea órdenes en la base de datos.
+- Solo procesa 'payment.updated' pero el evento podría ser otro.
+- Falta lógica para insertar la orden y items cuando el pago es aprobado.
 
-## Plan de Investigación y Solución
+## Pasos a Realizar
+- [ ] Modificar `app/api/webhooks/mercadopago/route.ts` para procesar eventos correctos y crear órdenes.
+- [ ] Agregar imports necesarios para base de datos y schemas.
+- [ ] En `handlePaymentEvent`, extraer metadata del pago y crear orden si aprobado.
+- [ ] Insertar orderItems basados en los items de metadata.
+- [ ] Actualizar status de la orden a 'paid'.
+- [ ] Probar el webhook con simulación.
+- [ ] Verificar que las órdenes aparezcan en /api/orders.
 
-### 1. Verificar configuración del webhook en MercadoPago
-- Ejecutar script de validación de configuración.
-- Verificar que la URL del webhook esté configurada correctamente en el dashboard de MP.
-- Confirmar que el evento `payment.updated` esté habilitado.
+## Archivos a Modificar
+- app/api/webhooks/mercadopago/route.ts
+- (Posiblemente checkout para asegurar metadata correcta)
 
-### 2. Revisar logs en producción
-- Buscar logs de error en el webhook endpoint.
-- Verificar si se están recibiendo webhooks.
-- Identificar errores específicos en el procesamiento.
-
-### 3. Probar estructura de datos del webhook
-- Ejecutar script de prueba de estructura de datos.
-- Verificar que la metadata se esté enviando correctamente desde checkout.
-
-### 4. Verificar conectividad y estado de la base de datos
-- Ejecutar script de verificación de salud de BD.
-- Confirmar que las operaciones de inserción funcionen.
-
-### 5. Simular webhook manualmente
-- Crear un script para simular envío de webhook con datos de prueba.
-- Verificar que el procesamiento funcione correctamente.
-
-### 6. Implementar mejoras de robustez
-- Agregar más logging detallado.
-- Mejorar manejo de errores.
-- Agregar validaciones adicionales.
-
-### 7. Probar en staging/entorno controlado
-- Desplegar cambios en un entorno de prueba.
-- Realizar pruebas completas del flujo de checkout.
-
-### 8. Monitoreo y alertas
-- Configurar alertas para fallos en creación de órdenes.
-- Agregar métricas de éxito/fallo de webhooks.
+## Notas
+- Usar metadata de la preferencia para obtener userId, items, shipping, etc.
+- Asegurar que payment.metadata esté disponible en el objeto payment.
