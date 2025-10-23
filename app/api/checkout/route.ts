@@ -47,14 +47,6 @@ export async function POST(req: NextRequest) {
 
     logger.info('Checkout: Usuario verificado correctamente', { userId, userEmail: userExists[0].email });
 
-    // Log de metadata que se enviará
-    logger.info('Checkout: Metadata preparada para MercadoPago', {
-      userId: userId?.toString() || '',
-      itemCount: items.length,
-      shippingMethodId: shippingMethod.id,
-      hasShippingAddress: !!shippingAddress
-    });
-
     // Obtener método de envío de la BD
     const shippingMethodData = await db
       .select()
@@ -86,6 +78,23 @@ export async function POST(req: NextRequest) {
 
     // Calcular total final
     const total = subtotal + shippingCost;
+
+    // Log de metadata que se enviará
+    logger.info('Checkout: Metadata preparada para MercadoPago', {
+      userId: userId?.toString() || '',
+      itemCount: items.length,
+      shippingMethodId: shippingMethod.id,
+      hasShippingAddress: !!shippingAddress,
+      metadata: {
+        userId: userId?.toString() || '',
+        shippingAddress: JSON.stringify(shippingAddress),
+        shippingMethodId: method.id.toString(),
+        items: JSON.stringify(items),
+        subtotal: subtotal.toString(),
+        shippingCost: shippingCost.toString(),
+        total: total.toString(),
+      }
+    });
 
     const preference = await new Preference(client).create({
       body: {

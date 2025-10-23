@@ -53,6 +53,52 @@ async function handlePaymentEvent(paymentId: string) {
   try {
     logger.info('handlePaymentEvent: Consultando pago en MercadoPago API', { paymentId });
 
+    // Para testing local, simular respuesta de MercadoPago
+    if (process.env.NODE_ENV === 'development' && paymentId === '123456789') {
+      logger.info('Modo desarrollo: simulando respuesta de MercadoPago API');
+
+      // Simular respuesta de MercadoPago con metadata
+      const mockPayment = {
+        id: paymentId,
+        status: 'approved',
+        metadata: {
+          userId: '4', // Usar ID de usuario existente
+          shippingAddress: JSON.stringify({
+            nombre: 'Test User',
+            direccion: 'Calle Falsa 123',
+            ciudad: 'Buenos Aires',
+            provincia: 'Buenos Aires',
+            codigoPostal: '1000',
+            telefono: '1123456789'
+          }),
+          shippingMethodId: '1',
+          items: JSON.stringify([{
+            id: '1', // Usar ID de producto existente
+            name: 'Producto de Prueba',
+            price: '1000.00',
+            quantity: 2
+          }]),
+          shippingCost: '500.00',
+          subtotal: '2000.00',
+          total: '2500.00'
+        }
+      };
+
+      logger.info('Pago simulado confirmado: válido, pertenece a la cuenta y estado correcto', {
+        paymentId,
+        status: mockPayment.status,
+        belongsToAccount: true,
+        metadata: mockPayment.metadata || {}
+      });
+
+      // Si el pago está aprobado, crear la orden
+      if (mockPayment.status === 'approved') {
+        await createOrderFromPayment(mockPayment);
+      }
+
+      return;
+    }
+
     // Hacer consulta directa a la API de Mercado Pago con ACCESS_TOKEN
     const payment = await new Payment(client).get({ id: paymentId });
 
@@ -71,7 +117,8 @@ async function handlePaymentEvent(paymentId: string) {
     logger.info('Pago confirmado: válido, pertenece a la cuenta y estado correcto', {
       paymentId,
       status: payment.status,
-      belongsToAccount: true // Confirmado por el access token usado en la consulta
+      belongsToAccount: true, // Confirmado por el access token usado en la consulta
+      metadata: payment.metadata || {}
     });
 
     // Si el pago está aprobado, crear la orden
@@ -96,6 +143,12 @@ async function createOrderFromPayment(payment: any) {
 
     // Extraer metadata del pago
     const metadata = payment.metadata || {};
+    logger.info('Metadata recibida del pago', {
+      paymentId: payment.id,
+      metadataKeys: Object.keys(metadata),
+      metadata: metadata
+    });
+
     const userId = parseInt(metadata.userId);
     const shippingAddress = metadata.shippingAddress ? JSON.parse(metadata.shippingAddress) : null;
     const shippingMethodId = parseInt(metadata.shippingMethodId);
@@ -103,10 +156,30 @@ async function createOrderFromPayment(payment: any) {
     const shippingCost = parseFloat(metadata.shippingCost || '0');
     const total = parseFloat(metadata.total || '0');
 
-    if (!userId || !items.length) {
-      logger.error('Metadata incompleta para crear orden', { userId, itemsCount: items.length });
+    // Validación más detallada de metadata
+    if (!userId) {
+      logger.error('Metadata incompleta: userId faltante o inválido', {
+        userId: metadata.userId,
+        userIdParsed: userId
+      });
       return;
     }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      logger.error('Metadata incompleta: items faltantes o inválidos', {
+        items: metadata.items,
+        itemsParsed: items,
+        itemsCount: items ? items.length : 0
+      });
+      return;
+    }
+
+    logger.info('Metadata validada correctamente', {
+      userId,
+      itemsCount: items.length,
+      shippingMethodId,
+      hasShippingAddress: !!shippingAddress
+    });
 
     // Crear la orden
     const newOrder = await db.insert(orders).values({
@@ -140,7 +213,9 @@ async function createOrderFromPayment(payment: any) {
   } catch (error) {
     logger.error('Error creando orden desde pago', {
       paymentId: payment.id,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      metadata: payment.metadata || {}
     });
     throw error;
   }
