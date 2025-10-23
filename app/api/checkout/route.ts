@@ -81,12 +81,12 @@ export async function POST(req: NextRequest) {
 
     // Log de metadata que se enviará
     logger.info('Checkout: Metadata preparada para MercadoPago', {
-      userId: userId?.toString() || '',
+      userId: userId.toString(),
       itemCount: items.length,
       shippingMethodId: shippingMethod.id,
       hasShippingAddress: !!shippingAddress,
       metadata: {
-        userId: userId?.toString() || '',
+        userId: userId.toString(),
         shippingAddress: JSON.stringify(shippingAddress),
         shippingMethodId: method.id.toString(),
         items: JSON.stringify(items),
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         auto_return: "approved",
         notification_url: `${process.env.MERCADO_PAGO_NOTIFICATION_URL}?source_news=webhooks&user_id=${userId}`,
         metadata: {
-          userId: userId?.toString() || '',
+          userId: userId.toString(),
           shippingAddress: JSON.stringify(shippingAddress),
           shippingMethodId: method.id.toString(),
           items: JSON.stringify(items),

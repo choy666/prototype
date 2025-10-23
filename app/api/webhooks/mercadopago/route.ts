@@ -149,35 +149,67 @@ async function createOrderFromPayment(payment: any) {
       metadata: metadata
     });
 
-    const userId = parseInt(metadata.userId);
+    // Validación robusta de userId
+    if (!metadata.userId || typeof metadata.userId !== 'string' || metadata.userId.trim() === '') {
+      logger.error('Metadata incompleta: userId faltante, vacío o no es string válido', {
+        userId: metadata.userId,
+        userIdType: typeof metadata.userId,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    const userId = parseInt(metadata.userId.trim());
+    if (isNaN(userId) || userId <= 0) {
+      logger.error('Metadata incompleta: userId no es un número válido positivo', {
+        userId: metadata.userId,
+        userIdParsed: userId,
+        isNaN: isNaN(userId),
+        isPositive: userId > 0
+      });
+      return;
+    }
+
+    // Validación de items
+    if (!metadata.items || typeof metadata.items !== 'string' || metadata.items.trim() === '') {
+      logger.error('Metadata incompleta: items faltante o no es string válido', {
+        items: metadata.items,
+        itemsType: typeof metadata.items,
+        metadataKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    let parsedItems: any[];
+    try {
+      parsedItems = JSON.parse(metadata.items);
+    } catch (error) {
+      logger.error('Metadata incompleta: items no es JSON válido', {
+        items: metadata.items,
+        parseError: error instanceof Error ? error.message : String(error)
+      });
+      return;
+    }
+
+    if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+      logger.error('Metadata incompleta: items no es array válido o está vacío', {
+        itemsParsed: parsedItems,
+        itemsCount: parsedItems.length,
+        isArray: Array.isArray(parsedItems)
+      });
+      return;
+    }
+
     const shippingAddress = metadata.shippingAddress ? JSON.parse(metadata.shippingAddress) : null;
     const shippingMethodId = parseInt(metadata.shippingMethodId);
-    const items = metadata.items ? JSON.parse(metadata.items) : [];
+    const items = parsedItems;
     const shippingCost = parseFloat(metadata.shippingCost || '0');
     const total = parseFloat(metadata.total || '0');
 
-    // Validación más detallada de metadata
-    if (!userId) {
-      logger.error('Metadata incompleta: userId faltante o inválido', {
-        userId: metadata.userId,
-        userIdParsed: userId
-      });
-      return;
-    }
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      logger.error('Metadata incompleta: items faltantes o inválidos', {
-        items: metadata.items,
-        itemsParsed: items,
-        itemsCount: items ? items.length : 0
-      });
-      return;
-    }
-
     logger.info('Metadata validada correctamente', {
       userId,
-      itemsCount: items.length,
       shippingMethodId,
+      itemsCount: items.length,
       hasShippingAddress: !!shippingAddress
     });
 

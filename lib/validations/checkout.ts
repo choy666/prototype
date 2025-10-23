@@ -121,7 +121,7 @@ export const checkoutSchema = z.object({
 
   shippingMethod: shippingMethodSchema,
 
-  userId: z.string().optional(),
+  userId: z.string().min(1, 'El userId es requerido'),
 });
 
 // Tipos TypeScript exportados
