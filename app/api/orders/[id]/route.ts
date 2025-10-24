@@ -92,6 +92,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const orderWithItems = {
       ...order,
+      total: Number(order.total),
+      shippingCost: Number(order.shippingCost),
       items: items.map(item => ({
         id: item.id.toString(),
         quantity: item.quantity,
