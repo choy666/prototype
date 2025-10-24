@@ -79,22 +79,28 @@ export async function POST(req: NextRequest) {
     // Calcular total final
     const total = subtotal + shippingCost;
 
+    // Preparar metadata
+    const metadata = {
+      userId: userId.toString(),
+      shippingAddress: JSON.stringify(shippingAddress),
+      shippingMethodId: method.id.toString(),
+      items: JSON.stringify(items),
+      subtotal: subtotal.toString(),
+      shippingCost: shippingCost.toString(),
+      total: total.toString(),
+    };
+
     // Log de metadata que se enviará
     logger.info('Checkout: Metadata preparada para MercadoPago', {
       userId: userId.toString(),
       itemCount: items.length,
       shippingMethodId: shippingMethod.id,
       hasShippingAddress: !!shippingAddress,
-      metadata: {
-        userId: userId.toString(),
-        shippingAddress: JSON.stringify(shippingAddress),
-        shippingMethodId: method.id.toString(),
-        items: JSON.stringify(items),
-        subtotal: subtotal.toString(),
-        shippingCost: shippingCost.toString(),
-        total: total.toString(),
-      }
+      metadata
     });
+
+    // Loggear antes de enviar a MercadoPago
+    console.log("Metadata enviada a MP:", metadata);
 
     const preference = await new Preference(client).create({
       body: {

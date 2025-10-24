@@ -160,10 +160,11 @@ async function createOrderFromPayment(payment: any) {
     }
 
     if (typeof metadata.userId !== 'string') {
-      logger.error('Metadata incompleta: userId no es string', {
+      logger.error('Metadata incompleta: userId no es string - loggeando valor crudo y abortando creación de orden', {
         userId: metadata.userId,
         userIdType: typeof metadata.userId,
-        metadataKeys: Object.keys(metadata)
+        metadataKeys: Object.keys(metadata),
+        rawMetadata: metadata
       });
       return;
     }
