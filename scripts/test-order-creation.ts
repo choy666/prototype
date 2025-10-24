@@ -72,7 +72,7 @@ async function testOrderCreation() {
     id: '123456789',
     status: 'approved',
     metadata: {
-      userId: '1', // Asumiendo que existe un usuario con ID 1
+      userId: '4', // Usando el primer usuario existente (ID: 4)
       shippingAddress: JSON.stringify({
         nombre: 'Test User',
         direccion: 'Calle Falsa 123',

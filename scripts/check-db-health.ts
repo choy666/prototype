@@ -1,5 +1,8 @@
 #!/usr/bin/env tsx
 
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import { checkDatabaseConnection, checkCriticalTables } from '../lib/db.js';
 
 async function main() {

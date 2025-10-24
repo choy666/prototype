@@ -8,15 +8,15 @@ import Link from 'next/link';
 import { Eye, Calendar, Package, AlertCircle } from 'lucide-react';
 
 type Order = {
-  id: string;
+  id: number;
   createdAt: string;
   status: string;
   items: {
-    id: string;
+    id: number;
     productName: string;
     productImage?: string;
     quantity: number;
-    price: number;
+    price: string;
   }[];
   total: number;
 };
@@ -208,7 +208,7 @@ export default function OrdersPage() {
                         {item.productName}
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        {item.quantity} × ${item.price.toFixed(2)}
+                        {item.quantity} × ${parseFloat(item.price).toFixed(2)}
                       </p>
                     </div>
                   </div>

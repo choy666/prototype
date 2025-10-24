@@ -15,6 +15,16 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
+// Cargar variables de entorno desde .env.local si no están definidas
+if (!process.env.DATABASE_URL) {
+  try {
+    const dotenv = require('dotenv');
+    dotenv.config({ path: '.env.local' });
+  } catch (error) {
+    console.warn('⚠️ No se pudo cargar dotenv:', error);
+  }
+}
+
 const env = envSchema.safeParse(process.env)
 
 if (!env.success) {
