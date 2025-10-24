@@ -55,49 +55,28 @@ export default function OrderDetailPage() {
   const fetchOrderDetail = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/order-status?order_id=${orderId}`);
+      const response = await fetch(`/api/orders/${orderId}`);
 
       if (!response.ok) {
         if (response.status === 404) {
           setError('Orden no encontrada');
         } else if (response.status === 403) {
           setError('No tienes permisos para ver esta orden');
+        } else if (response.status === 401) {
+          setError('Usuario no autenticado');
+        } else if (response.status === 400) {
+          setError('ID de orden inválido');
         } else {
-          setError('Error al cargar la orden');
+          setError('Error al cargar la orden. Por favor, intenta de nuevo.');
         }
         return;
       }
 
       const orderData = await response.json();
-
-      // Obtener los items de la orden
-      const itemsResponse = await fetch('/api/orders');
-      if (itemsResponse.ok) {
-        const ordersData = await itemsResponse.json();
-        const currentOrder = ordersData.find((o: { id: string }) => o.id === orderId);
-        if (currentOrder) {
-          setOrder({
-            ...orderData,
-            items: currentOrder.items || [],
-            total: currentOrder.total,
-          });
-        } else {
-          setOrder({
-            ...orderData,
-            items: [],
-            total: orderData.total,
-          });
-        }
-      } else {
-        setOrder({
-          ...orderData,
-          items: [],
-          total: orderData.total,
-        });
-      }
+      setOrder(orderData);
     } catch (error) {
       console.error('Error al cargar la orden:', error);
-      setError('Error al cargar la orden');
+      setError('Error de conexión. Verifica tu conexión a internet e intenta de nuevo.');
     } finally {
       setLoading(false);
     }
