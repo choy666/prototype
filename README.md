@@ -238,7 +238,7 @@ Verificación del flujo completo: login → agregar productos → checkout → p
 Pruebas de edge cases (stock insuficiente, errores de pago, etc.)
 Instrucciones para testing manual:
 
-Abrir el navegador en http://localhost:3000
+Abrir el navegador en http://localhost:3000 // https://prototype-ten-dun.vercel.app
 Iniciar sesión con usuario de prueba (crear manualmente si no existe)
 Agregar productos al carrito
 Ir a checkout y proceder al pago
