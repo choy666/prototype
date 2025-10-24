@@ -149,30 +149,30 @@ async function createOrderFromPayment(payment: any) {
       metadata: metadata
     });
 
-    // Validación robusta de userId
-    if (metadata.userId === undefined || metadata.userId === null) {
-      logger.error('Metadata incompleta: userId es undefined o null', {
-        userId: metadata.userId,
-        userIdType: typeof metadata.userId,
+    // Validación robusta de userId (usando snake_case como MercadoPago)
+    if (metadata.user_id === undefined || metadata.user_id === null) {
+      logger.error('Metadata incompleta: user_id es undefined o null', {
+        user_id: metadata.user_id,
+        userIdType: typeof metadata.user_id,
         metadataKeys: Object.keys(metadata)
       });
       return;
     }
 
-    if (typeof metadata.userId !== 'string') {
-      logger.error('Metadata incompleta: userId no es string - loggeando valor crudo y abortando creación de orden', {
-        userId: metadata.userId,
-        userIdType: typeof metadata.userId,
+    if (typeof metadata.user_id !== 'string') {
+      logger.error('Metadata incompleta: user_id no es string - loggeando valor crudo y abortando creación de orden', {
+        user_id: metadata.user_id,
+        userIdType: typeof metadata.user_id,
         metadataKeys: Object.keys(metadata),
         rawMetadata: metadata
       });
       return;
     }
 
-    const trimmedUserId = metadata.userId.trim();
+    const trimmedUserId = metadata.user_id.trim();
     if (trimmedUserId === '') {
-      logger.error('Metadata incompleta: userId es string vacío', {
-        userId: metadata.userId,
+      logger.error('Metadata incompleta: user_id es string vacío', {
+        user_id: metadata.user_id,
         trimmedUserId,
         metadataKeys: Object.keys(metadata)
       });
@@ -181,8 +181,8 @@ async function createOrderFromPayment(payment: any) {
 
     const userId = parseInt(trimmedUserId, 10);
     if (isNaN(userId) || userId <= 0) {
-      logger.error('Metadata incompleta: userId no es un número válido positivo', {
-        userId: metadata.userId,
+      logger.error('Metadata incompleta: user_id no es un número válido positivo', {
+        user_id: metadata.user_id,
         trimmedUserId,
         userIdParsed: userId,
         isNaN: isNaN(userId),
@@ -192,7 +192,7 @@ async function createOrderFromPayment(payment: any) {
       return;
     }
 
-    // Validación de items
+    // Validación de items (usando snake_case)
     if (metadata.items === undefined || metadata.items === null) {
       logger.error('Metadata incompleta: items es undefined o null', {
         items: metadata.items,
@@ -253,24 +253,24 @@ async function createOrderFromPayment(payment: any) {
       return;
     }
 
-    // Validación de shippingAddress
+    // Validación de shippingAddress (usando snake_case)
     let shippingAddress = null;
-    if (metadata.shippingAddress) {
-      if (typeof metadata.shippingAddress !== 'string') {
-        logger.error('Metadata incompleta: shippingAddress no es string', {
-          shippingAddress: metadata.shippingAddress,
-          shippingAddressType: typeof metadata.shippingAddress,
+    if (metadata.shipping_address) {
+      if (typeof metadata.shipping_address !== 'string') {
+        logger.error('Metadata incompleta: shipping_address no es string', {
+          shipping_address: metadata.shipping_address,
+          shippingAddressType: typeof metadata.shipping_address,
           metadataKeys: Object.keys(metadata)
         });
         return;
       }
-      const trimmedShippingAddress = metadata.shippingAddress.trim();
+      const trimmedShippingAddress = metadata.shipping_address.trim();
       if (trimmedShippingAddress !== '') {
         try {
           shippingAddress = JSON.parse(trimmedShippingAddress);
         } catch (error) {
-          logger.error('Metadata incompleta: shippingAddress no es JSON válido', {
-            shippingAddress: metadata.shippingAddress,
+          logger.error('Metadata incompleta: shipping_address no es JSON válido', {
+            shipping_address: metadata.shipping_address,
             trimmedShippingAddress,
             parseError: error instanceof Error ? error.message : String(error),
             metadataKeys: Object.keys(metadata)
@@ -280,42 +280,42 @@ async function createOrderFromPayment(payment: any) {
       }
     }
 
-    // Validación de shippingMethodId
-    if (metadata.shippingMethodId === undefined || metadata.shippingMethodId === null) {
-      logger.error('Metadata incompleta: shippingMethodId es undefined o null', {
-        shippingMethodId: metadata.shippingMethodId,
-        shippingMethodIdType: typeof metadata.shippingMethodId,
+    // Validación de shippingMethodId (usando snake_case)
+    if (metadata.shipping_method_id === undefined || metadata.shipping_method_id === null) {
+      logger.error('Metadata incompleta: shipping_method_id es undefined o null', {
+        shipping_method_id: metadata.shipping_method_id,
+        shippingMethodIdType: typeof metadata.shipping_method_id,
         metadataKeys: Object.keys(metadata)
       });
       return;
     }
 
     let shippingMethodId: number;
-    if (typeof metadata.shippingMethodId === 'string') {
-      const trimmedShippingMethodId = metadata.shippingMethodId.trim();
+    if (typeof metadata.shipping_method_id === 'string') {
+      const trimmedShippingMethodId = metadata.shipping_method_id.trim();
       shippingMethodId = parseInt(trimmedShippingMethodId, 10);
       if (isNaN(shippingMethodId) || shippingMethodId <= 0) {
-        logger.error('Metadata incompleta: shippingMethodId no es número válido', {
-          shippingMethodId: metadata.shippingMethodId,
+        logger.error('Metadata incompleta: shipping_method_id no es número válido', {
+          shipping_method_id: metadata.shipping_method_id,
           trimmedShippingMethodId,
           shippingMethodIdParsed: shippingMethodId,
           metadataKeys: Object.keys(metadata)
         });
         return;
       }
-    } else if (typeof metadata.shippingMethodId === 'number') {
-      shippingMethodId = metadata.shippingMethodId;
+    } else if (typeof metadata.shipping_method_id === 'number') {
+      shippingMethodId = metadata.shipping_method_id;
       if (shippingMethodId <= 0) {
-        logger.error('Metadata incompleta: shippingMethodId no es positivo', {
+        logger.error('Metadata incompleta: shipping_method_id no es positivo', {
           shippingMethodId,
           metadataKeys: Object.keys(metadata)
         });
         return;
       }
     } else {
-      logger.error('Metadata incompleta: shippingMethodId no es string ni number', {
-        shippingMethodId: metadata.shippingMethodId,
-        shippingMethodIdType: typeof metadata.shippingMethodId,
+      logger.error('Metadata incompleta: shipping_method_id no es string ni number', {
+        shipping_method_id: metadata.shipping_method_id,
+        shippingMethodIdType: typeof metadata.shipping_method_id,
         metadataKeys: Object.keys(metadata)
       });
       return;
@@ -323,24 +323,24 @@ async function createOrderFromPayment(payment: any) {
 
     const items = parsedItems;
 
-    // Validación de shippingCost
+    // Validación de shippingCost (usando snake_case)
     let shippingCost = 0;
-    if (metadata.shippingCost !== undefined && metadata.shippingCost !== null) {
-      if (typeof metadata.shippingCost === 'string') {
-        shippingCost = parseFloat(metadata.shippingCost.trim());
-      } else if (typeof metadata.shippingCost === 'number') {
-        shippingCost = metadata.shippingCost;
+    if (metadata.shipping_cost !== undefined && metadata.shipping_cost !== null) {
+      if (typeof metadata.shipping_cost === 'string') {
+        shippingCost = parseFloat(metadata.shipping_cost.trim());
+      } else if (typeof metadata.shipping_cost === 'number') {
+        shippingCost = metadata.shipping_cost;
       } else {
-        logger.error('Metadata incompleta: shippingCost no es string ni number', {
-          shippingCost: metadata.shippingCost,
-          shippingCostType: typeof metadata.shippingCost,
+        logger.error('Metadata incompleta: shipping_cost no es string ni number', {
+          shipping_cost: metadata.shipping_cost,
+          shippingCostType: typeof metadata.shipping_cost,
           metadataKeys: Object.keys(metadata)
         });
         return;
       }
       if (isNaN(shippingCost)) {
-        logger.error('Metadata incompleta: shippingCost no es número válido', {
-          shippingCost: metadata.shippingCost,
+        logger.error('Metadata incompleta: shipping_cost no es número válido', {
+          shipping_cost: metadata.shipping_cost,
           shippingCostParsed: shippingCost,
           metadataKeys: Object.keys(metadata)
         });
@@ -348,7 +348,7 @@ async function createOrderFromPayment(payment: any) {
       }
     }
 
-    // Validación de total
+    // Validación de total (usando snake_case)
     let total = 0;
     if (metadata.total !== undefined && metadata.total !== null) {
       if (typeof metadata.total === 'string') {
@@ -377,7 +377,8 @@ async function createOrderFromPayment(payment: any) {
       userId,
       shippingMethodId,
       itemsCount: items.length,
-      hasShippingAddress: !!shippingAddress
+      hasShippingAddress: !!shippingAddress,
+      metadataKeys: Object.keys(metadata)
     });
 
     // Crear la orden
