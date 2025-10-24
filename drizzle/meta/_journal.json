@@ -50,6 +50,13 @@
       "when": 1761169922513,
       "tag": "0006_rainy_shen",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1761302296310,
+      "tag": "0007_petite_dagger",
+      "breakpoints": true
     }
   ]
 }

@@ -4,36 +4,17 @@ import { MercadoPagoConfig, Preference } from "mercadopago";
 async function simulateWebhook() {
   console.log('🔄 Simulando envío de webhook de Mercado Pago...\n');
 
-  // Simular datos de un pago aprobado
-  const testItems = [{
-    id: 1,
-    name: 'Producto de Prueba',
-    price: '1000.00',
-    quantity: 2
-  }];
-
+  // Simular datos de un pago rechazado
   const testMetadata = {
-    userId: '123',
-    shippingAddress: JSON.stringify({
-      nombre: 'Test User',
-      direccion: 'Calle Falsa 123',
-      ciudad: 'Buenos Aires',
-      provincia: 'Buenos Aires',
-      codigoPostal: '1000',
-      telefono: '1123456789'
-    }),
-    shippingMethodId: '1',
-    items: JSON.stringify(testItems),
-    shippingCost: '500.00',
-    subtotal: '2000.00',
+    userId: '4', // Usar ID de usuario existente
     total: '2500.00'
   };
 
   const webhookPayload = {
     action: 'payment.updated',
     data: {
-      id: '123456789',
-      status: 'approved',
+      id: '987654321',
+      status: 'rejected',
       metadata: testMetadata
     }
   };
