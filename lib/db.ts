@@ -8,6 +8,7 @@ import {
   like, inArray, isNull, sql
 } from 'drizzle-orm'
 import { z } from 'zod'
+import dotenv from 'dotenv'
 
 // 1. Validación de variables de entorno
 const envSchema = z.object({
@@ -18,7 +19,6 @@ const envSchema = z.object({
 // Cargar variables de entorno desde .env.local si no están definidas
 if (!process.env.DATABASE_URL) {
   try {
-    const dotenv = require('dotenv');
     dotenv.config({ path: '.env.local' });
   } catch (error) {
     console.warn('⚠️ No se pudo cargar dotenv:', error);
