@@ -1,18 +1,20 @@
-# TODO - Actualización de Página de Orden Detallada
+# TODO: Solucionar Warnings y Errores en Build de Next.js
 
-## Completado ✅
-- [x] Crear nueva ruta API `/api/orders/[id]` para obtener orden específica con items
-- [x] Actualizar frontend para usar la nueva API única
-- [x] Mejorar manejo de errores con mensajes más específicos
-- [x] Simplificar lógica de fetching eliminando doble llamada API
+## Archivos a Modificar
 
-## Pendiente ⏳
-- [ ] Probar la nueva API y verificar funcionamiento
-- [ ] Verificar que la página funcione sin errores
-- [ ] Agregar mejoras visuales menores si es necesario
+### app/admin/products/page.tsx
+- [ ] Remover import 'Archive' no utilizado (línea 17)
+- [ ] Remover variable 'error' no utilizada en catch (línea 63)
+- [ ] Agregar 'fetchProducts' al array de dependencias de useEffect (línea 76)
+- [ ] Remover variable 'error' no utilizada en catch (línea 98)
+- [ ] Reemplazar `<img>` con `<Image>` de next/image (línea 177)
 
-## Notas
-- Se eliminó la llamada ineficiente a `/api/order-status` y `/api/orders`
-- Ahora se usa una sola llamada a `/api/orders/[id]`
-- Mejor manejo de errores con mensajes específicos para cada código de estado
-- Se agregó manejo de errores de conexión de red
+### app/admin/products/[id]/edit/page.tsx
+- [ ] Remover variable 'error' no utilizada en catch (línea 80)
+
+### app/api/admin/products/route.ts
+- [ ] Reemplazar 'any' en línea 38 con tipo específico
+- [ ] Reemplazar 'any' en línea 39 con tipo específico
+
+## Verificación
+- [ ] Ejecutar `npm run build` para confirmar que no hay warnings ni errores

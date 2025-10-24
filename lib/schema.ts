@@ -17,6 +17,17 @@ import {
 export type UserRole = "user" | "admin";
 
 // ======================
+// Categorías
+// ======================
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ======================
 // Productos
 // ======================
 export const products = pgTable("products", {
@@ -24,8 +35,10 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  image: text("image"),
-  category: text("category").notNull(),
+  image: text("image"), // imagen principal
+  images: jsonb("images"), // array de urls de imágenes adicionales
+  categoryId: integer("category_id").references(() => categories.id),
+  category: text("category").notNull(), // mantener para compatibilidad
   destacado: boolean("destacado").default(false).notNull(),
   stock: integer("stock").default(0).notNull(),
   discount: integer("discount").default(0).notNull(), // porcentaje de descuento
@@ -165,6 +178,8 @@ export type User = typeof users.$inferSelect & {
   id: string;
 };
 
+export type Category = typeof categories.$inferSelect;
+export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type NewProduct = typeof products.$inferInsert;

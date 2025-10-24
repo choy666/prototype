@@ -15,10 +15,10 @@
   - [ ] Validación de tokens de recuperación
 
 ### Semana 2: Panel Administrativo
-- [ ] Crear panel de administración básico
-  - [ ] Layout administrativo con navegación
-  - [ ] Middleware para roles de admin
-  - [ ] Dashboard con estadísticas básicas
+- [x] Crear panel de administración básico
+  - [x] Layout administrativo con navegación
+  - [x] Middleware para roles de admin
+  - [x] Dashboard con estadísticas básicas
 - [ ] Gestión de productos (Admin)
   - [ ] CRUD completo de productos
   - [ ] Gestión de categorías
@@ -27,6 +27,7 @@
 - [ ] Gestión de pedidos (Admin)
   - [ ] Ver todos los pedidos
   - [ ] Cambiar estados de pedidos
+  - [ ] Actualizar tracking_number de los pedidos 
   - [ ] Ver detalles de pedidos
   - [ ] Generar reportes básicos
 

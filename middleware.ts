@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { auth } from "@/lib/actions/auth";
 
 // Rutas protegidas (requieren sesión activa)
 const protectedRoutes = [
@@ -9,6 +10,11 @@ const protectedRoutes = [
   '/checkout',
   '/profile',
   '/orders',
+];
+
+// Rutas de admin (requieren role 'admin')
+const adminRoutes = [
+  '/admin',
 ];
 
 // Rutas que requieren validación adicional para checkout
@@ -21,17 +27,11 @@ const checkoutRoutes = [
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Obtener token de sesión de las cookies
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("next-auth.session-token")?.value ||
-                       cookieStore.get("__Secure-next-auth.session-token")?.value;
+  // Obtener sesión completa para verificar role
+  const session = await auth();
 
-  let isLoggedIn = false;
-  if (sessionToken) {
-    // Para Edge Runtime, simplemente verificar que existe el token
-    // La validación completa se hará en las rutas protegidas
-    isLoggedIn = true;
-  }
+  let isLoggedIn = !!session;
+  let isAdmin = session?.user?.role === 'admin';
 
   // Excluir rutas técnicas (API, assets, favicon)
   if (
@@ -51,6 +51,22 @@ export default async function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Redirección si accede a rutas de admin sin ser admin
+  const isAdminRoute = adminRoutes.some(route =>
+    pathname.startsWith(route)
+  );
+
+  if (isAdminRoute && (!isLoggedIn || !isAdmin)) {
+    if (!isLoggedIn) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    } else {
+      // Usuario logueado pero no admin
+      return NextResponse.redirect(new URL('/', request.url));
+    }
   }
 
   // Redirección si accede a login/register estando autenticado
