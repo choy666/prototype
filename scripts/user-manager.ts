@@ -53,6 +53,27 @@ async function createTestUser() {
   }
 }
 
+async function createAdminUser() {
+  try {
+    console.log('🛠️ Creando usuario administrador...');
+
+    const hashedPassword = bcrypt.hashSync('admin123', 10);
+
+    const result = await db.insert(users).values({
+      email: 'admin@example.com',
+      name: 'Administrador',
+      password: hashedPassword,
+      role: 'admin'
+    }).returning();
+
+    console.log('✅ Usuario administrador creado exitosamente:', result[0]);
+  } catch (error) {
+    console.error('❌ Error creando usuario administrador:', error instanceof Error ? error.message : String(error));
+  } finally {
+    process.exit(0);
+  }
+}
+
 async function main() {
   const command = process.argv[2];
 
@@ -63,8 +84,11 @@ async function main() {
     case 'create-test':
       await createTestUser();
       break;
+    case 'create-admin':
+      await createAdminUser();
+      break;
     default:
-      console.log('Uso: tsx user-manager.ts [check|create-test]');
+      console.log('Uso: tsx user-manager.ts [check|create-test|create-admin]');
       process.exit(1);
   }
 }
