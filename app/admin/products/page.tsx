@@ -191,7 +191,11 @@ export default function AdminProductsPage() {
                       <h3 className="font-medium">{product.name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {product.category} • Stock: {product.stock}
-                        {product.stock <= 10 && (
+                        {product.stock === 0 ? (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            Sin stock
+                          </span>
+                        ) : product.stock <= 10 && (
                           <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                             Stock bajo
                           </span>
