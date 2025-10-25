@@ -14,7 +14,8 @@ import {
   Trash2,
   Search,
   Package,
-  DollarSign
+  DollarSign,
+  Settings
 } from 'lucide-react'
 
 interface Product {
@@ -190,6 +191,11 @@ export default function AdminProductsPage() {
                       <h3 className="font-medium">{product.name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {product.category} • Stock: {product.stock}
+                        {product.stock <= 10 && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            Stock bajo
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -208,6 +214,11 @@ export default function AdminProductsPage() {
                     <Link href={`/admin/products/${product.id}/edit`}>
                       <Button variant="outline" size="sm">
                         <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Link href={`/admin/products/${product.id}/stock`}>
+                      <Button variant="outline" size="sm">
+                        <Settings className="h-4 w-4" />
                       </Button>
                     </Link>
                     <Button

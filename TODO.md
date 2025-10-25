@@ -26,12 +26,12 @@
 - [x] Integrar selección de categorías en formularios de productos
 
 ### 2. Mejorar Control de Stock
-- [ ] Agregar funcionalidades de ajuste de stock manual
-- [ ] Implementar alertas de stock bajo
-- [ ] Agregar historial de movimientos de stock
+- [x] Agregar funcionalidades de ajuste de stock manual
+- [x] Implementar alertas de stock bajo
+- [x] Agregar historial de movimientos de stock
 
 ### 3. Mejorar Gestión de Imágenes
-- [ ] Implementar subida de imágenes a un servicio de almacenamiento (ej. Cloudinary, AWS S3)
+- [ ] Implementar subida de imágenes a un servicio de almacenamiento (ej: https://postimages.org). Los links de las imagenes estan subidos a postimages.
 - [ ] Agregar vista previa de imágenes en formularios
 - [ ] Permitir múltiples imágenes con drag & drop
 

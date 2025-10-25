@@ -48,6 +48,20 @@ export const products = pgTable("products", {
 });
 
 // ======================
+// Historial de movimientos de stock
+// ======================
+export const stockLogs = pgTable("stock_logs", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  oldStock: integer("old_stock").notNull(),
+  newStock: integer("new_stock").notNull(),
+  change: integer("change").notNull(), // cantidad cambiada (positiva o negativa)
+  reason: text("reason").notNull(), // razón del cambio (ej: "Ajuste manual", "Venta", "Devolución")
+  userId: integer("user_id").references(() => users.id).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ======================
 // Usuarios
 // ======================
 export const users = pgTable("users", {
@@ -193,3 +207,5 @@ export type ShippingMethod = typeof shippingMethods.$inferSelect;
 export type NewShippingMethod = typeof shippingMethods.$inferInsert;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
+export type StockLog = typeof stockLogs.$inferSelect;
+export type NewStockLog = typeof stockLogs.$inferInsert;

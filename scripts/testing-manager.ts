@@ -2,7 +2,7 @@
 
 import { MercadoPagoConfig, Preference } from "mercadopago";
 import { db } from '../lib/db';
-import { orders, orderItems } from '../lib/schema';
+import { orders, orderItems, products, stockLogs } from '../lib/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../lib/utils/logger';
 import axios from 'axios';
