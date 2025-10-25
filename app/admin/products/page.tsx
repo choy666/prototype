@@ -89,17 +89,22 @@ export default function AdminProductsPage() {
       const response = await fetch(`/api/admin/products/${id}`, {
         method: 'DELETE'
       })
-      if (!response.ok) throw new Error('Failed to delete product')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete product')
+      }
 
       toast({
         title: 'Éxito',
         description: 'Producto eliminado correctamente'
       })
       fetchProducts(search, page)
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'No se pudo eliminar el producto'
+      const description = errorMessage.includes('órdenes') ? 'El producto tiene ordenes activa' : 'No se pudo eliminar el producto'
       toast({
         title: 'Error',
-        description: 'No se pudo eliminar el producto',
+        description,
         variant: 'destructive'
       })
     }
