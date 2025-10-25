@@ -208,6 +208,23 @@ Si tienes preguntas o problemas, por favor abre un issue en el repositorio o con
 Desarrollado con ❤️ usando Next.js y TypeScript
 
 ---
+
+## 📊 Estado Actual del Proyecto
+
+El proyecto se encuentra en fase de mejoras críticas post-auditoría. Para más detalles sobre el progreso y tareas pendientes, consulta [TODO_AUDITORIA.md](TODO_AUDITORIA.md).
+
+### Progreso Actual
+- **Semana Actual**: 0/8 completada
+- **Funcionalidades Críticas**: 0/3 completadas
+- **Puntuación Actual**: 8.5/10 → **Objetivo Final: 9.5/10**
+
+### Próximas Mejoras Prioritarias
+- Implementación completa de OAuth con Mercado Libre
+- Sistema de recuperación de contraseña
+- Panel administrativo avanzado
+- Persistencia del carrito en base de datos
+
+---
 # Listar variables de entorno
 vercel env ls
 

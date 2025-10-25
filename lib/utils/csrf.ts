@@ -15,7 +15,7 @@ export function generateCSRFToken(): string {
  * @param token Token a validar
  * @returns true si es válido, false si no
  */
-export function validateCSRFToken(token: string | null): boolean {
+export function validateCSRFToken(token: string | null | undefined): boolean {
   if (!token) return false;
 
   // Verificar formato: debe ser hexadecimal de 64 caracteres (32 bytes)

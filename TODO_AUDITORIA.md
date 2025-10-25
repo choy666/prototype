@@ -19,11 +19,11 @@
   - [x] Layout administrativo con navegación
   - [x] Middleware para roles de admin
   - [x] Dashboard con estadísticas básicas
-- [ ] Gestión de productos (Admin)
-  - [ ] CRUD completo de productos
-  - [ ] Gestión de categorías
-  - [ ] Control de stock
-  - [ ] Gestión de imágenes
+- [x] Gestión de productos (Admin)
+  - [x] CRUD completo de productos
+  - [x] Gestión de categorías
+  - [x] Control de stock
+  - [xs] Gestión de imágenes
 - [ ] Gestión de pedidos (Admin)
   - [ ] Ver todos los pedidos
   - [ ] Cambiar estados de pedidos
