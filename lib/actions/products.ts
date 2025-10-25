@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '../db';
-import { products } from '../schema';
+import { products, orderItems } from '../schema';
 import { and, eq, desc, sql, gte, lte, like, asc } from 'drizzle-orm';
 import type { NewProduct, Product } from '../schema';
 import { revalidatePath } from 'next/cache';
@@ -191,6 +191,12 @@ export async function updateProduct(
 // ✅ Eliminar un producto
 export async function deleteProduct(id: number): Promise<boolean> {
   try {
+    // Verificar si el producto tiene órdenes asociadas
+    const orderItemsCount = await db.$count(orderItems, eq(orderItems.productId, id));
+    if (orderItemsCount > 0) {
+      throw new Error('No se puede eliminar el producto porque tiene órdenes asociadas');
+    }
+
     const [deletedProduct] = await db
       .delete(products)
       .where(eq(products.id, id))
@@ -200,7 +206,7 @@ export async function deleteProduct(id: number): Promise<boolean> {
     return !!deletedProduct;
   } catch (error) {
     console.error('Error deleting product:', error);
-    throw new Error('No se pudo eliminar el producto');
+    throw error; // Re-lanzar el error para que sea manejado en el handler
   }
 }
 

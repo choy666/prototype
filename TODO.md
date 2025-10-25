@@ -1,47 +1,25 @@
-# Lista de Tareas para Implementación del Frontend de Gestión de Productos (Admin)
+# TODO: Solución a errores de eliminación de productos
 
-## Información Recopilada
-- **Panel de Administración Básico**: Ya implementado ([x])
-- **Layout Administrativo con Navegación**: Ya implementado ([x])
-- **Middleware para Roles de Admin**: Ya implementado ([x])
-- **Dashboard con Estadísticas Básicas**: Ya implementado ([x])
-- **Gestión de Productos (Admin)**: Parcialmente implementado
-  - **CRUD Completo de Productos**: Ya implementado (listado, crear, editar, eliminar)
-  - **Gestión de Categorías**: Pendiente
-  - **Control de Stock**: Implementado en formularios, pero puede mejorarse
-  - **Gestión de Imágenes**: Implementado con URLs, pero puede mejorarse con subida de archivos ([xs])
+## Tareas completadas:
+- [x] Modificar la función `deleteProduct` en `lib/actions/products.ts` para verificar si el producto tiene `order_items` asociados antes de intentar eliminarlo.
+- [x] Si el producto tiene órdenes asociadas, devolver un error específico en lugar de permitir la eliminación.
+- [x] Actualizar el handler DELETE en `app/api/admin/products/[id]/route.ts` para manejar el nuevo error y devolver un mensaje apropiado al cliente.
 
-## Archivos Relevantes Analizados
-- `app/admin/products/page.tsx`: Listado de productos con búsqueda, paginación y eliminación
-- `app/admin/products/new/page.tsx`: Formulario para crear productos
-- `app/admin/products/[id]/edit/page.tsx`: Formulario para editar productos
-- API endpoints: `app/api/admin/products/`, `app/api/admin/categories/`
+## Información recopilada:
+- El esquema de la base de datos muestra que `order_items` tiene una clave foránea `productId` que referencia `products.id`.
+- La función `deleteProduct` actual intenta eliminar directamente sin verificar dependencias.
+- El error ocurre porque PostgreSQL impide la eliminación debido a la restricción de clave foránea.
 
-## Tareas Pendientes
+## Plan de implementación completado:
+1. Agregar una consulta en `deleteProduct` para contar los `order_items` asociados al producto.
+2. Si hay órdenes asociadas, lanzar un error específico.
+3. Modificar el handler DELETE para capturar este error y devolver un mensaje de error apropiado.
+4. Probar la funcionalidad.
 
-### 1. Implementar Gestión de Categorías
-- [x] Crear página de listado de categorías (`app/admin/categories/page.tsx`)
-- [x] Crear formulario para nueva categoría (`app/admin/categories/new/page.tsx`)
-- [x] Crear formulario para editar categoría (`app/admin/categories/[id]/edit/page.tsx`)
-- [x] Integrar selección de categorías en formularios de productos
+## Archivos modificados:
+- `lib/actions/products.ts`: Modificar `deleteProduct` y agregar import de `orderItems`.
+- `app/api/admin/products/[id]/route.ts`: Actualizar manejo de errores en DELETE.
 
-### 2. Mejorar Control de Stock
-- [x] Agregar funcionalidades de ajuste de stock manual
-- [x] Implementar alertas de stock bajo
-- [x] Agregar historial de movimientos de stock
-
-### 3. Mejorar Gestión de Imágenes
-- [ ] Implementar subida de imágenes a un servicio de almacenamiento (ej: https://postimages.org). Los links de las imagenes estan subidos a postimages.
-- [ ] Agregar vista previa de imágenes en formularios
-- [ ] Permitir múltiples imágenes con drag & drop
-
-### 4. Verificaciones y Mejoras
-- [ ] Verificar validaciones en formularios
-- [ ] Agregar confirmaciones para acciones destructivas
-- [ ] Implementar manejo de errores mejorado
-
-## Pasos de Seguimiento
-- [ ] Instalar dependencias adicionales si es necesario (ej. para subida de imágenes)
-- [ ] Probar funcionalidades en desarrollo
-- [ ] Verificar integración con API backend
-- [ ] Actualizar documentación si es necesario
+## Próximos pasos:
+- [ ] Probar la eliminación de productos con y sin órdenes asociadas para verificar que la solución funcione correctamente.
+- [ ] Desplegar los cambios a Vercel para verificar que los errores en producción se resuelvan.

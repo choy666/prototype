@@ -109,6 +109,9 @@ export async function DELETE(
     return NextResponse.json({ message: 'Product deleted successfully' })
   } catch (error) {
     console.error('Error deleting product:', error)
+    if (error instanceof Error && error.message.includes('órdenes asociadas')) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
