@@ -214,12 +214,19 @@ export default function EditProductPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Categoría *</label>
-                <Input
+                <select
                   value={form.category}
                   onChange={(e) => handleChange('category', e.target.value)}
-                  placeholder="Categoría del producto"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
-                />
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {/* TODO: Load categories from API */}
+                  <option value="Electrónica">Electrónica</option>
+                  <option value="Ropa">Ropa</option>
+                  <option value="Hogar">Hogar</option>
+                  <option value="Deportes">Deportes</option>
+                </select>
               </div>
 
               <div>

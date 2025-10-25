@@ -1,15 +1,47 @@
-# Plan de Creación de Usuario Administrador y Corroboración del Panel Administrativo
+# Lista de Tareas para Implementación del Frontend de Gestión de Productos (Admin)
 
-## Pasos a Completar
+## Información Recopilada
+- **Panel de Administración Básico**: Ya implementado ([x])
+- **Layout Administrativo con Navegación**: Ya implementado ([x])
+- **Middleware para Roles de Admin**: Ya implementado ([x])
+- **Dashboard con Estadísticas Básicas**: Ya implementado ([x])
+- **Gestión de Productos (Admin)**: Parcialmente implementado
+  - **CRUD Completo de Productos**: Ya implementado (listado, crear, editar, eliminar)
+  - **Gestión de Categorías**: Pendiente
+  - **Control de Stock**: Implementado en formularios, pero puede mejorarse
+  - **Gestión de Imágenes**: Implementado con URLs, pero puede mejorarse con subida de archivos ([xs])
 
-- [x] Modificar scripts/user-manager.ts para agregar función createAdminUser
-- [x] Ejecutar el script para crear usuario administrador
-- [x] Verificar middleware.ts para protección de rutas admin
-- [x] Verificar existencia de rutas admin (app/admin/)
-- [x] Corroborar layout administrativo con navegación
-- [x] Corroborar middleware para roles de admin
-- [x] Corroborar dashboard con estadísticas básicas
-- [x] Corroborar CRUD completo de productos
-- [x] Corroborar gestión de categorías
-- [x] Corroborar control de stock
-- [x] Corroborar gestión de imágenes (marcado como [xs], verificar estado) - Implementado con campos para imagen principal y múltiples imágenes adicionales
+## Archivos Relevantes Analizados
+- `app/admin/products/page.tsx`: Listado de productos con búsqueda, paginación y eliminación
+- `app/admin/products/new/page.tsx`: Formulario para crear productos
+- `app/admin/products/[id]/edit/page.tsx`: Formulario para editar productos
+- API endpoints: `app/api/admin/products/`, `app/api/admin/categories/`
+
+## Tareas Pendientes
+
+### 1. Implementar Gestión de Categorías
+- [x] Crear página de listado de categorías (`app/admin/categories/page.tsx`)
+- [x] Crear formulario para nueva categoría (`app/admin/categories/new/page.tsx`)
+- [x] Crear formulario para editar categoría (`app/admin/categories/[id]/edit/page.tsx`)
+- [x] Integrar selección de categorías en formularios de productos
+
+### 2. Mejorar Control de Stock
+- [ ] Agregar funcionalidades de ajuste de stock manual
+- [ ] Implementar alertas de stock bajo
+- [ ] Agregar historial de movimientos de stock
+
+### 3. Mejorar Gestión de Imágenes
+- [ ] Implementar subida de imágenes a un servicio de almacenamiento (ej. Cloudinary, AWS S3)
+- [ ] Agregar vista previa de imágenes en formularios
+- [ ] Permitir múltiples imágenes con drag & drop
+
+### 4. Verificaciones y Mejoras
+- [ ] Verificar validaciones en formularios
+- [ ] Agregar confirmaciones para acciones destructivas
+- [ ] Implementar manejo de errores mejorado
+
+## Pasos de Seguimiento
+- [ ] Instalar dependencias adicionales si es necesario (ej. para subida de imágenes)
+- [ ] Probar funcionalidades en desarrollo
+- [ ] Verificar integración con API backend
+- [ ] Actualizar documentación si es necesario

@@ -2,17 +2,14 @@
 
 import { db } from '../db';
 import { categories } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, like } from 'drizzle-orm';
 import type { NewCategory, Category } from '../schema';
 import { revalidatePath } from 'next/cache';
 
 // Obtener todas las categorías
-export async function getCategories(): Promise<Category[]> {
+export async function getCategories(search?: string): Promise<Category[]> {
   try {
-    return await db
-      .select()
-      .from(categories)
-      .orderBy(desc(categories.created_at));
+    return await db.select().from(categories).where(search ? like(categories.name, `%${search}%`) : undefined).orderBy(desc(categories.created_at));
   } catch (error) {
     console.error('Error fetching categories:', error);
     throw new Error('No se pudieron obtener las categorías');

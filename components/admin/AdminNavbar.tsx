@@ -13,13 +13,15 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Tag
 } from 'lucide-react'
 import { useState } from 'react'
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'Productos', href: '/admin/products', icon: Package },
+  { name: 'Categorías', href: '/admin/categories', icon: Tag },
   { name: 'Pedidos', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Usuarios', href: '/admin/users', icon: Users },
   { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
