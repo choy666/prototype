@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '../db';
-import { products, orderItems } from '../schema';
+import { products, orderItems, categories } from '../schema';
 import { and, eq, desc, sql, gte, lte, like, asc } from 'drizzle-orm';
 import type { NewProduct, Product } from '../schema';
 import { revalidatePath } from 'next/cache';
@@ -144,13 +144,23 @@ export async function getCategories(): Promise<string[]> {
 
 // ✅ Crear un nuevo producto
 export async function createProduct(
-  productData: Omit<NewProduct, 'id' | 'created_at' | 'updated_at'>
+  productData: Omit<NewProduct, 'id' | 'created_at' | 'updated_at' | 'category'>
 ): Promise<Product> {
   try {
+    // Obtener el nombre de la categoría para poblar el campo category
+    const category = await db.query.categories.findFirst({
+      where: eq(categories.id, productData.categoryId!),
+    });
+
+    if (!category) {
+      throw new Error('Categoría no encontrada');
+    }
+
     const [newProduct] = await db
       .insert(products)
       .values({
         ...productData,
+        category: category.name,
         created_at: new Date(),
         updated_at: new Date(),
       })

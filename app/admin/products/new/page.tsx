@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
+import type { Category } from '@/lib/schema'
 
 interface ProductForm {
   name: string
@@ -15,7 +16,7 @@ interface ProductForm {
   price: string
   image: string
   images: string[]
-  category: string
+  categoryId: string
   discount: string
   weight: string
   destacado: boolean
@@ -25,17 +26,33 @@ export default function NewProductPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
   const [form, setForm] = useState<ProductForm>({
     name: '',
     description: '',
     price: '',
     image: '',
     images: [],
-    category: '',
+    categoryId: '',
     discount: '0',
     weight: '',
     destacado: false
   })
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/admin/categories')
+        if (response.ok) {
+          const data = await response.json()
+          setCategories(data)
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+      }
+    }
+    fetchCategories()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +65,7 @@ export default function NewProductPage() {
         price: form.price,
         image: form.image || undefined,
         images: form.images,
-        category: form.category,
+        categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
         destacado: form.destacado
@@ -125,17 +142,17 @@ export default function NewProductPage() {
               <div>
                 <label className="block text-sm font-medium mb-2">Categoría *</label>
                 <select
-                  value={form.category}
-                  onChange={(e) => handleChange('category', e.target.value)}
+                  value={form.categoryId}
+                  onChange={(e) => handleChange('categoryId', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="">Seleccionar categoría</option>
-                  {/* TODO: Load categories from API */}
-                  <option value="Electrónica">Electrónica</option>
-                  <option value="Ropa">Ropa</option>
-                  <option value="Hogar">Hogar</option>
-                  <option value="Deportes">Deportes</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
