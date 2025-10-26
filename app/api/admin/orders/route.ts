@@ -25,14 +25,14 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const params = {
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      status: searchParams.get('status'),
-      search: searchParams.get('search'),
-      dateFrom: searchParams.get('dateFrom'),
-      dateTo: searchParams.get('dateTo'),
-      sortBy: searchParams.get('sortBy'),
-      sortOrder: searchParams.get('sortOrder'),
+      page: searchParams.get('page') ?? '1',
+      limit: searchParams.get('limit') ?? '10',
+      status: searchParams.get('status') ?? undefined,
+      search: searchParams.get('search') ?? undefined,
+      dateFrom: searchParams.get('dateFrom') ?? undefined,
+      dateTo: searchParams.get('dateTo') ?? undefined,
+      sortBy: searchParams.get('sortBy') ?? 'createdAt',
+      sortOrder: searchParams.get('sortOrder') ?? 'desc',
     }
 
     const validatedParams = getOrdersSchema.parse(params)
