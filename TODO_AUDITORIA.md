@@ -24,12 +24,12 @@
   - [x] Gestión de categorías
   - [x] Control de stock
   - [xs] Gestión de imágenes
-- [ ] Gestión de pedidos (Admin)
-  - [ ] Ver todos los pedidos
-  - [ ] Cambiar estados de pedidos
-  - [ ] Actualizar tracking_number de los pedidos 
-  - [ ] Ver detalles de pedidos
-  - [ ] Generar reportes básicos
+- [x] Gestión de pedidos (Admin)
+  - [x] Ver todos los pedidos
+  - [x] Cambiar estados de pedidos
+  - [x] Actualizar tracking_number de los pedidos
+  - [x] Ver detalles de pedidos
+  - [x] Generar reportes básicos
 
 ### Semana 3: Persistencia y Estado
 - [ ] Implementar persistencia del carrito en BD

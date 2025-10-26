@@ -1,12 +1,10 @@
-# Mejora: Sincronizar categoría en productos al editar
+# TODO: Arreglar Errores de ESLint en Build
 
-## Descripción
-Implementar lógica en `updateProduct` para que al modificar `categoryId`, se actualice automáticamente el campo `category` con el nombre correspondiente de la categoría en la base de datos.
-
-## Pasos a completar
-- [ ] Modificar la función `updateProduct` en `lib/actions/products.ts` para sincronizar `category` cuando se actualiza `categoryId`
-- [ ] Verificar que la categoría existe antes de actualizar
-- [ ] Probar la funcionalidad editando un producto desde la interfaz de admin
-
-## Archivos a modificar
-- `lib/actions/products.ts`: Función `updateProduct`
+## Tareas Completadas
+- [ ] Eliminar import 'Filter' no usado en app/admin/orders/page.tsx
+- [ ] Cambiar shippingAddress de 'any' a tipo específico en app/admin/orders/page.tsx
+- [ ] Cambiar shippingAddress de 'any' a tipo específico en app/admin/orders/[id]/page.tsx
+- [ ] Agregar 'fetchOrder' a dependencias de useEffect en app/admin/orders/[id]/page.tsx
+- [ ] Eliminar import 'NewOrder' no usado en lib/actions/orders.ts
+- [ ] Cambiar tipos 'any' a específicos en lib/actions/orders.ts
+- [ ] Ejecutar npm run build para verificar correcciones
