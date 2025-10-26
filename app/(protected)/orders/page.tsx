@@ -22,7 +22,7 @@ type Order = {
 };
 
 export default function OrdersPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +31,11 @@ export default function OrdersPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login?callbackUrl=/orders');
+      return;
+    }
+
+    if (status === 'authenticated' && session?.user?.role === 'admin') {
+      router.push('/admin');
       return;
     }
 
@@ -61,10 +66,10 @@ export default function OrdersPage() {
       }
     };
 
-    if (status === 'authenticated') {
+    if (status === 'authenticated' && session?.user?.role !== 'admin') {
       fetchOrders();
     }
-  }, [status, router]);
+  }, [status, session, router]);
 
   if (status === 'loading' || loading) {
     return (

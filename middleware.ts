@@ -24,6 +24,12 @@ const checkoutRoutes = [
   '/api/order-status',
 ];
 
+// Rutas de usuario que admins no pueden acceder
+const userRestrictedRoutes = [
+  '/orders',
+  '/api/orders',
+];
+
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 

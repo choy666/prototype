@@ -26,3 +26,8 @@ export async function requireRole(role: string) {
   }
   return session;
 }
+
+export async function isAdmin() {
+  const role = await getCurrentRole();
+  return role === 'admin';
+}

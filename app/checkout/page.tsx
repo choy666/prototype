@@ -68,6 +68,19 @@ export default function CheckoutPage() {
     );
   }
 
+  // Verificar que no sea admin
+  if (session.user.role === 'admin') {
+    return (
+      <div className="container mx-auto p-8 text-center">
+        <h1 className="text-3xl font-bold mb-4">Acceso denegado</h1>
+        <p className="mb-6">Los administradores no pueden realizar compras.</p>
+        <Link href="/admin">
+          <Button>Ir al Panel de Administración</Button>
+        </Link>
+      </div>
+    );
+  }
+
   // Verificar que el carrito no esté vacío
   if (items.length === 0) {
     return (

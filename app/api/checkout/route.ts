@@ -13,6 +13,19 @@ const client = new MercadoPagoConfig({
 
 export async function POST(req: NextRequest) {
   try {
+    // Verificar que el usuario no sea admin
+    const { auth } = await import("@/lib/actions/auth");
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (session.user.role === 'admin') {
+      return NextResponse.json(
+        { error: "Los administradores no pueden realizar compras" },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     // Validar datos de entrada con Zod

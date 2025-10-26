@@ -13,6 +13,12 @@ export async function GET(request: Request) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 });
     }
 
+    // Verificar que el usuario no sea admin
+    if (session.user.role === 'admin') {
+      logger.warn('Intento de acceso de admin a /api/orders', { userId: session.user.id });
+      return new Response(JSON.stringify({ error: 'Los administradores no pueden acceder a sus pedidos' }), { status: 403 });
+    }
+
     // Validar y convertir userId
     const userId = parseInt(session.user.id);
     if (isNaN(userId)) {
