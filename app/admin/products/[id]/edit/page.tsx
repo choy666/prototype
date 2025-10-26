@@ -31,7 +31,6 @@ interface ProductForm {
   image: string
   images: string
   category: string
-  stock: string
   discount: string
   weight: string
   destacado: boolean
@@ -50,7 +49,6 @@ export default function EditProductPage() {
     image: '',
     images: '',
     category: '',
-    stock: '0',
     discount: '0',
     weight: '',
     destacado: false
@@ -72,7 +70,6 @@ export default function EditProductPage() {
           image: product.image || '',
           images: product.images ? product.images.join(', ') : '',
           category: product.category,
-          stock: product.stock.toString(),
           discount: product.discount.toString(),
           weight: product.weight || '',
           destacado: product.destacado
@@ -109,7 +106,6 @@ export default function EditProductPage() {
         image: form.image || undefined,
         images: imagesArray,
         category: form.category,
-        stock: parseInt(form.stock),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
         destacado: form.destacado
@@ -242,16 +238,7 @@ export default function EditProductPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Stock</label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={form.stock}
-                  onChange={(e) => handleChange('stock', e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+
 
               <div>
                 <label className="block text-sm font-medium mb-2">Descuento (%)</label>
