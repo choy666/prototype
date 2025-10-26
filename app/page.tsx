@@ -8,8 +8,15 @@ import { checkDatabaseConnection } from '@/lib/db';
 import FeaturedGrid from '@/components/products/FeaturedGrid';
 import { getFeaturedProducts } from '@/lib/actions/products';
 import HeroSlider from '@/components/ui/HeroSlider';
+import { auth } from '@/lib/actions/auth';
+import { redirect } from 'next/navigation';
 
 export default async function Home() {
+  const session = await auth();
+
+  if (session && session.user.role === 'admin') {
+    redirect('/admin');
+  }
   const dbStatus = await checkDatabaseConnection();
   const isConnected = dbStatus.success;
   const statusMessage = dbStatus.message;
