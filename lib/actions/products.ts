@@ -180,10 +180,25 @@ export async function updateProduct(
   productData: Partial<Omit<NewProduct, 'id' | 'created_at'>>
 ): Promise<Product | null> {
   try {
+    // Si se está actualizando categoryId, obtener el nombre de la categoría
+    let categoryName: string | undefined;
+    if (productData.categoryId != null) {
+      const category = await db.query.categories.findFirst({
+        where: eq(categories.id, productData.categoryId),
+      });
+
+      if (!category) {
+        throw new Error('Categoría no encontrada');
+      }
+
+      categoryName = category.name;
+    }
+
     const [updatedProduct] = await db
       .update(products)
       .set({
         ...productData,
+        ...(categoryName && { category: categoryName }),
         updated_at: new Date(),
       })
       .where(eq(products.id, id))
