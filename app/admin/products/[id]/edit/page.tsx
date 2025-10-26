@@ -234,6 +234,7 @@ export default function EditProductPage() {
                 <Input
                   type="number"
                   step="0.01"
+                  min="0.01"
                   value={form.price}
                   onChange={(e) => handleChange('price', e.target.value)}
                   placeholder="0.00"
@@ -245,6 +246,7 @@ export default function EditProductPage() {
                 <label className="block text-sm font-medium mb-2">Stock</label>
                 <Input
                   type="number"
+                  min="0"
                   value={form.stock}
                   onChange={(e) => handleChange('stock', e.target.value)}
                   placeholder="0"
@@ -268,6 +270,7 @@ export default function EditProductPage() {
                 <Input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={form.weight}
                   onChange={(e) => handleChange('weight', e.target.value)}
                   placeholder="0.00"

@@ -31,9 +31,9 @@
 - [x] Agregar historial de movimientos de stock
 
 ### 3. Mejorar Gestión de Imágenes
-- [ ] Implementar subida de imágenes a un servicio de almacenamiento (ej: https://postimages.org). Los links de las imagenes estan subidos a postimages.
-- [ ] Agregar vista previa de imágenes en formularios
-- [ ] Permitir múltiples imágenes con drag & drop
+- [x] Implementar subida de imágenes a un servicio de almacenamiento (ej: https://postimages.org). Los links de las imagenes estan subidos a postimages.
+- [x] Agregar vista previa de imágenes en formularios
+- [x] Permitir múltiples imágenes con drag & drop
 
 ### 4. Verificaciones y Mejoras
 - [ ] Verificar validaciones en formularios

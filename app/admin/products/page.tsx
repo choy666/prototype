@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import {
   Plus,
   Edit,
@@ -46,6 +47,10 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; productId: number | null }>({
+    isOpen: false,
+    productId: null
+  })
   const { toast } = useToast()
 
   const fetchProducts = useCallback(async (searchTerm = '', pageNum = 1) => {
@@ -82,11 +87,15 @@ export default function AdminProductsPage() {
     setPage(1)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este producto?')) return
+  const handleDeleteClick = (id: number) => {
+    setDeleteDialog({ isOpen: true, productId: id })
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.productId) return
 
     try {
-      const response = await fetch(`/api/admin/products/${id}`, {
+      const response = await fetch(`/api/admin/products/${deleteDialog.productId}`, {
         method: 'DELETE'
       })
       if (!response.ok) {
@@ -101,13 +110,19 @@ export default function AdminProductsPage() {
       fetchProducts(search, page)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'No se pudo eliminar el producto'
-      const description = errorMessage.includes('órdenes') ? 'El producto tiene ordenes activa' : 'No se pudo eliminar el producto'
+      const description = errorMessage.includes('órdenes') ? 'El producto tiene órdenes activas' : 'No se pudo eliminar el producto'
       toast({
         title: 'Error',
         description,
         variant: 'destructive'
       })
+    } finally {
+      setDeleteDialog({ isOpen: false, productId: null })
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteDialog({ isOpen: false, productId: null })
   }
 
   return (
@@ -233,7 +248,7 @@ export default function AdminProductsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(product.id)}
+                      onClick={() => handleDeleteClick(product.id)}
                       className="text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -273,6 +288,16 @@ export default function AdminProductsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmationDialog
+        isOpen={deleteDialog.isOpen}
+        title="Eliminar Producto"
+        description="¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   )
 }

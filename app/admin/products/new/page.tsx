@@ -14,7 +14,7 @@ interface ProductForm {
   description: string
   price: string
   image: string
-  images: string
+  images: string[]
   category: string
   stock: string
   discount: string
@@ -31,7 +31,7 @@ export default function NewProductPage() {
     description: '',
     price: '',
     image: '',
-    images: '',
+    images: [],
     category: '',
     stock: '0',
     discount: '0',
@@ -44,17 +44,12 @@ export default function NewProductPage() {
     setLoading(true)
 
     try {
-      const imagesArray = form.images
-        .split(',')
-        .map(url => url.trim())
-        .filter(url => url.length > 0)
-
       const productData = {
         name: form.name,
         description: form.description || undefined,
         price: form.price,
         image: form.image || undefined,
-        images: imagesArray,
+        images: form.images,
         category: form.category,
         stock: parseInt(form.stock),
         discount: parseInt(form.discount),
@@ -152,6 +147,7 @@ export default function NewProductPage() {
                 <Input
                   type="number"
                   step="0.01"
+                  min="0.01"
                   value={form.price}
                   onChange={(e) => handleChange('price', e.target.value)}
                   placeholder="0.00"
@@ -163,6 +159,7 @@ export default function NewProductPage() {
                 <label className="block text-sm font-medium mb-2">Stock</label>
                 <Input
                   type="number"
+                  min="0"
                   value={form.stock}
                   onChange={(e) => handleChange('stock', e.target.value)}
                   placeholder="0"
@@ -186,6 +183,7 @@ export default function NewProductPage() {
                 <Input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={form.weight}
                   onChange={(e) => handleChange('weight', e.target.value)}
                   placeholder="0.00"

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import {
   Plus,
   Edit,
@@ -27,6 +28,10 @@ export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; categoryId: number | null }>({
+    isOpen: false,
+    categoryId: null
+  })
   const { toast } = useToast()
 
   const fetchCategories = useCallback(async (searchTerm = '') => {
@@ -59,11 +64,15 @@ export default function AdminCategoriesPage() {
     fetchCategories(search)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar esta categoría?')) return
+  const handleDeleteClick = (id: number) => {
+    setDeleteDialog({ isOpen: true, categoryId: id })
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.categoryId) return
 
     try {
-      const response = await fetch(`/api/admin/categories/${id}`, {
+      const response = await fetch(`/api/admin/categories/${deleteDialog.categoryId}`, {
         method: 'DELETE'
       })
       if (!response.ok) throw new Error('Failed to delete category')
@@ -79,7 +88,13 @@ export default function AdminCategoriesPage() {
         description: 'No se pudo eliminar la categoría',
         variant: 'destructive'
       })
+    } finally {
+      setDeleteDialog({ isOpen: false, categoryId: null })
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteDialog({ isOpen: false, categoryId: null })
   }
 
   return (
@@ -184,6 +199,16 @@ export default function AdminCategoriesPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmationDialog
+        isOpen={deleteDialog.isOpen}
+        title="Eliminar Categoría"
+        description="¿Estás seguro de que quieres eliminar esta categoría? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   )
 }
