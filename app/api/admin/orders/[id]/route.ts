@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { orders, orderItems, products, users } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { logger } from '@/lib/utils/logger'
 
 const updateOrderSchema = z.object({
   status: z.enum(['pending', 'paid', 'shipped', 'delivered', 'cancelled', 'rejected']).optional(),
@@ -90,17 +91,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const session = await auth()
     if (!session || session.user.role !== 'admin') {
+      logger.warn('Unauthorized access attempt to update order', { userId: session?.user?.id, params: await params })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { id: orderId } = await params
     const orderIdNum = parseInt(orderId)
     if (isNaN(orderIdNum)) {
+      logger.warn('Invalid order ID provided', { orderId, userId: session.user.id })
       return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 })
     }
 
     const body = await request.json()
     const validatedData = updateOrderSchema.parse(body)
+
+    logger.info('Order update initiated', {
+      orderId: orderIdNum,
+      userId: session.user.id,
+      changes: validatedData
+    })
 
     // Verificar que la orden existe
     const existingOrder = await db
@@ -110,6 +119,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .limit(1)
 
     if (existingOrder.length === 0) {
+      logger.warn('Order not found for update', { orderId: orderIdNum, userId: session.user.id })
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
@@ -123,6 +133,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .where(eq(orders.id, orderIdNum))
       .returning()
 
+    logger.info('Order updated successfully', {
+      orderId: orderIdNum,
+      userId: session.user.id,
+      previousStatus: existingOrder[0].status,
+      newStatus: updatedOrder.status,
+      trackingNumber: updatedOrder.trackingNumber
+    })
+
     return NextResponse.json({
       ...updatedOrder,
       total: Number(updatedOrder.total),
@@ -130,9 +148,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation error', issues: error.issues }, { status: 400 })
+      logger.error('Validation error during order update', {
+        orderId: await params.then(p => p.id),
+        userId: (await auth())?.user?.id,
+        issues: error.issues
+      })
+      return NextResponse.json({
+        error: 'Error de validación',
+        details: error.issues.map(issue => issue.message).join(', ')
+      }, { status: 400 })
     }
-    console.error('Error updating order:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    logger.error('Unexpected error during order update', {
+      orderId: await params.then(p => p.id),
+      userId: (await auth())?.user?.id,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+
+    return NextResponse.json({
+      error: 'Error interno del servidor',
+      details: 'Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.'
+    }, { status: 500 })
   }
 }

@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import {
   Package,
   DollarSign,
@@ -83,6 +84,8 @@ export default function AdminOrderDetailPage() {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
   const [trackingNumber, setTrackingNumber] = useState('')
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [pendingChanges, setPendingChanges] = useState<{ status: string; trackingNumber: string } | null>(null)
   const { toast } = useToast()
 
   const fetchOrder = useCallback(async () => {
@@ -109,21 +112,36 @@ export default function AdminOrderDetailPage() {
     fetchOrder()
   }, [fetchOrder])
 
-  const handleSave = async () => {
+  const handleSaveClick = () => {
+    const changes = {
+      status,
+      trackingNumber,
+    }
+    setPendingChanges(changes)
+    setShowConfirmation(true)
+  }
+
+  const handleConfirmSave = async () => {
+    if (!pendingChanges) return
+
     try {
       setSaving(true)
+      setShowConfirmation(false)
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          status,
-          trackingNumber: trackingNumber || undefined,
+          status: pendingChanges.status,
+          trackingNumber: pendingChanges.trackingNumber || undefined,
         }),
       })
 
-      if (!response.ok) throw new Error('Failed to update order')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || errorData.error || 'Failed to update order')
+      }
 
       toast({
         title: 'Éxito',
@@ -132,15 +150,21 @@ export default function AdminOrderDetailPage() {
 
       // Refresh order data
       fetchOrder()
-    } catch {
+      setPendingChanges(null)
+    } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo actualizar el pedido',
+        description: error instanceof Error ? error.message : 'No se pudo actualizar el pedido',
         variant: 'destructive'
       })
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleCancelSave = () => {
+    setShowConfirmation(false)
+    setPendingChanges(null)
   }
 
   const formatDate = (dateString: string) => {
@@ -324,7 +348,7 @@ export default function AdminOrderDetailPage() {
               />
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSaveClick} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
@@ -375,6 +399,17 @@ export default function AdminOrderDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmation}
+        title="Confirmar Cambios"
+        description={`¿Estás seguro de que deseas guardar los siguientes cambios en el pedido #${order.id}?`}
+        confirmText="Guardar Cambios"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmSave}
+        onCancel={handleCancelSave}
+      />
     </div>
   )
 }
