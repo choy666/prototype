@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
+import type { Category } from '@/lib/schema'
 
 interface Product {
   id: number
@@ -18,6 +19,7 @@ interface Product {
   image?: string
   images?: string[]
   category: string
+  categoryId?: number
   stock: number
   discount: number
   weight?: string
@@ -30,7 +32,7 @@ interface ProductForm {
   price: string
   image: string
   images: string
-  category: string
+  categoryId: string
   discount: string
   weight: string
   destacado: boolean
@@ -42,13 +44,15 @@ export default function EditProductPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [form, setForm] = useState<ProductForm>({
     name: '',
     description: '',
     price: '',
     image: '',
     images: '',
-    category: '',
+    categoryId: '',
     discount: '0',
     weight: '',
     destacado: false
@@ -57,6 +61,24 @@ export default function EditProductPage() {
   const id = params.id as string
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/admin/categories')
+        if (!response.ok) throw new Error('Failed to fetch categories')
+        const categoriesData: Category[] = await response.json()
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+        toast({
+          title: 'Error',
+          description: 'No se pudieron cargar las categorías',
+          variant: 'destructive'
+        })
+      } finally {
+        setCategoriesLoading(false)
+      }
+    }
+
     const fetchProduct = async () => {
       try {
         const response = await fetch(`/api/admin/products/${id}`)
@@ -69,7 +91,7 @@ export default function EditProductPage() {
           price: product.price,
           image: product.image || '',
           images: product.images ? product.images.join(', ') : '',
-          category: product.category,
+          categoryId: product.categoryId?.toString() || '',
           discount: product.discount.toString(),
           weight: product.weight || '',
           destacado: product.destacado
@@ -86,6 +108,7 @@ export default function EditProductPage() {
       }
     }
 
+    fetchCategories()
     if (id) fetchProduct()
   }, [id, router, toast])
 
@@ -105,7 +128,7 @@ export default function EditProductPage() {
         price: form.price,
         image: form.image || undefined,
         images: imagesArray,
-        category: form.category,
+        categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
         destacado: form.destacado
@@ -211,17 +234,18 @@ export default function EditProductPage() {
               <div>
                 <label className="block text-sm font-medium mb-2">Categoría *</label>
                 <select
-                  value={form.category}
-                  onChange={(e) => handleChange('category', e.target.value)}
+                  value={form.categoryId}
+                  onChange={(e) => handleChange('categoryId', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  disabled={categoriesLoading}
                 >
                   <option value="">Seleccionar categoría</option>
-                  {/* TODO: Load categories from API */}
-                  <option value="Electrónica">Electrónica</option>
-                  <option value="Ropa">Ropa</option>
-                  <option value="Hogar">Hogar</option>
-                  <option value="Deportes">Deportes</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
