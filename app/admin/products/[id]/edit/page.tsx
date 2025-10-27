@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ArrowLeft, Save } from 'lucide-react'
 import type { Category } from '@/lib/schema'
 
@@ -199,6 +200,10 @@ export default function EditProductPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[
+        { label: 'Productos', href: '/admin/products' },
+        { label: 'Editar Producto' }
+      ]} />
       <div className="flex items-center space-x-4">
         <Link href="/admin/products">
           <Button variant="outline" size="sm">
@@ -236,7 +241,7 @@ export default function EditProductPage() {
                 <select
                   value={form.categoryId}
                   onChange={(e) => handleChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                   required
                   disabled={categoriesLoading}
                 >
@@ -259,10 +264,9 @@ export default function EditProductPage() {
                   onChange={(e) => handleChange('price', e.target.value)}
                   placeholder="0.00"
                   required
+                  className="min-h-[44px]"
                 />
               </div>
-
-
 
               <div>
                 <label className="block text-sm font-medium mb-2">Descuento (%)</label>
@@ -273,6 +277,7 @@ export default function EditProductPage() {
                   value={form.discount}
                   onChange={(e) => handleChange('discount', e.target.value)}
                   placeholder="0"
+                  className="min-h-[44px]"
                 />
               </div>
 
@@ -285,6 +290,7 @@ export default function EditProductPage() {
                   value={form.weight}
                   onChange={(e) => handleChange('weight', e.target.value)}
                   placeholder="0.00"
+                  className="min-h-[44px]"
                 />
               </div>
             </div>
@@ -295,7 +301,7 @@ export default function EditProductPage() {
                 value={form.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 placeholder="Descripción del producto"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                 rows={4}
               />
             </div>
@@ -307,6 +313,7 @@ export default function EditProductPage() {
                 value={form.image}
                 onChange={(e) => handleChange('image', e.target.value)}
                 placeholder="https://ejemplo.com/imagen.jpg"
+                className="min-h-[44px]"
               />
             </div>
 
@@ -316,6 +323,7 @@ export default function EditProductPage() {
                 value={form.images}
                 onChange={(e) => handleChange('images', e.target.value)}
                 placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
+                className="min-h-[44px]"
               />
             </div>
 
@@ -325,20 +333,20 @@ export default function EditProductPage() {
                 id="destacado"
                 checked={form.destacado}
                 onChange={(e) => handleChange('destacado', e.target.checked)}
-                className="rounded"
+                className="rounded w-5 h-5 min-h-[44px] min-w-[44px]"
               />
               <label htmlFor="destacado" className="text-sm font-medium">
                 Producto destacado
               </label>
             </div>
 
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
               <Link href="/admin/products">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
                   Cancelar
                 </Button>
               </Link>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto min-h-[44px]">
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? 'Actualizando...' : 'Actualizar Producto'}
               </Button>

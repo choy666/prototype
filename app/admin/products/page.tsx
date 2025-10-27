@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import {
   Plus,
   Edit,
@@ -127,6 +128,7 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Productos' }]} />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Productos</h1>
@@ -192,7 +194,7 @@ export default function AdminProductsPage() {
           ) : (
             <div className="space-y-4">
               {products.map((product) => (
-                <div key={product.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={product.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg space-y-4 md:space-y-0">
                   <div className="flex items-center space-x-4">
                     {product.image ? (
                       <Image
@@ -207,8 +209,8 @@ export default function AdminProductsPage() {
                         <Package className="h-6 w-6 text-gray-400" />
                       </div>
                     )}
-                    <div>
-                      <h3 className="font-medium">{product.name}</h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium truncate">{product.name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {product.category} • Stock: {product.stock}
                         {product.stock === 0 ? (
@@ -223,8 +225,8 @@ export default function AdminProductsPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="text-right">
+                  <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-4">
+                    <div className="text-left md:text-right">
                       <p className="font-medium">
                         <DollarSign className="inline h-4 w-4" />
                         {parseFloat(product.price).toFixed(2)}
@@ -235,24 +237,26 @@ export default function AdminProductsPage() {
                         </p>
                       )}
                     </div>
-                    <Link href={`/admin/products/${product.id}/edit`}>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
+                    <div className="flex space-x-2">
+                      <Link href={`/admin/products/${product.id}/edit`}>
+                        <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link href={`/admin/products/${product.id}/stock`}>
+                        <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteClick(product.id)}
+                        className="text-red-600 hover:text-red-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </Link>
-                    <Link href={`/admin/products/${product.id}/stock`}>
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteClick(product.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </div>
                   </div>
                 </div>
               ))}

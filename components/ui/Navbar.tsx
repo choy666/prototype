@@ -153,7 +153,7 @@ const Navbar = () => {
 
             {/* Mobile menu button */}
             <button
-              className="md:hidden p-2 text-foreground hover:text-primary focus:outline-none"
+              className="md:hidden p-3 text-foreground hover:text-primary focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setIsMobileOpen(!isMobileOpen)}
               aria-expanded={isMobileOpen}
               aria-label="Menú de navegación"
@@ -165,14 +165,14 @@ const Navbar = () => {
 
         {/* Mobile menu */}
         {isMobileOpen && (
-          <div className="md:hidden pt-2 pb-4 space-y-4">
+          <div className="md:hidden pt-2 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
             <div className="px-2 space-y-1">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    'block px-3 py-2 rounded-md text-base font-medium',
+                    'block px-3 py-3 rounded-md text-base font-medium min-h-[44px] flex items-center',
                     pathname === item.href
                       ? 'bg-accent text-accent-foreground'
                       : 'text-foreground hover:bg-accent hover:text-accent-foreground'
@@ -189,7 +189,7 @@ const Navbar = () => {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+                    className="block px-3 py-3 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground min-h-[44px] flex items-center"
                     onClick={() => setIsMobileOpen(false)}
                   >
                     {item.name}
@@ -201,7 +201,7 @@ const Navbar = () => {
                       item.onClick?.();
                       setIsMobileOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+                    className="w-full text-left px-3 py-3 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground min-h-[44px] flex items-center"
                   >
                     {item.name}
                   </button>

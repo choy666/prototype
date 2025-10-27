@@ -172,21 +172,21 @@ export default function HeroSlider() {
   };
 
   return (
-    <div className="group relative bg-black p-6 rounded-lg overflow-hidden">
+    <div className="group relative bg-black p-4 md:p-6 rounded-lg overflow-hidden">
       {/* Botones manuales */}
       <button
         onClick={handlePrev}
         aria-label="Anterior"
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 
-                   bg-black/50 text-white p-2 md:p-3 rounded-full hover:bg-black"
+        className="absolute left-2 top-1/2 -translate-y-1/2 z-20
+                   bg-black/50 text-white p-3 rounded-full hover:bg-black min-h-[44px] min-w-[44px] flex items-center justify-center"
       >
         ◀
       </button>
       <button
         onClick={handleNext}
         aria-label="Siguiente"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 
-                   bg-black/50 text-white p-2 md:p-3 rounded-full hover:bg-black"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-20
+                   bg-black/50 text-white p-3 rounded-full hover:bg-black min-h-[44px] min-w-[44px] flex items-center justify-center"
       >
         ▶
       </button>

@@ -23,59 +23,58 @@ const Footer = () => {
   ];
 
   return (
-    <footer className='flex flex-wrap items-center justify-between gap-3 border-t border-[#E4E5E7] py-5 sm:gap-2 sm:gap-6 md:pb-12 md:pt-10 dark:border-[#303236]'>
-      <div className='max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8'>
-        <div className='grid'>
-          <div className='space-y-8 col text-center'>
-            <h3 className='text-xl font-bold  text-[var(--color-page)]'>MiTienda</h3>
-            <p className='text-gray-500 text-base'>
+    <footer className='border-t border-border py-8 md:py-12'>
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12'>
+          <div className='text-center md:text-left'>
+            <h3 className='text-xl font-bold text-foreground mb-4'>MiTienda</h3>
+            <p className='text-muted-foreground text-base mb-6'>
               La mejor selección de productos de calidad para todos los gustos y necesidades.
             </p>
-            <div className='flex space-x-6 text-center d-flex justify-center'>
+            <div className='flex justify-center md:justify-start space-x-6'>
               {social.map((item) => (
                 <a
                   key={item.name}
                   href={item.href}
-                  className='hover:text-gray-500  text-[var(--color-page)]'
+                  className='text-muted-foreground hover:text-foreground transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center'
+                  aria-label={item.name}
                 >
-                  <span className='sr-only'>{item.name}</span>
                   <item.icon className='h-6 w-6' aria-hidden='true' />
                 </a>
               ))}
             </div>
           </div>
-          <div className='mt-12 col text-center'>
-            <div>
-              <h3 className='text-xl font-semibold tracking-wider uppercase'>Contacto</h3>
-              <ul role='list' className='mt-4 space-y-4'>
-                <li>
-                  <a
-                    href='mailto:info@mitienda.com'
-                    className='text-base text-gray-500 hover:text-green-500'
-                  >
-                    info@mitienda.com
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='tel:+1234567890'
-                    className='text-base text-gray-500 hover:text-green-500'
-                  >
-                    +1 (234) 567-890
-                  </a>
-                </li>
-                <li className='text-base text-gray-500'>123 Calle Falsa, Ciudad, País</li>
-              </ul>
-            </div>
+          <div className='text-center md:text-left'>
+            <h3 className='text-lg font-semibold text-foreground mb-4'>Contacto</h3>
+            <ul role='list' className='space-y-3'>
+              <li>
+                <a
+                  href='mailto:info@mitienda.com'
+                  className='text-muted-foreground hover:text-foreground transition-colors text-base'
+                >
+                  info@mitienda.com
+                </a>
+              </li>
+              <li>
+                <a
+                  href='tel:+1234567890'
+                  className='text-muted-foreground hover:text-foreground transition-colors text-base'
+                >
+                  +1 (234) 567-890
+                </a>
+              </li>
+              <li className='text-muted-foreground text-base'>123 Calle Falsa, Ciudad, País</li>
+            </ul>
           </div>
         </div>
-        <div className='mt-12 border-t border-gray-200 pt-8 text-center'>
+        <div className='mt-8 md:mt-12 border-t border-border pt-6 md:pt-8 text-center'>
           <Link
             href='#'
-            className='text-base text-yellow-500 hover:text-gray-600 flex items-center flex-col group transition-all duration-300 hover:scale-105 active:scale-95'
+            className='text-muted-foreground hover:text-foreground flex items-center justify-center flex-col group transition-all duration-300 hover:scale-105 active:scale-95'
+            aria-label="Ir al inicio"
           >
             &copy; {currentYear} LumenCommerce. Todos los derechos reservados.
-            <Shield className='h-6 w-6 fill-[var(--color-page)] stroke-[var(--color-page)] transition-transform duration-300 group-hover:rotate-6' />
+            <Shield className='h-6 w-6 fill-current transition-transform duration-300 group-hover:rotate-6 mt-2' />
           </Link>
         </div>
       </div>
