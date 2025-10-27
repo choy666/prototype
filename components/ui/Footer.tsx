@@ -26,7 +26,7 @@ const Footer = () => {
     <footer className='border-t border-border py-8 md:py-12'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12'>
-          <div className='text-center md:text-left'>
+          <div className='text-center'>
             <h3 className='text-xl font-bold text-foreground mb-4'>MiTienda</h3>
             <p className='text-muted-foreground text-base mb-6'>
               La mejor selección de productos de calidad para todos los gustos y necesidades.
