@@ -31,7 +31,7 @@ const Footer = () => {
             <p className='text-muted-foreground text-base mb-6'>
               La mejor selección de productos de calidad para todos los gustos y necesidades.
             </p>
-            <div className='flex justify-center md:justify-start space-x-6'>
+            <div className='flex justify-center space-x-6'>
               {social.map((item) => (
                 <a
                   key={item.name}

@@ -111,7 +111,7 @@ export function ImageUpload({
               <div className="aspect-square relative overflow-hidden rounded-lg">
                 <Image
                   src={image}
-                  alt={`Imagen ${index + 1}`}
+                  alt={`Imagen subida ${index + 1} para el producto`}
                   fill
                   className="object-cover"
                 />

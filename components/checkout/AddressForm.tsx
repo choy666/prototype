@@ -57,6 +57,11 @@ export function AddressForm({
         </p>
       </div>
 
+      {/* Instrucciones para navegación por teclado */}
+      <div className="sr-only" aria-live="polite">
+        Usa Tab para navegar entre campos. Presiona Enter para enviar el formulario.
+      </div>
+
       {/* Nombre Completo */}
       <div className="space-y-2">
         <Label htmlFor="nombre">

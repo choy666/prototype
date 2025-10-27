@@ -9,6 +9,7 @@ import Navbar from '@/components/ui/Navbar'
 import Footer from '@/components/ui/Footer'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import ErrorFallback from '@/components/ui/ErrorFallback'
+import { SkipLink } from '@/components/ui/SkipLink'
 import { auth } from '@/lib/actions/auth'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -38,8 +39,11 @@ export default async function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
+              <SkipLink />
               <Navbar />
+              <main id="main-content">
                 {children}
+              </main>
               <Footer />
             </ThemeProvider>
           </AuthProvider>

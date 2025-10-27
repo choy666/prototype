@@ -157,6 +157,7 @@ const Navbar = () => {
               onClick={() => setIsMobileOpen(!isMobileOpen)}
               aria-expanded={isMobileOpen}
               aria-label="Menú de navegación"
+              aria-controls="mobile-menu"
             >
               {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
@@ -165,7 +166,7 @@ const Navbar = () => {
 
         {/* Mobile menu */}
         {isMobileOpen && (
-          <div className="md:hidden pt-2 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+          <div id="mobile-menu" className="md:hidden pt-2 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
             <div className="px-2 space-y-1">
               {navItems.map((item) => (
                 <Link

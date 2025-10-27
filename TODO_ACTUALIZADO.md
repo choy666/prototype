@@ -24,28 +24,28 @@
   - [x] Mejorar navegación móvil en panel admin
 
 ### ♿ 1.2 Accesibilidad WCAG 2.1 AA
-- [ ] **Imágenes y alt texts**
-  - [ ] Agregar alt texts descriptivos a todas las imágenes de productos
-  - [ ] Implementar alt texts contextuales en componentes
-  - [ ] Usar aria-hidden para imágenes decorativas
-- [ ] **Contraste y legibilidad**
-  - [ ] Corregir contraste en gradientes sobre imágenes
-  - [ ] Mejorar contraste de texto en modo oscuro
-  - [ ] Implementar focus indicators visibles
-- [ ] **Navegación por teclado**
-  - [ ] Hacer todos los componentes focusables
-  - [ ] Implementar skip links
-  - [ ] Mejorar navegación en formularios complejos
+- [x] **Imágenes y alt texts**
+  - [x] Agregar alt texts descriptivos a todas las imágenes de productos
+  - [x] Implementar alt texts contextuales en componentes
+  - [x] Usar aria-hidden para imágenes decorativas
+- [x] **Contraste y legibilidad**
+  - [x] Corregir contraste en gradientes sobre imágenes
+  - [x] Mejorar contraste de texto en modo oscuro
+  - [x] Implementar focus indicators visibles
+- [x] **Navegación por teclado**
+  - [x] Hacer todos los componentes focusables
+  - [x] Implementar skip links
+  - [x] Mejorar navegación en formularios complejos
 
 ### 🖼️ 1.3 Optimización de Imágenes
-- [ ] **Next.js Image optimization**
-  - [ ] Agregar atributo `sizes` apropiado en todas las imágenes
-  - [ ] Implementar `priority` en imágenes above the fold
-  - [ ] Agregar `placeholder="blur"` con blurDataURL
-- [ ] **Responsive images**
-  - [ ] Crear diferentes tamaños para breakpoints
-  - [ ] Optimizar carga en conexiones lentas
-  - [ ] Implementar lazy loading sistemático
+- [x] **Next.js Image optimization**
+  - [x] Agregar atributo `sizes` apropiado en todas las imágenes
+  - [x] Implementar `priority` en imágenes above the fold
+  - [x] Agregar `placeholder="blur"` con blurDataURL
+- [x] **Responsive images**
+  - [x] Crear diferentes tamaños para breakpoints
+  - [x] Optimizar carga en conexiones lentas
+  - [x] Implementar lazy loading sistemático
 
 ## 🎨 Fase 2: Consistencia Visual (Semanas 3-4)
 **Prioridad: Media | Impacto: Alto**
