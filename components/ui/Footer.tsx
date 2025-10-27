@@ -44,7 +44,7 @@ const Footer = () => {
               ))}
             </div>
           </div>
-          <div className='text-center md:text-left'>
+          <div className='text-center'>
             <h3 className='text-lg font-semibold text-foreground mb-4'>Contacto</h3>
             <ul role='list' className='space-y-3'>
               <li>
