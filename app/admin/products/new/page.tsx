@@ -128,14 +128,15 @@ export default function NewProductPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-2">Nombre *</label>
                 <Input
                   value={form.name}
                   onChange={(e) => handleChange('name', e.target.value)}
                   placeholder="Nombre del producto"
                   required
+                  className="w-full"
                 />
               </div>
 
@@ -144,7 +145,7 @@ export default function NewProductPage() {
                 <select
                   value={form.categoryId}
                   onChange={(e) => handleChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                   required
                 >
                   <option value="">Seleccionar categoría</option>
@@ -166,10 +167,9 @@ export default function NewProductPage() {
                   onChange={(e) => handleChange('price', e.target.value)}
                   placeholder="0.00"
                   required
+                  className="w-full"
                 />
               </div>
-
-
 
               <div>
                 <label className="block text-sm font-medium mb-2">Descuento (%)</label>
@@ -180,6 +180,7 @@ export default function NewProductPage() {
                   value={form.discount}
                   onChange={(e) => handleChange('discount', e.target.value)}
                   placeholder="0"
+                  className="w-full"
                 />
               </div>
 
@@ -192,7 +193,53 @@ export default function NewProductPage() {
                   value={form.weight}
                   onChange={(e) => handleChange('weight', e.target.value)}
                   placeholder="0.00"
+                  className="w-full"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-2">Descripción</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  placeholder="Descripción del producto"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[100px] resize-y"
+                  rows={4}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
+                <Input
+                  type="url"
+                  value={form.image}
+                  onChange={(e) => handleChange('image', e.target.value)}
+                  placeholder="https://ejemplo.com/imagen.jpg"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
+                <Input
+                  value={form.images}
+                  onChange={(e) => handleChange('images', e.target.value)}
+                  placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="destacado"
+                    checked={form.destacado}
+                    onChange={(e) => handleChange('destacado', e.target.checked)}
+                    className="rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium">Producto destacado</span>
+                </label>
               </div>
             </div>
 

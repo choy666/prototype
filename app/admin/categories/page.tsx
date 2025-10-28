@@ -164,23 +164,23 @@ export default function AdminCategoriesPage() {
           ) : (
             <div className="space-y-4">
               {categories.map((category) => (
-                <div key={category.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-12 w-12 rounded bg-blue-100 flex items-center justify-center">
-                      <Tag className="h-6 w-6 text-blue-600" />
+                <div key={category.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg space-y-4 sm:space-y-0 gap-4">
+                  <div className="flex items-center space-x-4 min-w-0 flex-1">
+                    <div className="h-12 w-12 rounded bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0">
+                      <Tag className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <div>
-                      <h3 className="font-medium">{category.name}</h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-sm sm:text-base truncate">{category.name}</h3>
                       {category.description && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                           {category.description}
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-shrink-0">
                     <Link href={`/admin/categories/${category.id}/edit`}>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2" aria-label={`Editar ${category.name}`}>
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
@@ -188,7 +188,8 @@ export default function AdminCategoriesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteClick(category.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 min-h-[44px] min-w-[44px] flex items-center justify-center p-2"
+                      aria-label={`Eliminar ${category.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

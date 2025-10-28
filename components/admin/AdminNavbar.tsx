@@ -37,25 +37,25 @@ export function AdminNavbar() {
       {/* Mobile sidebar */}
       <div className="lg:hidden">
         <div className="fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black bg-opacity-25" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <div className={cn(
-            "relative flex w-full max-w-xs flex-col bg-white transition-transform duration-300 ease-in-out",
+            "relative flex w-full max-w-xs flex-col bg-white dark:bg-gray-800 transition-transform duration-300 ease-in-out shadow-xl",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}>
             <div className="absolute right-0 top-0 -mr-12 pt-2">
               <button
                 type="button"
-                className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white min-h-[44px] min-w-[44px]"
+                className="ml-1 flex h-10 w-10 items-center justify-center rounded-full bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 min-h-[44px] min-w-[44px] shadow-lg"
                 onClick={() => setSidebarOpen(false)}
                 aria-label="Cerrar menú"
               >
-                <X className="h-6 w-6 text-white" />
+                <X className="h-6 w-6 text-gray-900 dark:text-white" />
               </button>
             </div>
-            <div className="flex flex-shrink-0 items-center px-4 py-6">
-              <h1 className="text-xl font-bold text-gray-900">Panel Admin</h1>
+            <div className="flex flex-shrink-0 items-center px-4 py-6 border-b border-gray-200 dark:border-gray-700">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Panel Admin</h1>
             </div>
-            <nav className="flex-1 space-y-1 px-2 pb-4" role="navigation" aria-label="Navegación principal">
+            <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto" role="navigation" aria-label="Navegación principal">
               {navigation.map((item) => {
                 const isActive = pathname === item.href
                 return (
@@ -63,24 +63,24 @@ export function AdminNavbar() {
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      'group flex items-center px-3 py-3 text-sm font-medium rounded-md min-h-[44px]',
+                      'group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors min-h-[48px] w-full',
                       isActive
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-500'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                     )}
                     onClick={() => setSidebarOpen(false)}
                     aria-current={isActive ? 'page' : undefined}
                   >
                     <item.icon className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
-                    {item.name}
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 )
               })}
             </nav>
-            <div className="flex-shrink-0 p-4">
+            <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => signOut()}
-                className="group flex w-full items-center px-3 py-3 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900 min-h-[44px] flex items-center"
+                className="group flex w-full items-center px-3 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[48px]"
                 aria-label="Cerrar sesión"
               >
                 <LogOut className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
@@ -93,11 +93,11 @@ export function AdminNavbar() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex flex-grow flex-col overflow-y-auto bg-white border-r border-gray-200">
-          <div className="flex flex-shrink-0 items-center px-4 py-6">
-            <h1 className="text-xl font-bold text-gray-900">Panel Admin</h1>
+        <div className="flex flex-grow flex-col overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+          <div className="flex flex-shrink-0 items-center px-4 py-6 border-b border-gray-200 dark:border-gray-700">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Panel Admin</h1>
           </div>
-          <nav className="flex-1 space-y-1 px-2 pb-4">
+          <nav className="flex-1 space-y-1 px-2 py-4">
             {navigation.map((item) => {
               const isActive = pathname === item.href
               return (
@@ -105,24 +105,26 @@ export function AdminNavbar() {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md',
+                    'group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors min-h-[48px] w-full',
                     isActive
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-500'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                   )}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
-                  {item.name}
+                  <item.icon className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                  <span className="truncate">{item.name}</span>
                 </Link>
               )
             })}
           </nav>
-          <div className="flex-shrink-0 p-4">
+          <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={() => signOut()}
-              className="group flex w-full items-center px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"
+              className="group flex w-full items-center px-3 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[48px]"
+              aria-label="Cerrar sesión"
             >
-              <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
+              <LogOut className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
               Cerrar Sesión
             </button>
           </div>
