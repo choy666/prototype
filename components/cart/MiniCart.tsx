@@ -129,15 +129,15 @@ export function MiniCart() {
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           aria-label={`Disminuir cantidad de ${item.name}`}
-                          className="p-1 rounded bg-gray-200 hover:bg-gray-300 transition"
+                          className="p-2 rounded bg-gray-200 hover:bg-gray-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
-                        <span>{item.quantity}</span>
+                        <span className="px-2">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           aria-label={`Aumentar cantidad de ${item.name}`}
-                          className="p-1 rounded bg-gray-200 hover:bg-gray-300 transition"
+                          className="p-2 rounded bg-gray-200 hover:bg-gray-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                           <Plus className="h-4 w-4" />
                         </button>

@@ -42,8 +42,8 @@ export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: Che
   const total = subtotal + shippingCost;
 
   return (
-    <div className="bg-gray-50 p-6 rounded-lg h-fit">
-      <h2 className="text-xl font-bold mb-6">Resumen del Pedido</h2>
+    <div className="bg-gray-50 p-4 sm:p-6 rounded-lg h-fit">
+      <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6">Resumen del Pedido</h2>
 
       {/* Lista de productos */}
       <div className="space-y-4 mb-6">
