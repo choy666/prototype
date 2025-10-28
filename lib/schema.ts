@@ -188,9 +188,7 @@ export const orderItems = pgTable("order_items", {
 // ======================
 // Tipos TypeScript
 // ======================
-export type User = typeof users.$inferSelect & {
-  id: string;
-};
+export type User = typeof users.$inferSelect;
 
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
