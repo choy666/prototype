@@ -107,7 +107,7 @@ export default function AdminCategoriesPage() {
           </p>
         </div>
         <Link href="/admin/categories/new">
-          <Button className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto min-h-[44px]">
             <Plus className="mr-2 h-4 w-4" />
             Nueva Categoría
           </Button>
@@ -119,7 +119,7 @@ export default function AdminCategoriesPage() {
           <CardTitle>Buscar Categorías</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSearch} className="flex gap-4">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Buscar por nombre..."
@@ -128,7 +128,7 @@ export default function AdminCategoriesPage() {
                 className="w-full"
               />
             </div>
-            <Button type="submit">
+            <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
               <Search className="mr-2 h-4 w-4" />
               Buscar
             </Button>

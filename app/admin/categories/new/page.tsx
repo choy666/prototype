@@ -71,7 +71,7 @@ export default function NewCategoryPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Link href="/admin/categories">
-          <Button variant="outline" size="sm" className="w-full sm:w-auto">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto min-h-[44px]">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Button>
@@ -97,6 +97,7 @@ export default function NewCategoryPage() {
                 onChange={(e) => handleChange('name', e.target.value)}
                 placeholder="Nombre de la categoría"
                 required
+                className="w-full"
               />
             </div>
 
@@ -106,18 +107,18 @@ export default function NewCategoryPage() {
                 value={form.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 placeholder="Descripción de la categoría"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[100px] resize-y"
                 rows={4}
               />
             </div>
 
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-4">
               <Link href="/admin/categories">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
                   Cancelar
                 </Button>
               </Link>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto min-h-[44px]">
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? 'Creando...' : 'Crear Categoría'}
               </Button>

@@ -109,7 +109,7 @@ export default function NewProductPage() {
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
         <Link href="/admin/products">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="min-h-[44px]">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Button>

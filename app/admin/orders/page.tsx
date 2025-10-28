@@ -155,7 +155,7 @@ export default function AdminOrdersPage() {
                 className="w-full"
               />
             </div>
-            <Button type="submit" className="w-full sm:w-auto">
+            <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
               <Search className="mr-2 h-4 w-4" />
               Buscar
             </Button>
@@ -166,6 +166,7 @@ export default function AdminOrdersPage() {
               variant={statusFilter === '' ? 'default' : 'outline'}
               size="sm"
               onClick={() => handleStatusFilter('')}
+              className="min-h-[44px]"
             >
               Todos
             </Button>
@@ -175,6 +176,7 @@ export default function AdminOrdersPage() {
                 variant={statusFilter === key ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => handleStatusFilter(key)}
+                className="min-h-[44px]"
               >
                 {label}
               </Button>
@@ -254,7 +256,7 @@ export default function AdminOrdersPage() {
           )}
 
           {pagination && pagination.totalPages > 1 && (
-            <div className="flex justify-center mt-6 space-x-2">
+            <div className="flex flex-col sm:flex-row justify-center items-center mt-6 gap-2">
               <Button
                 variant="outline"
                 disabled={page === 1}
@@ -262,10 +264,11 @@ export default function AdminOrdersPage() {
                   setPage(page - 1)
                   fetchOrders(search, statusFilter, page - 1)
                 }}
+                className="w-full sm:w-auto min-h-[44px]"
               >
                 Anterior
               </Button>
-              <span className="px-4 py-2">
+              <span className="px-4 py-2 text-sm sm:text-base">
                 Página {page} de {pagination.totalPages}
               </span>
               <Button
@@ -275,6 +278,7 @@ export default function AdminOrdersPage() {
                   setPage(page + 1)
                   fetchOrders(search, statusFilter, page + 1)
                 }}
+                className="w-full sm:w-auto min-h-[44px]"
               >
                 Siguiente
               </Button>

@@ -137,7 +137,7 @@ export default function AdminProductsPage() {
           </p>
         </div>
         <Link href="/admin/products/new">
-          <Button className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto min-h-[44px]">
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Producto
           </Button>
@@ -158,7 +158,7 @@ export default function AdminProductsPage() {
                 className="w-full"
               />
             </div>
-            <Button type="submit" className="w-full sm:w-auto">
+            <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
               <Search className="mr-2 h-4 w-4" />
               Buscar
             </Button>
@@ -276,7 +276,7 @@ export default function AdminProductsPage() {
                   setPage(page - 1)
                   fetchProducts(search, page - 1)
                 }}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-h-[44px]"
               >
                 Anterior
               </Button>
@@ -290,7 +290,7 @@ export default function AdminProductsPage() {
                   setPage(page + 1)
                   fetchProducts(search, page + 1)
                 }}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-h-[44px]"
               >
                 Siguiente
               </Button>
