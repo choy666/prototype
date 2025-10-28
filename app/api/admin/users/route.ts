@@ -10,6 +10,15 @@ const createUserSchema = z.object({
   role: z.enum(['user', 'admin']).default('user'),
 })
 
+const getUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  limit: z.coerce.number().int().min(1).default(10).optional(),
+  search: z.string().optional(),
+  role: z.enum(['user', 'admin']).optional(),
+  sortBy: z.enum(['name', 'email', 'role', 'createdAt']).default('createdAt').optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
+})
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
@@ -18,22 +27,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const search = searchParams.get('search') || undefined
-    const role = searchParams.get('role') as 'user' | 'admin' | undefined
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const queryParams = Object.fromEntries(searchParams.entries())
+    const validatedQuery = getUsersQuerySchema.parse(queryParams)
 
-    const result = await getUsers(page, limit, {
-      search,
-      role,
-      sortBy: sortBy as 'name' | 'email' | 'role' | 'createdAt',
-      sortOrder: sortOrder as 'asc' | 'desc',
+    const result = await getUsers(validatedQuery.page, validatedQuery.limit, {
+      search: validatedQuery.search,
+      role: validatedQuery.role,
+      sortBy: validatedQuery.sortBy,
+      sortOrder: validatedQuery.sortOrder,
     })
 
     return NextResponse.json(result)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Validation error', issues: error.issues }, { status: 400 })
+    }
     console.error('Error fetching users:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
