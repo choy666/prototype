@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { auth } from '@/lib/actions/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { count } from 'drizzle-orm'
+import { count, sum, eq, gte, lte, and } from 'drizzle-orm'
 import { users, products, orders } from '@/lib/schema'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,14 +19,43 @@ async function getStats() {
   const [userCount] = await db.select({ count: count() }).from(users)
   const [productCount] = await db.select({ count: count() }).from(products)
   const [orderCount] = await db.select({ count: count() }).from(orders)
-  // Calcular ingresos totales (simulado - en producción calcular sum(total))
-  const revenue = 0 // TODO: Implementar cálculo real
+
+  // Calcular ingresos totales de pedidos pagados
+  const [revenueResult] = await db
+    .select({ total: sum(orders.total) })
+    .from(orders)
+    .where(eq(orders.status, 'paid'))
+
+  const revenue = Number(revenueResult?.total ?? 0)
+
+  // Calcular ingresos del último mes para tendencias
+  const lastMonth = new Date()
+  lastMonth.setMonth(lastMonth.getMonth() - 1)
+  const currentMonth = new Date()
+
+  const [lastMonthRevenue] = await db
+    .select({ total: sum(orders.total) })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, 'paid'),
+        gte(orders.createdAt, lastMonth),
+        lte(orders.createdAt, currentMonth)
+      )
+    )
+
+  const lastMonthTotal = Number(lastMonthRevenue?.total ?? 0)
+  const revenueTrend = lastMonthTotal > 0 ? ((revenue - lastMonthTotal) / lastMonthTotal) * 100 : 0
 
   return {
     users: userCount.count,
     products: productCount.count,
     orders: orderCount.count,
-    revenue
+    revenue,
+    revenueTrend: {
+      value: Math.abs(revenueTrend),
+      isPositive: revenueTrend >= 0
+    }
   }
 }
 
@@ -113,7 +142,7 @@ async function DashboardContent() {
           title="Ingresos Totales"
           value={`$${stats.revenue.toLocaleString()}`}
           icon={DollarSign}
-          trend={{ value: 23, isPositive: true }}
+          trend={stats.revenueTrend}
         />
       </div>
 
