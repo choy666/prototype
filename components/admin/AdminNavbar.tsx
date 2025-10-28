@@ -142,7 +142,7 @@ export function AdminNavbar() {
           <Menu className="h-6 w-6" />
         </button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold text-gray-900">Panel de Administración</h1>
+          <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Panel de Administración</h1>
         </div>
       </div>
     </>

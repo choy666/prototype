@@ -132,10 +132,10 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Pedidos</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Pedidos</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gestiona todos los pedidos de tu tienda
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function AdminOrdersPage() {
           <CardTitle>Buscar y Filtrar Pedidos</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSearch} className="flex gap-4 mb-4">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="flex-1">
               <Input
                 placeholder="Buscar por email del usuario..."
@@ -155,7 +155,7 @@ export default function AdminOrdersPage() {
                 className="w-full"
               />
             </div>
-            <Button type="submit">
+            <Button type="submit" className="w-full sm:w-auto">
               <Search className="mr-2 h-4 w-4" />
               Buscar
             </Button>

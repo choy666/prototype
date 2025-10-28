@@ -129,15 +129,15 @@ export default function AdminProductsPage() {
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Productos' }]} />
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Productos</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Productos</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gestiona el catálogo de productos de tu tienda
           </p>
         </div>
         <Link href="/admin/products/new">
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Producto
           </Button>
@@ -149,7 +149,7 @@ export default function AdminProductsPage() {
           <CardTitle>Buscar Productos</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSearch} className="flex gap-4">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Buscar por nombre..."
@@ -158,7 +158,7 @@ export default function AdminProductsPage() {
                 className="w-full"
               />
             </div>
-            <Button type="submit">
+            <Button type="submit" className="w-full sm:w-auto">
               <Search className="mr-2 h-4 w-4" />
               Buscar
             </Button>
@@ -268,7 +268,7 @@ export default function AdminProductsPage() {
           )}
 
           {pagination && pagination.totalPages > 1 && (
-            <div className="flex justify-center mt-6 space-x-2">
+            <div className="flex flex-col sm:flex-row justify-center items-center mt-6 gap-2">
               <Button
                 variant="outline"
                 disabled={page === 1}
@@ -276,10 +276,11 @@ export default function AdminProductsPage() {
                   setPage(page - 1)
                   fetchProducts(search, page - 1)
                 }}
+                className="w-full sm:w-auto"
               >
                 Anterior
               </Button>
-              <span className="px-4 py-2">
+              <span className="px-4 py-2 text-sm sm:text-base">
                 Página {page} de {pagination.totalPages}
               </span>
               <Button
@@ -289,6 +290,7 @@ export default function AdminProductsPage() {
                   setPage(page + 1)
                   fetchProducts(search, page + 1)
                 }}
+                className="w-full sm:w-auto"
               >
                 Siguiente
               </Button>

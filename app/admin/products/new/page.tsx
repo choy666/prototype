@@ -128,8 +128,8 @@ export default function NewProductPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              <div className="sm:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2">Nombre *</label>
                 <Input
                   value={form.name}
@@ -145,7 +145,7 @@ export default function NewProductPage() {
                 <select
                   value={form.categoryId}
                   onChange={(e) => handleChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[44px]"
                   required
                 >
                   <option value="">Seleccionar categoría</option>
@@ -197,7 +197,7 @@ export default function NewProductPage() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2">Descripción</label>
                 <textarea
                   value={form.description}
@@ -208,7 +208,7 @@ export default function NewProductPage() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
                 <Input
                   type="url"
@@ -219,7 +219,7 @@ export default function NewProductPage() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
                 <Input
                   value={form.images}
@@ -229,70 +229,27 @@ export default function NewProductPage() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     id="destacado"
                     checked={form.destacado}
                     onChange={(e) => handleChange('destacado', e.target.checked)}
-                    className="rounded border-gray-300 focus:ring-blue-500"
+                    className="rounded border-gray-300 focus:ring-blue-500 min-h-[44px] min-w-[44px]"
                   />
                   <span className="text-sm font-medium">Producto destacado</span>
                 </label>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Descripción</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="Descripción del producto"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={4}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
-              <Input
-                type="url"
-                value={form.image}
-                onChange={(e) => handleChange('image', e.target.value)}
-                placeholder="https://ejemplo.com/imagen.jpg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
-              <Input
-                value={form.images}
-                onChange={(e) => handleChange('images', e.target.value)}
-                placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="destacado"
-                checked={form.destacado}
-                onChange={(e) => handleChange('destacado', e.target.checked)}
-                className="rounded"
-              />
-              <label htmlFor="destacado" className="text-sm font-medium">
-                Producto destacado
-              </label>
-            </div>
-
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-4">
               <Link href="/admin/products">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
                   Cancelar
                 </Button>
               </Link>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto min-h-[44px]">
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? 'Creando...' : 'Crear Producto'}
               </Button>
