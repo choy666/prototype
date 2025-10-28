@@ -34,7 +34,7 @@ export function AdminNavbar() {
 
   return (
     <>
-      {/* Mobile sidebar */}
+      {/* Mobile and Tablet sidebar */}
       <div className="lg:hidden">
         <div className="fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
@@ -91,8 +91,8 @@ export function AdminNavbar() {
         </div>
       </div>
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col">
+      {/* Desktop and Tablet sidebar */}
+      <div className="hidden md:fixed md:inset-y-0 md:flex md:w-72 md:flex-col">
         <div className="flex flex-grow flex-col overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
           <div className="flex flex-shrink-0 items-center px-4 py-6 border-b border-gray-200 dark:border-gray-700">
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Panel Admin</h1>
@@ -132,10 +132,10 @@ export function AdminNavbar() {
       </div>
 
       {/* Mobile header */}
-      <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm lg:hidden">
+      <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm md:hidden">
         <button
           type="button"
-          className="-m-2.5 p-2.5 text-gray-700 lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="-m-2.5 p-2.5 text-gray-700 md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
           onClick={() => setSidebarOpen(true)}
           aria-label="Abrir menú de navegación"
         >

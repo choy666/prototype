@@ -16,7 +16,7 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <AdminNavbar />
-      <main className="lg:pl-72">
+      <main className="md:pl-72">
         <div className="py-2 px-2 sm:py-4 sm:px-4 md:py-6 md:px-6 lg:py-8 lg:px-8 xl:py-10 xl:px-10">
           <div className="max-w-7xl mx-auto">
             {children}
