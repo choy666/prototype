@@ -35,7 +35,7 @@ export function AdminNavbar() {
   return (
     <>
       {/* Mobile and Tablet sidebar */}
-      <div className="lg:hidden">
+      <div className="md:hidden">
         <div className="fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <div className={cn(

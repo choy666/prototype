@@ -229,16 +229,16 @@ export default function NewProductPage() {
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="destacado"
-                    checked={form.destacado}
-                    onChange={(e) => handleChange('destacado', e.target.checked)}
-                    className="rounded border-gray-300 focus:ring-blue-500 min-h-[44px] min-w-[44px]"
-                  />
-                  <span className="text-sm font-medium">Producto destacado</span>
+              <div className="md:col-span-2 flex items-center">
+                <input
+                  type="checkbox"
+                  id="destacado"
+                  checked={form.destacado}
+                  onChange={(e) => handleChange('destacado', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="destacado" className="ml-2 block text-sm font-medium">
+                  Producto destacado
                 </label>
               </div>
             </div>

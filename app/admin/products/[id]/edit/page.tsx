@@ -225,8 +225,8 @@ export default function EditProductPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2">Nombre *</label>
                 <Input
                   value={form.name}
@@ -241,7 +241,7 @@ export default function EditProductPage() {
                 <select
                   value={form.categoryId}
                   onChange={(e) => handleChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[44px]"
                   required
                   disabled={categoriesLoading}
                 >
@@ -264,7 +264,6 @@ export default function EditProductPage() {
                   onChange={(e) => handleChange('price', e.target.value)}
                   placeholder="0.00"
                   required
-                  className="min-h-[44px]"
                 />
               </div>
 
@@ -277,7 +276,6 @@ export default function EditProductPage() {
                   value={form.discount}
                   onChange={(e) => handleChange('discount', e.target.value)}
                   placeholder="0"
-                  className="min-h-[44px]"
                 />
               </div>
 
@@ -290,54 +288,51 @@ export default function EditProductPage() {
                   value={form.weight}
                   onChange={(e) => handleChange('weight', e.target.value)}
                   placeholder="0.00"
-                  className="min-h-[44px]"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Descripción</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="Descripción del producto"
-                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
-                rows={4}
-              />
-            </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Descripción</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  placeholder="Descripción del producto"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[100px] resize-y"
+                  rows={4}
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
-              <Input
-                type="url"
-                value={form.image}
-                onChange={(e) => handleChange('image', e.target.value)}
-                placeholder="https://ejemplo.com/imagen.jpg"
-                className="min-h-[44px]"
-              />
-            </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
+                <Input
+                  type="url"
+                  value={form.image}
+                  onChange={(e) => handleChange('image', e.target.value)}
+                  placeholder="https://ejemplo.com/imagen.jpg"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
-              <Input
-                value={form.images}
-                onChange={(e) => handleChange('images', e.target.value)}
-                placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
-                className="min-h-[44px]"
-              />
-            </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
+                <Input
+                  value={form.images}
+                  onChange={(e) => handleChange('images', e.target.value)}
+                  placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
+                />
+              </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="destacado"
-                checked={form.destacado}
-                onChange={(e) => handleChange('destacado', e.target.checked)}
-                className="rounded w-5 h-5 min-h-[44px] min-w-[44px]"
-              />
-              <label htmlFor="destacado" className="text-sm font-medium">
-                Producto destacado
-              </label>
+              <div className="md:col-span-2 flex items-center">
+                <input
+                  type="checkbox"
+                  id="destacado"
+                  checked={form.destacado}
+                  onChange={(e) => handleChange('destacado', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="destacado" className="ml-2 block text-sm font-medium">
+                  Producto destacado
+                </label>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">

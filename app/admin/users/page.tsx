@@ -323,18 +323,18 @@ export default function AdminUsersPage() {
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleRoleChangeClick(user.id, user.role, user.name)}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2"
+                        className="h-9 w-9"
                         aria-label={`Cambiar rol de ${user.name}`}
                       >
                         {user.role === 'admin' ? <UserX className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="destructive"
+                        size="icon"
                         onClick={() => handleDeleteClick(user.id, user.name)}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 min-h-[44px] min-w-[44px] flex items-center justify-center p-2"
+                        className="h-9 w-9"
                         aria-label={`Eliminar ${user.name}`}
                       >
                         <Trash2 className="h-4 w-4" />

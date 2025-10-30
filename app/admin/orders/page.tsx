@@ -10,7 +10,6 @@ import {
   Search,
   Eye,
   Package,
-  DollarSign,
   Calendar,
   User
 } from 'lucide-react'
@@ -211,42 +210,41 @@ export default function AdminOrdersPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {orders.map((order) => (
-                <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg space-y-4 sm:space-y-0 gap-4">
-                  <div className="flex items-center space-x-4 min-w-0 flex-1">
-                    <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                      <Package className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-sm sm:text-base">Pedido #{order.id}</h3>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1 truncate">
-                          <User className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate">{order.userName} ({order.userEmail})</span>
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4 flex-shrink-0" />
-                          {formatDate(order.createdAt)}
-                        </span>
-                        <span className="whitespace-nowrap">{order.itemCount} producto{order.itemCount !== 1 ? 's' : ''}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 flex-shrink-0">
-                    <div className="text-left sm:text-right">
-                      <p className="font-medium text-sm sm:text-base">
-                        <DollarSign className="inline h-4 w-4" />
-                        {order.total.toFixed(2)}
-                      </p>
-                      <Badge className={`${statusColors[order.status]} text-xs`}>
+                <div key={order.id} className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                  {/* Order Info */}
+                  <div className="md:col-span-3">
+                    <div className="flex items-center mb-2">
+                      <h3 className="font-semibold text-lg">Pedido #{order.id}</h3>
+                      <Badge className={`${statusColors[order.status]} ml-3`}>
                         {statusLabels[order.status]}
                       </Badge>
                     </div>
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{order.userName} - {order.userEmail}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span>{formatDate(order.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 flex-shrink-0" />
+                        <span>{order.itemCount} producto{order.itemCount !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Total and Actions */}
+                  <div className="flex flex-row md:flex-col items-center md:items-end justify-between">
+                    <p className="font-bold text-lg mb-0 md:mb-2">
+                      ${order.total.toFixed(2)}
+                    </p>
                     <Link href={`/admin/orders/${order.id}`}>
-                      <Button variant="outline" size="sm" className="min-h-[44px] whitespace-nowrap" aria-label={`Ver detalles del pedido ${order.id}`}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver Detalles
+                      <Button variant="outline" size="sm" className="w-full" aria-label={`Ver detalles del pedido ${order.id}`}>
+                        <Eye className="h-4 w-4 mr-0 sm:mr-2" />
+                        <span className="hidden sm:inline">Ver Detalles</span>
                       </Button>
                     </Link>
                   </div>

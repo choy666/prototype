@@ -227,7 +227,7 @@ export default function ProductStockPage() {
                 />
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full">
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? 'Ajustando...' : 'Ajustar Stock'}
               </Button>

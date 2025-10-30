@@ -180,15 +180,15 @@ export default function AdminCategoriesPage() {
                   </div>
                   <div className="flex items-center space-x-2 flex-shrink-0">
                     <Link href={`/admin/categories/${category.id}/edit`}>
-                      <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2" aria-label={`Editar ${category.name}`}>
+                      <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Editar ${category.name}`}>
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant="destructive"
+                      size="icon"
                       onClick={() => handleDeleteClick(category.id)}
-                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 min-h-[44px] min-w-[44px] flex items-center justify-center p-2"
+                      className="h-9 w-9"
                       aria-label={`Eliminar ${category.name}`}
                     >
                       <Trash2 className="h-4 w-4" />

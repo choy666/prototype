@@ -179,13 +179,13 @@ export default function EditCategoryPage() {
               />
             </div>
 
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-4">
               <Link href="/admin/categories">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
                   Cancelar
                 </Button>
               </Link>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto min-h-[44px]">
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? 'Actualizando...' : 'Actualizar Categoría'}
               </Button>
