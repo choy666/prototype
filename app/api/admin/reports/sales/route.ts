@@ -56,11 +56,11 @@ export async function GET(request: NextRequest) {
         dateFormat = 'YYYY-MM-DD'
     }
 
-    const salesData = await db
+    const subquery = db
       .select({
         period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`,
-        sales: sum(orders.total),
-        orders: count(orders.id),
+        total: orders.total,
+        id: orders.id,
       })
       .from(orders)
       .where(
@@ -70,8 +70,17 @@ export async function GET(request: NextRequest) {
           lte(orders.createdAt, now)
         )
       )
-      .groupBy(sql`to_char(${orders.createdAt}, '${dateFormat}')`)
-      .orderBy(sql`to_char(${orders.createdAt}, '${dateFormat}')`)
+      .as('sub')
+
+    const salesData = await db
+      .select({
+        period: subquery.period,
+        sales: sum(subquery.total),
+        orders: count(subquery.id),
+      })
+      .from(subquery)
+      .groupBy(subquery.period)
+      .orderBy(subquery.period)
 
     const formattedData = salesData.map(row => ({
       period: formatPeriodLabel(row.period!, groupBy),
