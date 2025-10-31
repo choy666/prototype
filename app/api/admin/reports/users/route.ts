@@ -44,22 +44,22 @@ export async function GET(request: NextRequest) {
     let dateFormat: string
     switch (groupBy) {
       case 'day':
-        dateFormat = '%Y-%m-%d'
+        dateFormat = 'YYYY-MM-DD'
         break
       case 'week':
-        dateFormat = '%Y-%U'
+        dateFormat = 'IYYY-IW'
         break
       case 'month':
-        dateFormat = '%Y-%m'
+        dateFormat = 'YYYY-MM'
         break
       default:
-        dateFormat = '%Y-%m-%d'
+        dateFormat = 'YYYY-MM-DD'
     }
 
     // Get active users (users who made orders in the period)
     const activeUsers = await db
       .select({
-        period: sql<string>`strftime(${dateFormat}, ${orders.createdAt})`,
+        period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`,
         activeUsers: count(sql`DISTINCT ${orders.userId}`),
       })
       .from(orders)
@@ -69,13 +69,13 @@ export async function GET(request: NextRequest) {
           lte(orders.createdAt, now)
         )
       )
-      .groupBy(sql`strftime(${dateFormat}, ${orders.createdAt})`)
-      .orderBy(sql`strftime(${dateFormat}, ${orders.createdAt})`)
+      .groupBy(sql`to_char(${orders.createdAt}, '${dateFormat}')`)
+      .orderBy(sql`to_char(${orders.createdAt}, '${dateFormat}')`)
 
     // Get new users
     const newUsers = await db
       .select({
-        period: sql<string>`strftime(${dateFormat}, ${users.createdAt})`,
+        period: sql<string>`to_char(${users.createdAt}, '${dateFormat}')`,
         newUsers: count(users.id),
       })
       .from(users)
@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
           lte(users.createdAt, now)
         )
       )
-      .groupBy(sql`strftime(${dateFormat}, ${users.createdAt})`)
-      .orderBy(sql`strftime(${dateFormat}, ${users.createdAt})`)
+      .groupBy(sql`to_char(${users.createdAt}, '${dateFormat}')`)
+      .orderBy(sql`to_char(${users.createdAt}, '${dateFormat}')`)
 
     // Combine the data
     const combinedData: { [key: string]: { activeUsers: number; newUsers: number } } = {}
