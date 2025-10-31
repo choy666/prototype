@@ -44,21 +44,21 @@ export async function GET(request: NextRequest) {
     let dateFormat: string
     switch (groupBy) {
       case 'day':
-        dateFormat = '%Y-%m-%d'
+        dateFormat = 'YYYY-MM-DD'
         break
       case 'week':
-        dateFormat = '%Y-%U'
+        dateFormat = 'YYYY-IW'
         break
       case 'month':
-        dateFormat = '%Y-%m'
+        dateFormat = 'YYYY-MM'
         break
       default:
-        dateFormat = '%Y-%m-%d'
+        dateFormat = 'YYYY-MM-DD'
     }
 
     const salesData = await db
       .select({
-        period: sql<string>`strftime(${dateFormat}, ${orders.createdAt})`,
+        period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`,
         sales: sum(orders.total),
         orders: count(orders.id),
       })
@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
           lte(orders.createdAt, now)
         )
       )
-      .groupBy(sql`strftime(${dateFormat}, ${orders.createdAt})`)
-      .orderBy(sql`strftime(${dateFormat}, ${orders.createdAt})`)
+      .groupBy(sql`to_char(${orders.createdAt}, '${dateFormat}')`)
+      .orderBy(sql`to_char(${orders.createdAt}, '${dateFormat}')`)
 
     const formattedData = salesData.map(row => ({
       period: formatPeriodLabel(row.period!, groupBy),
