@@ -81,7 +81,7 @@ const Navbar = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
+          <div className="hidden lg:flex items-center space-x-6">
             {navItems.map((item) => (
               <Link
                 key={item.name}
@@ -171,7 +171,7 @@ const Navbar = () => {
 
             {/* Mobile menu button */}
             <button
-              className="md:hidden p-3 text-foreground hover:text-primary focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="lg:hidden p-3 text-foreground hover:text-primary focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setIsMobileOpen(!isMobileOpen)}
               aria-expanded={isMobileOpen}
               aria-label="Menú de navegación"
@@ -184,7 +184,7 @@ const Navbar = () => {
 
         {/* Mobile menu */}
         {isMobileOpen && (
-          <div id="mobile-menu" className="md:hidden pt-2 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+          <div id="mobile-menu" className="lg:hidden pt-2 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
             <div className="px-2 space-y-1">
               {navItems.map((item) => (
                 <Link

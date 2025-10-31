@@ -1,6 +1,5 @@
-# TODO: Solucionar duplicación de navbar en panel administrativo
-
-## Pasos a completar:
-- [x] Remover la importación y uso de Navbar en app/admin/layout.tsx para evitar duplicación con el root layout.
-
-## Estado: Completado
+- [x] Modificar components/ui/Navbar.tsx para expandir navbar solo en desktop (lg+), colapsar en tablet y mobile
+  - [x] Cambiar clase de desktop nav de "hidden md:flex" a "hidden lg:flex"
+  - [x] Cambiar clase del botón menú mobile de "md:hidden" a "lg:hidden"
+  - [x] Cambiar clase del mobile menu de "md:hidden" a "lg:hidden"
+- [ ] Verificar cambios con browser_action en diferentes tamaños de pantalla (browser tool disabled)
