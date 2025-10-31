@@ -23,11 +23,11 @@
 - [x] Mostrar tendencias reales en lugar de datos mock
 
 #### 3. Sistema de Reportes
-- [ ] Crear página `/admin/reports/page.tsx`
-- [ ] Implementar reportes de ventas por período
-- [ ] Agregar gráficos de productos más vendidos
-- [ ] Crear reporte de usuarios activos
-- [ ] Implementar exportación a CSV/PDF
+- [x] Crear página `/admin/reports/page.tsx`
+- [x] Implementar reportes de ventas por período
+- [x] Agregar gráficos de productos más vendidos
+- [x] Crear reporte de usuarios activos
+- [x] Implementar exportación a CSV/PDF
 
 ### 🟡 **MEDIA PRIORIDAD**
 

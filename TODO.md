@@ -1,5 +1,0 @@
-- [x] Modificar components/ui/Navbar.tsx para expandir navbar solo en desktop (lg+), colapsar en tablet y mobile
-  - [x] Cambiar clase de desktop nav de "hidden md:flex" a "hidden lg:flex"
-  - [x] Cambiar clase del botón menú mobile de "md:hidden" a "lg:hidden"
-  - [x] Cambiar clase del mobile menu de "md:hidden" a "lg:hidden"
-- [ ] Verificar cambios con browser_action en diferentes tamaños de pantalla (browser tool disabled)
