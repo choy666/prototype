@@ -57,10 +57,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get active users (users who made orders in the period)
-    const periodExpr = sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`
     const activeUsers = await db
       .select({
-        period: periodExpr,
+        period: sql<string>`to_char(${orders.createdAt}, ${dateFormat})`.as('period'),
         activeUsers: count(sql`DISTINCT ${orders.userId}`),
       })
       .from(orders)
@@ -70,14 +69,13 @@ export async function GET(request: NextRequest) {
           lte(orders.createdAt, now)
         )
       )
-      .groupBy(periodExpr)
-      .orderBy(periodExpr)
+      .groupBy(sql`period`)
+      .orderBy(sql`period`)
 
     // Get new users
-    const periodExprUsers = sql<string>`to_char(${users.createdAt}, '${dateFormat}')`
     const newUsers = await db
       .select({
-        period: periodExprUsers,
+        period: sql<string>`to_char(${users.createdAt}, ${dateFormat})`.as('period'),
         newUsers: count(users.id),
       })
       .from(users)
@@ -87,8 +85,8 @@ export async function GET(request: NextRequest) {
           lte(users.createdAt, now)
         )
       )
-      .groupBy(periodExprUsers)
-      .orderBy(periodExprUsers)
+      .groupBy(sql`period`)
+      .orderBy(sql`period`)
 
     // Combine the data
     const combinedData: { [key: string]: { activeUsers: number; newUsers: number } } = {}
