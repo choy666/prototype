@@ -41,13 +41,14 @@ export async function GET(request: NextRequest) {
         groupBy = 'day'
     }
 
+    // Definimos el formato de fecha según el agrupamiento
     let dateFormat: string
     switch (groupBy) {
       case 'day':
         dateFormat = 'YYYY-MM-DD'
         break
       case 'week':
-        dateFormat = 'YYYY-IW'
+        dateFormat = 'IYYY-IW' // ISO week-year + week number
         break
       case 'month':
         dateFormat = 'YYYY-MM'
@@ -56,9 +57,10 @@ export async function GET(request: NextRequest) {
         dateFormat = 'YYYY-MM-DD'
     }
 
+    // Subquery con to_char usando literal fijo
     const subquery = db
       .select({
-        period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`.as('period'),
+        period: sql<string>`to_char(${orders.createdAt}, '${sql.raw(dateFormat)}')`.as('period'),
         total: orders.total,
         id: orders.id,
       })
@@ -72,6 +74,7 @@ export async function GET(request: NextRequest) {
       )
       .as('sub')
 
+    // Query principal agrupando por el periodo
     const salesData = await db
       .select({
         period: subquery.period,
@@ -82,6 +85,7 @@ export async function GET(request: NextRequest) {
       .groupBy(subquery.period)
       .orderBy(subquery.period)
 
+    // Formateo de etiquetas para frontend
     const formattedData = salesData.map(row => ({
       period: formatPeriodLabel(row.period!, groupBy),
       sales: Number(row.sales || 0),
@@ -102,15 +106,17 @@ function formatPeriodLabel(period: string, groupBy: string): string {
         day: '2-digit',
         month: '2-digit'
       })
-    case 'week':
+    case 'week': {
       const [year, week] = period.split('-')
       return `Sem ${week}/${year.slice(-2)}`
-    case 'month':
+    }
+    case 'month': {
       const [year2, month] = period.split('-')
       return new Date(parseInt(year2), parseInt(month) - 1).toLocaleDateString('es-ES', {
         month: 'short',
         year: '2-digit'
       })
+    }
     default:
       return period
   }
