@@ -1,11 +1,8 @@
-import { notFound } from 'next/navigation'
+import { NextRequest, NextResponse } from 'next/server'
 import { getProductById } from '@/lib/actions/products'
 import { getProductVariants } from '@/lib/actions/productVariants'
-import ProductClient from '@/app/products/[id]/ProductClient'
 import { z } from 'zod'
-import { ProductVariant } from '@/types/index'
 
-// ✅ Esquema de validación para params
 const paramsSchema = z.object({
   id: z
     .string()
@@ -13,35 +10,34 @@ const paramsSchema = z.object({
     .transform((val) => parseInt(val, 10)),
 })
 
-export default async function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    // 🔎 Resolver params primero
     const rawParams = await params
-
-    // 🔎 Validar con Zod
     const parsed = paramsSchema.safeParse(rawParams)
     if (!parsed.success) {
-      return notFound()
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     }
 
     const productId = parsed.data.id
 
     const product = await getProductById(productId)
-
     if (!product) {
-      return notFound()
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
     // Obtener variantes del producto
     const variants = await getProductVariants(productId)
 
-    return <ProductClient product={{ ...product, variants: (variants as ProductVariant[]) || [] }} />
+    // Retornar producto con variantes
+    return NextResponse.json({
+      ...product,
+      variants,
+    })
   } catch (error) {
-    console.error('Error loading product:', error)
-    return notFound()
+    console.error('Error fetching product:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

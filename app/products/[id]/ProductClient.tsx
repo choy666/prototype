@@ -8,10 +8,12 @@ import type { Product } from '@/types';
 import { AddToCartButton } from '@/components/cart/AddToCartButton';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import { getDiscountedPrice } from '@/lib/utils/pricing';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ProductClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
 
   // Normalizamos imágenes para la galería
   const productImages = useMemo<string[]>(() => {
@@ -19,8 +21,42 @@ export default function ProductClient({ product }: { product: Product }) {
     return Array.isArray(product.image) ? product.image.slice(0, 3) : [product.image];
   }, [product?.image]);
 
-  // Precio original como number
-  const price = Number(product.price);
+  // Atributos disponibles de las variantes
+  const availableAttributes = useMemo(() => {
+    if (!product.variants?.length) return {};
+
+    const attrs: Record<string, Set<string>> = {};
+    product.variants.forEach(variant => {
+      Object.entries(variant.attributes).forEach(([key, value]) => {
+        if (!attrs[key]) attrs[key] = new Set();
+        attrs[key].add(value);
+      });
+    });
+
+    return Object.fromEntries(
+      Object.entries(attrs).map(([key, values]) => [key, Array.from(values)])
+    );
+  }, [product.variants]);
+
+  // Variante seleccionada
+  const selectedVariant = useMemo(() => {
+    if (!product.variants?.length || Object.keys(selectedAttributes).length === 0) return null;
+
+    return product.variants.find(variant =>
+      Object.entries(selectedAttributes).every(([key, value]) =>
+        variant.attributes[key] === value
+      )
+    ) || null;
+  }, [product.variants, selectedAttributes]);
+
+  // Precio actual (de variante o producto)
+  const currentPrice = selectedVariant?.price ? Number(selectedVariant.price) : Number(product.price);
+
+  // Stock actual (de variante o producto)
+  const currentStock = selectedVariant?.stock ?? product.stock;
+
+  // Imagen actual (de variante o producto)
+  const currentImageSrc = selectedVariant?.image || productImages[currentImageIndex % productImages.length];
 
   // Normalizamos para getDiscountedPrice
   const normalizedProduct = {
@@ -41,7 +77,7 @@ export default function ProductClient({ product }: { product: Product }) {
   const hasDiscount = (product.discount ?? 0) > 0;
   const finalPrice = getDiscountedPrice(normalizedProduct);
 
-  const currentImage = productImages[currentImageIndex % productImages.length];
+
 
   const nextImage = () => {
     if (!productImages.length) return;
@@ -64,7 +100,7 @@ export default function ProductClient({ product }: { product: Product }) {
         <div className="space-y-3 sm:space-y-4 p-5 bg-black rounded-2xl">
           <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100">
             <Image
-              src={currentImage}
+              src={currentImageSrc}
               alt={product.name}
               fill
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -140,16 +176,52 @@ export default function ProductClient({ product }: { product: Product }) {
             {hasDiscount ? (
               <div className="flex flex-col">
                 <span className="text-sm text-gray-400 line-through">
-                  {formatPrice(price)}
+                  {formatPrice(currentPrice)}
                 </span>
                 <span>{formatPrice(finalPrice)}</span>
               </div>
             ) : (
-              <span>{formatPrice(price)}</span>
+              <span>{formatPrice(currentPrice)}</span>
             )}
           </div>
 
           <p className="text-gray-600">{product.description}</p>
+
+          {/* Selección de variantes */}
+          {Object.keys(availableAttributes).length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-white">Opciones disponibles</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Object.entries(availableAttributes).map(([attrKey, values]) => (
+                  <div key={attrKey} className="space-y-2">
+                    <label className="text-sm font-medium text-white capitalize">
+                      {attrKey}
+                    </label>
+                    <Select
+                      value={selectedAttributes[attrKey] || ''}
+                      onValueChange={(value) =>
+                        setSelectedAttributes(prev => ({
+                          ...prev,
+                          [attrKey]: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={`Seleccionar ${attrKey}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {values.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center space-x-4">
             <div className="flex items-center border rounded-md">
@@ -173,10 +245,11 @@ export default function ProductClient({ product }: { product: Product }) {
               product={{
                 id: product.id,
                 name: product.name,
-                price: price,                  // guardamos precio original
-                discount: product.discount,    // 👈 pasamos descuento al carrito
-                image: productImages[0] || '/placeholder-product.jpg',
-                stock: product.stock,
+                price: currentPrice,           // precio de variante o producto
+                discount: product.discount,    // pasamos descuento al carrito
+                image: currentImageSrc,        // imagen de variante o producto
+                stock: currentStock,           // stock de variante o producto
+                variantId: selectedVariant?.id, // ID de la variante seleccionada
               }}
               quantity={quantity}
               className="flex-1"
@@ -191,8 +264,8 @@ export default function ProductClient({ product }: { product: Product }) {
             <div>
               <h3 className="font-semibold">Disponibilidad</h3>
               <p className="text-gray-600">
-                {product.stock > 0
-                  ? `En stock (${product.stock} disponibles)`
+                {currentStock > 0
+                  ? `En stock (${currentStock} disponibles)`
                   : 'Sin stock'}
               </p>
             </div>

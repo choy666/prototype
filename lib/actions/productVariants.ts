@@ -105,11 +105,17 @@ export async function createProductVariant(
 // ✅ Obtener variantes de un producto
 export async function getProductVariants(productId: number): Promise<ProductVariant[]> {
   try {
-    return await db
+    const variants = await db
       .select()
       .from(productVariants)
       .where(and(eq(productVariants.productId, productId), eq(productVariants.isActive, true)))
       .orderBy(productVariants.created_at);
+
+    // Asegurar que attributes sea Record<string, string>
+    return variants.map(variant => ({
+      ...variant,
+      attributes: variant.attributes as Record<string, string>,
+    }));
   } catch (error) {
     console.error('Error fetching product variants:', error);
     throw new Error('No se pudieron obtener las variantes del producto');

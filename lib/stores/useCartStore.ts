@@ -10,6 +10,7 @@ export interface CartItem {
   quantity: number
   stock: number
   weight?: number | null   // peso en kg para cálculo de envío
+  variantId?: number       // ID de la variante seleccionada
 }
 
 interface CartState {

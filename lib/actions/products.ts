@@ -7,6 +7,7 @@ import type { NewProduct, Product } from '../schema';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ProductFilters } from '@/types';
+import { getProductVariants } from './productVariants';
 
 // ✅ Esquema de validación para los filtros de productos
 const productFiltersSchema = z.object({
@@ -142,7 +143,20 @@ export async function getProducts(
 export async function getProductById(id: number): Promise<Product | null> {
   try {
     const [product] = await db.select().from(products).where(eq(products.id, id));
-    return product || null;
+    if (!product) return null;
+
+    // Si el producto tiene variantes, calcular el stock total de variantes activas
+    const variants = await getProductVariants(id);
+    if (variants.length > 0) {
+      const activeVariants = variants.filter(v => v.isActive);
+      const totalVariantStock = activeVariants.reduce((sum, v) => sum + v.stock, 0);
+      return {
+        ...product,
+        stock: totalVariantStock,
+      };
+    }
+
+    return product;
   } catch (error) {
     console.error('Error fetching product by id:', error);
     throw new Error('No se pudieron obtener los productos');

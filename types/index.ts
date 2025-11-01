@@ -8,6 +8,19 @@ export interface User {
   image?: string | null;
 }
 
+export interface ProductVariant {
+  id: number;
+  productId: number;
+  sku?: string | null;
+  attributes: Record<string, string>;
+  price?: string | null;
+  stock: number;
+  image?: string | null;
+  isActive: boolean;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
 export interface Product {
   discount: number;
   id: number;
@@ -18,6 +31,7 @@ export interface Product {
   category: string;
   destacado: boolean;
   stock: number;
+  variants?: ProductVariant[];
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -130,6 +144,7 @@ export interface CheckoutData {
     quantity: number;
     image?: string;
     discount?: number;
+    variantId?: number;
   }>;
   shippingAddress: ShippingAddress;
   userId?: string;
