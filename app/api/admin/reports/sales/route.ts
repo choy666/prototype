@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     const subquery = db
       .select({
-        period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`,
+        period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`.as('period'),
         total: orders.total,
         id: orders.id,
       })

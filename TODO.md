@@ -1,21 +1,29 @@
-# Plan para corregir el error en el reporte de ventas
+# TODO: Solución al Error en Reporte de Ventas
 
-## Información Recopilada
-- El error ocurre en `app/api/admin/reports/sales/route.ts` debido al uso de `strftime`, que no existe en PostgreSQL (NeonDB).
-- El código usa Drizzle ORM con consultas SQL que incluyen `strftime` para formatear fechas.
-- Necesario cambiar `strftime` por `to_char` de PostgreSQL y ajustar los formatos de fecha.
+## Descripción del Error
+- Error: "You tried to reference 'period' field from a subquery, which is a raw SQL field, but it doesn't have an alias declared. Please add an alias to the field using '.as('alias')' method."
+- Ubicación: `app/api/admin/reports/sales/route.ts`
+- Causa: En Drizzle ORM, los campos de SQL raw en subqueries requieren un alias explícito usando `.as('alias')`.
 
-## Plan
-- Actualizar los formatos de fecha (`dateFormat`) para que sean compatibles con `to_char` de PostgreSQL.
-- Reemplazar `strftime` por `to_char` en las consultas SQL del select, groupBy y orderBy.
+## Pasos para Solucionar
+1. **Editar el archivo `app/api/admin/reports/sales/route.ts`**:
+   - En la subquery, cambiar la línea:
+     ```typescript
+     period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`,
+     ```
+     Por:
+     ```typescript
+     period: sql<string>`to_char(${orders.createdAt}, '${dateFormat}')`.as('period'),
+     ```
 
-## Archivos a editar
-- `app/api/admin/reports/sales/route.ts`
+2. **Verificar la funcionalidad**:
+   - Ejecutar el endpoint `/api/admin/reports/sales` para confirmar que el error se resuelve.
+   - Probar con diferentes parámetros de período (week, month, quarter, year).
 
-## Pasos de Seguimiento
-- [x] Cambiar formatos de fecha de strftime a to_char.
-- [x] Reemplazar strftime por to_char en la consulta SQL.
-- [x] Iniciar el servidor de desarrollo para verificar los cambios.
-- [x] Probar el endpoint con diferentes periodos (month, week, year) - consultas compiladas sin errores de strftime.
-- Verificar que las consultas funcionen correctamente después de los cambios.
-- Probar el endpoint para asegurar que los reportes se generen sin errores.
+3. **Pruebas adicionales**:
+   - Asegurarse de que los datos se agrupan y ordenan correctamente.
+   - Verificar que el formato de las etiquetas de período sigue funcionando (formatPeriodLabel).
+
+## Notas
+- Este cambio es mínimo y no afecta la lógica del reporte.
+- El alias asegura que Drizzle pueda referenciar correctamente el campo en las consultas posteriores.
