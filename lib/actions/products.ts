@@ -24,7 +24,16 @@ const productFiltersSchema = z.object({
     v => (v === '' || v === null ? undefined : v),
     z.coerce.number().min(0).optional()
   ),
+  minStock: z.preprocess(
+    v => (v === '' || v === null ? undefined : v),
+    z.coerce.number().min(0).optional()
+  ),
+  maxStock: z.preprocess(
+    v => (v === '' || v === null ? undefined : v),
+    z.coerce.number().min(0).optional()
+  ),
   minDiscount: z.coerce.number().min(0).max(100).optional(),
+  featured: z.boolean().optional(),
   search: z.string().optional(),
   sortBy: z
     .enum(['name', 'price', 'category', 'created_at', 'updated_at', 'stock', 'discount'])
@@ -48,7 +57,10 @@ export async function getProducts(
       category,
       minPrice,
       maxPrice,
+      minStock,
+      maxStock,
       minDiscount,
+      featured,
       search,
       sortBy,
       sortOrder,
@@ -65,8 +77,17 @@ export async function getProducts(
     if (typeof maxPrice === 'number') {
       conditions.push(lte(products.price, String(maxPrice)));
     }
+    if (typeof minStock === 'number') {
+      conditions.push(gte(products.stock, minStock));
+    }
+    if (typeof maxStock === 'number') {
+      conditions.push(lte(products.stock, maxStock));
+    }
     if (typeof minDiscount === 'number') {
       conditions.push(gte(products.discount, minDiscount));
+    }
+    if (typeof featured === 'boolean') {
+      conditions.push(eq(products.destacado, featured));
     }
     if (search) {
       conditions.push(like(products.name, `%${search}%`));

@@ -28,19 +28,22 @@ export interface ProductFilters {
   category?: string;
   minPrice?: number;
   maxPrice?: number;
+  minStock?: number;
+  maxStock?: number;
   search?: string;
-  sortBy?: 
-    | 'name' 
-    | 'price' 
-    | 'category' 
-    | 'created_at' 
-    | 'updated_at' 
-    | 'stock' 
+  sortBy?:
+    | 'name'
+    | 'price'
+    | 'category'
+    | 'created_at'
+    | 'updated_at'
+    | 'stock'
     | 'discount'; // 🔥 agregado para soportar orden por descuento
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
   minDiscount?: number; // 🔥 agregado para la categoría OFERTAS
+  featured?: boolean;
 }
 
 export interface Pagination {

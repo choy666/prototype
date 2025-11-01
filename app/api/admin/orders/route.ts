@@ -12,6 +12,8 @@ const getOrdersSchema = z.object({
   search: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
+  totalMin: z.coerce.number().min(0).optional(),
+  totalMax: z.coerce.number().min(0).optional(),
   sortBy: z.enum(['createdAt', 'total', 'status']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 })
@@ -31,12 +33,14 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search') ?? undefined,
       dateFrom: searchParams.get('dateFrom') ?? undefined,
       dateTo: searchParams.get('dateTo') ?? undefined,
+      totalMin: searchParams.get('totalMin') ? parseFloat(searchParams.get('totalMin')!) : undefined,
+      totalMax: searchParams.get('totalMax') ? parseFloat(searchParams.get('totalMax')!) : undefined,
       sortBy: searchParams.get('sortBy') ?? 'createdAt',
       sortOrder: searchParams.get('sortOrder') ?? 'desc',
     }
 
     const validatedParams = getOrdersSchema.parse(params)
-    const { page, limit, status, search, dateFrom, dateTo, sortBy, sortOrder } = validatedParams
+    const { page, limit, status, search, dateFrom, dateTo, totalMin, totalMax, sortBy, sortOrder } = validatedParams
     const offset = (page - 1) * limit
 
     // Construir condiciones de filtro
@@ -52,6 +56,12 @@ export async function GET(request: NextRequest) {
     }
     if (dateTo) {
       conditions.push(lte(orders.createdAt, new Date(dateTo)))
+    }
+    if (typeof totalMin === 'number') {
+      conditions.push(gte(orders.total, totalMin.toString()))
+    }
+    if (typeof totalMax === 'number') {
+      conditions.push(lte(orders.total, totalMax.toString()))
     }
 
     // Obtener órdenes con información del usuario

@@ -30,12 +30,24 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined
     const sortBy = searchParams.get('sortBy') || 'created_at'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : undefined
+    const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : undefined
+    const minStock = searchParams.get('minStock') ? parseInt(searchParams.get('minStock')!) : undefined
+    const maxStock = searchParams.get('maxStock') ? parseInt(searchParams.get('maxStock')!) : undefined
+    const minDiscount = searchParams.get('minDiscount') ? parseInt(searchParams.get('minDiscount')!) : undefined
+    const featured = searchParams.get('featured') === 'true' ? true : searchParams.get('featured') === 'false' ? false : undefined
 
     const result = await getProducts(page, limit, {
       category,
       search,
-      sortBy: sortBy as 'created_at' | 'name' | 'price' | 'stock',
+      sortBy: sortBy as 'created_at' | 'name' | 'price' | 'stock' | 'discount',
       sortOrder: sortOrder as 'asc' | 'desc',
+      minPrice,
+      maxPrice,
+      minStock,
+      maxStock,
+      minDiscount,
+      featured,
     })
 
     return NextResponse.json(result)

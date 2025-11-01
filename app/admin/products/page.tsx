@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
@@ -10,13 +10,17 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { debounce } from '@/lib/utils'
 import {
   Plus,
   Edit,
   Trash2,
   Search,
   Package,
-  Settings
+  Settings,
+  Filter,
+  X
 } from 'lucide-react'
 
 interface Product {
@@ -44,6 +48,7 @@ interface ApiResponse {
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null)
@@ -51,20 +56,44 @@ export default function AdminProductsPage() {
     isOpen: false,
     productId: null
   })
+  const [filters, setFilters] = useState({
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    minStock: '',
+    maxStock: '',
+    minDiscount: '',
+    featured: '',
+  })
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const { toast } = useToast()
+  const observerRef = useRef<HTMLDivElement>(null)
 
-  const fetchProducts = useCallback(async (searchTerm = '', pageNum = 1) => {
+  const fetchProducts = useCallback(async (searchTerm = '', pageNum = 1, append = false) => {
     try {
-      setLoading(true)
+      if (!append) setLoading(true)
+      else setLoadingMore(true)
       const params = new URLSearchParams({
         page: pageNum.toString(),
         limit: '10',
-        ...(searchTerm && { search: searchTerm })
+        ...(searchTerm && { search: searchTerm }),
+        ...(filters.category && { category: filters.category }),
+        ...(filters.minPrice && { minPrice: filters.minPrice }),
+        ...(filters.maxPrice && { maxPrice: filters.maxPrice }),
+        ...(filters.minStock && { minStock: filters.minStock }),
+        ...(filters.maxStock && { maxStock: filters.maxStock }),
+        ...(filters.minDiscount && { minDiscount: filters.minDiscount }),
+        ...(filters.featured && { featured: filters.featured }),
       })
       const response = await fetch(`/api/admin/products?${params}`)
       if (!response.ok) throw new Error('Failed to fetch products')
       const data: ApiResponse = await response.json()
-      setProducts(data.data)
+      if (append) {
+        setProducts(prev => [...prev, ...data.data])
+      } else {
+        setProducts(data.data)
+      }
       setPagination(data.pagination)
     } catch {
       toast({
@@ -74,12 +103,73 @@ export default function AdminProductsPage() {
       })
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }, [toast])
+  }, [toast, filters])
 
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
+
+  // Debounced search
+  useEffect(() => {
+    const debouncedSearch = debounce(() => {
+      setProducts([])
+      setPage(1)
+      fetchProducts(search, 1)
+    }, 300)
+    debouncedSearch()
+    return () => {
+      // Cleanup
+    }
+  }, [search, filters, fetchProducts])
+
+  // Infinite scroll
+  useEffect(() => {
+    if (!observerRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && pagination && page < pagination.totalPages) {
+          setPage(prev => prev + 1)
+          fetchProducts(search, page + 1, true)
+        }
+      },
+      { threshold: 1.0 }
+    )
+
+    observer.observe(observerRef.current)
+    return () => observer.disconnect()
+  }, [loading, loadingMore, pagination, page, search, fetchProducts])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelectedIndex(prev => Math.min(prev + 1, products.length - 1))
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelectedIndex(prev => Math.max(prev - 1, -1))
+          break
+        case 'Enter':
+          if (selectedIndex >= 0 && products[selectedIndex]) {
+            window.location.href = `/admin/products/${products[selectedIndex].id}/edit`
+          }
+          break
+        case 'Escape':
+          setSelectedIndex(-1)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedIndex, products])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,25 +235,132 @@ export default function AdminProductsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Buscar Productos</CardTitle>
+          <CardTitle>Buscar y Filtrar Productos</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Buscar por nombre..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full"
-              />
+          <form onSubmit={handleSearch} className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Buscar por nombre..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="w-full sm:w-auto min-h-[44px]"
+              >
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
+                <Search className="mr-2 h-4 w-4" />
+                Buscar
+              </Button>
             </div>
-            <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
-              <Search className="mr-2 h-4 w-4" />
-              Buscar
-            </Button>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 border rounded-lg bg-muted/50">
+                <div>
+                  <label className="text-sm font-medium">Categoría</label>
+                  <Select value={filters.category} onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      {/* Add categories here */}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Precio Mín</label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={filters.minPrice}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Precio Máx</label>
+                  <Input
+                    type="number"
+                    placeholder="1000"
+                    value={filters.maxPrice}
+                    onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Stock Mín</label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={filters.minStock}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minStock: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Stock Máx</label>
+                  <Input
+                    type="number"
+                    placeholder="100"
+                    value={filters.maxStock}
+                    onChange={(e) => setFilters(prev => ({ ...prev, maxStock: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Descuento Mín (%)</label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={filters.minDiscount}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minDiscount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Destacado</label>
+                  <Select value={filters.featured} onValueChange={(value) => setFilters(prev => ({ ...prev, featured: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="true">Sí</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setFilters({
+                      category: '',
+                      minPrice: '',
+                      maxPrice: '',
+                      minStock: '',
+                      maxStock: '',
+                      minDiscount: '',
+                      featured: '',
+                    })}
+                    className="w-full"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Limpiar
+                  </Button>
+                </div>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
+
+
 
       <Card>
         <CardHeader>
