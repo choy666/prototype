@@ -9,20 +9,20 @@
 
 ### 🔥 **ALTA PRIORIDAD**
 
-#### 1. Gestión de Usuarios
+####  Gestión de Usuarios
 - [x] Crear página `/admin/users/page.tsx`
 - [x] Implementar API endpoints en `/api/admin/users/`
 - [x] Agregar funcionalidad de búsqueda y filtrado
 - [x] Implementar edición de roles de usuario
 - [x] Agregar confirmaciones para cambios de rol
 
-#### 2. Cálculo Real de Ingresos en Dashboard
+####  Cálculo Real de Ingresos en Dashboard
 - [x] Modificar `getStats()` en `app/admin/page.tsx`
 - [x] Implementar consulta SQL para sumar `total` de pedidos pagados
 - [x] Agregar filtros por período (último mes)
 - [x] Mostrar tendencias reales en lugar de datos mock
 
-#### 3. Sistema de Reportes
+####  Sistema de Reportes
 - [x] Crear página `/admin/reports/page.tsx`
 - [x] Implementar reportes de ventas por período
 - [x] Agregar gráficos de productos más vendidos
@@ -31,36 +31,21 @@
 
 ### 🟡 **MEDIA PRIORIDAD**
 
-#### 4. Mejoras de UX/UI
+####  Mejoras de UX/UI
 - [x] Agregar paginación infinita en listas largas (implementado en productos)
 - [x] Implementar filtros avanzados en productos y pedidos (implementado en productos)
 - [x] Agregar búsqueda en tiempo real (debounced) (implementado en productos)
 - [x] Mejorar estados de carga con indicadores más específicos (implementado en productos)
 - [x] Agregar atajos de teclado para navegación rápida (implementado en productos)
 
-#### 5. Gestión Avanzada de Productos
+####  Gestión Avanzada de Productos
 - [ ] Implementar variantes de productos (tallas, colores)
 - [ ] Agregar sistema de atributos personalizados
-- [ ] Implementar importación/exportación masiva de productos
-- [ ] Agregar validación de imágenes antes de subida
 - [ ] Implementar drag & drop para reordenar imágenes
-
-#### 6. Sistema de Notificaciones
-- [ ] Agregar notificaciones para stock bajo
-- [ ] Implementar alertas para pedidos nuevos
-- [ ] Crear sistema de notificaciones push (opcional)
-- [ ] Agregar log de actividades administrativas
 
 ### 🟢 **BAJA PRIORIDAD**
 
-#### 7. Optimizaciones de Rendimiento
-- [ ] Implementar caché para consultas frecuentes
-- [ ] Agregar lazy loading para imágenes de productos
-- [ ] Optimizar consultas de base de datos con índices
-- [ ] Implementar virtualización para listas muy largas
-
-#### 8. Funcionalidades Adicionales
-- [ ] Sistema de cupones/descuentos
+####  Funcionalidades Adicionales
 - [ ] Gestión de métodos de envío
 - [ ] Integración con sistemas de envío (tracking automático)
 - [ ] Sistema de reseñas de productos

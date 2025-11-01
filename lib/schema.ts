@@ -207,3 +207,38 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type StockLog = typeof stockLogs.$inferSelect;
 export type NewStockLog = typeof stockLogs.$inferInsert;
+
+// ======================
+// Atributos de productos (tallas, colores, etc.)
+// ======================
+export const productAttributes = pgTable("product_attributes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // ej: "Talla", "Color", "Material"
+  values: jsonb("values").notNull(), // array de valores posibles ["S", "M", "L"] o ["Rojo", "Azul"]
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ======================
+// Variantes de productos
+// ======================
+export const productVariants = pgTable("product_variants", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  sku: text("sku"), // código único de variante
+  attributes: jsonb("attributes").notNull(), // ej: { "Talla": "M", "Color": "Rojo" }
+  price: decimal("price", { precision: 10, scale: 2 }), // precio específico de variante, opcional
+  stock: integer("stock").default(0).notNull(),
+  image: text("image"), // imagen específica de variante
+  isActive: boolean("is_active").default(true).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ======================
+// Tipos TypeScript para atributos y variantes
+// ======================
+export type ProductAttribute = typeof productAttributes.$inferSelect;
+export type NewProductAttribute = typeof productAttributes.$inferInsert;
+export type ProductVariant = typeof productVariants.$inferSelect;
+export type NewProductVariant = typeof productVariants.$inferInsert;
