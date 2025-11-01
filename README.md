@@ -265,3 +265,4 @@ Contraseña: TemH1Q4tCP
 Tarjeta: 5031 7557 3453 0604 (11/30, CVV 123)
 Completar el pago y verificar redirección y estado de orden
 
+$ npx drizzle-kit push

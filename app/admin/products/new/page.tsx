@@ -9,6 +9,15 @@ import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 import type { Category } from '@/lib/schema'
+import type { ProductAttribute } from '@/lib/schema'
+
+interface VariantForm {
+  attributes: Record<string, string>
+  stock: number
+  price: string
+  sku: string
+  image: string
+}
 
 interface ProductForm {
   name: string
@@ -20,6 +29,8 @@ interface ProductForm {
   discount: string
   weight: string
   destacado: boolean
+  selectedAttributes: number[]
+  variants: VariantForm[]
 }
 
 export default function NewProductPage() {
@@ -27,6 +38,7 @@ export default function NewProductPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [attributes, setAttributes] = useState<ProductAttribute[]>([])
   const [form, setForm] = useState<ProductForm>({
     name: '',
     description: '',
@@ -36,23 +48,62 @@ export default function NewProductPage() {
     categoryId: '',
     discount: '0',
     weight: '',
-    destacado: false
+    destacado: false,
+    selectedAttributes: [],
+    variants: []
   })
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/admin/categories')
-        if (response.ok) {
-          const data = await response.json()
-          setCategories(data)
+        const [categoriesRes, attributesRes] = await Promise.all([
+          fetch('/api/admin/categories'),
+          fetch('/api/admin/product-attributes')
+        ])
+
+        if (categoriesRes.ok) {
+          const categoriesData = await categoriesRes.json()
+          setCategories(categoriesData)
+        }
+
+        if (attributesRes.ok) {
+          const attributesData = await attributesRes.json()
+          setAttributes(attributesData)
         }
       } catch (error) {
-        console.error('Error fetching categories:', error)
+        console.error('Error fetching data:', error)
       }
     }
-    fetchCategories()
+    fetchData()
   }, [])
+
+  // Generate combinations when selected attributes change
+  useEffect(() => {
+    const generateCombinations = (selectedAttrs: number[]) => {
+      const selectedAttributeObjects = attributes.filter(attr => selectedAttrs.includes(attr.id))
+      if (selectedAttributeObjects.length === 0) return []
+
+      const combinations = selectedAttributeObjects.reduce((acc, attr) => {
+        if (acc.length === 0) {
+          return (attr.values as string[]).map(value => ({ [attr.name]: value }))
+        }
+        return acc.flatMap(comb =>
+          (attr.values as string[]).map(value => ({ ...comb, [attr.name]: value }))
+        )
+      }, [] as Record<string, string>[])
+
+      return combinations.map(attrs => ({
+        attributes: attrs,
+        stock: 0,
+        price: '',
+        sku: '',
+        image: ''
+      }))
+    }
+
+    const combinations = generateCombinations(form.selectedAttributes)
+    setForm(prev => ({ ...prev, variants: combinations }))
+  }, [form.selectedAttributes, attributes])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,6 +135,27 @@ export default function NewProductPage() {
         throw new Error(error.error || 'Failed to create product')
       }
 
+      const product = await response.json()
+
+      // Create variants if any
+      if (form.variants.length > 0) {
+        const variantPromises = form.variants.map(variant =>
+          fetch(`/api/admin/products/${product.id}/variants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              attributes: variant.attributes,
+              stock: variant.stock,
+              price: variant.price || undefined,
+              sku: variant.sku || undefined,
+              image: variant.image || undefined
+            })
+          })
+        )
+
+        await Promise.all(variantPromises)
+      }
+
       toast({
         title: 'Éxito',
         description: 'Producto creado correctamente'
@@ -103,6 +175,24 @@ export default function NewProductPage() {
 
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleAttributeChange = (attributeId: number, checked: boolean) => {
+    setForm(prev => ({
+      ...prev,
+      selectedAttributes: checked
+        ? [...prev.selectedAttributes, attributeId]
+        : prev.selectedAttributes.filter(id => id !== attributeId)
+    }))
+  }
+
+  const handleVariantChange = (index: number, field: keyof VariantForm, value: string | number) => {
+    setForm(prev => ({
+      ...prev,
+      variants: prev.variants.map((variant, i) =>
+        i === index ? { ...variant, [field]: value } : variant
+      )
+    }))
   }
 
   return (
@@ -242,6 +332,83 @@ export default function NewProductPage() {
                 </label>
               </div>
             </div>
+
+            {/* Atributos */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2">Atributos (opcional)</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {attributes.map((attribute) => (
+                  <div key={attribute.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`attr-${attribute.id}`}
+                      checked={form.selectedAttributes.includes(attribute.id)}
+                      onChange={(e) => handleAttributeChange(attribute.id, e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor={`attr-${attribute.id}`} className="ml-2 block text-sm">
+                      {attribute.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Variantes */}
+            {form.variants.length > 0 && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Variantes</label>
+                <div className="space-y-4">
+                  {form.variants.map((variant, index) => (
+                    <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                      <div className="font-medium mb-2">
+                        {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Stock</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={variant.stock}
+                            onChange={(e) => handleVariantChange(index, 'stock', parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Precio (opcional)</label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={variant.price}
+                            onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">SKU (opcional)</label>
+                          <Input
+                            value={variant.sku}
+                            onChange={(e) => handleVariantChange(index, 'sku', e.target.value)}
+                            placeholder="SKU-001"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Imagen (opcional)</label>
+                          <Input
+                            type="url"
+                            value={variant.image}
+                            onChange={(e) => handleVariantChange(index, 'image', e.target.value)}
+                            placeholder="https://ejemplo.com/imagen.jpg"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row justify-end gap-4">
               <Link href="/admin/products">
