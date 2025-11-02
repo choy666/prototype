@@ -101,8 +101,7 @@ export async function createProductVariant(
   data: Omit<NewProductVariant, 'id' | 'created_at' | 'updated_at'>
 ): Promise<ProductVariant> {
   try {
-    // Remover sku si existe en los datos (para compatibilidad)
-    const { sku, ...variantData } = data as Record<string, unknown>;
+    const {...variantData } = data as Record<string, unknown>;
 
     const [newVariant] = await db
       .insert(productVariants)

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
+import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
 import type { ProductAttribute } from '@/lib/schema'
 
@@ -16,6 +17,11 @@ interface VariantForm {
   stock: number
   price: string
   image: string
+}
+
+interface DynamicAttribute {
+  name: string
+  values: string[]
 }
 
 interface ProductForm {
@@ -30,6 +36,7 @@ interface ProductForm {
   stock: string
   destacado: boolean
   selectedAttributes: number[]
+  dynamicAttributes: DynamicAttribute[]
   variants: VariantForm[]
 }
 
@@ -51,6 +58,7 @@ export default function NewProductPage() {
     stock: '0',
     destacado: false,
     selectedAttributes: [],
+    dynamicAttributes: [],
     variants: []
   })
 
@@ -78,18 +86,23 @@ export default function NewProductPage() {
     fetchData()
   }, [])
 
-  // Generate combinations when selected attributes change
+  // Generate combinations when selected attributes or dynamic attributes change
   useEffect(() => {
-    const generateCombinations = (selectedAttrs: number[]) => {
+    const generateCombinations = (selectedAttrs: number[], dynamicAttrs: DynamicAttribute[]) => {
       const selectedAttributeObjects = attributes.filter(attr => selectedAttrs.includes(attr.id))
-      if (selectedAttributeObjects.length === 0) return []
+      const allAttributes = [
+        ...selectedAttributeObjects.map(attr => ({ name: attr.name, values: attr.values as string[] })),
+        ...dynamicAttrs.map(attr => ({ name: attr.name, values: attr.values }))
+      ]
 
-      const combinations = selectedAttributeObjects.reduce((acc, attr) => {
+      if (allAttributes.length === 0) return []
+
+      const combinations = allAttributes.reduce((acc, attr) => {
         if (acc.length === 0) {
-          return (attr.values as string[]).map(value => ({ [attr.name]: value }))
+          return attr.values.map((value: string) => ({ [attr.name]: value }))
         }
         return acc.flatMap(comb =>
-          (attr.values as string[]).map(value => ({ ...comb, [attr.name]: value }))
+          attr.values.map((value: string) => ({ ...comb, [attr.name]: value }))
         )
       }, [] as Record<string, string>[])
 
@@ -101,9 +114,9 @@ export default function NewProductPage() {
       }))
     }
 
-    const combinations = generateCombinations(form.selectedAttributes)
+    const combinations = generateCombinations(form.selectedAttributes, form.dynamicAttributes)
     setForm(prev => ({ ...prev, variants: combinations }))
-  }, [form.selectedAttributes, attributes])
+  }, [form.selectedAttributes, form.dynamicAttributes, attributes])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -174,7 +187,12 @@ export default function NewProductPage() {
   }
 
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
-    setForm(prev => ({ ...prev, [field]: value }))
+    if (field === 'images' && typeof value === 'string') {
+      const imagesArray = value.split(',').map(img => img.trim()).filter(img => img.length > 0)
+      setForm(prev => ({ ...prev, [field]: imagesArray }))
+    } else {
+      setForm(prev => ({ ...prev, [field]: value }))
+    }
   }
 
   const handleAttributeChange = (attributeId: number, checked: boolean) => {
@@ -345,10 +363,18 @@ export default function NewProductPage() {
               </div>
             </div>
 
-            {/* Atributos */}
+            {/* Atributos Dinámicos */}
+            <div className="md:col-span-2">
+              <AttributeBuilder
+                attributes={form.dynamicAttributes}
+                onChange={(dynamicAttributes) => setForm(prev => ({ ...prev, dynamicAttributes }))}
+              />
+            </div>
+
+            {/* Atributos Predefinidos */}
             {attributes.length > 0 && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Atributos (opcional)</label>
+                <label className="block text-sm font-medium mb-2">Atributos Predefinidos (opcional)</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {attributes.map((attribute) => (
                     <div key={attribute.id} className="flex items-center">

@@ -16,17 +16,17 @@
 ## Pasos de Implementación
 
 ### 1. Eliminar SKU del Sistema
-- [ ] Remover campo `sku` de tabla `productVariants` en `lib/schema.ts`
-- [ ] Actualizar tipos TypeScript `ProductVariant` y `NewProductVariant`
-- [ ] Remover SKU de `lib/actions/productVariants.ts`
-- [ ] Actualizar formularios: `app/admin/products/new/page.tsx` y `components/admin/ProductVariants.tsx`
-- [ ] Verificar y actualizar APIs relacionadas
+- [x] Remover campo `sku` de tabla `productVariants` en `lib/schema.ts`
+- [x] Actualizar tipos TypeScript `ProductVariant` y `NewProductVariant`
+- [x] Remover SKU de `lib/actions/productVariants.ts`
+- [x] Actualizar formularios: `app/admin/products/new/page.tsx` y `components/admin/ProductVariants.tsx`
+- [x] Verificar y actualizar APIs relacionadas
 
 ### 2. Hacer Atributos Dinámicos
-- [ ] Modificar `app/admin/products/new/page.tsx` para permitir agregar atributos inline
-- [ ] Crear componente `AttributeBuilder` para gestión dinámica de atributos
-- [ ] Actualizar lógica de generación de variantes para trabajar con atributos dinámicos
-- [ ] Mantener compatibilidad con atributos predefinidos existentes
+- [x] Modificar `app/admin/products/new/page.tsx` para permitir agregar atributos inline
+- [x] Crear componente `AttributeBuilder` para gestión dinámica de atributos
+- [x] Actualizar lógica de generación de variantes para trabajar con atributos dinámicos
+- [x] Mantener compatibilidad con atributos predefinidos existentes
 
 ### 3. Mejorar UI de Gestión de Variantes
 - [ ] Rediseñar componente `ProductVariants.tsx` con mejor UX
