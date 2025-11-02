@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createAttributeSchema.parse(body)
 
+    // Verificar unicidad del nombre
+    const existingAttributes = await getProductAttributes()
+    const nameExists = existingAttributes.some(attr =>
+      attr.name.toLowerCase() === validatedData.name.toLowerCase()
+    )
+
+    if (nameExists) {
+      return NextResponse.json({
+        error: 'Ya existe un atributo con este nombre'
+      }, { status: 400 })
+    }
+
     const attribute = await createProductAttribute(validatedData)
     return NextResponse.json(attribute, { status: 201 })
   } catch (error) {

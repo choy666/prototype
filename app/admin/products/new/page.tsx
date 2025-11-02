@@ -28,6 +28,7 @@ interface ProductForm {
   categoryId: string
   discount: string
   weight: string
+  stock: string
   destacado: boolean
   selectedAttributes: number[]
   variants: VariantForm[]
@@ -48,6 +49,7 @@ export default function NewProductPage() {
     categoryId: '',
     discount: '0',
     weight: '',
+    stock: '0',
     destacado: false,
     selectedAttributes: [],
     variants: []
@@ -119,6 +121,7 @@ export default function NewProductPage() {
         categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
+        stock: parseInt(form.stock) || 0,
         destacado: form.destacado
       }
 
@@ -269,6 +272,18 @@ export default function NewProductPage() {
                   max="100"
                   value={form.discount}
                   onChange={(e) => handleChange('discount', e.target.value)}
+                  placeholder="0"
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Stock</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={form.stock}
+                  onChange={(e) => handleChange('stock', e.target.value)}
                   placeholder="0"
                   className="w-full"
                 />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -37,6 +37,31 @@ export default function ProductClient({ product }: { product: Product }) {
       Object.entries(attrs).map(([key, values]) => [key, Array.from(values)])
     );
   }, [product.variants]);
+
+  // Opciones disponibles para cada atributo basándose en selecciones previas
+  const getAvailableOptions = useCallback((attrKey: string) => {
+    if (!product.variants?.length) return availableAttributes[attrKey] || [];
+
+    const selectedKeys = Object.keys(selectedAttributes);
+    if (selectedKeys.length === 0) return availableAttributes[attrKey] || [];
+
+    // Encontrar variantes que coincidan con las selecciones actuales
+    const matchingVariants = product.variants.filter(variant => {
+      return selectedKeys.every(selectedKey => {
+        if (selectedKey === attrKey) return true; // No filtrar por el atributo actual
+        return variant.attributes[selectedKey] === selectedAttributes[selectedKey];
+      });
+    });
+
+    // Extraer valores únicos del atributo objetivo de las variantes coincidentes
+    const options = new Set<string>();
+    matchingVariants.forEach(variant => {
+      const value = variant.attributes[attrKey];
+      if (value) options.add(value);
+    });
+
+    return Array.from(options);
+  }, [product.variants, selectedAttributes, availableAttributes]);
 
   // Variante seleccionada
   const selectedVariant = useMemo(() => {
@@ -192,7 +217,7 @@ export default function ProductClient({ product }: { product: Product }) {
             <div className="space-y-4">
               <h3 className="font-semibold text-white">Opciones disponibles</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {Object.entries(availableAttributes).map(([attrKey, values]) => (
+                {Object.entries(availableAttributes).map(([attrKey]) => (
                   <div key={attrKey} className="space-y-2">
                     <label className="text-sm font-medium text-white capitalize">
                       {attrKey}
@@ -210,7 +235,7 @@ export default function ProductClient({ product }: { product: Product }) {
                         <SelectValue placeholder={`Seleccionar ${attrKey}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {values.map((value) => (
+                        {getAvailableOptions(attrKey).map((value) => (
                           <SelectItem key={value} value={value}>
                             {value}
                           </SelectItem>

@@ -9,6 +9,8 @@ import {
   varchar,
   jsonb,
   pgEnum,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ======================
@@ -217,7 +219,10 @@ export const productAttributes = pgTable("product_attributes", {
   values: jsonb("values").notNull(), // array de valores posibles ["S", "M", "L"] o ["Rojo", "Azul"]
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("product_attributes_name_unique").on(table.name),
+  index("product_attributes_name_idx").on(table.name),
+]);
 
 // ======================
 // Variantes de productos
@@ -233,7 +238,11 @@ export const productVariants = pgTable("product_variants", {
   isActive: boolean("is_active").default(true).notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("product_variants_product_id_idx").on(table.productId),
+  index("product_variants_is_active_idx").on(table.isActive),
+  index("product_variants_product_active_idx").on(table.productId, table.isActive),
+]);
 
 // ======================
 // Tipos TypeScript para atributos y variantes

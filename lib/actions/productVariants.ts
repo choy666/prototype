@@ -2,7 +2,7 @@
 
 import { db } from '../db';
 import { productAttributes, productVariants, products } from '../schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { NewProductAttribute, ProductAttribute, NewProductVariant, ProductVariant } from '../schema';
 
 // ======================
@@ -62,9 +62,24 @@ export async function updateProductAttribute(
   }
 }
 
-// ✅ Eliminar un atributo
+// ✅ Eliminar un atributo (con validación de uso)
 export async function deleteProductAttribute(id: number): Promise<boolean> {
   try {
+    // Verificar si el atributo está siendo usado en variantes activas
+    const [attributeUsage] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(productVariants)
+      .where(
+        and(
+          eq(productVariants.isActive, true),
+          sql`attributes ? ${id.toString()}`
+        )
+      );
+
+    if (attributeUsage.count > 0) {
+      throw new Error('No se puede eliminar el atributo porque está siendo usado en variantes activas');
+    }
+
     const [deletedAttribute] = await db
       .delete(productAttributes)
       .where(eq(productAttributes.id, id))
@@ -73,7 +88,7 @@ export async function deleteProductAttribute(id: number): Promise<boolean> {
     return !!deletedAttribute;
   } catch (error) {
     console.error('Error deleting product attribute:', error);
-    throw new Error('No se pudo eliminar el atributo del producto');
+    throw new Error(error instanceof Error ? error.message : 'No se pudo eliminar el atributo del producto');
   }
 }
 
