@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X, ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 
 interface ProductVariant {
@@ -37,16 +37,26 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     stock: 0,
     image: ''
   })
+  const [availableImages, setAvailableImages] = useState<string[]>([])
+  const [showImageSuggestions, setShowImageSuggestions] = useState(false)
   const { toast } = useToast()
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const variantsRes = await fetch(`/api/admin/products/${productId}/variants`)
+      const [variantsRes, imagesRes] = await Promise.all([
+        fetch(`/api/admin/products/${productId}/variants`),
+        fetch(`/api/admin/products/${productId}/variants?suggestions=true`)
+      ])
 
       if (variantsRes.ok) {
         const variantsData = await variantsRes.json()
         setVariants(variantsData)
+      }
+
+      if (imagesRes.ok) {
+        const imagesData = await imagesRes.json()
+        setAvailableImages(imagesData.images || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -222,6 +232,40 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                   onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
                   placeholder="https://ejemplo.com/imagen.jpg"
                 />
+                {availableImages.length > 0 && (
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowImageSuggestions(!showImageSuggestions)}
+                      className="mb-2"
+                    >
+                      <ImageIcon className="h-4 w-4 mr-2" />
+                      {showImageSuggestions ? 'Ocultar' : 'Mostrar'} Imágenes Disponibles
+                    </Button>
+                    {showImageSuggestions && (
+                      <div className="grid grid-cols-4 gap-2 p-2 border rounded">
+                        {availableImages.map((imageUrl, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, image: imageUrl }))}
+                            className="relative group"
+                          >
+                            <Image
+                              src={imageUrl}
+                              alt={`Imagen ${index + 1}`}
+                              width={60}
+                              height={60}
+                              className="w-15 h-15 object-cover rounded border-2 border-transparent group-hover:border-blue-500"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

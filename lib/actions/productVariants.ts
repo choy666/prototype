@@ -92,6 +92,43 @@ export async function deleteProductVariant(id: number): Promise<boolean> {
   }
 }
 
+// ✅ Función helper para normalizar imágenes
+function normalizeImages(images: unknown): string[] {
+  if (typeof images === 'string') {
+    return images.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  }
+  if (Array.isArray(images)) {
+    return images as string[];
+  }
+  return [];
+}
+
+// ✅ Obtener imágenes disponibles del producto para sugerencias de variantes
+export async function getProductImagesForVariant(productId: number): Promise<string[]> {
+  try {
+    const [product] = await db
+      .select({ image: products.image, images: products.images })
+      .from(products)
+      .where(eq(products.id, productId));
+
+    if (!product) return [];
+
+    const additionalImages = normalizeImages(product.images);
+
+    // Combinar imagen principal con imágenes adicionales
+    const allImages: string[] = [];
+    if (product.image) {
+      allImages.push(product.image);
+    }
+    allImages.push(...additionalImages);
+
+    return allImages;
+  } catch (error) {
+    console.error('Error fetching product images for variant:', error);
+    return [];
+  }
+}
+
 // ✅ Obtener stock total de un producto incluyendo variantes
 export async function getTotalProductStock(productId: number): Promise<number> {
   try {
