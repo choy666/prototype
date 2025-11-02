@@ -230,7 +230,6 @@ export const productAttributes = pgTable("product_attributes", {
 export const productVariants = pgTable("product_variants", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-  sku: text("sku"), // código único de variante
   attributes: jsonb("attributes").notNull(), // ej: { "Talla": "M", "Color": "Rojo" }
   price: decimal("price", { precision: 10, scale: 2 }), // precio específico de variante, opcional
   stock: integer("stock").default(0).notNull(),
@@ -251,3 +250,7 @@ export type ProductAttribute = typeof productAttributes.$inferSelect;
 export type NewProductAttribute = typeof productAttributes.$inferInsert;
 export type ProductVariant = typeof productVariants.$inferSelect;
 export type NewProductVariant = typeof productVariants.$inferInsert;
+
+// Tipos sin SKU para compatibilidad
+export type ProductVariantWithoutSKU = Omit<ProductVariant, 'sku'>;
+export type NewProductVariantWithoutSKU = Omit<NewProductVariant, 'sku'>;

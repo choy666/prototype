@@ -1,59 +1,60 @@
-# TODO: Implementación de Atributos y Variantes en Nuevo Producto
+# Mejoras al Sistema de Atributos y Variantes
 
-## Estado Actual
-- ✅ Tablas `product_attributes` y `product_variants` definidas en `lib/schema.ts`
-- ✅ API para atributos en `app/api/admin/product-attributes/route.ts` (GET, POST, PUT, DELETE)
-- ✅ UI en `app/admin/products/new/page.tsx` para seleccionar atributos y generar variantes
-- ❌ Falta API para crear variantes: `/api/admin/products/[id]/variants`
-- ❌ Posiblemente faltan atributos por defecto (Talla, Color)
+## Información Recopilada
+- Sistema actual: Atributos predefinidos (Talla, Color, etc.) con valores fijos, variantes generadas automáticamente con todas las combinaciones posibles
+- SKU presente en esquemas, formularios y componentes
+- UI básica para gestión de atributos y variantes
+- Variantes creadas con selección manual de atributos existentes
+
+## Plan de Mejoras
+1. **Eliminar SKU completamente**: Remover de esquemas, tipos, formularios y componentes
+2. **Hacer atributos dinámicos**: Permitir crear atributos inline en el formulario de producto sin necesidad de predefinirlos
+3. **Mejorar UI de variantes**: Interfaz más intuitiva para agregar/editar variantes con builder visual
+4. **Optimizar flujo de creación**: Simplificar proceso de agregar atributos y variantes
+5. **Generación inteligente de variantes**: Permitir variantes personalizadas sin forzar todas las combinaciones
 
 ## Pasos de Implementación
 
-### 1. Crear API para Variantes
-- [ ] Crear archivo `app/api/admin/products/[id]/variants/route.ts`
-- [ ] Implementar endpoint POST para crear variantes de un producto
-- [ ] Validar datos con Zod
-- [ ] Usar `createProductVariant` de `lib/actions/productVariants.ts`
+### 1. Eliminar SKU del Sistema
+- [ ] Remover campo `sku` de tabla `productVariants` en `lib/schema.ts`
+- [ ] Actualizar tipos TypeScript `ProductVariant` y `NewProductVariant`
+- [ ] Remover SKU de `lib/actions/productVariants.ts`
+- [ ] Actualizar formularios: `app/admin/products/new/page.tsx` y `components/admin/ProductVariants.tsx`
+- [ ] Verificar y actualizar APIs relacionadas
 
-### 2. Verificar Atributos por Defecto
-- [ ] Revisar si existen atributos "Talla" y "Color" en la base de datos
-- [ ] Si no existen, crearlos con valores comunes:
-  - Talla: ["XS", "S", "M", "L", "XL", "XXL"]
-  - Color: ["Rojo", "Azul", "Verde", "Negro", "Blanco", "Gris"]
+### 2. Hacer Atributos Dinámicos
+- [ ] Modificar `app/admin/products/new/page.tsx` para permitir agregar atributos inline
+- [ ] Crear componente `AttributeBuilder` para gestión dinámica de atributos
+- [ ] Actualizar lógica de generación de variantes para trabajar con atributos dinámicos
+- [ ] Mantener compatibilidad con atributos predefinidos existentes
 
-### 3. Probar Funcionalidad
-- [ ] Crear un producto con atributos seleccionados
-- [ ] Verificar que se generen las variantes correctamente
-- [ ] Comprobar que las variantes se guarden en la base de datos
-- [ ] Probar en el frontend que aparezcan las opciones de variantes
+### 3. Mejorar UI de Gestión de Variantes
+- [ ] Rediseñar componente `ProductVariants.tsx` con mejor UX
+- [ ] Agregar vista de tabla/grid para variantes
+- [ ] Implementar drag & drop para reordenar variantes
+- [ ] Agregar validaciones visuales y feedback
 
-### 4. Mejoras Opcionales
-- [ ] Agregar validación para evitar atributos duplicados en variantes
-- [ ] Implementar edición de variantes después de crear el producto
-- [ ] Agregar imágenes específicas para cada variante
-- [ ] Mostrar preview de combinaciones de atributos
+### 4. Optimizar APIs y Acciones
+- [ ] Actualizar `lib/actions/productVariants.ts` para nuevos flujos
+- [ ] Modificar APIs en `app/api/admin/products/[id]/variants/route.ts`
+- [ ] Asegurar compatibilidad con datos existentes
 
-## Corroboración de Tablas de Base de Datos
+### 5. Testing y Validación
+- [ ] Probar creación de productos con atributos dinámicos
+- [ ] Verificar eliminación de SKU no rompe funcionalidad
+- [ ] Testear UI mejorada en diferentes escenarios
+- [ ] Validar migración de datos existentes
 
-### product_attributes
-- id: serial primary key
-- name: text (ej: "Talla", "Color")
-- values: jsonb (array de strings, ej: ["S", "M", "L"])
-- created_at, updated_at: timestamps
+## Archivos a Modificar
+- `lib/schema.ts` - Eliminar SKU, actualizar tipos
+- `lib/actions/productVariants.ts` - Remover SKU, actualizar lógica
+- `app/admin/products/new/page.tsx` - Atributos dinámicos, quitar SKU
+- `components/admin/ProductVariants.tsx` - Mejorar UI, quitar SKU
+- `app/api/admin/products/[id]/variants/route.ts` - Actualizar API
+- `components/admin/ProductAttributes.tsx` - Posible simplificación
 
-### product_variants
-- id: serial primary key
-- productId: integer references products.id
-- sku: text (opcional)
-- attributes: jsonb (objeto, ej: {"Talla": "M", "Color": "Rojo"})
-- price: decimal (opcional, precio específico de variante)
-- stock: integer default 0
-- image: text (opcional, imagen específica)
-- isActive: boolean default true
-- created_at, updated_at: timestamps
-
-## Notas Técnicas
-- Las variantes se generan automáticamente como combinaciones cartesianas de los atributos seleccionados
-- El stock base del producto se mantiene, pero las variantes tienen stock individual
-- Las variantes pueden tener precio específico o heredar del producto
-- Usar `isActive` para "eliminar" variantes sin borrar datos
+## Seguimiento de Progreso
+- [x] Análisis del sistema actual completado
+- [x] Plan de mejoras aprobado
+- [ ] TODO.md creado
+- [ ] Implementación iniciada

@@ -15,7 +15,6 @@ interface VariantForm {
   attributes: Record<string, string>
   stock: number
   price: string
-  sku: string
   image: string
 }
 
@@ -98,7 +97,6 @@ export default function NewProductPage() {
         attributes: attrs,
         stock: 0,
         price: '',
-        sku: '',
         image: ''
       }))
     }
@@ -150,7 +148,6 @@ export default function NewProductPage() {
               attributes: variant.attributes,
               stock: variant.stock,
               price: variant.price || undefined,
-              sku: variant.sku || undefined,
               image: variant.image || undefined
             })
           })
@@ -403,14 +400,7 @@ export default function NewProductPage() {
                             placeholder="0.00"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">SKU (opcional)</label>
-                          <Input
-                            value={variant.sku}
-                            onChange={(e) => handleVariantChange(index, 'sku', e.target.value)}
-                            placeholder="SKU-001"
-                          />
-                        </div>
+
                         <div>
                           <label className="block text-sm font-medium mb-1">Imagen (opcional)</label>
                           <Input

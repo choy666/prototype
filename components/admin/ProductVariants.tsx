@@ -11,7 +11,6 @@ import Image from 'next/image'
 
 interface ProductVariant {
   id: number
-  sku?: string
   attributes: Record<string, string>
   price?: string
   stock: number
@@ -40,7 +39,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     variantId: null
   })
   const [formData, setFormData] = useState({
-    sku: '',
     attributes: {} as Record<string, string>,
     price: '',
     stock: 0,
@@ -152,7 +150,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
 
   const resetForm = () => {
     setFormData({
-      sku: '',
       attributes: {},
       price: '',
       stock: 0,
@@ -164,7 +161,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
 
   const startEdit = (variant: ProductVariant) => {
     setFormData({
-      sku: variant.sku || '',
       attributes: variant.attributes,
       price: variant.price || '',
       stock: variant.stock,
@@ -211,15 +207,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">SKU (opcional)</label>
-                <Input
-                  value={formData.sku}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-                  placeholder="SKU-001"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium mb-2">Precio (opcional)</label>
                 <Input
                   type="number"
@@ -242,7 +229,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2">Imagen (opcional)</label>
                 <Input
                   type="url"
@@ -317,7 +304,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                       <p className="font-medium">
                         {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
                       </p>
-                      {variant.sku && <p className="text-sm text-gray-600">SKU: {variant.sku}</p>}
                       <p className="text-sm text-gray-600">
                         Stock: {variant.stock}
                         {variant.price && ` | Precio: $${parseFloat(variant.price).toFixed(2)}`}
