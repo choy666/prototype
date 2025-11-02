@@ -349,25 +349,27 @@ export default function NewProductPage() {
             </div>
 
             {/* Atributos */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2">Atributos (opcional)</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {attributes.map((attribute) => (
-                  <div key={attribute.id} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`attr-${attribute.id}`}
-                      checked={form.selectedAttributes.includes(attribute.id)}
-                      onChange={(e) => handleAttributeChange(attribute.id, e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <label htmlFor={`attr-${attribute.id}`} className="ml-2 block text-sm">
-                      {attribute.name}
-                    </label>
-                  </div>
-                ))}
+            {attributes.length > 0 && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Atributos (opcional)</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {attributes.map((attribute) => (
+                    <div key={attribute.id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`attr-${attribute.id}`}
+                        checked={form.selectedAttributes.includes(attribute.id)}
+                        onChange={(e) => handleAttributeChange(attribute.id, e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor={`attr-${attribute.id}`} className="ml-2 block text-sm">
+                        {attribute.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Variantes */}
             {form.variants.length > 0 && (
