@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X } from 'lucide-react'
 import Image from 'next/image'
 
 interface ProductVariant {
@@ -18,19 +18,12 @@ interface ProductVariant {
   isActive: boolean
 }
 
-interface ProductAttribute {
-  id: number
-  name: string
-  values: string[]
-}
-
 interface ProductVariantsProps {
   productId: number
 }
 
 export function ProductVariants({ productId }: ProductVariantsProps) {
   const [variants, setVariants] = useState<ProductVariant[]>([])
-  const [attributes, setAttributes] = useState<ProductAttribute[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
@@ -49,25 +42,17 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [variantsRes, attributesRes] = await Promise.all([
-        fetch(`/api/admin/products/${productId}/variants`),
-        fetch('/api/admin/product-attributes')
-      ])
+      const variantsRes = await fetch(`/api/admin/products/${productId}/variants`)
 
       if (variantsRes.ok) {
         const variantsData = await variantsRes.json()
         setVariants(variantsData)
       }
-
-      if (attributesRes.ok) {
-        const attributesData = await attributesRes.json()
-        setAttributes(attributesData)
-      }
     } catch (error) {
       console.error('Error fetching data:', error)
       toast({
         title: 'Error',
-        description: 'No se pudieron cargar las variantes y atributos',
+        description: 'No se pudieron cargar las variantes',
         variant: 'destructive'
       })
     } finally {
@@ -240,31 +225,60 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
               </div>
             </div>
 
-            {/* Atributos */}
+            {/* Atributos Dinámicos */}
             <div>
               <label className="block text-sm font-medium mb-2">Atributos</label>
               <div className="space-y-2">
-                {attributes.map((attribute) => (
-                  <div key={attribute.id} className="flex items-center gap-2">
-                    <span className="text-sm font-medium min-w-[100px]">{attribute.name}:</span>
-                    <select
-                      value={formData.attributes[attribute.name] || ''}
+                {Object.keys(formData.attributes).map((attrName) => (
+                  <div key={attrName} className="flex items-center gap-2">
+                    <span className="text-sm font-medium min-w-[100px]">{attrName}:</span>
+                    <Input
+                      value={formData.attributes[attrName] || ''}
                       onChange={(e) => setFormData(prev => ({
                         ...prev,
                         attributes: {
                           ...prev.attributes,
-                          [attribute.name]: e.target.value
+                          [attrName]: e.target.value
                         }
                       }))}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-h-[44px]"
+                      placeholder={`Valor para ${attrName}`}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData(prev => {
+                        const newAttributes = { ...prev.attributes }
+                        delete newAttributes[attrName]
+                        return { ...prev, attributes: newAttributes }
+                      })}
+                      className="min-h-[36px]"
                     >
-                      <option value="">Seleccionar {attribute.name.toLowerCase()}</option>
-                      {attribute.values.map((value) => (
-                        <option key={value} value={value}>{value}</option>
-                      ))}
-                    </select>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const attrName = prompt('Nombre del atributo:')
+                    if (attrName && !formData.attributes[attrName]) {
+                      setFormData(prev => ({
+                        ...prev,
+                        attributes: {
+                          ...prev.attributes,
+                          [attrName]: ''
+                        }
+                      }))
+                    }
+                  }}
+                  className="w-full min-h-[44px]"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Atributo
+                </Button>
               </div>
             </div>
 

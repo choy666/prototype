@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
-import type { ProductAttribute } from '@/lib/schema'
+
 
 interface VariantForm {
   attributes: Record<string, string>
@@ -35,7 +35,6 @@ interface ProductForm {
   weight: string
   stock: string
   destacado: boolean
-  selectedAttributes: number[]
   dynamicAttributes: DynamicAttribute[]
   variants: VariantForm[]
 }
@@ -45,7 +44,7 @@ export default function NewProductPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
-  const [attributes, setAttributes] = useState<ProductAttribute[]>([])
+
   const [form, setForm] = useState<ProductForm>({
     name: '',
     description: '',
@@ -57,7 +56,6 @@ export default function NewProductPage() {
     weight: '',
     stock: '0',
     destacado: false,
-    selectedAttributes: [],
     dynamicAttributes: [],
     variants: []
   })
@@ -65,19 +63,11 @@ export default function NewProductPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [categoriesRes, attributesRes] = await Promise.all([
-          fetch('/api/admin/categories'),
-          fetch('/api/admin/product-attributes')
-        ])
+        const categoriesRes = await fetch('/api/admin/categories')
 
         if (categoriesRes.ok) {
           const categoriesData = await categoriesRes.json()
           setCategories(categoriesData)
-        }
-
-        if (attributesRes.ok) {
-          const attributesData = await attributesRes.json()
-          setAttributes(attributesData)
         }
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -86,18 +76,12 @@ export default function NewProductPage() {
     fetchData()
   }, [])
 
-  // Generate combinations when selected attributes or dynamic attributes change
+  // Generate combinations when dynamic attributes change
   useEffect(() => {
-    const generateCombinations = (selectedAttrs: number[], dynamicAttrs: DynamicAttribute[]) => {
-      const selectedAttributeObjects = attributes.filter(attr => selectedAttrs.includes(attr.id))
-      const allAttributes = [
-        ...selectedAttributeObjects.map(attr => ({ name: attr.name, values: attr.values as string[] })),
-        ...dynamicAttrs.map(attr => ({ name: attr.name, values: attr.values }))
-      ]
+    const generateCombinations = (dynamicAttrs: DynamicAttribute[]) => {
+      if (dynamicAttrs.length === 0) return []
 
-      if (allAttributes.length === 0) return []
-
-      const combinations = allAttributes.reduce((acc, attr) => {
+      const combinations = dynamicAttrs.reduce((acc, attr) => {
         if (acc.length === 0) {
           return attr.values.map((value: string) => ({ [attr.name]: value }))
         }
@@ -114,9 +98,9 @@ export default function NewProductPage() {
       }))
     }
 
-    const combinations = generateCombinations(form.selectedAttributes, form.dynamicAttributes)
+    const combinations = generateCombinations(form.dynamicAttributes)
     setForm(prev => ({ ...prev, variants: combinations }))
-  }, [form.selectedAttributes, form.dynamicAttributes, attributes])
+  }, [form.dynamicAttributes])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -195,14 +179,7 @@ export default function NewProductPage() {
     }
   }
 
-  const handleAttributeChange = (attributeId: number, checked: boolean) => {
-    setForm(prev => ({
-      ...prev,
-      selectedAttributes: checked
-        ? [...prev.selectedAttributes, attributeId]
-        : prev.selectedAttributes.filter(id => id !== attributeId)
-    }))
-  }
+
 
   const handleVariantChange = (index: number, field: keyof VariantForm, value: string | number) => {
     setForm(prev => ({
@@ -371,28 +348,7 @@ export default function NewProductPage() {
               />
             </div>
 
-            {/* Atributos Predefinidos */}
-            {attributes.length > 0 && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Atributos Predefinidos (opcional)</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {attributes.map((attribute) => (
-                    <div key={attribute.id} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`attr-${attribute.id}`}
-                        checked={form.selectedAttributes.includes(attribute.id)}
-                        onChange={(e) => handleAttributeChange(attribute.id, e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor={`attr-${attribute.id}`} className="ml-2 block text-sm">
-                        {attribute.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* Variantes */}
             {form.variants.length > 0 && (

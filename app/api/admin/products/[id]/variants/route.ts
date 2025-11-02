@@ -7,7 +7,6 @@ const createVariantSchema = z.object({
   attributes: z.record(z.string(), z.string()), // { "Talla": "M", "Color": "Rojo" }
   stock: z.number().min(0).default(0),
   price: z.string().optional(), // precio específico opcional
-  sku: z.string().optional(),
   image: z.string().optional(),
 })
 
@@ -60,7 +59,6 @@ export async function POST(
       attributes: validatedData.attributes,
       stock: validatedData.stock,
       price: validatedData.price,
-      sku: validatedData.sku,
       image: validatedData.image,
     }
 

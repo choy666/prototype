@@ -1,96 +1,11 @@
 'use server';
 
 import { db } from '../db';
-import { productAttributes, productVariants, products } from '../schema';
-import { eq, and, sql } from 'drizzle-orm';
-import type { NewProductAttribute, ProductAttribute, NewProductVariant, ProductVariant } from '../schema';
+import { productVariants, products } from '../schema';
+import { eq, and } from 'drizzle-orm';
+import type { NewProductVariant, ProductVariant } from '../schema';
 
-// ======================
-// Atributos de productos
-// ======================
 
-// ✅ Crear un nuevo atributo
-export async function createProductAttribute(
-  data: Omit<NewProductAttribute, 'id' | 'created_at' | 'updated_at'>
-): Promise<ProductAttribute> {
-  try {
-    const [newAttribute] = await db
-      .insert(productAttributes)
-      .values({
-        ...data,
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-      .returning();
-
-    return newAttribute;
-  } catch (error) {
-    console.error('Error creating product attribute:', error);
-    throw new Error('No se pudo crear el atributo del producto');
-  }
-}
-
-// ✅ Obtener todos los atributos
-export async function getProductAttributes(): Promise<ProductAttribute[]> {
-  try {
-    return await db.select().from(productAttributes).orderBy(productAttributes.name);
-  } catch (error) {
-    console.error('Error fetching product attributes:', error);
-    throw new Error('No se pudieron obtener los atributos de productos');
-  }
-}
-
-// ✅ Actualizar un atributo
-export async function updateProductAttribute(
-  id: number,
-  data: Partial<Omit<NewProductAttribute, 'id' | 'created_at'>>
-): Promise<ProductAttribute | null> {
-  try {
-    const [updatedAttribute] = await db
-      .update(productAttributes)
-      .set({
-        ...data,
-        updated_at: new Date(),
-      })
-      .where(eq(productAttributes.id, id))
-      .returning();
-
-    return updatedAttribute || null;
-  } catch (error) {
-    console.error('Error updating product attribute:', error);
-    throw new Error('No se pudo actualizar el atributo del producto');
-  }
-}
-
-// ✅ Eliminar un atributo (con validación de uso)
-export async function deleteProductAttribute(id: number): Promise<boolean> {
-  try {
-    // Verificar si el atributo está siendo usado en variantes activas
-    const [attributeUsage] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(productVariants)
-      .where(
-        and(
-          eq(productVariants.isActive, true),
-          sql`attributes ? ${id.toString()}`
-        )
-      );
-
-    if (attributeUsage.count > 0) {
-      throw new Error('No se puede eliminar el atributo porque está siendo usado en variantes activas');
-    }
-
-    const [deletedAttribute] = await db
-      .delete(productAttributes)
-      .where(eq(productAttributes.id, id))
-      .returning({ id: productAttributes.id });
-
-    return !!deletedAttribute;
-  } catch (error) {
-    console.error('Error deleting product attribute:', error);
-    throw new Error(error instanceof Error ? error.message : 'No se pudo eliminar el atributo del producto');
-  }
-}
 
 // ======================
 // Variantes de productos

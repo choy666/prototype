@@ -28,18 +28,25 @@
 - [x] Actualizar lógica de generación de variantes para trabajar con atributos dinámicos
 - [x] Mantener compatibilidad con atributos predefinidos existentes
 
-### 3. Mejorar UI de Gestión de Variantes
-- [ ] Rediseñar componente `ProductVariants.tsx` con mejor UX
-- [ ] Agregar vista de tabla/grid para variantes
-- [ ] Implementar drag & drop para reordenar variantes
-- [ ] Agregar validaciones visuales y feedback
+### 3. Eliminar Atributos Predefinidos
+- [x] Remover sección de "Atributos Predefinidos" de `app/admin/products/new/page.tsx`
+- [x] Eliminar estado `selectedAttributes` y lógica relacionada
+- [x] Simplificar lógica de generación de variantes para usar solo `dynamicAttributes`
+- [x] Verificar si `components/admin/ProductAttributes.tsx` y `app/admin/products/attributes/page.tsx` se pueden eliminar
+- [x] Actualizar APIs relacionadas si es necesario
 
-### 4. Optimizar APIs y Acciones
-- [ ] Actualizar `lib/actions/productVariants.ts` para nuevos flujos
-- [ ] Modificar APIs en `app/api/admin/products/[id]/variants/route.ts`
-- [ ] Asegurar compatibilidad con datos existentes
+### 4. Mejorar UI de Gestión de Variantes
+- [x] Rediseñar componente `ProductVariants.tsx` con mejor UX
+- [x] Agregar vista de tabla/grid para variantes
+- [x] Implementar drag & drop para reordenar variantes
+- [x] Agregar validaciones visuales y feedback
 
-### 5. Testing y Validación
+### 5. Optimizar APIs y Acciones
+- [x] Actualizar `lib/actions/productVariants.ts` para nuevos flujos
+- [x] Modificar APIs en `app/api/admin/products/[id]/variants/route.ts`
+- [x] Asegurar compatibilidad con datos existentes
+
+### 6. Testing y Validación
 - [ ] Probar creación de productos con atributos dinámicos
 - [ ] Verificar eliminación de SKU no rompe funcionalidad
 - [ ] Testear UI mejorada en diferentes escenarios
@@ -56,5 +63,5 @@
 ## Seguimiento de Progreso
 - [x] Análisis del sistema actual completado
 - [x] Plan de mejoras aprobado
-- [ ] TODO.md creado
+- [x] TODO.md creado
 - [ ] Implementación iniciada
