@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
+import { ImageReorder } from '@/components/ui/ImageReorder'
 import type { Category } from '@/lib/schema'
 
 
@@ -171,12 +172,25 @@ export default function NewProductPage() {
   }
 
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
-    if (field === 'images' && typeof value === 'string') {
-      const imagesArray = value.split(',').map(img => img.trim()).filter(img => img.length > 0)
-      setForm(prev => ({ ...prev, [field]: imagesArray }))
-    } else {
-      setForm(prev => ({ ...prev, [field]: value }))
-    }
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleImagesReorder = (images: string[]) => {
+    setForm(prev => ({ ...prev, images }))
+  }
+
+  const handleImageRemove = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleImageAdd = (imageUrl: string) => {
+    setForm(prev => ({
+      ...prev,
+      images: [...prev.images, imageUrl]
+    }))
   }
 
 
@@ -317,12 +331,13 @@ export default function NewProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
-                <Input
-                  value={form.images}
-                  onChange={(e) => handleChange('images', e.target.value)}
-                  placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
-                  className="w-full"
+                <label className="block text-sm font-medium mb-2">Imágenes Adicionales</label>
+                <ImageReorder
+                  images={form.images}
+                  onReorder={handleImagesReorder}
+                  onRemove={handleImageRemove}
+                  onAdd={handleImageAdd}
+                  maxImages={10}
                 />
               </div>
 

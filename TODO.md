@@ -1,67 +1,57 @@
-# Mejoras al Sistema de Atributos y Variantes
+# Mejoras para Subida de Imágenes Adicionales
 
 ## Información Recopilada
-- Sistema actual: Atributos predefinidos (Talla, Color, etc.) con valores fijos, variantes generadas automáticamente con todas las combinaciones posibles
-- SKU presente en esquemas, formularios y componentes
-- UI básica para gestión de atributos y variantes
-- Variantes creadas con selección manual de atributos existentes
+- Actualmente en `app/admin/products/new/page.tsx` y `app/admin/products/[id]/edit/page.tsx`, las imágenes adicionales se manejan como un campo de texto simple donde el usuario ingresa URLs separadas por coma
+- Existen componentes `ImageUpload` y `ImageReorder` que permiten subir imágenes con drag & drop y reordenarlas, pero no se usan en los formularios de productos
+- El componente `ImageUpload` soporta subida de archivos y URLs, con vista previa y eliminación
+- El componente `ImageReorder` permite agregar URLs manualmente y reordenar imágenes existentes
 
-## Plan de Mejoras
-1. **Eliminar SKU completamente**: Remover de esquemas, tipos, formularios y componentes
-2. **Hacer atributos dinámicos**: Permitir crear atributos inline en el formulario de producto sin necesidad de predefinirlos
-3. **Mejorar UI de variantes**: Interfaz más intuitiva para agregar/editar variantes con builder visual
-4. **Optimizar flujo de creación**: Simplificar proceso de agregar atributos y variantes
-5. **Generación inteligente de variantes**: Permitir variantes personalizadas sin forzar todas las combinaciones
+## Plan de Mejoras para Imágenes Adicionales
+1. **Reemplazar campo de texto por componente visual**: Usar `ImageReorder` para una mejor UX en la gestión de imágenes adicionales
+2. **Actualizar página de creación de productos**: Modificar `app/admin/products/new/page.tsx` para usar el componente `ImageReorder`
+3. **Actualizar página de edición de productos**: Modificar `app/admin/products/[id]/edit/page.tsx` para usar el componente `ImageReorder`
+4. **Mantener compatibilidad**: Asegurar que los datos existentes sigan funcionando
+5. **Agregar funcionalidad de reordenamiento**: Permitir cambiar el orden de las imágenes adicionales
 
 ## Pasos de Implementación
 
-### 1. Eliminar SKU del Sistema
-- [x] Remover campo `sku` de tabla `productVariants` en `lib/schema.ts`
-- [x] Actualizar tipos TypeScript `ProductVariant` y `NewProductVariant`
-- [x] Remover SKU de `lib/actions/productVariants.ts`
-- [x] Actualizar formularios: `app/admin/products/new/page.tsx` y `components/admin/ProductVariants.tsx`
-- [x] Verificar y actualizar APIs relacionadas
+### 1. Actualizar Página de Creación de Productos
+- [ ] Modificar `app/admin/products/new/page.tsx`:
+  - Importar `ImageReorder` component
+  - Reemplazar el campo de input de texto para `images` por el componente `ImageReorder`
+  - Actualizar el estado `form.images` de `string` a `string[]`
+  - Actualizar `handleChange` para manejar arrays de imágenes
+  - Actualizar `handleSubmit` para enviar el array directamente
 
-### 2. Hacer Atributos Dinámicos
-- [x] Modificar `app/admin/products/new/page.tsx` para permitir agregar atributos inline
-- [x] Crear componente `AttributeBuilder` para gestión dinámica de atributos
-- [x] Actualizar lógica de generación de variantes para trabajar con atributos dinámicos
-- [x] Mantener compatibilidad con atributos predefinidos existentes
+### 2. Actualizar Página de Edición de Productos
+- [ ] Modificar `app/admin/products/[id]/edit/page.tsx`:
+  - Importar `ImageReorder` component
+  - Reemplazar el campo de input de texto para `images` por el componente `ImageReorder`
+  - Actualizar el estado `form.images` de `string` a `string[]`
+  - Actualizar lógica de carga inicial para convertir string separado por coma a array
+  - Actualizar `handleChange` para manejar arrays de imágenes
+  - Actualizar `handleSubmit` para enviar el array directamente
 
-### 3. Eliminar Atributos Predefinidos
-- [x] Remover sección de "Atributos Predefinidos" de `app/admin/products/new/page.tsx`
-- [x] Eliminar estado `selectedAttributes` y lógica relacionada
-- [x] Simplificar lógica de generación de variantes para usar solo `dynamicAttributes`
-- [x] Verificar si `components/admin/ProductAttributes.tsx` y `app/admin/products/attributes/page.tsx` se pueden eliminar
-- [x] Actualizar APIs relacionadas si es necesario
+### 3. Verificar Compatibilidad de Datos
+- [ ] Asegurar que la API `/api/admin/products` maneje arrays de imágenes correctamente
+- [ ] Verificar que los productos existentes con imágenes separadas por coma sigan funcionando
+- [ ] Probar migración de datos existentes
 
-### 4. Mejorar UI de Gestión de Variantes
-- [x] Rediseñar componente `ProductVariants.tsx` con mejor UX
-- [x] Agregar vista de tabla/grid para variantes
-- [x] Implementar drag & drop para reordenar variantes
-- [x] Agregar validaciones visuales y feedback
-
-### 5. Optimizar APIs y Acciones
-- [x] Actualizar `lib/actions/productVariants.ts` para nuevos flujos
-- [x] Modificar APIs en `app/api/admin/products/[id]/variants/route.ts`
-- [x] Asegurar compatibilidad con datos existentes
-
-### 6. Testing y Validación
-- [ ] Probar creación de productos con atributos dinámicos
-- [ ] Verificar eliminación de SKU no rompe funcionalidad
-- [ ] Testear UI mejorada en diferentes escenarios
-- [ ] Validar migración de datos existentes
+### 4. Testing y Validación
+- [ ] Probar creación de productos con imágenes adicionales usando el nuevo componente
+- [ ] Probar edición de productos existentes con imágenes
+- [ ] Verificar funcionalidad de reordenamiento
+- [ ] Testear subida de URLs válidas e inválidas
+- [ ] Validar límites de cantidad de imágenes
 
 ## Archivos a Modificar
-- `lib/schema.ts` - Eliminar SKU, actualizar tipos
-- `lib/actions/productVariants.ts` - Remover SKU, actualizar lógica
-- `app/admin/products/new/page.tsx` - Atributos dinámicos, quitar SKU
-- `components/admin/ProductVariants.tsx` - Mejorar UI, quitar SKU
-- `app/api/admin/products/[id]/variants/route.ts` - Actualizar API
-- `components/admin/ProductAttributes.tsx` - Posible simplificación
+- `app/admin/products/new/page.tsx` - Reemplazar campo de texto por `ImageReorder`
+- `app/admin/products/[id]/edit/page.tsx` - Reemplazar campo de texto por `ImageReorder`
+- Posiblemente `app/api/admin/products/route.ts` si necesita ajustes para arrays
 
-## Seguimiento de Progreso
-- [x] Análisis del sistema actual completado
-- [x] Plan de mejoras aprobado
-- [x] TODO.md creado
-- [ ] Implementación iniciada
+## Beneficios Esperados
+- Mejor experiencia de usuario para gestionar imágenes adicionales
+- Interfaz más intuitiva y visual
+- Posibilidad de reordenar imágenes fácilmente
+- Validación visual de URLs
+- Reducción de errores en la entrada de URLs
