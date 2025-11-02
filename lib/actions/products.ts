@@ -110,8 +110,14 @@ export async function getProducts(
 
     const count = Number(countResult[0]?.count ?? 0);
 
+    // Normalizar imágenes para cada producto
+    const normalizedData = data.map(product => ({
+      ...product,
+      images: normalizeImages(product.images),
+    }));
+
     return {
-      data,
+      data: normalizedData,
       pagination: {
         total: count,
         page: validatedPage,
@@ -139,11 +145,28 @@ export async function getProducts(
   }
 }
 
+// ✅ Función helper para normalizar imágenes
+function normalizeImages(images: unknown): string[] {
+  if (typeof images === 'string') {
+    return images.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  }
+  if (Array.isArray(images)) {
+    return images as string[];
+  }
+  return [];
+}
+
 // ✅ Obtener un producto por ID
 export async function getProductById(id: number): Promise<Product | null> {
   try {
     const [product] = await db.select().from(products).where(eq(products.id, id));
     if (!product) return null;
+
+    // Normalizar imágenes para compatibilidad
+    const normalizedProduct = {
+      ...product,
+      images: normalizeImages(product.images),
+    };
 
     // Si el producto tiene variantes, calcular el stock total de variantes activas
     const variants = await getProductVariants(id);
@@ -151,12 +174,12 @@ export async function getProductById(id: number): Promise<Product | null> {
       const activeVariants = variants.filter(v => v.isActive);
       const totalVariantStock = activeVariants.reduce((sum, v) => sum + v.stock, 0);
       return {
-        ...product,
+        ...normalizedProduct,
         stock: totalVariantStock,
       };
     }
 
-    return product;
+    return normalizedProduct;
   } catch (error) {
     console.error('Error fetching product by id:', error);
     throw new Error('No se pudieron obtener los productos');
@@ -273,12 +296,18 @@ export async function deleteProduct(id: number): Promise<boolean> {
 // ✅ Obtener productos destacados
 export async function getFeaturedProducts(limit: number = 5): Promise<Product[]> {
   try {
-    return await db
+    const productsData = await db
       .select()
       .from(products)
       .where(eq(products.destacado, true))
       .limit(limit)
       .orderBy(desc(products.created_at));
+
+    // Normalizar imágenes para cada producto
+    return productsData.map(product => ({
+      ...product,
+      images: normalizeImages(product.images),
+    }));
   } catch (error) {
     console.error('Error fetching featured products:', error);
     throw new Error('No se pudieron obtener los productos destacados');
@@ -288,10 +317,16 @@ export async function getFeaturedProducts(limit: number = 5): Promise<Product[]>
 // ✅ Obtener todos los productos (sin filtros, sin límite)
 export async function getAllProducts(): Promise<Product[]> {
   try {
-    return await db
+    const productsData = await db
       .select()
       .from(products)
       .orderBy(desc(products.created_at));
+
+    // Normalizar imágenes para cada producto
+    return productsData.map(product => ({
+      ...product,
+      images: normalizeImages(product.images),
+    }));
   } catch (error) {
     console.error('Error fetching all products:', error);
     throw new Error('No se pudieron obtener todos los productos');

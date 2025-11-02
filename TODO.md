@@ -16,7 +16,7 @@
 ## Pasos de Implementación
 
 ### 1. Actualizar Página de Creación de Productos
-- [ ] Modificar `app/admin/products/new/page.tsx`:
+- [x] Modificar `app/admin/products/new/page.tsx`:
   - Importar `ImageReorder` component
   - Reemplazar el campo de input de texto para `images` por el componente `ImageReorder`
   - Actualizar el estado `form.images` de `string` a `string[]`
@@ -24,7 +24,7 @@
   - Actualizar `handleSubmit` para enviar el array directamente
 
 ### 2. Actualizar Página de Edición de Productos
-- [ ] Modificar `app/admin/products/[id]/edit/page.tsx`:
+- [x] Modificar `app/admin/products/[id]/edit/page.tsx`:
   - Importar `ImageReorder` component
   - Reemplazar el campo de input de texto para `images` por el componente `ImageReorder`
   - Actualizar el estado `form.images` de `string` a `string[]`
@@ -33,9 +33,9 @@
   - Actualizar `handleSubmit` para enviar el array directamente
 
 ### 3. Verificar Compatibilidad de Datos
-- [ ] Asegurar que la API `/api/admin/products` maneje arrays de imágenes correctamente
-- [ ] Verificar que los productos existentes con imágenes separadas por coma sigan funcionando
-- [ ] Probar migración de datos existentes
+- [x] Asegurar que la API `/api/admin/products` maneje arrays de imágenes correctamente
+- [x] Verificar que los productos existentes con imágenes separadas por coma sigan funcionando
+- [x] Probar migración de datos existentes
 
 ### 4. Testing y Validación
 - [ ] Probar creación de productos con imágenes adicionales usando el nuevo componente

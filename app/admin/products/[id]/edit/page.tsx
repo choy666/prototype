@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ArrowLeft, Save } from 'lucide-react'
+import { ImageReorder } from '@/components/ui/ImageReorder'
 import type { Category } from '@/lib/schema'
 
 interface Product {
@@ -32,7 +33,7 @@ interface ProductForm {
   description: string
   price: string
   image: string
-  images: string
+  images: string[]
   categoryId: string
   discount: string
   weight: string
@@ -52,7 +53,7 @@ export default function EditProductPage() {
     description: '',
     price: '',
     image: '',
-    images: '',
+    images: [],
     categoryId: '',
     discount: '0',
     weight: '',
@@ -91,7 +92,7 @@ export default function EditProductPage() {
           description: product.description || '',
           price: product.price,
           image: product.image || '',
-          images: product.images ? product.images.join(', ') : '',
+          images: product.images || [],
           categoryId: product.categoryId?.toString() || '',
           discount: product.discount.toString(),
           weight: product.weight || '',
@@ -118,17 +119,12 @@ export default function EditProductPage() {
     setLoading(true)
 
     try {
-      const imagesArray = form.images
-        .split(',')
-        .map(url => url.trim())
-        .filter(url => url.length > 0)
-
       const productData = {
         name: form.name,
         description: form.description || undefined,
         price: form.price,
         image: form.image || undefined,
-        images: imagesArray,
+        images: form.images,
         categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
@@ -167,6 +163,24 @@ export default function EditProductPage() {
 
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleImagesReorder = (images: string[]) => {
+    setForm(prev => ({ ...prev, images }))
+  }
+
+  const handleImageRemove = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleImageAdd = (imageUrl: string) => {
+    setForm(prev => ({
+      ...prev,
+      images: [...prev.images, imageUrl]
+    }))
   }
 
   if (fetchLoading) {
@@ -313,11 +327,13 @@ export default function EditProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imágenes Adicionales (URLs separadas por coma)</label>
-                <Input
-                  value={form.images}
-                  onChange={(e) => handleChange('images', e.target.value)}
-                  placeholder="https://ejemplo.com/img1.jpg, https://ejemplo.com/img2.jpg"
+                <label className="block text-sm font-medium mb-2">Imágenes Adicionales</label>
+                <ImageReorder
+                  images={form.images}
+                  onReorder={handleImagesReorder}
+                  onRemove={handleImageRemove}
+                  onAdd={handleImageAdd}
+                  maxImages={10}
                 />
               </div>
 

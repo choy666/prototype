@@ -8,7 +8,12 @@ const updateProductSchema = z.object({
   description: z.string().optional(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
   image: z.string().url().optional(),
-  images: z.array(z.string().url()).optional(),
+  images: z.union([z.string(), z.array(z.string().url())]).optional().transform((val) => {
+    if (typeof val === 'string') {
+      return val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    }
+    return val;
+  }),
   category: z.string().min(1).optional(),
   categoryId: z.number().optional(),
   destacado: z.boolean().optional(),
