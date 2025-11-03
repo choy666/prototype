@@ -15,27 +15,7 @@ export default function ProductClient({ product }: { product: Product }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
 
-  // Combinar imágenes del producto (principal + secundarias) con imágenes de variantes
-  const productImages = useMemo<string[]>(() => {
-    const images: string[] = [];
 
-    // Imagen principal del producto
-    if (product?.image && typeof product.image === 'string') {
-      images.push(product.image);
-    }
-
-    // Imágenes secundarias del producto
-    if (product?.images && Array.isArray(product.images)) {
-      images.push(...product.images);
-    }
-
-    // Si no hay imágenes del producto, usar placeholder
-    if (images.length === 0) {
-      images.push('/placeholder-product.jpg');
-    }
-
-    return images;
-  }, [product?.image, product?.images]);
 
   // Atributos disponibles de las variantes
   const availableAttributes = useMemo(() => {
@@ -96,25 +76,40 @@ export default function ProductClient({ product }: { product: Product }) {
   // Stock actual (de variante o producto)
   const currentStock = selectedVariant?.stock ?? product.stock;
 
-  // Imágenes disponibles incluyendo variantes
-  const allImages = useMemo<string[]>(() => {
-    const images = [...productImages];
+  // Imágenes disponibles incluyendo variantes con tipo
+  const allImages = useMemo<{src: string, type: 'main' | 'secondary' | 'variant'}[]>(() => {
+    const images: {src: string, type: 'main' | 'secondary' | 'variant'}[] = [];
+
+    // Imagen principal del producto
+    if (product?.image && typeof product.image === 'string') {
+      images.push({ src: product.image, type: 'main' });
+    }
+
+    // Imágenes secundarias del producto
+    if (product?.images && Array.isArray(product.images)) {
+      product.images.forEach(img => images.push({ src: img, type: 'secondary' }));
+    }
 
     // Agregar imágenes de variantes activas
     if (product.variants?.length) {
       const variantImages = product.variants
         .filter(v => v.isActive && v.image)
-        .map(v => v.image!)
-        .filter(img => !images.includes(img)); // Evitar duplicados
+        .map(v => ({ src: v.image!, type: 'variant' as const }))
+        .filter(img => !images.some(existing => existing.src === img.src)); // Evitar duplicados
 
       images.push(...variantImages);
     }
 
+    // Si no hay imágenes del producto, usar placeholder
+    if (images.length === 0) {
+      images.push({ src: '/placeholder-product.jpg', type: 'main' });
+    }
+
     return images;
-  }, [productImages, product.variants]);
+  }, [product?.image, product?.images, product.variants]);
 
   // Imagen actual (priorizar variante seleccionada, luego galería)
-  const currentImageSrc = selectedVariant?.image || allImages[currentImageIndex % allImages.length];
+  const currentImageSrc = selectedVariant?.image || allImages[currentImageIndex % allImages.length]?.src;
 
   // Normalizamos para getDiscountedPrice
   const normalizedProduct = {
@@ -166,6 +161,7 @@ export default function ProductClient({ product }: { product: Product }) {
               blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
               className="object-cover"
               priority
+              loading="eager"
             />
 
             {hasDiscount && <DiscountBadge discount={product.discount} />}
@@ -193,7 +189,7 @@ export default function ProductClient({ product }: { product: Product }) {
           {/* Miniaturas */}
           <div className={`grid gap-2 ${allImages.length <= 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
             {allImages.slice(0, 4).map((img, index) => {
-              const isActive = currentImageSrc === img;
+              const isActive = currentImageSrc === img.src;
 
               return (
                 <button
@@ -205,16 +201,24 @@ export default function ProductClient({ product }: { product: Product }) {
                       : 'border-transparent hover:border-gray-300'
                   }`}
                   aria-label={`Ver imagen ${index + 1}`}
+                  title={`${img.type === 'main' ? 'Imagen principal' : img.type === 'secondary' ? 'Imagen secundaria' : 'Imagen de variante'}`}
                 >
                   <Image
-                    src={img}
+                    src={img.src}
                     alt={`${product.name} - Vista ${index + 1}`}
                     fill
                     sizes="(max-width: 768px) 25vw, 25vw"
                     placeholder="blur"
                     blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
                     className="object-cover hover:opacity-90 transition-opacity"
+                    loading="lazy"
                   />
+                  {/* Indicador visual del tipo de imagen */}
+                  <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+                    img.type === 'main' ? 'bg-blue-500' :
+                    img.type === 'secondary' ? 'bg-green-500' :
+                    'bg-purple-500'
+                  }`} />
                 </button>
               );
             })}
