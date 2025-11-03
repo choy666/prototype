@@ -14,6 +14,7 @@ export default function ProductClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
 
 
 
@@ -111,6 +112,16 @@ export default function ProductClient({ product }: { product: Product }) {
   // Imagen actual (priorizar variante seleccionada, luego galería)
   const currentImageSrc = selectedVariant?.image || allImages[currentImageIndex % allImages.length]?.src;
 
+  // Efecto para actualizar currentImageIndex cuando se selecciona una variante con imagen
+  useMemo(() => {
+    if (selectedVariant?.image) {
+      const variantImageIndex = allImages.findIndex(img => img.src === selectedVariant.image);
+      if (variantImageIndex !== -1) {
+        setCurrentImageIndex(variantImageIndex);
+      }
+    }
+  }, [selectedVariant?.image, allImages]);
+
   // Normalizamos para getDiscountedPrice
   const normalizedProduct = {
     ...product,
@@ -143,6 +154,20 @@ export default function ProductClient({ product }: { product: Product }) {
     if (!allImages.length) return;
     setCurrentImageIndex(prev =>
       prev === 0 ? allImages.length - 1 : prev - 1
+    );
+  };
+
+  const nextThumbnail = () => {
+    if (allImages.length <= 4) return;
+    setThumbnailStartIndex(prev =>
+      prev + 4 >= allImages.length ? 0 : prev + 1
+    );
+  };
+
+  const prevThumbnail = () => {
+    if (allImages.length <= 4) return;
+    setThumbnailStartIndex(prev =>
+      prev === 0 ? Math.max(0, allImages.length - 4) : prev - 1
     );
   };
 
@@ -186,42 +211,63 @@ export default function ProductClient({ product }: { product: Product }) {
             )}
           </div>
 
-          {/* Miniaturas */}
-          <div className={`grid gap-2 ${allImages.length <= 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
-            {allImages.slice(0, 4).map((img, index) => {
-              const isActive = currentImageSrc === img.src;
-
-              return (
+          {/* Miniaturas con carrusel */}
+          <div className="relative">
+            {allImages.length > 4 && (
+              <>
                 <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`relative aspect-square overflow-hidden rounded-md border-2 transition-all ${
-                    isActive
-                      ? 'border-primary'
-                      : 'border-transparent hover:border-gray-300'
-                  }`}
-                  aria-label={`Ver imagen ${index + 1}`}
-                  title={`${img.type === 'main' ? 'Imagen principal' : img.type === 'secondary' ? 'Imagen secundaria' : 'Imagen de variante'}`}
+                  onClick={prevThumbnail}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 p-1 rounded-full shadow hover:bg-white transition-colors"
+                  aria-label="Miniaturas anteriores"
                 >
-                  <Image
-                    src={img.src}
-                    alt={`${product.name} - Vista ${index + 1}`}
-                    fill
-                    sizes="(max-width: 768px) 25vw, 25vw"
-                    placeholder="blur"
-                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                    className="object-cover hover:opacity-90 transition-opacity"
-                    loading="lazy"
-                  />
-                  {/* Indicador visual del tipo de imagen */}
-                  <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                    img.type === 'main' ? 'bg-blue-500' :
-                    img.type === 'secondary' ? 'bg-green-500' :
-                    'bg-purple-500'
-                  }`} />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-              );
-            })}
+                <button
+                  onClick={nextThumbnail}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 p-1 rounded-full shadow hover:bg-white transition-colors"
+                  aria-label="Miniaturas siguientes"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </>
+            )}
+            <div className={`grid gap-2 ${allImages.length <= 3 ? 'grid-cols-3' : 'grid-cols-4'} ${allImages.length > 4 ? 'px-8' : ''}`}>
+              {allImages.slice(thumbnailStartIndex, thumbnailStartIndex + 4).map((img, index) => {
+                const absoluteIndex = thumbnailStartIndex + index;
+                const isActive = currentImageSrc === img.src;
+
+                return (
+                  <button
+                    key={absoluteIndex}
+                    onClick={() => setCurrentImageIndex(absoluteIndex)}
+                    className={`relative aspect-square overflow-hidden rounded-md border-2 transition-all ${
+                      isActive
+                        ? 'border-primary'
+                        : 'border-transparent hover:border-gray-300'
+                    }`}
+                    aria-label={`Ver imagen ${absoluteIndex + 1}`}
+                    title={`${img.type === 'main' ? 'Imagen principal' : img.type === 'secondary' ? 'Imagen secundaria' : 'Imagen de variante'}`}
+                  >
+                    <Image
+                      src={img.src}
+                      alt={`${product.name} - Vista ${absoluteIndex + 1}`}
+                      fill
+                      sizes="(max-width: 768px) 25vw, 25vw"
+                      placeholder="blur"
+                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                      className="object-cover hover:opacity-90 transition-opacity"
+                      loading="lazy"
+                    />
+                    {/* Indicador visual del tipo de imagen */}
+                    <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+                      img.type === 'main' ? 'bg-blue-500' :
+                      img.type === 'secondary' ? 'bg-green-500' :
+                      'bg-purple-500'
+                    }`} />
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
