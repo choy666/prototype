@@ -15,11 +15,27 @@ export default function ProductClient({ product }: { product: Product }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
 
-  // Normalizamos imágenes para la galería
+  // Combinar imágenes del producto (principal + secundarias) con imágenes de variantes
   const productImages = useMemo<string[]>(() => {
-    if (!product?.image) return ['/placeholder-product.jpg'];
-    return Array.isArray(product.image) ? product.image.slice(0, 3) : [product.image];
-  }, [product?.image]);
+    const images: string[] = [];
+
+    // Imagen principal del producto
+    if (product?.image && typeof product.image === 'string') {
+      images.push(product.image);
+    }
+
+    // Imágenes secundarias del producto
+    if (product?.images && Array.isArray(product.images)) {
+      images.push(...product.images);
+    }
+
+    // Si no hay imágenes del producto, usar placeholder
+    if (images.length === 0) {
+      images.push('/placeholder-product.jpg');
+    }
+
+    return images;
+  }, [product?.image, product?.images]);
 
   // Atributos disponibles de las variantes
   const availableAttributes = useMemo(() => {
@@ -80,8 +96,25 @@ export default function ProductClient({ product }: { product: Product }) {
   // Stock actual (de variante o producto)
   const currentStock = selectedVariant?.stock ?? product.stock;
 
-  // Imagen actual (de variante o producto)
-  const currentImageSrc = selectedVariant?.image || productImages[currentImageIndex % productImages.length];
+  // Imágenes disponibles incluyendo variantes
+  const allImages = useMemo<string[]>(() => {
+    const images = [...productImages];
+
+    // Agregar imágenes de variantes activas
+    if (product.variants?.length) {
+      const variantImages = product.variants
+        .filter(v => v.isActive && v.image)
+        .map(v => v.image!)
+        .filter(img => !images.includes(img)); // Evitar duplicados
+
+      images.push(...variantImages);
+    }
+
+    return images;
+  }, [productImages, product.variants]);
+
+  // Imagen actual (priorizar variante seleccionada, luego galería)
+  const currentImageSrc = selectedVariant?.image || allImages[currentImageIndex % allImages.length];
 
   // Normalizamos para getDiscountedPrice
   const normalizedProduct = {
@@ -105,16 +138,16 @@ export default function ProductClient({ product }: { product: Product }) {
 
 
   const nextImage = () => {
-    if (!productImages.length) return;
+    if (!allImages.length) return;
     setCurrentImageIndex(prev =>
-      prev === productImages.length - 1 ? 0 : prev + 1
+      prev === allImages.length - 1 ? 0 : prev + 1
     );
   };
 
   const prevImage = () => {
-    if (!productImages.length) return;
+    if (!allImages.length) return;
     setCurrentImageIndex(prev =>
-      prev === 0 ? productImages.length - 1 : prev - 1
+      prev === 0 ? allImages.length - 1 : prev - 1
     );
   };
 
@@ -137,7 +170,7 @@ export default function ProductClient({ product }: { product: Product }) {
 
             {hasDiscount && <DiscountBadge discount={product.discount} />}
 
-            {productImages.length > 1 && (
+            {allImages.length > 1 && (
               <>
                 <button
                   onClick={prevImage}
@@ -158,29 +191,26 @@ export default function ProductClient({ product }: { product: Product }) {
           </div>
 
           {/* Miniaturas */}
-          <div className="grid grid-cols-3 gap-2">
-            {Array.from({ length: 3 }).map((_, index) => {
-              const imgIndex = index % productImages.length;
-              const img = productImages[imgIndex];
-              const isActive =
-                currentImageIndex % productImages.length === imgIndex;
+          <div className={`grid gap-2 ${allImages.length <= 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+            {allImages.slice(0, 4).map((img, index) => {
+              const isActive = currentImageSrc === img;
 
               return (
                 <button
                   key={index}
-                  onClick={() => setCurrentImageIndex(imgIndex)}
+                  onClick={() => setCurrentImageIndex(index)}
                   className={`relative aspect-square overflow-hidden rounded-md border-2 transition-all ${
                     isActive
                       ? 'border-primary'
                       : 'border-transparent hover:border-gray-300'
                   }`}
-                  aria-label={`Ver imagen ${imgIndex + 1}`}
+                  aria-label={`Ver imagen ${index + 1}`}
                 >
                   <Image
                     src={img}
-                    alt={`${product.name} - Vista ${imgIndex + 1}`}
+                    alt={`${product.name} - Vista ${index + 1}`}
                     fill
-                    sizes="(max-width: 768px) 33vw, 33vw"
+                    sizes="(max-width: 768px) 25vw, 25vw"
                     placeholder="blur"
                     blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
                     className="object-cover hover:opacity-90 transition-opacity"

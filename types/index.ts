@@ -28,6 +28,7 @@ export interface Product {
   description: string | null;
   price: string;
   image?: string | string[] | null;
+  images?: string[]; // Array de imágenes secundarias
   category: string;
   destacado: boolean;
   stock: number;
