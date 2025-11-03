@@ -1,7 +1,4 @@
-# TODO: Mejoras en ProductClient.tsx
+# TODO: Habilitar Linting Durante el Build de Next.js
 
-- [x] Agregar estado para thumbnailStartIndex
-- [x] Implementar carrusel en miniaturas con navegación (prev/next)
-- [x] Ajustar lógica de selección de miniaturas para índices absolutos
-- [x] Verificar cambio automático de imagen y precio al seleccionar variante
-- [x] Probar funcionalidad completa
+- [x] Editar `next.config.ts` para agregar configuración de ESLint que habilite el linting durante el build.
+- [x] Ejecutar `npm run build` para verificar que el linting se ejecute correctamente y no haya errores.
