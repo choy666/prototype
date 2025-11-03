@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Plus, X, Tag } from 'lucide-react'
 
-interface DynamicAttribute {
+export interface DynamicAttribute {
   name: string
   values: string[]
 }

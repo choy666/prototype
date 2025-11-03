@@ -186,6 +186,45 @@ export async function getProductById(id: number): Promise<Product | null> {
   }
 }
 
+// ✅ Actualizar un producto con atributos
+export async function updateProductWithAttributes(
+  id: number,
+  productData: Partial<Omit<NewProduct, 'id' | 'created_at'>>
+): Promise<Product | null> {
+  try {
+    // Si se está actualizando categoryId, obtener el nombre de la categoría
+    let categoryName: string | undefined;
+    if (productData.categoryId != null) {
+      const category = await db.query.categories.findFirst({
+        where: eq(categories.id, productData.categoryId),
+      });
+
+      if (!category) {
+        throw new Error('Categoría no encontrada');
+      }
+
+      categoryName = category.name;
+    }
+
+    const [updatedProduct] = await db
+      .update(products)
+      .set({
+        ...productData,
+        ...(categoryName && { category: categoryName }),
+        updated_at: new Date(),
+      })
+      .where(eq(products.id, id))
+      .returning();
+
+    revalidatePath(`/products/${id}`);
+    revalidatePath('/products');
+    return updatedProduct || null;
+  } catch (error) {
+    console.error('Error updating product with attributes:', error);
+    throw new Error('No se pudo actualizar el producto con atributos');
+  }
+}
+
 // ✅ Obtener categorías únicas
 export async function getCategories(): Promise<string[]> {
   try {

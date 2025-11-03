@@ -14,7 +14,10 @@ import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ArrowLeft, Save } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
+import { ProductVariants } from '@/components/admin/ProductVariants'
+import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
+import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 
 interface Product {
   id: number
@@ -62,6 +65,7 @@ export default function EditProductPage() {
     weight: '',
     destacado: false
   })
+  const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
 
   const id = params.id as string
 
@@ -101,6 +105,7 @@ export default function EditProductPage() {
           weight: product.weight || '',
           destacado: product.destacado
         })
+        setAttributes((product as unknown as { attributes?: DynamicAttribute[] }).attributes || [])
       } catch {
         toast({
           title: 'Error',
@@ -131,7 +136,8 @@ export default function EditProductPage() {
         categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
-        destacado: form.destacado
+        destacado: form.destacado,
+        attributes: attributes.length > 0 ? attributes : undefined
       }
 
       const response = await fetch(`/api/admin/products/${id}`, {
@@ -211,9 +217,26 @@ export default function EditProductPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    )
-  }
+
+        {/* Sección de Atributos */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Atributos del Producto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AttributeBuilder
+              attributes={attributes}
+              onChange={setAttributes}
+            />
+          </CardContent>
+        </Card>
+
+      {/* Sección de Variantes */}
+      <ProductVariants productId={parseInt(id)} />
+
+    </div>
+  )
+}
 
   return (
     <div className="space-y-6">
@@ -372,6 +395,23 @@ export default function EditProductPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Sección de Atributos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Atributos del Producto</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AttributeBuilder
+            attributes={attributes}
+            onChange={setAttributes}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Sección de Variantes */}
+      <ProductVariants productId={parseInt(id)} />
+
     </div>
   )
 }

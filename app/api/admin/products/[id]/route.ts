@@ -20,6 +20,10 @@ const updateProductSchema = z.object({
   stock: z.number().int().min(0).optional(),
   discount: z.number().int().min(0).max(100).optional(),
   weight: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+  attributes: z.array(z.object({
+    name: z.string().min(1),
+    values: z.array(z.string().min(1))
+  })).optional(),
 })
 
 export async function GET(
@@ -74,6 +78,7 @@ export async function PUT(
       price: validatedData.price,
       weight: validatedData.weight,
       images: validatedData.images,
+      attributes: validatedData.attributes,
     })
 
     if (!product) {

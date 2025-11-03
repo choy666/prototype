@@ -1,49 +1,59 @@
-# Plan de Unificación de Estilos en Formularios de Admin
+# Plan de Implementación: Gestión de Variantes y Atributos en Edición de Productos
 
 ## Información Recopilada
-- Análisis de páginas de formularios: new product, edit product, new category, edit category
-- Estilos actuales inconsistentes: labels personalizados, selects con clases inline, textareas con clases inline
-- Componentes shadcn/ui disponibles: Input, Label, Select (verificado)
-- Faltante: componente Textarea para consistencia
+- **Página actual de edición**: `app/admin/products/[id]/edit/page.tsx` maneja solo campos básicos del producto
+- **Componentes existentes**: `ProductVariants.tsx` y `AttributeBuilder.tsx` para gestión de variantes y atributos
+- **Esquema DB**: Tablas `productAttributes` y `productVariants` disponibles
+- **Acciones**: `lib/actions/productVariants.ts` con funciones CRUD para variantes
+- **API**: `app/api/admin/products/[id]/variants/route.ts` para operaciones de variantes
 
 ## Plan de Implementación
-### 1. Crear componente Textarea
-- Crear `components/ui/textarea.tsx` basado en shadcn/ui para reemplazar textareas inline
 
-### 2. Actualizar página de nuevo producto (app/admin/products/new/page.tsx)
-- Reemplazar `<label>` con `<Label>` de shadcn
-- Usar `<Select>` para categoría
-- Usar `<Textarea>` para descripción
-- Mantener Input para otros campos
-- Unificar clases de contenedores
+### 1. Actualizar Página de Edición de Productos
+- [x] Agregar sección de atributos dinámicos usando `AttributeBuilder`
+- [x] Agregar sección de variantes usando `ProductVariants`
+- [x] Integrar ambos componentes en el formulario de edición
+- [x] Asegurar que los datos se carguen correctamente al editar
 
-### 3. Actualizar página de editar producto (app/admin/products/[id]/edit/page.tsx)
-- Aplicar mismos cambios que en new product
+### 2. Actualizar API de Productos
+- [x] Modificar `app/api/admin/products/[id]/route.ts` para manejar atributos junto con el producto
+- [x] Crear endpoint para guardar atributos del producto
+- [x] Actualizar validaciones para incluir atributos
 
-### 4. Actualizar páginas de categorías
-- new category (app/admin/categories/new/page.tsx)
-- edit category (app/admin/categories/[id]/edit/page.tsx)
-- Usar Label y Textarea consistentes
+### 3. Actualizar Acciones de Productos
+- [x] Modificar `lib/actions/products.ts` para manejar atributos
+- [x] Agregar funciones para crear/actualizar atributos del producto
 
-### 5. Verificar consistencia
-- Asegurar que todos los formularios usen los mismos estilos
-- Probar funcionalidad
+### 4. Actualizar Esquema de Base de Datos (si necesario)
+- [ ] Verificar si se necesita relación producto-atributos
+- [ ] Crear tabla intermedia si es necesario para atributos por producto
 
-## Archivos a Modificar
-- components/ui/textarea.tsx (nuevo)
-- app/admin/products/new/page.tsx
-- app/admin/products/[id]/edit/page.tsx
-- app/admin/categories/new/page.tsx
-- app/admin/categories/[id]/edit/page.tsx
+### 5. Testing y Validación
+- [ ] Probar creación de atributos y variantes
+- [ ] Probar edición de producto con variantes existentes
+- [ ] Verificar que los datos se guarden correctamente
+
+## Pasos de Implementación Detallados
+
+1. **Paso 1**: Modificar `app/admin/products/[id]/edit/page.tsx`
+   - [x] Importar `AttributeBuilder` y `ProductVariants`
+   - [x] Agregar estado para atributos y variantes
+   - [x] Agregar secciones en el formulario
+   - [ ] Actualizar `handleSubmit` para guardar atributos y variantes
+
+2. **Paso 2**: Actualizar `lib/actions/products.ts`
+   - Agregar funciones para manejar atributos del producto
+   - Crear función `updateProductWithAttributes`
+
+3. **Paso 3**: Modificar API `app/api/admin/products/[id]/route.ts`
+   - Actualizar PUT endpoint para aceptar atributos
+   - Agregar lógica para guardar atributos junto con el producto
+
+4. **Paso 4**: Testing
+   - Verificar que todo funcione en la interfaz
+   - Probar con datos reales
 
 ## Dependencias
-- Ninguna nueva instalación requerida
-- Usar componentes existentes de shadcn/ui
-
-## Seguimiento de Progreso
-- [ ] Crear componente Textarea
-- [ ] Actualizar new product page
-- [ ] Actualizar edit product page
-- [ ] Actualizar new category page
-- [ ] Actualizar edit category page
-- [ ] Verificar consistencia
+- `AttributeBuilder` depende de `ProductVariants` para mostrar atributos disponibles
+- Variantes dependen de atributos definidos para el producto
+- API necesita manejar tanto producto como atributos/variantes

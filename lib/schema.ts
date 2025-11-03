@@ -45,6 +45,7 @@ export const products = pgTable("products", {
   stock: integer("stock").default(0).notNull(),
   discount: integer("discount").default(0).notNull(), // porcentaje de descuento
   weight: decimal("weight", { precision: 5, scale: 2 }), // peso en kg, opcional para cálculo de envío
+  attributes: jsonb("attributes"), // atributos dinámicos del producto
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
