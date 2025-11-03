@@ -305,6 +305,7 @@ export default function ProductClient({ product }: { product: Product }) {
                 image: currentImageSrc,        // imagen de variante o producto
                 stock: currentStock,           // stock de variante o producto
                 variantId: selectedVariant?.id, // ID de la variante seleccionada
+                variantAttributes: selectedVariant?.attributes, // atributos de la variante
               }}
               quantity={quantity}
               className="flex-1"

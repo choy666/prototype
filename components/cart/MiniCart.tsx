@@ -120,6 +120,11 @@ export function MiniCart() {
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">{item.name}</h4>
+                      {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {Object.entries(item.variantAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                        </p>
+                      )}
                       <p className="text-sm text-gray-600">
                         ${item.price} x {item.quantity}
                       </p>
@@ -127,7 +132,7 @@ export function MiniCart() {
                       {/* Botones de cantidad */}
                       <div className="flex items-center gap-2 mt-1">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity - 1, item.variantId)}
                           aria-label={`Disminuir cantidad de ${item.name}`}
                           className="p-2 rounded bg-gray-200 hover:bg-gray-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
@@ -135,7 +140,7 @@ export function MiniCart() {
                         </button>
                         <span className="px-2">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1, item.variantId)}
                           aria-label={`Aumentar cantidad de ${item.name}`}
                           className="p-2 rounded bg-gray-200 hover:bg-gray-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
@@ -146,7 +151,7 @@ export function MiniCart() {
 
                     {/* Botón eliminar */}
                     <button
-                      onClick={() => removeItem(item.id)}
+                      onClick={() => removeItem(item.id, item.variantId)}
                       aria-label={`Eliminar ${item.name} del carrito`} // ♿ accesibilidad
                       className="text-red-500 hover:scale-110 transition-transform"
                     >

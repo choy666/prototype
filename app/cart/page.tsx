@@ -73,6 +73,11 @@ export default function CartPage() {
                 />
                 <div className='flex-1 min-w-0'>
                   <h3 className='font-medium text-sm sm:text-base'>{item.name}</h3>
+                  {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
+                    <p className='text-xs text-gray-500'>
+                      {Object.entries(item.variantAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                    </p>
+                  )}
                   {hasDiscount ? (
                     <div className='flex flex-col'>
                       <span className='text-xs sm:text-sm text-gray-400 line-through'>
@@ -92,7 +97,7 @@ export default function CartPage() {
                       variant='outline'
                       size='icon'
                       aria-label='Disminuir cantidad'
-                      onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                      onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1), item.variantId)}
                       className='min-h-[44px] min-w-[44px]'
                     >
                       <Minus className='h-4 w-4' />
@@ -102,7 +107,7 @@ export default function CartPage() {
                       variant='outline'
                       size='icon'
                       aria-label='Aumentar cantidad'
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.id, item.quantity + 1, item.variantId)}
                       className='min-h-[44px] min-w-[44px]'
                     >
                       <Plus className='h-4 w-4' />
@@ -113,7 +118,7 @@ export default function CartPage() {
                     variant='ghost'
                     size='icon'
                     aria-label='Eliminar producto'
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => removeItem(item.id, item.variantId)}
                     className='min-h-[44px] min-w-[44px]'
                   >
                     <X className='h-5 w-5' />

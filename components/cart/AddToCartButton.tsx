@@ -15,6 +15,7 @@ type AddToCartButtonProps = {
     image: string | null
     stock: number
     variantId?: number  // ID de la variante seleccionada
+    variantAttributes?: Record<string, string> // atributos de la variante
   }
   quantity?: number
   className?: string
@@ -58,6 +59,7 @@ export function AddToCartButton({
       quantity,
       stock: product.stock,
       variantId: product.variantId,       // 👈 guardamos variante
+      variantAttributes: product.variantAttributes, // 👈 guardamos atributos de variante
     })
 
     timeoutRef.current = setTimeout(() => {
