@@ -85,6 +85,13 @@
       "when": 1762130691260,
       "tag": "0011_smart_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1762165792458,
+      "tag": "0012_curious_lifeguard",
+      "breakpoints": true
     }
   ]
 }
