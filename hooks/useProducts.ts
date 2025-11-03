@@ -83,7 +83,8 @@ export function useProducts(initialFilters: Partial<ProductFilters> = {}): UsePr
 
   const updateFilters = useCallback((newFilters: Partial<ProductFilters>) => {
     setState(prev => {
-      const merged = normalizeFilters({ ...prev.filters, ...newFilters, page: 1 });
+      const shouldResetPage = !('page' in newFilters);
+      const merged = normalizeFilters({ ...prev.filters, ...newFilters, ...(shouldResetPage ? { page: 1 } : {}) });
       return {
         ...prev,
         filters: merged,
