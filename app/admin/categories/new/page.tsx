@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 
@@ -91,24 +93,25 @@ export default function NewCategoryPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">Nombre *</label>
+              <Label htmlFor="name">Nombre *</Label>
               <Input
+                id="name"
                 value={form.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 placeholder="Nombre de la categoría"
                 required
-                className="w-full"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Descripción</label>
-              <textarea
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
                 value={form.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 placeholder="Descripción de la categoría"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[100px] resize-y"
                 rows={4}
+                className="resize-y"
               />
             </div>
 

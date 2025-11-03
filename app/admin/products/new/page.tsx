@@ -6,6 +6,9 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -229,36 +232,36 @@ export default function NewProductPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Nombre *</label>
+                <Label htmlFor="name">Nombre *</Label>
                 <Input
+                  id="name"
                   value={form.name}
                   onChange={(e) => handleChange('name', e.target.value)}
                   placeholder="Nombre del producto"
                   required
-                  className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Categoría *</label>
-                <select
-                  value={form.categoryId}
-                  onChange={(e) => handleChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[44px]"
-                  required
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                <Label htmlFor="categoryId">Categoría *</Label>
+                <Select value={form.categoryId} onValueChange={(value) => handleChange('categoryId', value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id.toString()}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Precio *</label>
+                <Label htmlFor="price">Precio *</Label>
                 <Input
+                  id="price"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -266,72 +269,72 @@ export default function NewProductPage() {
                   onChange={(e) => handleChange('price', e.target.value)}
                   placeholder="0.00"
                   required
-                  className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Descuento (%)</label>
+                <Label htmlFor="discount">Descuento (%)</Label>
                 <Input
+                  id="discount"
                   type="number"
                   min="0"
                   max="100"
                   value={form.discount}
                   onChange={(e) => handleChange('discount', e.target.value)}
                   placeholder="0"
-                  className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Stock</label>
+                <Label htmlFor="stock">Stock</Label>
                 <Input
+                  id="stock"
                   type="number"
                   min="0"
                   value={form.stock}
                   onChange={(e) => handleChange('stock', e.target.value)}
                   placeholder="0"
-                  className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Peso (kg)</label>
+                <Label htmlFor="weight">Peso (kg)</Label>
                 <Input
+                  id="weight"
                   type="number"
                   step="0.01"
                   min="0"
                   value={form.weight}
                   onChange={(e) => handleChange('weight', e.target.value)}
                   placeholder="0.00"
-                  className="w-full"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Descripción</label>
-                <textarea
+                <Label htmlFor="description">Descripción</Label>
+                <Textarea
+                  id="description"
                   value={form.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Descripción del producto"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[100px] resize-y"
                   rows={4}
+                  className="resize-y"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
+                <Label htmlFor="image">Imagen Principal (URL)</Label>
                 <Input
+                  id="image"
                   type="url"
                   value={form.image}
                   onChange={(e) => handleChange('image', e.target.value)}
                   placeholder="https://ejemplo.com/imagen.jpg"
-                  className="w-full"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imágenes Adicionales</label>
+                <Label htmlFor="images">Imágenes Adicionales</Label>
                 <ImageReorder
                   images={form.images}
                   onReorder={handleImagesReorder}
@@ -349,9 +352,9 @@ export default function NewProductPage() {
                   onChange={(e) => handleChange('destacado', e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <label htmlFor="destacado" className="ml-2 block text-sm font-medium">
+                <Label htmlFor="destacado" className="ml-2 block text-sm font-medium">
                   Producto destacado
-                </label>
+                </Label>
               </div>
             </div>
 
@@ -368,7 +371,7 @@ export default function NewProductPage() {
             {/* Variantes */}
             {form.variants.length > 0 && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Variantes</label>
+                <Label htmlFor="variants">Variantes</Label>
                 <div className="space-y-4">
                   {form.variants.map((variant, index) => (
                     <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
@@ -377,8 +380,9 @@ export default function NewProductPage() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                          <label className="block text-sm font-medium mb-1">Stock</label>
+                          <Label htmlFor={`variant-stock-${index}`}>Stock</Label>
                           <Input
+                            id={`variant-stock-${index}`}
                             type="number"
                             min="0"
                             value={variant.stock}
@@ -387,8 +391,9 @@ export default function NewProductPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-1">Precio (opcional)</label>
+                          <Label htmlFor={`variant-price-${index}`}>Precio (opcional)</Label>
                           <Input
+                            id={`variant-price-${index}`}
                             type="number"
                             step="0.01"
                             min="0"
@@ -399,8 +404,9 @@ export default function NewProductPage() {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium mb-1">Imagen (opcional)</label>
+                          <Label htmlFor={`variant-image-${index}`}>Imagen (opcional)</Label>
                           <Input
+                            id={`variant-image-${index}`}
                             type="url"
                             value={variant.image}
                             onChange={(e) => handleVariantChange(index, 'image', e.target.value)}

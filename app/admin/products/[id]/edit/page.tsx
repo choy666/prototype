@@ -6,6 +6,9 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
@@ -241,8 +244,9 @@ export default function EditProductPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Nombre *</label>
+                <Label htmlFor="name">Nombre *</Label>
                 <Input
+                  id="name"
                   value={form.name}
                   onChange={(e) => handleChange('name', e.target.value)}
                   placeholder="Nombre del producto"
@@ -251,26 +255,25 @@ export default function EditProductPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Categoría *</label>
-                <select
-                  value={form.categoryId}
-                  onChange={(e) => handleChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[44px]"
-                  required
-                  disabled={categoriesLoading}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id.toString()}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                <Label htmlFor="categoryId">Categoría *</Label>
+                <Select value={form.categoryId} onValueChange={(value) => handleChange('categoryId', value)} disabled={categoriesLoading}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id.toString()}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Precio *</label>
+                <Label htmlFor="price">Precio *</Label>
                 <Input
+                  id="price"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -282,8 +285,9 @@ export default function EditProductPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Descuento (%)</label>
+                <Label htmlFor="discount">Descuento (%)</Label>
                 <Input
+                  id="discount"
                   type="number"
                   min="0"
                   max="100"
@@ -294,8 +298,9 @@ export default function EditProductPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Peso (kg)</label>
+                <Label htmlFor="weight">Peso (kg)</Label>
                 <Input
+                  id="weight"
                   type="number"
                   step="0.01"
                   min="0"
@@ -306,19 +311,21 @@ export default function EditProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Descripción</label>
-                <textarea
+                <Label htmlFor="description">Descripción</Label>
+                <Textarea
+                  id="description"
                   value={form.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Descripción del producto"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[100px] resize-y"
                   rows={4}
+                  className="resize-y"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imagen Principal (URL)</label>
+                <Label htmlFor="image">Imagen Principal (URL)</Label>
                 <Input
+                  id="image"
                   type="url"
                   value={form.image}
                   onChange={(e) => handleChange('image', e.target.value)}
@@ -327,7 +334,7 @@ export default function EditProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imágenes Adicionales</label>
+                <Label htmlFor="images">Imágenes Adicionales</Label>
                 <ImageReorder
                   images={form.images}
                   onReorder={handleImagesReorder}
@@ -345,9 +352,9 @@ export default function EditProductPage() {
                   onChange={(e) => handleChange('destacado', e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <label htmlFor="destacado" className="ml-2 block text-sm font-medium">
+                <Label htmlFor="destacado" className="ml-2 block text-sm font-medium">
                   Producto destacado
-                </label>
+                </Label>
               </div>
             </div>
 
