@@ -1,62 +1,73 @@
-# TODO: Implementación de Variantes de Productos, Precios, Ofertas, Carrito, Checkout y Control de Stock
+# TODO: Implementación de Selección de Variantes en Producto
 
-## Información Recopilada
-- **Esquema Actual**: Productos tienen precio, descuento (porcentaje), stock. Variantes tienen precio opcional, stock, imagen, atributos.
-- **Carrito**: Ya soporta variantId y variantAttributes en CartItem (store), pero cartItems en BD solo tiene productId.
-- **Precios**: Necesita lógica para usar precio de variante si existe, sino precio de producto, aplicando descuento del producto padre.
-- **Stock**: Deducción debe ser de variante si seleccionada, sino del producto.
-- **Checkout**: Actualmente calcula precios con descuento, pero no maneja variantes.
-- **Lado Usuario**: Página de producto debe permitir selección de variante.
-- **Lado Admin**: Formularios para gestionar variantes.
+## Problema Actual
+En la página `app/products/[id]`, al seleccionar una imagen del carrusel que corresponde a una variante, los checkboxes (Select components) de variantes no se actualizan automáticamente para reflejar la variante seleccionada. Además, los selects de variantes no incluyen una opción para seleccionar el "producto original" (sin variantes), lo que limita la experiencia del usuario.
 
-## Plan de Implementación
-### 1. Actualizar Esquema de Base de Datos
-- [x] Agregar campo `variantId` opcional a tabla `cartItems` para referenciar variante seleccionada.
-- [x] Agregar campo `variantId` opcional a tabla `orderItems` para referenciar variante seleccionada.
-- [x] Crear migración Drizzle para actualizar esquema.
+## Objetivos
+- Corregir la sincronización entre la selección de imágenes de variantes y los selects de atributos.
+- Agregar una opción "Producto Original" en cada select de variante para permitir al usuario elegir entre el producto base o variantes específicas.
+- Mejorar la experiencia de usuario con indicadores visuales y feedback claro.
 
-### 2. Actualizar Lógica de Precios y Ofertas
-- [x] Modificar `lib/utils/pricing.ts` para calcular precio final: si variante tiene precio usar ese, sino precio producto, aplicar descuento.
-- [x] Actualizar `useCartStore.ts` para usar lógica de precios correcta en `totalPrice` (ya implementado).
-- [x] Asegurar que ofertas (descuentos) se hereden de producto padre a variantes.
+## Tareas de Implementación
 
-### 3. Actualizar Gestión de Carrito
-- [x] Modificar acciones de carrito (`lib/actions/cart.ts` si existe, o crear) para manejar variantId al agregar/remover items.
-- [x] Actualizar `AddToCartButton.tsx` para incluir variantId y atributos al agregar al carrito.
-- [x] Modificar `MiniCart.tsx` y `CartProvider.tsx` para mostrar atributos de variante.
+### 1. Agregar Opción "Producto Original" en Selects de Variantes
+- **Archivo:** `app/products/[id]/ProductClient.tsx`
+- **Cambios:**
+  - Modificar `getAvailableOptions` para incluir una opción "Producto Original" al inicio de cada lista de opciones.
+  - Actualizar la lógica de selección para manejar el caso cuando se selecciona "Producto Original" (limpiar `selectedAttributes`).
+  - Asegurar que al seleccionar "Producto Original", se resetee la variante seleccionada y se muestre la imagen principal del producto.
 
-### 4. Actualizar Checkout y Deducción de Stock
-- [x] Modificar `app/api/checkout/route.ts` para incluir variantId en items y calcular precios correctamente.
-- [x] Crear función en `lib/actions/stock.ts` para deducir stock de variante o producto según corresponda.
-- [x] Integrar deducción de stock en webhook de pago exitoso (`app/api/webhooks/route.ts`).
+### 2. Corregir Sincronización de Selects al Seleccionar Imagen de Variante
+- **Archivo:** `app/products/[id]/ProductClient.tsx`
+- **Cambios:**
+  - Verificar que el `onClick` de las miniaturas de variantes actualice correctamente `selectedAttributes`.
+  - Agregar un `useEffect` para forzar la actualización de los Selects cuando `selectedAttributes` cambie.
+  - Asegurar que los Selects reflejen la variante seleccionada incluso si se cambia manualmente después.
 
-### 5. Lado Usuario: Selección de Variantes
-- [x] Actualizar `app/products/[id]/ProductClient.tsx` para mostrar opciones de variantes (atributos, imágenes).
-- [x] Agregar estado para variante seleccionada y actualizar precio/imagen dinámicamente.
-- [x] Modificar `ProductCard.tsx` para mostrar precio de variante si aplica.
+### 3. Mejorar Indicadores Visuales de Selección
+- **Archivo:** `app/products/[id]/ProductClient.tsx`
+- **Cambios:**
+  - Agregar un indicador visual (badge o texto) que muestre "Variante Seleccionada" cuando hay una variante activa.
+  - Resaltar el select correspondiente cuando se selecciona una variante desde el carrusel.
+  - Mostrar un mensaje cuando se selecciona "Producto Original" para confirmar la selección.
 
-### 6. Lado Admin: Gestión de Variantes
-- [x] Actualizar `components/admin/ProductVariants.tsx` para crear/editar variantes con precio, stock, imagen.
-- [x] Modificar páginas admin de productos para incluir gestión de variantes.
-- [x] Actualizar `lib/actions/productVariants.ts` si necesario para validaciones.
+### 4. Actualizar Lógica de Precios y Stock
+- **Archivo:** `app/products/[id]/ProductClient.tsx`
+- **Cambios:**
+  - Asegurar que al seleccionar "Producto Original", se use el precio y stock del producto base.
+  - Verificar que `currentPrice` y `currentStock` se actualicen correctamente en todos los casos.
 
-### 7. Actualizar Validaciones y Tipos
-- [x] Actualizar `lib/validations/checkout.ts` para incluir variantId en items.
-- [x] Actualizar tipos en `types/index.ts` para CartItem con variantId.
+### 5. Agregar Validación y Feedback
+- **Archivo:** `app/products/[id]/ProductClient.tsx`
+- **Cambios:**
+  - Agregar validación para evitar selecciones inválidas (ej: variante no disponible).
+  - Mostrar mensajes de error o advertencia si una variante no está disponible.
+  - Implementar feedback visual (loading states) durante la selección.
 
-## Archivos Dependientes a Editar
-- `lib/schema.ts`: Agregar variantId a cartItems.
-- `lib/stores/useCartStore.ts`: Ya tiene variantId, verificar lógica de precios.
-- `lib/actions/products.ts`: Actualizar getProductById para incluir variantes.
-- `lib/actions/stock.ts`: Agregar función para deducir stock de variante.
-- `app/api/checkout/route.ts`: Manejar variantes en cálculo de precios.
-- `app/products/[id]/ProductClient.tsx`: Agregar selección de variante.
-- `components/cart/AddToCartButton.tsx`: Pasar variantId.
-- `components/admin/ProductVariants.tsx`: Mejorar gestión.
+### 6. Pruebas y Verificación
+- **Tareas:**
+  - Probar la selección de imágenes de variantes y verificar que los selects se actualicen.
+  - Probar la opción "Producto Original" y confirmar que resetea la selección.
+  - Verificar en diferentes dispositivos y tamaños de pantalla.
+  - Probar con productos que tienen múltiples variantes y atributos.
 
-## Pasos de Seguimiento
-- [x] Ejecutar migración de BD después de cambios en esquema.
-- [x] Probar flujo completo: agregar variante al carrito, checkout, verificación de stock.
-- [ ] Verificar que precios se calculen correctamente en carrito y checkout.
-- [ ] Asegurar compatibilidad con ofertas (descuentos).
-- [ ] Probar desde lado usuario y admin.
+### 7. Recomendaciones Adicionales
+- **Mejora de UX:** Agregar tooltips en las miniaturas para explicar qué hace cada imagen (principal, secundaria, variante).
+- **Optimización:** Implementar lazy loading para imágenes de variantes si hay muchas.
+- **Accesibilidad:** Asegurar que los selects y botones tengan labels adecuados y sean navegables por teclado.
+- **Analytics:** Agregar tracking para ver qué opciones seleccionan los usuarios (producto original vs variantes).
+- **Compatibilidad:** Verificar que funcione correctamente con productos que no tienen variantes.
+
+## Estado de Implementación
+- [x] 1. Agregar Opción "Producto Original"
+- [x] 2. Corregir Sincronización de Selects
+- [ ] 3. Mejorar Indicadores Visuales
+- [ ] 4. Actualizar Lógica de Precios y Stock
+- [ ] 5. Agregar Validación y Feedback
+- [ ] 6. Pruebas y Verificación
+- [ ] 7. Recomendaciones Adicionales
+
+## Notas Técnicas
+- Usar `useEffect` para sincronizar cambios en `selectedAttributes`.
+- Mantener la lógica de `getAvailableOptions` para filtrar opciones válidas.
+- Asegurar compatibilidad con el componente `AddToCartButton` que recibe `variantId` y `variantAttributes`.

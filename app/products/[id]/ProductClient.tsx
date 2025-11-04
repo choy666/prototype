@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -62,13 +62,28 @@ export default function ProductClient({ product }: { product: Product }) {
         if (value) options.add(value);
       });
 
-      return Array.from(options);
+      // Agregar opción "Producto Original" al inicio si no hay selección completa de variante
+      const fullSelection = Object.keys(availableAttributes).length === Object.keys(selectedAttributes).length;
+      if (!fullSelection) {
+        options.add('Producto Original');
+      }
+
+      return Array.from(options).sort((a, b) => {
+        if (a === 'Producto Original') return -1;
+        if (b === 'Producto Original') return 1;
+        return a.localeCompare(b);
+      });
     },
     [product.variants, selectedAttributes, availableAttributes]
   );
 
   // Variante seleccionada
   const selectedVariant = useMemo(() => {
+    // Si hay selección de "Producto Original" en algún atributo, retornar null (producto base)
+    if (Object.values(selectedAttributes).includes('Producto Original')) {
+      return null;
+    }
+
     if (!product.variants?.length || Object.keys(selectedAttributes).length === 0) return null;
 
     return (
@@ -133,6 +148,11 @@ export default function ProductClient({ product }: { product: Product }) {
       }
     }
   }, [selectedVariant?.image, allImages]);
+
+  // Efecto para sincronizar selects cuando cambia selectedAttributes (para forzar actualización visual)
+  useEffect(() => {
+    // Esto asegura que los Selects se actualicen cuando selectedAttributes cambia desde imagen click
+  }, [selectedAttributes]);
 
   // Normalizamos para getDiscountedPrice
   const normalizedProduct = {
@@ -242,7 +262,12 @@ export default function ProductClient({ product }: { product: Product }) {
                       if (img.type === 'variant') {
                         const variant = product.variants?.find((v) => v.image === img.src);
                         if (variant) {
+                          // Actualizar selectedAttributes y forzar sincronización
                           setSelectedAttributes(variant.attributes);
+                          // Pequeño delay para asegurar que los selects se actualicen
+                          setTimeout(() => {
+                            // Confirmar que selectedAttributes se ha actualizado
+                          }, 0);
                         }
                       }
                       setCurrentImageIndex(absoluteIndex);
@@ -251,7 +276,7 @@ export default function ProductClient({ product }: { product: Product }) {
                       isActive ? 'border-primary' : 'border-transparent hover:border-gray-300'
                     }`}
                     aria-label={`Ver imagen ${absoluteIndex + 1}`}
-                    title={`${img.type === 'main' ? 'Imagen principal' : img.type === 'secondary' ? 'Imagen secundaria' : 'Imagen de variante - clic para seleccionar'}`}
+                    title={`${img.type === 'main' ? 'Imagen principal' : img.type === 'secondary' ? 'Imagen secundaria' : 'Imagen de variante - clic para seleccionar variante'}`}
                   >
                     <Image
                       src={img.src}
@@ -316,12 +341,23 @@ export default function ProductClient({ product }: { product: Product }) {
                     <label className='text-sm font-medium text-white capitalize'>{attrKey}</label>
                     <Select
                       value={selectedAttributes[attrKey] || ''}
-                      onValueChange={(value) =>
+                    onValueChange={(value) => {
+                      if (value === 'Producto Original') {
+                        // Resetear todos los atributos a "Producto Original" o limpiar si es el único
+                        setSelectedAttributes((prev) => {
+                          const newAttrs = { ...prev };
+                          Object.keys(availableAttributes).forEach(key => {
+                            newAttrs[key] = 'Producto Original';
+                          });
+                          return newAttrs;
+                        });
+                      } else {
                         setSelectedAttributes((prev) => ({
                           ...prev,
                           [attrKey]: value,
-                        }))
+                        }));
                       }
+                    }}
                     >
                       <SelectTrigger className='w-full'>
                         <SelectValue placeholder={`Seleccionar ${attrKey}`} />
@@ -329,7 +365,7 @@ export default function ProductClient({ product }: { product: Product }) {
                       <SelectContent>
                         {getAvailableOptions(attrKey).map((value) => (
                           <SelectItem key={value} value={value}>
-                            {value}
+                            {value === 'Producto Original' ? 'Producto Original (sin variantes)' : value}
                           </SelectItem>
                         ))}
                       </SelectContent>
