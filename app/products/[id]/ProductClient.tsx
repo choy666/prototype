@@ -8,7 +8,7 @@ import type { Product } from '@/types';
 import { AddToCartButton } from '@/components/cart/AddToCartButton';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import { getDiscountedPrice } from '@/lib/utils/pricing';
-import { useToast } from '@/components/ui/use-toast';
+
 import {
   Select,
   SelectContent,
@@ -18,12 +18,10 @@ import {
 } from '@/components/ui/select';
 
 export default function ProductClient({ product }: { product: Product }) {
-  const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
-  const [selectedFromCarousel, setSelectedFromCarousel] = useState<Record<string, boolean>>({});
 
   // Atributos disponibles de las variantes
   const availableAttributes = useMemo(() => {
@@ -267,11 +265,6 @@ export default function ProductClient({ product }: { product: Product }) {
                         if (variant) {
                           // Actualizar selectedAttributes y forzar sincronización
                           setSelectedAttributes(variant.attributes);
-                          // Marcar que se seleccionó desde el carrusel
-                          setSelectedFromCarousel((prev) => ({
-                            ...prev,
-                            ...Object.fromEntries(Object.keys(variant.attributes).map(key => [key, true]))
-                          }));
                           // Pequeño delay para asegurar que los selects se actualicen
                           setTimeout(() => {
                             // Confirmar que selectedAttributes se ha actualizado
@@ -349,23 +342,23 @@ export default function ProductClient({ product }: { product: Product }) {
                     <label className='text-sm font-medium text-white capitalize'>{attrKey}</label>
                     <Select
                       value={selectedAttributes[attrKey] || ''}
-                    onValueChange={(value) => {
-                      if (value === 'Producto Original') {
-                        // Resetear todos los atributos a "Producto Original" o limpiar si es el único
-                        setSelectedAttributes((prev) => {
-                          const newAttrs = { ...prev };
-                          Object.keys(availableAttributes).forEach(key => {
-                            newAttrs[key] = 'Producto Original';
+                      onValueChange={(value) => {
+                        if (value === 'Producto Original') {
+                          // Resetear todos los atributos a "Producto Original" o limpiar si es el único
+                          setSelectedAttributes((prev) => {
+                            const newAttrs = { ...prev };
+                            Object.keys(availableAttributes).forEach(key => {
+                              newAttrs[key] = 'Producto Original';
+                            });
+                            return newAttrs;
                           });
-                          return newAttrs;
-                        });
-                      } else {
-                        setSelectedAttributes((prev) => ({
-                          ...prev,
-                          [attrKey]: value,
-                        }));
-                      }
-                    }}
+                        } else {
+                          setSelectedAttributes((prev) => ({
+                            ...prev,
+                            [attrKey]: value,
+                          }));
+                        }
+                      }}
                     >
                       <SelectTrigger className='w-full'>
                         <SelectValue placeholder={`Seleccionar ${attrKey}`} />
@@ -383,7 +376,6 @@ export default function ProductClient({ product }: { product: Product }) {
               </div>
             </div>
           )}
-                        ))}
 
           <div className='flex items-center space-x-4'>
             <div className='flex items-center border rounded-md'>
@@ -399,9 +391,6 @@ export default function ProductClient({ product }: { product: Product }) {
                 onClick={() => setQuantity((prev) => prev + 1)}
                 className='px-3 py-1 text-lg hover:bg-gray-100 transition-colors'
               >
-                      </SelectContent>
-                    </Select>
-                  </div>
                 +
               </button>
             </div>
