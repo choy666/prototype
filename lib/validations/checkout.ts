@@ -114,6 +114,7 @@ export const checkoutSchema = z.object({
       image: z.string().optional(),
       discount: z.number().optional(),
       weight: z.number().optional(),
+      variantId: z.number().optional(),
     })
   ).min(1, 'El carrito debe tener al menos un producto'),
 
