@@ -61,7 +61,7 @@ En la página `app/products/[id]`, al seleccionar una imagen del carrusel que co
 ## Estado de Implementación
 - [x] 1. Agregar Opción "Producto Original"
 - [x] 2. Corregir Sincronización de Selects
-- [ ] 3. Mejorar Indicadores Visuales
+- [x] 3. Mejorar Indicadores Visuales
 - [ ] 4. Actualizar Lógica de Precios y Stock
 - [ ] 5. Agregar Validación y Feedback
 - [ ] 6. Pruebas y Verificación
