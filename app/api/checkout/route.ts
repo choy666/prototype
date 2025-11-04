@@ -92,12 +92,15 @@ export async function POST(req: NextRequest) {
     // Calcular total final
     const total = subtotal + shippingCost;
 
-    // Preparar metadata
+    // Preparar metadata incluyendo variantId en items
     const metadata = {
       userId: userId.toString(),
       shippingAddress: JSON.stringify(shippingAddress),
       shippingMethodId: method.id.toString(),
-      items: JSON.stringify(items),
+      items: JSON.stringify(items.map(item => ({
+        ...item,
+        variantId: item.variantId || null
+      }))),
       subtotal: subtotal.toString(),
       shippingCost: shippingCost.toString(),
       total: total.toString(),

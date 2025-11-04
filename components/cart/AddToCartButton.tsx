@@ -5,6 +5,8 @@ import { useCartStore } from '@/lib/stores/useCartStore'
 import { useState, useEffect, useRef } from 'react'
 import { ShoppingCart } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
+import { addToCart } from '@/lib/actions/cart'
+import { useSession } from 'next-auth/react'
 
 type AddToCartButtonProps = {
   product: {
@@ -32,13 +34,17 @@ export function AddToCartButton({
   const error = useCartStore(state => state.error)
   const { toast } = useToast()
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { data: session } = useSession()
 
-  const cartItem = cartItems.find(item => item.id === product.id)
+  const cartItem = cartItems.find(item =>
+    item.id === product.id &&
+    item.variantId === product.variantId
+  )
   const currentQuantity = cartItem?.quantity ?? 0
   const isOutOfStock = product.stock <= 0
   const isMaxedOut = currentQuantity + quantity > product.stock
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product?.id || product.price <= 0 || isOutOfStock || isMaxedOut) {
       toast({
         title: 'Error',
@@ -48,23 +54,50 @@ export function AddToCartButton({
       return
     }
 
+    if (!session?.user?.id) {
+      toast({
+        title: 'Error',
+        description: 'Debes iniciar sesión para agregar productos al carrito',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsAdding(true)
 
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,               // precio original
-      discount: product.discount ?? 0,    // 👈 guardamos descuento
-      image: product.image || undefined,
-      quantity,
-      stock: product.stock,
-      variantId: product.variantId,       // 👈 guardamos variante
-      variantAttributes: product.variantAttributes, // 👈 guardamos atributos de variante
-    })
+    try {
+      // Agregar al carrito del servidor
+      await addToCart(Number(session.user.id), product.id, quantity, product.variantId)
 
-    timeoutRef.current = setTimeout(() => {
-      setIsAdding(false)
-    }, 1000)
+      // También actualizar el store local para UI inmediata
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,               // precio original
+        discount: product.discount ?? 0,    // 👈 guardamos descuento
+        image: product.image || undefined,
+        quantity,
+        stock: product.stock,
+        variantId: product.variantId,       // 👈 guardamos variante
+        variantAttributes: product.variantAttributes, // 👈 guardamos atributos de variante
+      })
+
+      toast({
+        title: 'Producto agregado',
+        description: `${product.name} se agregó al carrito`,
+      })
+    } catch (error) {
+      console.error('Error agregando al carrito:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo agregar el producto al carrito',
+        variant: 'destructive',
+      })
+    } finally {
+      timeoutRef.current = setTimeout(() => {
+        setIsAdding(false)
+      }, 1000)
+    }
   }
 
   // Manejo de errores del store

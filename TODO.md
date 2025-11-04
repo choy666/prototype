@@ -21,28 +21,28 @@
 - [x] Asegurar que ofertas (descuentos) se hereden de producto padre a variantes.
 
 ### 3. Actualizar Gestión de Carrito
-- [ ] Modificar acciones de carrito (`lib/actions/cart.ts` si existe, o crear) para manejar variantId al agregar/remover items.
-- [ ] Actualizar `AddToCartButton.tsx` para incluir variantId y atributos al agregar al carrito.
-- [ ] Modificar `MiniCart.tsx` y `CartProvider.tsx` para mostrar atributos de variante.
+- [x] Modificar acciones de carrito (`lib/actions/cart.ts` si existe, o crear) para manejar variantId al agregar/remover items.
+- [x] Actualizar `AddToCartButton.tsx` para incluir variantId y atributos al agregar al carrito.
+- [x] Modificar `MiniCart.tsx` y `CartProvider.tsx` para mostrar atributos de variante.
 
 ### 4. Actualizar Checkout y Deducción de Stock
-- [ ] Modificar `app/api/checkout/route.ts` para incluir variantId en items y calcular precios correctamente.
+- [x] Modificar `app/api/checkout/route.ts` para incluir variantId en items y calcular precios correctamente.
 - [x] Crear función en `lib/actions/stock.ts` para deducir stock de variante o producto según corresponda.
-- [ ] Integrar deducción de stock en webhook de pago exitoso (`app/api/webhooks/route.ts`).
+- [x] Integrar deducción de stock en webhook de pago exitoso (`app/api/webhooks/route.ts`).
 
 ### 5. Lado Usuario: Selección de Variantes
-- [ ] Actualizar `app/products/[id]/ProductClient.tsx` para mostrar opciones de variantes (atributos, imágenes).
-- [ ] Agregar estado para variante seleccionada y actualizar precio/imagen dinámicamente.
-- [ ] Modificar `ProductCard.tsx` para mostrar precio de variante si aplica.
+- [x] Actualizar `app/products/[id]/ProductClient.tsx` para mostrar opciones de variantes (atributos, imágenes).
+- [x] Agregar estado para variante seleccionada y actualizar precio/imagen dinámicamente.
+- [x] Modificar `ProductCard.tsx` para mostrar precio de variante si aplica.
 
 ### 6. Lado Admin: Gestión de Variantes
-- [ ] Actualizar `components/admin/ProductVariants.tsx` para crear/editar variantes con precio, stock, imagen.
-- [ ] Modificar páginas admin de productos para incluir gestión de variantes.
-- [ ] Actualizar `lib/actions/productVariants.ts` si necesario para validaciones.
+- [x] Actualizar `components/admin/ProductVariants.tsx` para crear/editar variantes con precio, stock, imagen.
+- [x] Modificar páginas admin de productos para incluir gestión de variantes.
+- [x] Actualizar `lib/actions/productVariants.ts` si necesario para validaciones.
 
 ### 7. Actualizar Validaciones y Tipos
-- [ ] Actualizar `lib/validations/checkout.ts` para incluir variantId en items.
-- [ ] Actualizar tipos en `types/index.ts` para CartItem con variantId.
+- [x] Actualizar `lib/validations/checkout.ts` para incluir variantId en items.
+- [x] Actualizar tipos en `types/index.ts` para CartItem con variantId.
 
 ## Archivos Dependientes a Editar
 - `lib/schema.ts`: Agregar variantId a cartItems.
@@ -55,8 +55,8 @@
 - `components/admin/ProductVariants.tsx`: Mejorar gestión.
 
 ## Pasos de Seguimiento
-- [ ] Ejecutar migración de BD después de cambios en esquema.
-- [ ] Probar flujo completo: agregar variante al carrito, checkout, verificación de stock.
+- [x] Ejecutar migración de BD después de cambios en esquema.
+- [x] Probar flujo completo: agregar variante al carrito, checkout, verificación de stock.
 - [ ] Verificar que precios se calculen correctamente en carrito y checkout.
 - [ ] Asegurar compatibilidad con ofertas (descuentos).
 - [ ] Probar desde lado usuario y admin.
