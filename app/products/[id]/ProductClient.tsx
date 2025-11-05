@@ -166,7 +166,8 @@ export default function ProductClient({ product }: { product: Product }) {
   };
 
   const hasDiscount = (product.discount ?? 0) > 0;
-  const finalPrice = getDiscountedPrice(normalizedProduct);
+  // Calcular precio final aplicando descuento al precio actual (variante o base)
+  const finalPrice = hasDiscount ? getDiscountedPrice({ ...normalizedProduct, price: currentPrice }) : currentPrice;
 
   const nextImage = () => {
     if (!allImages.length) return;
@@ -344,7 +345,7 @@ export default function ProductClient({ product }: { product: Product }) {
                       value={selectedAttributes[attrKey] || ''}
                       onValueChange={(value) => {
                         if (value === 'Producto Original') {
-                          // Resetear todos los atributos a "Producto Original" o limpiar si es el único
+                          // Resetear todos los atributos a "Producto Original" y resetear imagen a principal
                           setSelectedAttributes((prev) => {
                             const newAttrs = { ...prev };
                             Object.keys(availableAttributes).forEach(key => {
@@ -352,6 +353,8 @@ export default function ProductClient({ product }: { product: Product }) {
                             });
                             return newAttrs;
                           });
+                          // Resetear imagen a la principal del producto
+                          setCurrentImageIndex(0);
                         } else {
                           setSelectedAttributes((prev) => ({
                             ...prev,
