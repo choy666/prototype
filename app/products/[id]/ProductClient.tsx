@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -22,6 +22,7 @@ export default function ProductClient({ product }: { product: Product }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
+  const [useOriginalProduct, setUseOriginalProduct] = useState(true); // Estado para alternar entre original y variantes
 
   // Atributos disponibles de las variantes
   const availableAttributes = useMemo(() => {
@@ -40,48 +41,12 @@ export default function ProductClient({ product }: { product: Product }) {
     );
   }, [product.variants]);
 
-  // Opciones disponibles para cada atributo basándose en selecciones previas
-  const getAvailableOptions = useCallback(
-    (attrKey: string) => {
-      if (!product.variants?.length) return availableAttributes[attrKey] || [];
 
-      const selectedKeys = Object.keys(selectedAttributes);
-      if (selectedKeys.length === 0) return availableAttributes[attrKey] || [];
-
-      // Encontrar variantes que coincidan con las selecciones actuales
-      const matchingVariants = product.variants.filter((variant) => {
-        return selectedKeys.every((selectedKey) => {
-          if (selectedKey === attrKey) return true; // No filtrar por el atributo actual
-          return variant.attributes[selectedKey] === selectedAttributes[selectedKey];
-        });
-      });
-
-      // Extraer valores únicos del atributo objetivo de las variantes coincidentes
-      const options = new Set<string>();
-      matchingVariants.forEach((variant) => {
-        const value = variant.attributes[attrKey];
-        if (value) options.add(value);
-      });
-
-      // Agregar opción "Producto Original" al inicio si no hay selección completa de variante
-      const fullSelection = Object.keys(availableAttributes).length === Object.keys(selectedAttributes).length;
-      if (!fullSelection) {
-        options.add('Producto Original');
-      }
-
-      return Array.from(options).sort((a, b) => {
-        if (a === 'Producto Original') return -1;
-        if (b === 'Producto Original') return 1;
-        return a.localeCompare(b);
-      });
-    },
-    [product.variants, selectedAttributes, availableAttributes]
-  );
 
   // Variante seleccionada
   const selectedVariant = useMemo(() => {
-    // Si hay selección de "Producto Original" en algún atributo, retornar null (producto base)
-    if (Object.values(selectedAttributes).includes('Producto Original')) {
+    // Si useOriginalProduct es true, retornar null (producto base)
+    if (useOriginalProduct) {
       return null;
     }
 
@@ -94,7 +59,7 @@ export default function ProductClient({ product }: { product: Product }) {
         )
       ) || null
     );
-  }, [product.variants, selectedAttributes]);
+  }, [product.variants, selectedAttributes, useOriginalProduct]);
 
   // Precio actual (de variante o producto)
   const currentPrice = selectedVariant?.price
@@ -264,7 +229,8 @@ export default function ProductClient({ product }: { product: Product }) {
                       if (img.type === 'variant') {
                         const variant = product.variants?.find((v) => v.image === img.src);
                         if (variant) {
-                          // Actualizar selectedAttributes y forzar sincronización
+                          // Cambiar a modo variantes y seleccionar atributos
+                          setUseOriginalProduct(false);
                           setSelectedAttributes(variant.attributes);
                           // Pequeño delay para asegurar que los selects se actualicen
                           setTimeout(() => {
@@ -333,50 +299,70 @@ export default function ProductClient({ product }: { product: Product }) {
 
           <p className='text-gray-600'>{product.description}</p>
 
-          {/* Selección de variantes */}
+          {/* Toggle entre Producto Original y Variantes */}
           {Object.keys(availableAttributes).length > 0 && (
             <div className='space-y-4'>
-              <h3 className='font-semibold text-white'>Opciones disponibles</h3>
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                {Object.entries(availableAttributes).map(([attrKey]) => (
-                  <div key={attrKey} className='space-y-2'>
-                    <label className='text-sm font-medium text-white capitalize'>{attrKey}</label>
-                    <Select
-                      value={selectedAttributes[attrKey] || ''}
-                      onValueChange={(value) => {
-                        if (value === 'Producto Original') {
-                          // Resetear todos los atributos a "Producto Original" y resetear imagen a principal
-                          setSelectedAttributes((prev) => {
-                            const newAttrs = { ...prev };
-                            Object.keys(availableAttributes).forEach(key => {
-                              newAttrs[key] = 'Producto Original';
-                            });
-                            return newAttrs;
-                          });
-                          // Resetear imagen a la principal del producto
-                          setCurrentImageIndex(0);
-                        } else {
-                          setSelectedAttributes((prev) => ({
-                            ...prev,
-                            [attrKey]: value,
-                          }));
-                        }
-                      }}
-                    >
-                      <SelectTrigger className='w-full'>
-                        <SelectValue placeholder={`Seleccionar ${attrKey}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableOptions(attrKey).map((value) => (
-                          <SelectItem key={value} value={value}>
-                            {value === 'Producto Original' ? 'Producto Original (sin variantes)' : value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+              <h3 className='font-semibold text-white'>Selección de producto</h3>
+              <div className='flex gap-2'>
+                <button
+                  onClick={() => {
+                    setUseOriginalProduct(true);
+                    setSelectedAttributes({});
+                    setCurrentImageIndex(0);
+                  }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    useOriginalProduct
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Producto Original
+                </button>
+                <button
+                  onClick={() => setUseOriginalProduct(false)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    !useOriginalProduct
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Variantes
+                </button>
               </div>
+
+              {/* Selección de atributos solo si no es producto original */}
+              {!useOriginalProduct && (
+                <div className='space-y-4'>
+                  <h4 className='font-medium text-white'>Seleccionar opciones</h4>
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    {Object.entries(availableAttributes).map(([attrKey]) => (
+                      <div key={attrKey} className='space-y-2'>
+                        <label className='text-sm font-medium text-white capitalize'>{attrKey}</label>
+                        <Select
+                          value={selectedAttributes[attrKey] || ''}
+                          onValueChange={(value) => {
+                            setSelectedAttributes((prev) => ({
+                              ...prev,
+                              [attrKey]: value,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className='w-full'>
+                            <SelectValue placeholder={`Seleccionar ${attrKey}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableAttributes[attrKey].map((value) => (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
