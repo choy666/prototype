@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X, ImageIcon, Search, Filter, AlertTriangle, CheckCircle, Eye, EyeOff, Check } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X, ImageIcon, Search, AlertTriangle, CheckCircle, EyeOff, Check } from 'lucide-react'
 import Image from 'next/image'
 
 interface ProductVariant {
@@ -41,7 +41,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   const [showImageSuggestions, setShowImageSuggestions] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
-  const [showBulkActions, setShowBulkActions] = useState(false)
   const [selectedVariants, setSelectedVariants] = useState<number[]>([])
   const [inlineEditing, setInlineEditing] = useState<{ [key: number]: { field: string; value: string | number } }>({})
   const [inlineLoading, setInlineLoading] = useState<{ [key: number]: boolean }>({})

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Collapsible } from '@/components/ui/Collapsible'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { Progress } from '@/components/ui/Progress'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Download, Upload, RotateCcw, RotateCw, HelpCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Download, Upload, RotateCcw, RotateCw, CheckCircle } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import { ProductVariants } from '@/components/admin/ProductVariants'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -97,7 +97,7 @@ export default function EditProductPage() {
     variants: []
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
+  const [autoSaveEnabled] = useState(true)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [undoRedo, setUndoRedo] = useState<UndoRedoState>({
@@ -458,7 +458,7 @@ export default function EditProductPage() {
   // Calculate completion progress
   const calculateProgress = () => {
     let completed = 0
-    let total = 6 // name, price, category, description, attributes, variants
+    const total = 6 // name, price, category, description, attributes, variants
 
     if (form.name.trim()) completed++
     if (form.price && parseFloat(form.price) > 0) completed++
@@ -1034,4 +1034,3 @@ export default function EditProductPage() {
       </div>
     )
   }
-}
