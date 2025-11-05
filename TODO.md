@@ -1,34 +1,65 @@
-# Plan de Implementación: Sincronizar Sistema de Variantes en Edición de Productos
+# Mejoras UX/UI en Variantes y Atributos Dinámicos - Página de Edición de Productos
 
-## Objetivo
-Implementar el mismo sistema y formato de variantes y atributos al editar un producto que se usa al crear uno, sincronizando la estética y uso en todo el proyecto.
+## Información Recopilada
+- **Página principal**: `app/admin/products/[id]/edit/page.tsx` - Maneja la edición general del producto, incluye secciones para atributos dinámicos y variantes.
+- **Componente AttributeBuilder**: `components/admin/AttributeBuilder.tsx` - Gestiona la creación y edición de atributos dinámicos con nombre y valores.
+- **Componente ProductVariants**: `components/admin/ProductVariants.tsx` - Maneja la gestión de variantes del producto con atributos, precio, stock e imagen.
+- **Estado actual**: Interfaz básica con formularios estáticos, falta dinamismo, visualización clara de combinaciones, y facilidad de uso.
 
-## Tareas Pendientes
+## Plan de Implementación
 
-### 1. Modificar Página de Edición (app/admin/products/[id]/edit/page.tsx)
-- [x] Integrar AttributeBuilder para gestión de atributos dinámicos
-- [x] Agregar lógica de generación automática de variantes basada en atributos
-- [x] Incluir sección de variantes con formulario inline (similar a creación)
-- [x] Actualizar estado del formulario para incluir atributos y variantes
-- [x] Modificar handleSubmit para guardar atributos y variantes
-- [x] Agregar campo de stock al formulario principal
+### 1. Mejorar AttributeBuilder con UX/UI Dinámica
+- [x] Agregar drag-and-drop para reordenar atributos
+- [x] Implementar visualización mejorada con chips/tags interactivos
+- [x] Agregar validaciones en tiempo real
+- [x] Implementar edición en línea para valores
+- [x] Agregar animaciones de entrada/salida
+- [x] Mejorar responsividad móvil
 
-### 2. Actualizar Componente ProductVariants
-- [ ] Mejorar integración con AttributeBuilder
-- [ ] Asegurar consistencia visual con el formulario de creación
-- [ ] Optimizar manejo de atributos dinámicos
+### 2. Mejorar ProductVariants con Interfaz Interactiva
+- [x] Reemplazar lista básica con tabla interactiva
+- [x] Agregar filtros y búsqueda para variantes
+- [x] Implementar edición en línea (inline editing)
+- [x] Agregar vista previa de combinaciones de atributos
+- [x] Implementar bulk actions (editar múltiples variantes)
+- [x] Agregar indicadores visuales de stock bajo/agotado
+- [x] Mejorar gestión de imágenes con galería
 
-### 3. Verificar Consistencia Estética
-- [ ] Revisar que los estilos coincidan entre creación y edición
-- [ ] Asegurar responsive design consistente
-- [ ] Verificar accesibilidad (labels, ARIA, etc.)
+### 3. Integrar Mejor las Secciones en la Página de Edición
+- [x] Crear tabs o secciones colapsables para mejor organización
+- [x] Agregar indicadores de progreso/completitud
+- [x] Implementar sincronización automática entre atributos y variantes
+- [x] Agregar preview de cómo se verán las variantes en el frontend
+- [x] Mejorar navegación entre secciones
 
-### 4. Testing y Validación
-- [ ] Probar creación de variantes desde atributos
-- [ ] Verificar edición de productos existentes con variantes
-- [ ] Validar que no se pierdan datos al editar
-- [ ] Probar eliminación y modificación de variantes
+### 4. Agregar Funcionalidades Avanzadas
+- [x] Implementar guardado automático con indicadores
+- [x] Agregar tooltips y ayuda contextual
+- [x] Implementar undo/redo para cambios
+- [x] Agregar exportación/importación de configuraciones
+- [x] Implementar plantillas predefinidas
 
-### 5. Documentación
-- [ ] Actualizar documentación si es necesario
-- [ ] Agregar comentarios en código para futuras modificaciones
+
+
+### 6. Testing y Ajustes Finales
+- [ ] Probar en diferentes dispositivos y navegadores
+- [ ] Realizar pruebas de usabilidad
+- [ ] Optimizar rendimiento
+- [ ] Agregar tests unitarios para nuevos componentes
+
+## Archivos a Modificar
+- `components/admin/AttributeBuilder.tsx`
+- `components/admin/ProductVariants.tsx`
+- `app/admin/products/[id]/edit/page.tsx`
+- Posiblemente crear nuevos componentes utilitarios
+
+## Dependencias
+- Mantener compatibilidad con componentes UI existentes
+- Posible adición de librerías como `react-beautiful-dnd` para drag-and-drop
+- Asegurar compatibilidad con Tailwind CSS
+
+## Recomendaciones Adicionales
+- Implementar modo oscuro consistente
+- Agregar accesibilidad (ARIA labels, navegación por teclado)
+- Considerar internacionalización para textos
+- Optimizar para pantallas táctiles
