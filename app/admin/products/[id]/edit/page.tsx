@@ -19,6 +19,13 @@ import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
 import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 
+interface VariantForm {
+  attributes: Record<string, string>
+  stock: number
+  price: string
+  image: string
+}
+
 interface Product {
   id: number
   name: string
@@ -43,7 +50,10 @@ interface ProductForm {
   categoryId: string
   discount: string
   weight: string
+  stock: string
   destacado: boolean
+  dynamicAttributes: DynamicAttribute[]
+  variants: VariantForm[]
 }
 
 export default function EditProductPage() {
@@ -63,7 +73,10 @@ export default function EditProductPage() {
     categoryId: '',
     discount: '0',
     weight: '',
-    destacado: false
+    stock: '0',
+    destacado: false,
+    dynamicAttributes: [],
+    variants: []
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
 
@@ -103,7 +116,10 @@ export default function EditProductPage() {
           categoryId: product.categoryId?.toString() || '',
           discount: product.discount.toString(),
           weight: product.weight || '',
-          destacado: product.destacado
+          stock: product.stock.toString(),
+          destacado: product.destacado,
+          dynamicAttributes: (product as unknown as { attributes?: DynamicAttribute[] }).attributes || [],
+          variants: [] // Se cargarán desde ProductVariants
         })
         setAttributes((product as unknown as { attributes?: DynamicAttribute[] }).attributes || [])
       } catch {
@@ -122,6 +138,32 @@ export default function EditProductPage() {
     if (id) fetchProduct()
   }, [id, router, toast])
 
+  // Generate combinations when dynamic attributes change
+  useEffect(() => {
+    const generateCombinations = (dynamicAttrs: DynamicAttribute[]) => {
+      if (dynamicAttrs.length === 0) return []
+
+      const combinations = dynamicAttrs.reduce((acc, attr) => {
+        if (acc.length === 0) {
+          return attr.values.map((value: string) => ({ [attr.name]: value }))
+        }
+        return acc.flatMap(comb =>
+          attr.values.map((value: string) => ({ ...comb, [attr.name]: value }))
+        )
+      }, [] as Record<string, string>[])
+
+      return combinations.map(attrs => ({
+        attributes: attrs,
+        stock: 0,
+        price: '',
+        image: ''
+      }))
+    }
+
+    const combinations = generateCombinations(attributes)
+    setForm(prev => ({ ...prev, variants: combinations }))
+  }, [attributes])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -136,6 +178,7 @@ export default function EditProductPage() {
         categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
+        stock: parseInt(form.stock) || 0,
         destacado: form.destacado,
         attributes: attributes.length > 0 ? attributes : undefined
       }
@@ -192,6 +235,15 @@ export default function EditProductPage() {
     }))
   }
 
+  const handleVariantChange = (index: number, field: keyof VariantForm, value: string | number) => {
+    setForm(prev => ({
+      ...prev,
+      variants: prev.variants.map((variant, i) =>
+        i === index ? { ...variant, [field]: value } : variant
+      )
+    }))
+  }
+
   if (fetchLoading) {
     return (
       <div className="space-y-6">
@@ -218,18 +270,7 @@ export default function EditProductPage() {
           </CardContent>
         </Card>
 
-        {/* Sección de Atributos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Atributos del Producto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AttributeBuilder
-              attributes={attributes}
-              onChange={setAttributes}
-            />
-          </CardContent>
-        </Card>
+
 
       {/* Sección de Variantes */}
       <ProductVariants productId={parseInt(id)} />
@@ -333,6 +374,18 @@ export default function EditProductPage() {
                 />
               </div>
 
+              <div>
+                <Label htmlFor="stock">Stock</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  min="0"
+                  value={form.stock}
+                  onChange={(e) => handleChange('stock', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+
               <div className="md:col-span-2">
                 <Label htmlFor="description">Descripción</Label>
                 <Textarea
@@ -381,6 +434,66 @@ export default function EditProductPage() {
               </div>
             </div>
 
+            {/* Atributos Dinámicos */}
+            <div className="md:col-span-2">
+              <AttributeBuilder
+                attributes={attributes}
+                onChange={setAttributes}
+              />
+            </div>
+
+            {/* Variantes */}
+            {form.variants.length > 0 && (
+              <div className="md:col-span-2">
+                <Label htmlFor="variants">Variantes</Label>
+                <div className="space-y-4">
+                  {form.variants.map((variant, index) => (
+                    <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                      <div className="font-medium mb-2">
+                        {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label htmlFor={`variant-stock-${index}`}>Stock</Label>
+                          <Input
+                            id={`variant-stock-${index}`}
+                            type="number"
+                            min="0"
+                            value={variant.stock}
+                            onChange={(e) => handleVariantChange(index, 'stock', parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`variant-price-${index}`}>Precio (opcional)</Label>
+                          <Input
+                            id={`variant-price-${index}`}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={variant.price}
+                            onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`variant-image-${index}`}>Imagen (opcional)</Label>
+                          <Input
+                            id={`variant-image-${index}`}
+                            type="url"
+                            value={variant.image}
+                            onChange={(e) => handleVariantChange(index, 'image', e.target.value)}
+                            placeholder="https://ejemplo.com/imagen.jpg"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
               <Link href="/admin/products">
                 <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
@@ -393,19 +506,6 @@ export default function EditProductPage() {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      {/* Sección de Atributos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Atributos del Producto</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AttributeBuilder
-            attributes={attributes}
-            onChange={setAttributes}
-          />
         </CardContent>
       </Card>
 

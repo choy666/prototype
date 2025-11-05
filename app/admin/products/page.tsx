@@ -19,7 +19,6 @@ import {
   Search,
   Package,
   Settings,
-  Filter,
   X
 } from 'lucide-react'
 
@@ -65,7 +64,7 @@ export default function AdminProductsPage() {
     minDiscount: '',
     featured: '',
   })
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const { toast } = useToast()
   const observerRef = useRef<HTMLDivElement>(null)
@@ -248,15 +247,6 @@ export default function AdminProductsPage() {
                   className="w-full"
                 />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="w-full sm:w-auto min-h-[44px]"
-              >
-                <Filter className="mr-2 h-4 w-4" />
-                Filtros
-              </Button>
               <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
                 <Search className="mr-2 h-4 w-4" />
                 Buscar

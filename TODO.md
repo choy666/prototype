@@ -1,26 +1,34 @@
-# Mejoras en la página de producto para navegación y selección de variantes
+# Plan de Implementación: Sincronizar Sistema de Variantes en Edición de Productos
+
+## Objetivo
+Implementar el mismo sistema y formato de variantes y atributos al editar un producto que se usa al crear uno, sincronizando la estética y uso en todo el proyecto.
 
 ## Tareas Pendientes
 
-- [ ] Agregar toggle/botón para alternar entre "Producto Original" y "Variantes"
-- [ ] Mejorar lógica de selección de atributos para ser más intuitiva
-- [ ] Actualizar visualización de selección actual (precio, stock, imagen)
-- [ ] Agregar navegación entre variantes similares si existen múltiples
-- [ ] Asegurar que el carrito reciba la información correcta (producto base o variante)
-- [ ] Probar la funcionalidad completa
+### 1. Modificar Página de Edición (app/admin/products/[id]/edit/page.tsx)
+- [x] Integrar AttributeBuilder para gestión de atributos dinámicos
+- [x] Agregar lógica de generación automática de variantes basada en atributos
+- [x] Incluir sección de variantes con formulario inline (similar a creación)
+- [x] Actualizar estado del formulario para incluir atributos y variantes
+- [x] Modificar handleSubmit para guardar atributos y variantes
+- [x] Agregar campo de stock al formulario principal
 
-## Información Recopilada
+### 2. Actualizar Componente ProductVariants
+- [ ] Mejorar integración con AttributeBuilder
+- [ ] Asegurar consistencia visual con el formulario de creación
+- [ ] Optimizar manejo de atributos dinámicos
 
-- Archivo principal: `app/products/[id]/ProductClient.tsx`
-- Ya existe lógica básica para selección de variantes con selects
-- Incluye opción "Producto Original" en los selects
-- Hay auto-selección al clic en imagen de variante
-- Schema soporta variantes con attributes, price, stock, image, isActive
+### 3. Verificar Consistencia Estética
+- [ ] Revisar que los estilos coincidan entre creación y edición
+- [ ] Asegurar responsive design consistente
+- [ ] Verificar accesibilidad (labels, ARIA, etc.)
 
-## Plan de Implementación
+### 4. Testing y Validación
+- [ ] Probar creación de variantes desde atributos
+- [ ] Verificar edición de productos existentes con variantes
+- [ ] Validar que no se pierdan datos al editar
+- [ ] Probar eliminación y modificación de variantes
 
-1. Modificar `ProductClient.tsx` para agregar toggle de selección
-2. Mejorar la lógica de `selectedVariant` y `getAvailableOptions`
-3. Actualizar la UI para mostrar claramente la selección
-4. Agregar navegación opcional entre variantes
-5. Verificar integración con carrito
+### 5. Documentación
+- [ ] Actualizar documentación si es necesario
+- [ ] Agregar comentarios en código para futuras modificaciones
