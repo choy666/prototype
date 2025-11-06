@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X, ImageIcon, Search, AlertTriangle, CheckCircle, EyeOff, Check } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X, ImageIcon, AlertTriangle, CheckCircle, EyeOff, Check } from 'lucide-react'
 import Image from 'next/image'
 
 interface ProductVariant {
@@ -39,7 +39,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   })
   const [availableImages, setAvailableImages] = useState<string[]>([])
   const [showImageSuggestions, setShowImageSuggestions] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
+
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [selectedVariants, setSelectedVariants] = useState<number[]>([])
   const [inlineEditing, setInlineEditing] = useState<{ [key: number]: { field: string; value: string | number } }>({})
@@ -75,19 +75,13 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     }
   }, [productId, toast])
 
-  // Filtrar variantes basado en búsqueda y estado
+  // Filtrar variantes basado en estado
   const filteredVariants = variants.filter(variant => {
-    const matchesSearch = searchTerm === '' ||
-      Object.entries(variant.attributes).some(([key, value]) =>
-        `${key} ${value}`.toLowerCase().includes(searchTerm.toLowerCase())
-      ) ||
-      (variant.price && variant.price.includes(searchTerm))
-
     const matchesStatus = filterStatus === 'all' ||
       (filterStatus === 'active' && variant.isActive) ||
       (filterStatus === 'inactive' && !variant.isActive)
 
-    return matchesSearch && matchesStatus
+    return matchesStatus
   })
 
   // Funciones para edición en línea
@@ -403,40 +397,29 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Barra de búsqueda y filtros */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar variantes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={filterStatus === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterStatus('all')}
-            >
-              Todas
-            </Button>
-            <Button
-              variant={filterStatus === 'active' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterStatus('active')}
-            >
-              Activas
-            </Button>
-            <Button
-              variant={filterStatus === 'inactive' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterStatus('inactive')}
-            >
-              Inactivas
-            </Button>
-          </div>
+        {/* Filtros */}
+        <div className="flex gap-2">
+          <Button
+            variant={filterStatus === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilterStatus('all')}
+          >
+            Todas
+          </Button>
+          <Button
+            variant={filterStatus === 'active' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilterStatus('active')}
+          >
+            Activas
+          </Button>
+          <Button
+            variant={filterStatus === 'inactive' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilterStatus('inactive')}
+          >
+            Inactivas
+          </Button>
         </div>
 
         {/* Acciones masivas */}
@@ -637,7 +620,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
               <Package className="mx-auto h-16 w-16 mb-4 text-gray-300" />
               <p className="text-lg font-medium mb-2">No hay variantes configuradas</p>
               <p className="text-sm">
-                {searchTerm || filterStatus !== 'all'
+                {filterStatus !== 'all'
                   ? 'No se encontraron variantes con los filtros aplicados.'
                   : 'Comienza creando tu primera variante para este producto.'
                 }

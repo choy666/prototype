@@ -1,29 +1,30 @@
-# Plan para quitar "Vista Rápida de Variantes" en app/admin/products/id/edit
+# Plan de Implementación: Quitar Opción de Buscar Variantes
 
 ## Información Recopilada
-- Archivo principal: `app/admin/products/[id]/edit/page.tsx`
-- La pestaña "variants" contiene:
-  - Un Collapsible "Vista Rápida de Variantes" con formulario para editar variantes generadas automáticamente.
-  - Componente `ProductVariants` para gestión completa de variantes.
-- Lógica automática de generación de variantes basada en atributos dinámicos.
-- Vista previa muestra variantes generadas.
+- El componente `ProductVariants.tsx` incluye una barra de búsqueda con un input que filtra variantes por atributos y precio.
+- También hay filtros de estado (Todas, Activas, Inactivas) que se mantendrán.
+- La funcionalidad de búsqueda se implementa mediante el estado `searchTerm` y la lógica de filtrado en `filteredVariants`.
 
-## Plan de Cambios
-1. Quitar el Collapsible "Vista Rápida de Variantes" de la pestaña "variants".
-2. Eliminar la lógica de generación automática de `form.variants`.
-3. Remover `variants` del estado del formulario y interfaces.
-4. Ajustar la vista previa para no mostrar variantes generadas.
-5. Mantener únicamente el componente `ProductVariants`.
+## Plan de Implementación
+- Eliminar el input de búsqueda y el ícono de búsqueda de la barra de filtros.
+- Remover el estado `searchTerm` y su manejo.
+- Modificar la lógica de `filteredVariants` para quitar el filtro de búsqueda, manteniendo solo el filtro por estado (activo/inactivo).
+- Ajustar el mensaje de "No hay variantes" para que no mencione filtros de búsqueda.
+- Mantener la funcionalidad de mostrar variantes existentes, crear nuevas variantes y los filtros de estado.
 
-## Pasos de Implementación
-- [x] Editar `app/admin/products/[id]/edit/page.tsx` para quitar lógica de variants automática.
-- [x] Quitar Collapsible "Vista Rápida de Variantes".
-- [x] Ajustar vista previa.
-- [x] Verificar que solo quede `ProductVariants`.
-
-## Archivos Dependientes
-- Ninguno adicional.
+## Archivos a Modificar
+- `components/admin/ProductVariants.tsx`
 
 ## Pasos de Seguimiento
-- [ ] Probar la página de edición después de cambios.
-- [ ] Verificar que las variantes se gestionen solo a través de `ProductVariants`.
+- Verificar que la página cargue correctamente sin errores.
+- Probar que las variantes se muestren y se puedan crear/editar sin problemas.
+- Confirmar que los filtros de estado funcionen correctamente.
+
+## Estado de Tareas
+- [ ] Eliminar estado `searchTerm` y su setter
+- [ ] Eliminar input de búsqueda de la barra de filtros
+- [ ] Modificar lógica de `filteredVariants` para quitar filtro de búsqueda
+- [ ] Ajustar mensaje de "No hay variantes" para no mencionar búsqueda
+- [ ] Verificar funcionamiento de la página
+- [ ] Probar creación y edición de variantes
+- [ ] Confirmar filtros de estado funcionan correctamente
