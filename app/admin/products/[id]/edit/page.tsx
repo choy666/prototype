@@ -14,9 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
-import { Collapsible } from '@/components/ui/Collapsible'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye, Image as ImageIcon } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import { ProductVariants } from '@/components/admin/ProductVariants'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -311,7 +310,7 @@ export default function EditProductPage() {
 
       {/* Main content with tabs */}
       <Tabs defaultValue="basic" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basic" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
             <FileText className="h-4 w-4" />
             Información Básica
@@ -323,10 +322,6 @@ export default function EditProductPage() {
           <TabsTrigger value="variants" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
             <Package className="h-4 w-4" />
             Variantes
-          </TabsTrigger>
-          <TabsTrigger value="templates" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
-            <Settings className="h-4 w-4" />
-            Plantillas
           </TabsTrigger>
         </TabsList>
 
@@ -546,21 +541,7 @@ export default function EditProductPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="templates" className="animate-in fade-in slide-in-from-right-2 duration-300">
-            <Card className="transition-all duration-300 hover:shadow-lg">
-              <CardHeader>
-                <CardTitle>Plantillas y Configuraciones</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Aplica plantillas predefinidas
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Collapsible title="Plantillas Disponibles" icon={<Settings className="h-4 w-4" />}>
-                  <p className="text-muted-foreground">No hay plantillas disponibles.</p>
-                </Collapsible>
-              </CardContent>
-            </Card>
-          </TabsContent>
+
         </Tabs>
 
         {/* Preview Section */}
