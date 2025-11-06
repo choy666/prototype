@@ -17,25 +17,25 @@ interface AttributeBuilderProps {
 
 export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps) {
   const [newAttributeName, setNewAttributeName] = useState('')
-  const [newAttributeValues, setNewAttributeValues] = useState('')
+  const [newAttributeValue, setNewAttributeValue] = useState('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editingValues, setEditingValues] = useState<string[]>([])
+  const [editingValue, setEditingValue] = useState('')
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [animatingItems, setAnimatingItems] = useState<Set<number>>(new Set())
 
   const addAttribute = () => {
-    if (!newAttributeName.trim() || !newAttributeValues.trim()) return
+    if (!newAttributeName.trim() || !newAttributeValue.trim()) return
 
     const newAttribute: DynamicAttribute = {
       name: newAttributeName.trim(),
-      value: newAttributeValues.trim()
+      value: newAttributeValue.trim()
     }
 
     const newIndex = attributes.length
     setAnimatingItems(prev => new Set(prev).add(newIndex))
     onChange([...attributes, newAttribute])
     setNewAttributeName('')
-    setNewAttributeValues('')
+    setNewAttributeValue('')
 
     // Remove animation class after animation completes
     setTimeout(() => {
@@ -61,24 +61,24 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
 
   const startEditingValue = (index: number) => {
     setEditingIndex(index)
-    setEditingValues([attributes[index].value])
+    setEditingValue(attributes[index].value)
   }
 
   const saveEditingValue = () => {
-    if (editingIndex !== null && editingValues.length > 0) {
-      updateAttribute(editingIndex, 'value', editingValues[0].trim())
+    if (editingIndex !== null && editingValue.trim()) {
+      updateAttribute(editingIndex, 'value', editingValue.trim())
       setEditingIndex(null)
-      setEditingValues([])
+      setEditingValue('')
     }
   }
 
   const cancelEditingValue = () => {
     setEditingIndex(null)
-    setEditingValues([])
+    setEditingValue('')
   }
 
   const updateEditingValue = (value: string) => {
-    setEditingValues([value])
+    setEditingValue(value)
   }
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -196,7 +196,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                   {editingIndex === index ? (
                     <div className="space-y-3">
                       <Input
-                        value={editingValues[0] || ''}
+                        value={editingValue}
                         onChange={(e) => updateEditingValue(e.target.value)}
                         placeholder="Valor del atributo"
                         className="flex-1"
@@ -254,12 +254,12 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
           </div>
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Valores (separados por coma) *
+              Valor del Atributo *
             </label>
             <Input
-              value={newAttributeValues}
-              onChange={(e) => setNewAttributeValues(e.target.value)}
-              placeholder="ej: Rojo, Azul, Verde"
+              value={newAttributeValue}
+              onChange={(e) => setNewAttributeValue(e.target.value)}
+              placeholder="ej: Rojo"
               className="transition-colors focus:border-blue-500"
             />
           </div>
@@ -267,7 +267,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
         <Button
           type="button"
           onClick={addAttribute}
-          disabled={!newAttributeName.trim() || !newAttributeValues.trim()}
+          disabled={!newAttributeName.trim() || !newAttributeValue.trim()}
           className="min-h-[44px] bg-blue-600 hover:bg-blue-700 transition-colors"
         >
           <Plus className="h-4 w-4 mr-2" />
