@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Collapsible } from '@/components/ui/Collapsible'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { Progress } from '@/components/ui/Progress'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Download, Upload, RotateCcw, RotateCw, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Download, Upload, RotateCcw, RotateCw, CheckCircle, Image as ImageIcon } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import { ProductVariants } from '@/components/admin/ProductVariants'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -756,14 +757,48 @@ export default function EditProductPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <Label htmlFor="image">Imagen Principal (URL)</Label>
-                    <Input
-                      id="image"
-                      type="url"
-                      value={form.image}
-                      onChange={(e) => handleChange('image', e.target.value)}
-                      placeholder="https://ejemplo.com/imagen.jpg"
-                    />
+                    <Label htmlFor="image" className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Imagen Principal (URL)
+                    </Label>
+                    <div className="space-y-3">
+                      <Input
+                        id="image"
+                        type="url"
+                        value={form.image}
+                        onChange={(e) => handleChange('image', e.target.value)}
+                        placeholder="https://ejemplo.com/imagen.jpg"
+                      />
+                      {form.image && (
+                        <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="relative w-16 h-16 rounded-lg overflow-hidden border">
+                            <Image
+                              src={form.image}
+                              alt="Vista previa de imagen principal"
+                              fill
+                              sizes="64px"
+                              className="object-cover"
+                              placeholder="blur"
+                              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Imagen Principal</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-xs">{form.image}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(form.image, '_blank')}
+                            className="min-h-[32px]"
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            Ver
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="md:col-span-2">
