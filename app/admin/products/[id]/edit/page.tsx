@@ -16,7 +16,6 @@ import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Collapsible } from '@/components/ui/Collapsible'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { Progress } from '@/components/ui/Progress'
 import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Download, Upload, RotateCcw, RotateCw, CheckCircle, Image as ImageIcon } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import { ProductVariants } from '@/components/admin/ProductVariants'
@@ -456,20 +455,7 @@ export default function EditProductPage() {
     })
   }
 
-  // Calculate completion progress
-  const calculateProgress = () => {
-    let completed = 0
-    const total = 6 // name, price, category, description, attributes, variants
 
-    if (form.name.trim()) completed++
-    if (form.price && parseFloat(form.price) > 0) completed++
-    if (form.categoryId) completed++
-    if (form.description.trim()) completed++
-    if (attributes.length > 0) completed++
-    if (form.variants.length > 0) completed++
-
-    return (completed / total) * 100
-  }
 
   const handleVariantChange = (index: number, field: keyof VariantForm, value: string | number) => {
     setForm(prev => ({
@@ -625,16 +611,7 @@ export default function EditProductPage() {
         </div>
       </div>
 
-      {/* Progress bar */}
-      <Card className="transition-all duration-300 hover:shadow-md">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progreso de completitud</span>
-            <span className="text-sm text-muted-foreground animate-in fade-in duration-300">{Math.round(calculateProgress())}%</span>
-          </div>
-          <Progress value={calculateProgress()} className="w-full transition-all duration-500" />
-        </CardContent>
-      </Card>
+
 
       {/* Main content with tabs */}
       <Tabs defaultValue="basic" className="w-full">
