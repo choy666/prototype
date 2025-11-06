@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
-import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
+import { AttributeBuilder, type DynamicAttribute } from '@/components/admin/AttributeBuilder'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import type { Category } from '@/lib/schema'
 
@@ -21,11 +21,6 @@ interface VariantForm {
   stock: number
   price: string
   image: string
-}
-
-interface DynamicAttribute {
-  name: string
-  values: string[]
 }
 
 interface ProductForm {
@@ -86,11 +81,12 @@ export default function NewProductPage() {
       if (dynamicAttrs.length === 0) return []
 
       const combinations = dynamicAttrs.reduce((acc, attr) => {
+        const values = attr.value.split(',').map(v => v.trim()).filter(v => v)
         if (acc.length === 0) {
-          return attr.values.map((value: string) => ({ [attr.name]: value }))
+          return values.map((value: string) => ({ [attr.name]: value }))
         }
         return acc.flatMap(comb =>
-          attr.values.map((value: string) => ({ ...comb, [attr.name]: value }))
+          values.map((value: string) => ({ ...comb, [attr.name]: value }))
         )
       }, [] as Record<string, string>[])
 

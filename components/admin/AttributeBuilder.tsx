@@ -7,7 +7,7 @@ import { Plus, X, Tag, GripVertical, Edit3, Check, AlertCircle } from 'lucide-re
 
 export interface DynamicAttribute {
   name: string
-  values: string[]
+  value: string
 }
 
 interface AttributeBuilderProps {
@@ -24,18 +24,11 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
   const [animatingItems, setAnimatingItems] = useState<Set<number>>(new Set())
 
   const addAttribute = () => {
-    if (!newAttributeName.trim()) return
-
-    const values = newAttributeValues
-      .split(',')
-      .map(v => v.trim())
-      .filter(v => v.length > 0)
-
-    if (values.length === 0) return
+    if (!newAttributeName.trim() || !newAttributeValues.trim()) return
 
     const newAttribute: DynamicAttribute = {
       name: newAttributeName.trim(),
-      values
+      value: newAttributeValues.trim()
     }
 
     const newIndex = attributes.length
@@ -59,43 +52,33 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
     onChange(newAttributes)
   }
 
-  const updateAttribute = (index: number, field: keyof DynamicAttribute, value: string | string[]) => {
+  const updateAttribute = (index: number, field: keyof DynamicAttribute, value: string) => {
     const newAttributes = attributes.map((attr, i) =>
       i === index ? { ...attr, [field]: value } : attr
     )
     onChange(newAttributes)
   }
 
-  const startEditingValues = (index: number) => {
+  const startEditingValue = (index: number) => {
     setEditingIndex(index)
-    setEditingValues([...attributes[index].values])
+    setEditingValues([attributes[index].value])
   }
 
-  const saveEditingValues = () => {
-    if (editingIndex !== null) {
-      updateAttribute(editingIndex, 'values', editingValues.filter(v => v.trim()))
+  const saveEditingValue = () => {
+    if (editingIndex !== null && editingValues.length > 0) {
+      updateAttribute(editingIndex, 'value', editingValues[0].trim())
       setEditingIndex(null)
       setEditingValues([])
     }
   }
 
-  const cancelEditingValues = () => {
+  const cancelEditingValue = () => {
     setEditingIndex(null)
     setEditingValues([])
   }
 
-  const addValueToEditing = () => {
-    setEditingValues([...editingValues, ''])
-  }
-
-  const updateEditingValue = (valueIndex: number, value: string) => {
-    const newValues = [...editingValues]
-    newValues[valueIndex] = value
-    setEditingValues(newValues)
-  }
-
-  const removeValueFromEditing = (valueIndex: number) => {
-    setEditingValues(editingValues.filter((_, i) => i !== valueIndex))
+  const updateEditingValue = (value: string) => {
+    setEditingValues([value])
   }
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -125,11 +108,10 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
     setDraggedIndex(null)
   }
 
-  const validateAttribute = (name: string, values: string[]) => {
+  const validateAttribute = (name: string, value: string) => {
     const errors = []
     if (!name.trim()) errors.push('Nombre requerido')
-    if (values.length === 0) errors.push('Al menos un valor requerido')
-    if (values.some(v => !v.trim())) errors.push('Valores no pueden estar vacíos')
+    if (!value.trim()) errors.push('Valor requerido')
     return errors
   }
 
@@ -145,7 +127,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
       {attributes.length > 0 && (
         <div className="space-y-4">
           {attributes.map((attribute, index) => {
-            const errors = validateAttribute(attribute.name, attribute.values)
+            const errors = validateAttribute(attribute.name, attribute.value)
             return (
               <div
                 key={index}
@@ -195,14 +177,14 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Valores del Atributo
+                      Valor del Atributo
                     </label>
                     {editingIndex !== index && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => startEditingValues(index)}
+                        onClick={() => startEditingValue(index)}
                         className="min-h-[32px]"
                       >
                         <Edit3 className="h-3 w-3 mr-1" />
@@ -213,41 +195,18 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
 
                   {editingIndex === index ? (
                     <div className="space-y-3">
-                      {editingValues.map((value, valueIndex) => (
-                        <div key={valueIndex} className="flex items-center gap-2">
-                          <Input
-                            value={value}
-                            onChange={(e) => updateEditingValue(valueIndex, e.target.value)}
-                            placeholder="Valor del atributo"
-                            className="flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeValueFromEditing(valueIndex)}
-                            className="text-red-500 hover:text-red-700 min-h-[36px]"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      <Input
+                        value={editingValues[0] || ''}
+                        onChange={(e) => updateEditingValue(e.target.value)}
+                        placeholder="Valor del atributo"
+                        className="flex-1"
+                      />
                       <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={addValueToEditing}
-                          className="min-h-[36px]"
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Agregar Valor
-                        </Button>
                         <Button
                           type="button"
                           variant="default"
                           size="sm"
-                          onClick={saveEditingValues}
+                          onClick={saveEditingValue}
                           className="min-h-[36px]"
                         >
                           <Check className="h-3 w-3 mr-1" />
@@ -257,7 +216,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={cancelEditingValues}
+                          onClick={cancelEditingValue}
                           className="min-h-[36px]"
                         >
                           Cancelar
@@ -266,14 +225,9 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {attribute.values.map((value, valueIndex) => (
-                        <span
-                          key={valueIndex}
-                          className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800"
-                        >
-                          {value}
-                        </span>
-                      ))}
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800">
+                        {attribute.value}
+                      </span>
                     </div>
                   )}
                 </div>

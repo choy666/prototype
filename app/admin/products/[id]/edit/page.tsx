@@ -156,30 +156,21 @@ export default function EditProductPage() {
     if (id) fetchProduct()
   }, [id, router, toast])
 
-  // Generate combinations when dynamic attributes change
+  // Generate single variant per attribute when dynamic attributes change
   useEffect(() => {
-    const generateCombinations = (dynamicAttrs: DynamicAttribute[]) => {
+    const generateVariants = (dynamicAttrs: DynamicAttribute[]) => {
       if (dynamicAttrs.length === 0) return []
 
-      const combinations = dynamicAttrs.reduce((acc, attr) => {
-        if (acc.length === 0) {
-          return attr.values.map((value: string) => ({ [attr.name]: value }))
-        }
-        return acc.flatMap(comb =>
-          attr.values.map((value: string) => ({ ...comb, [attr.name]: value }))
-        )
-      }, [] as Record<string, string>[])
-
-      return combinations.map(attrs => ({
-        attributes: attrs,
+      return dynamicAttrs.map(attr => ({
+        attributes: { [attr.name]: attr.value },
         stock: 0,
         price: '',
         image: ''
       }))
     }
 
-    const combinations = generateCombinations(attributes)
-    setForm(prev => ({ ...prev, variants: combinations }))
+    const variants = generateVariants(attributes)
+    setForm(prev => ({ ...prev, variants }))
   }, [attributes])
 
 
@@ -679,11 +670,9 @@ export default function EditProductPage() {
                       {attributes.map((attr, index) => (
                         <div key={index} className="text-sm">
                           <span className="font-medium">{attr.name}:</span>
-                          {attr.values.map((value, vIndex) => (
-                            <span key={vIndex} className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                              {value}
-                            </span>
-                          ))}
+                          <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                            {attr.value}
+                          </span>
                         </div>
                       ))}
                     </div>
