@@ -7,7 +7,7 @@ import { Plus, X, Tag, GripVertical, Edit3, Check, AlertCircle } from 'lucide-re
 
 export interface DynamicAttribute {
   name: string
-  value: string
+  values: string[]
 }
 
 interface AttributeBuilderProps {
@@ -28,7 +28,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
 
     const newAttribute: DynamicAttribute = {
       name: newAttributeName.trim(),
-      value: newAttributeValue.trim()
+      values: [newAttributeValue.trim()]
     }
 
     const newIndex = attributes.length
@@ -52,21 +52,32 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
     onChange(newAttributes)
   }
 
-  const updateAttribute = (index: number, field: keyof DynamicAttribute, value: string) => {
+  const updateAttribute = (index: number, field: keyof DynamicAttribute, value: string | string[]) => {
     const newAttributes = attributes.map((attr, i) =>
       i === index ? { ...attr, [field]: value } : attr
     )
     onChange(newAttributes)
   }
 
+  const addValueToAttribute = (index: number, value: string) => {
+    if (!value.trim()) return
+    const newValues = [...attributes[index].values, value.trim()]
+    updateAttribute(index, 'values', newValues)
+  }
+
+  const removeValueFromAttribute = (attrIndex: number, valueIndex: number) => {
+    const newValues = attributes[attrIndex].values.filter((_, i) => i !== valueIndex)
+    updateAttribute(attrIndex, 'values', newValues)
+  }
+
   const startEditingValue = (index: number) => {
     setEditingIndex(index)
-    setEditingValue(attributes[index].value)
+    setEditingValue('')
   }
 
   const saveEditingValue = () => {
     if (editingIndex !== null && editingValue.trim()) {
-      updateAttribute(editingIndex, 'value', editingValue.trim())
+      addValueToAttribute(editingIndex, editingValue.trim())
       setEditingIndex(null)
       setEditingValue('')
     }
@@ -108,10 +119,10 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
     setDraggedIndex(null)
   }
 
-  const validateAttribute = (name: string, value: string) => {
+  const validateAttribute = (name: string, values: string[]) => {
     const errors = []
     if (!name.trim()) errors.push('Nombre requerido')
-    if (!value.trim()) errors.push('Valor requerido')
+    if (values.length === 0) errors.push('Al menos un valor requerido')
     return errors
   }
 
@@ -127,7 +138,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
       {attributes.length > 0 && (
         <div className="space-y-4">
           {attributes.map((attribute, index) => {
-            const errors = validateAttribute(attribute.name, attribute.value)
+            const errors = validateAttribute(attribute.name, attribute.values)
             return (
               <div
                 key={index}
@@ -225,9 +236,20 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800">
-                        {attribute.value}
-                      </span>
+                      {attribute.values.map((value, valueIndex) => (
+                        <span key={valueIndex} className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800">
+                          {value}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeValueFromAttribute(index, valueIndex)}
+                            className="ml-1 h-4 w-4 p-0 text-blue-600 hover:text-blue-800"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>

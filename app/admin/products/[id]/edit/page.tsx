@@ -156,17 +156,34 @@ export default function EditProductPage() {
     if (id) fetchProduct()
   }, [id, router, toast])
 
-  // Generate single variant per attribute when dynamic attributes change
+  // Generate all combinations of attribute values when dynamic attributes change
   useEffect(() => {
+    const cartesianProduct = (arrays: string[][]): string[][] => {
+      if (arrays.length === 0) return [[]]
+      const [first, ...rest] = arrays
+      const restProduct = cartesianProduct(rest)
+      return first.flatMap(item => restProduct.map(combination => [item, ...combination]))
+    }
+
     const generateVariants = (dynamicAttrs: DynamicAttribute[]) => {
       if (dynamicAttrs.length === 0) return []
 
-      return dynamicAttrs.map(attr => ({
-        attributes: { [attr.name]: attr.value },
-        stock: 0,
-        price: '',
-        image: ''
-      }))
+      const attributeNames = dynamicAttrs.map(attr => attr.name)
+      const valueArrays = dynamicAttrs.map(attr => attr.values)
+      const combinations = cartesianProduct(valueArrays)
+
+      return combinations.map(combination => {
+        const attributes: Record<string, string> = {}
+        attributeNames.forEach((name, index) => {
+          attributes[name] = combination[index]
+        })
+        return {
+          attributes,
+          stock: 0,
+          price: '',
+          image: ''
+        }
+      })
     }
 
     const variants = generateVariants(attributes)
@@ -671,7 +688,7 @@ export default function EditProductPage() {
                         <div key={index} className="text-sm">
                           <span className="font-medium">{attr.name}:</span>
                           <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                            {attr.value}
+                            {attr.values.join(', ')}
                           </span>
                         </div>
                       ))}

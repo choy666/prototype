@@ -81,7 +81,7 @@ export default function NewProductPage() {
       if (dynamicAttrs.length === 0) return []
 
       const combinations = dynamicAttrs.reduce((acc, attr) => {
-        const values = attr.value.split(',').map(v => v.trim()).filter(v => v)
+        const values = attr.values
         if (acc.length === 0) {
           return values.map((value: string) => ({ [attr.name]: value }))
         }
