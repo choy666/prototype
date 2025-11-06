@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -16,7 +16,7 @@ import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Collapsible } from '@/components/ui/Collapsible'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Download, Upload, RotateCcw, RotateCw, CheckCircle, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye, Settings, Image as ImageIcon } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import { ProductVariants } from '@/components/admin/ProductVariants'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -60,19 +60,9 @@ interface ProductForm {
   variants: VariantForm[]
 }
 
-interface ProductConfig {
-  id: string
-  name: string
-  attributes: DynamicAttribute[]
-  variants: VariantForm[]
-  createdAt: string
-}
 
-interface UndoRedoState {
-  past: ProductForm[]
-  present: ProductForm
-  future: ProductForm[]
-}
+
+
 
 export default function EditProductPage() {
   const router = useRouter()
@@ -97,89 +87,16 @@ export default function EditProductPage() {
     variants: []
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
-  const [autoSaveEnabled] = useState(true)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-  const [undoRedo, setUndoRedo] = useState<UndoRedoState>({
-    past: [],
-    present: form,
-    future: []
-  })
-  const [templates, setTemplates] = useState<ProductConfig[]>([])
+
+
+
   const [showPreview, setShowPreview] = useState(false)
 
   const id = params.id as string
 
-  // Auto-save functionality
-  const autoSave = useCallback(async (currentForm: ProductForm) => {
-    if (!autoSaveEnabled || isSaving) return
 
-    setIsSaving(true)
-    try {
-      const productData = {
-        name: currentForm.name,
-        description: currentForm.description || undefined,
-        price: currentForm.price,
-        image: currentForm.image || undefined,
-        images: currentForm.images,
-        categoryId: parseInt(currentForm.categoryId),
-        discount: parseInt(currentForm.discount),
-        weight: currentForm.weight || undefined,
-        stock: parseInt(currentForm.stock) || 0,
-        destacado: currentForm.destacado,
-        attributes: attributes.length > 0 ? attributes : undefined
-      }
 
-      const response = await fetch(`/api/admin/products/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
-      })
 
-      if (response.ok) {
-        setLastSaved(new Date())
-      }
-    } catch (error) {
-      console.error('Auto-save failed:', error)
-    } finally {
-      setIsSaving(false)
-    }
-  }, [autoSaveEnabled, isSaving, attributes, id])
-
-  // Undo/Redo functionality
-  const saveToHistory = useCallback((newForm: ProductForm) => {
-    setUndoRedo(prev => ({
-      past: [...prev.past, prev.present],
-      present: newForm,
-      future: []
-    }))
-  }, [])
-
-  const undo = useCallback(() => {
-    setUndoRedo(prev => {
-      if (prev.past.length === 0) return prev
-      const newPresent = prev.past[prev.past.length - 1]
-      const newPast = prev.past.slice(0, -1)
-      return {
-        past: newPast,
-        present: newPresent,
-        future: [prev.present, ...prev.future]
-      }
-    })
-  }, [])
-
-  const redo = useCallback(() => {
-    setUndoRedo(prev => {
-      if (prev.future.length === 0) return prev
-      const newPresent = prev.future[0]
-      const newFuture = prev.future.slice(1)
-      return {
-        past: [...prev.past, prev.present],
-        present: newPresent,
-        future: newFuture
-      }
-    })
-  }, [])
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -222,9 +139,7 @@ export default function EditProductPage() {
         }
 
         setForm(initialForm)
-        setUndoRedo({ past: [], present: initialForm, future: [] })
         setAttributes((product as unknown as { attributes?: DynamicAttribute[] }).attributes || [])
-        setLastSaved(new Date())
       } catch {
         toast({
           title: 'Error',
@@ -237,20 +152,7 @@ export default function EditProductPage() {
       }
     }
 
-    const fetchTemplates = async () => {
-      try {
-        const response = await fetch('/api/admin/product-templates')
-        if (response.ok) {
-          const templatesData = await response.json()
-          setTemplates(templatesData)
-        }
-      } catch (error) {
-        console.error('Error fetching templates:', error)
-      }
-    }
-
     fetchCategories()
-    fetchTemplates()
     if (id) fetchProduct()
   }, [id, router, toast])
 
@@ -277,26 +179,12 @@ export default function EditProductPage() {
     }
 
     const combinations = generateCombinations(attributes)
-    setForm(prev => {
-      const newForm = { ...prev, variants: combinations }
-      saveToHistory(newForm)
-      return newForm
-    })
-  }, [attributes, saveToHistory])
+    setForm(prev => ({ ...prev, variants: combinations }))
+  }, [attributes])
 
-  // Auto-save effect
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      autoSave(form)
-    }, 2000) // Auto-save after 2 seconds of inactivity
 
-    return () => clearTimeout(timeoutId)
-  }, [form, autoSave])
 
-  // Update form when undo/redo changes
-  useEffect(() => {
-    setForm(undoRedo.present)
-  }, [undoRedo.present])
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -348,112 +236,30 @@ export default function EditProductPage() {
   }
 
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
-    setForm(prev => {
-      const newForm = { ...prev, [field]: value }
-      saveToHistory(newForm)
-      return newForm
-    })
+    setForm(prev => ({ ...prev, [field]: value }))
   }
 
   const handleImagesReorder = (images: string[]) => {
-    setForm(prev => {
-      const newForm = { ...prev, images }
-      saveToHistory(newForm)
-      return newForm
-    })
+    setForm(prev => ({ ...prev, images }))
   }
 
   const handleImageRemove = (index: number) => {
-    setForm(prev => {
-      const newForm = {
-        ...prev,
-        images: prev.images.filter((_, i) => i !== index)
-      }
-      saveToHistory(newForm)
-      return newForm
-    })
+    setForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
   }
 
   const handleImageAdd = (imageUrl: string) => {
-    setForm(prev => {
-      const newForm = {
-        ...prev,
-        images: [...prev.images, imageUrl]
-      }
-      saveToHistory(newForm)
-      return newForm
-    })
+    setForm(prev => ({
+      ...prev,
+      images: [...prev.images, imageUrl]
+    }))
   }
 
-  // Export/Import functionality
-  const exportConfig = () => {
-    const config: ProductConfig = {
-      id: `config-${Date.now()}`,
-      name: form.name || 'Configuración sin nombre',
-      attributes: attributes,
-      variants: form.variants,
-      createdAt: new Date().toISOString()
-    }
 
-    const dataStr = JSON.stringify(config, null, 2)
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
 
-    const exportFileDefaultName = `product-config-${form.name.replace(/\s+/g, '-').toLowerCase()}.json`
 
-    const linkElement = document.createElement('a')
-    linkElement.setAttribute('href', dataUri)
-    linkElement.setAttribute('download', exportFileDefaultName)
-    linkElement.click()
-  }
-
-  const importConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const config: ProductConfig = JSON.parse(e.target?.result as string)
-        setAttributes(config.attributes)
-        setForm(prev => {
-          const newForm = {
-            ...prev,
-            variants: config.variants
-          }
-          saveToHistory(newForm)
-          return newForm
-        })
-        toast({
-          title: 'Éxito',
-          description: 'Configuración importada correctamente'
-        })
-      } catch {
-        toast({
-          title: 'Error',
-          description: 'Archivo de configuración inválido',
-          variant: 'destructive'
-        })
-      }
-    }
-    reader.readAsText(file)
-    event.target.value = ''
-  }
-
-  const applyTemplate = (template: ProductConfig) => {
-    setAttributes(template.attributes)
-    setForm(prev => {
-      const newForm = {
-        ...prev,
-        variants: template.variants
-      }
-      saveToHistory(newForm)
-      return newForm
-    })
-    toast({
-      title: 'Éxito',
-      description: `Plantilla "${template.name}" aplicada`
-    })
-  }
 
 
 
@@ -524,79 +330,6 @@ export default function EditProductPage() {
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
-          {/* Auto-save indicator */}
-          {lastSaved && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  Guardado {lastSaved.toLocaleTimeString()}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Undo/Redo */}
-          <Tooltip content="Deshacer">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={undo}
-              disabled={undoRedo.past.length === 0}
-              className="min-h-[36px]"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="Rehacer">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={redo}
-              disabled={undoRedo.future.length === 0}
-              className="min-h-[36px]"
-            >
-              <RotateCw className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-
-          {/* Export/Import */}
-          <Tooltip content="Exportar configuración">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportConfig}
-              className="min-h-[36px]"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="Importar configuración">
-            <label className="cursor-pointer">
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-                className="min-h-[36px]"
-              >
-                <span>
-                  <Upload className="h-4 w-4" />
-                </span>
-              </Button>
-              <input
-                type="file"
-                accept=".json"
-                onChange={importConfig}
-                className="hidden"
-              />
-            </label>
-          </Tooltip>
-
           {/* Preview toggle */}
           <Tooltip content="Vista previa">
             <Button
@@ -908,68 +641,12 @@ export default function EditProductPage() {
               <CardHeader>
                 <CardTitle>Plantillas y Configuraciones</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Aplica plantillas predefinidas o guarda/exporta configuraciones
+                  Aplica plantillas predefinidas
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 <Collapsible title="Plantillas Disponibles" icon={<Settings className="h-4 w-4" />}>
-                  {templates.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {templates.map((template) => (
-                        <div key={template.id} className="p-4 border rounded-lg">
-                          <h4 className="font-medium">{template.name}</h4>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {template.attributes.length} atributos, {template.variants.length} variantes
-                          </p>
-                          <Button
-                            onClick={() => applyTemplate(template)}
-                            size="sm"
-                            className="w-full"
-                          >
-                            Aplicar Plantilla
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No hay plantillas disponibles.</p>
-                  )}
-                </Collapsible>
-
-                <Collapsible title="Acciones de Configuración" icon={<Download className="h-4 w-4" />}>
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-2">Exportar Configuración</h4>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Descarga la configuración actual de atributos y variantes como archivo JSON
-                      </p>
-                      <Button onClick={exportConfig} variant="outline">
-                        <Download className="h-4 w-4 mr-2" />
-                        Exportar Configuración
-                      </Button>
-                    </div>
-
-                    <div>
-                      <h4 className="font-medium mb-2">Importar Configuración</h4>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Carga una configuración previamente exportada
-                      </p>
-                      <label className="cursor-pointer">
-                        <Button variant="outline" asChild>
-                          <span>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Importar Configuración
-                          </span>
-                        </Button>
-                        <input
-                          type="file"
-                          accept=".json"
-                          onChange={importConfig}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  </div>
+                  <p className="text-muted-foreground">No hay plantillas disponibles.</p>
                 </Collapsible>
               </CardContent>
             </Card>
