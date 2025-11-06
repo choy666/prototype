@@ -1,23 +1,42 @@
-# TODO: Quitar Atributos Dinámicos de Creación de Productos
+# TODO: Implementar Botón de Agregar Imagen y Visualización para Imagen Principal en app/admin/products/new
 
-## Información Gathered
-- La página `app/admin/products/new/page.tsx` incluye funciones de Atributos Dinámicos usando `AttributeBuilder`, genera variantes automáticamente basadas en `dynamicAttributes`, y muestra una sección de Variantes en el formulario.
-- La página `app/admin/products/[id]/edit/page.tsx` mantiene los Atributos Dinámicos en una pestaña separada ("Atributos") y usa `ProductVariants` para gestionar variantes existentes.
-- El objetivo es eliminar completamente las funciones de atributos dinámicos de la creación de productos, dejando solo la edición con estas funcionalidades.
+## Información Recopilada
+- **Archivo principal**: `app/admin/products/new/page.tsx`
+- **Componente de imágenes adicionales**: `components/ui/ImageReorder.tsx` (maneja múltiples imágenes con input URL, botón "Agregar", preview, reordenar, remover)
+- **Estado actual**: `image: string` para imagen principal, solo input simple de URL sin preview ni botón dedicado
+- **Estado adicional**: `images: string[]` para imágenes adicionales, usando ImageReorder
+- **Objetivo**: Implementar funcionalidad similar a imágenes adicionales para la imagen principal (botón agregar, preview, posibilidad de remover)
 
-## Plan
-- [ ] Quitar import de `AttributeBuilder` en `app/admin/products/new/page.tsx`
-- [ ] Eliminar el estado `dynamicAttributes` del `ProductForm` interface y del estado inicial `form`
-- [ ] Remover el `useEffect` que genera combinaciones de variantes basadas en `dynamicAttributes`
-- [ ] Eliminar la sección "Atributos Dinámicos" del formulario (el componente `AttributeBuilder`)
-- [ ] Eliminar la sección "Variantes" del formulario (ya que sin atributos dinámicos no hay variantes automáticas)
-- [ ] Ajustar el `handleSubmit` para no enviar `dynamicAttributes` ni crear variantes automáticamente
-- [ ] Verificar que la página de edición siga funcionando correctamente con atributos dinámicos
+## Plan de Implementación
+1. **Crear componente ImageSingle.tsx**: Componente basado en ImageReorder pero limitado a una sola imagen, con input URL, botón "Agregar", preview y botón remover
+2. **Actualizar page.tsx**: Reemplazar el input simple de imagen principal por el nuevo componente ImageSingle
+3. **Ajustar manejadores de estado**: Crear funciones handleImageAdd, handleImageRemove para la imagen principal (similar a las de adicionales)
+4. **Pruebas**: Verificar que la funcionalidad funcione correctamente en el formulario
 
-## Dependent Files to be edited
-- `app/admin/products/new/page.tsx`
+## Pasos Detallados
+- [x] Crear `components/ui/ImageSingle.tsx` basado en ImageReorder.tsx
+  - [x] Adaptar lógica para manejar una sola imagen (string en lugar de array)
+  - [x] Mantener input URL y botón "Agregar"
+  - [x] Agregar preview de imagen cuando se agregue
+  - [x] Agregar botón para remover imagen
+  - [x] Incluir validación de URL y toasts de éxito/error
+- [x] Modificar `app/admin/products/new/page.tsx`
+  - [x] Importar ImageSingle
+  - [x] Reemplazar el div de "Imagen Principal (URL)" por ImageSingle
+  - [x] Agregar manejadores: handleMainImageAdd, handleMainImageRemove
+  - [x] Actualizar props: onAdd={handleMainImageAdd}, onRemove={handleMainImageRemove}, image={form.image}
+- [ ] Probar funcionalidad
+  - [ ] Verificar que se pueda agregar imagen principal con botón
+  - [ ] Confirmar preview correcto
+  - [ ] Probar remover imagen
+  - [ ] Asegurar que el formulario envíe la imagen correctamente
 
-## Followup steps
-- [ ] Probar la creación de productos sin atributos dinámicos
-- [ ] Verificar que la edición de productos conserve las funciones de atributos dinámicos
-- [ ] Asegurar que no haya errores en la consola o funcionalidades rotas
+## Dependencias
+- Depende de: `components/ui/ImageSingle.tsx` (nuevo)
+- Archivos afectados: `app/admin/products/new/page.tsx`
+
+## Seguimiento de Progreso
+- [x] Paso 1 completado
+- [x] Paso 2 completado
+- [x] Paso 3 completado
+- [ ] Pruebas completadas

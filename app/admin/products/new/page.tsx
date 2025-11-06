@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 
 import { ImageReorder } from '@/components/ui/ImageReorder'
+import { ImageSingle } from '@/components/ui/ImageSingle'
 import type { Category } from '@/lib/schema'
 
 
@@ -136,6 +137,20 @@ export default function NewProductPage() {
     }))
   }
 
+  const handleMainImageAdd = (imageUrl: string) => {
+    setForm(prev => ({
+      ...prev,
+      image: imageUrl
+    }))
+  }
+
+  const handleMainImageRemove = () => {
+    setForm(prev => ({
+      ...prev,
+      image: ''
+    }))
+  }
+
 
 
 
@@ -256,13 +271,11 @@ export default function NewProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <Label htmlFor="image">Imagen Principal (URL)</Label>
-                <Input
-                  id="image"
-                  type="url"
-                  value={form.image}
-                  onChange={(e) => handleChange('image', e.target.value)}
-                  placeholder="https://ejemplo.com/imagen.jpg"
+                <Label htmlFor="image">Imagen Principal</Label>
+                <ImageSingle
+                  image={form.image}
+                  onAdd={handleMainImageAdd}
+                  onRemove={handleMainImageRemove}
                 />
               </div>
 
