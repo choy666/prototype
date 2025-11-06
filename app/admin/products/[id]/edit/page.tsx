@@ -23,12 +23,6 @@ import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
 import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 
-interface VariantForm {
-  attributes: Record<string, string>
-  stock: number
-  price: string
-  image: string
-}
 
 interface Product {
   id: number
@@ -57,7 +51,6 @@ interface ProductForm {
   stock: string
   destacado: boolean
   dynamicAttributes: DynamicAttribute[]
-  variants: VariantForm[]
 }
 
 
@@ -83,8 +76,7 @@ export default function EditProductPage() {
     weight: '',
     stock: '0',
     destacado: false,
-    dynamicAttributes: [],
-    variants: []
+    dynamicAttributes: []
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
 
@@ -156,39 +148,7 @@ export default function EditProductPage() {
     if (id) fetchProduct()
   }, [id, router, toast])
 
-  // Generate all combinations of attribute values when dynamic attributes change
-  useEffect(() => {
-    const cartesianProduct = (arrays: string[][]): string[][] => {
-      if (arrays.length === 0) return [[]]
-      const [first, ...rest] = arrays
-      const restProduct = cartesianProduct(rest)
-      return first.flatMap(item => restProduct.map(combination => [item, ...combination]))
-    }
 
-    const generateVariants = (dynamicAttrs: DynamicAttribute[]) => {
-      if (dynamicAttrs.length === 0) return []
-
-      const attributeNames = dynamicAttrs.map(attr => attr.name)
-      const valueArrays = dynamicAttrs.map(attr => attr.values)
-      const combinations = cartesianProduct(valueArrays)
-
-      return combinations.map(combination => {
-        const attributes: Record<string, string> = {}
-        attributeNames.forEach((name, index) => {
-          attributes[name] = combination[index]
-        })
-        return {
-          attributes,
-          stock: 0,
-          price: '',
-          image: ''
-        }
-      })
-    }
-
-    const variants = generateVariants(attributes)
-    setForm(prev => ({ ...prev, variants }))
-  }, [attributes])
 
 
 
@@ -271,14 +231,7 @@ export default function EditProductPage() {
 
 
 
-  const handleVariantChange = (index: number, field: keyof VariantForm, value: string | number) => {
-    setForm(prev => ({
-      ...prev,
-      variants: prev.variants.map((variant, i) =>
-        i === index ? { ...variant, [field]: value } : variant
-      )
-    }))
-  }
+
 
   if (fetchLoading) {
     return (
@@ -586,60 +539,7 @@ export default function EditProductPage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <Collapsible title="Vista Rápida de Variantes" defaultOpen={true}>
-                  {form.variants.length > 0 ? (
-                    <div className="space-y-4">
-                      {form.variants.map((variant, index) => (
-                        <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                          <div className="font-medium mb-2">
-                            {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div>
-                              <Label htmlFor={`variant-stock-${index}`}>Stock</Label>
-                              <Input
-                                id={`variant-stock-${index}`}
-                                type="number"
-                                min="0"
-                                value={variant.stock}
-                                onChange={(e) => handleVariantChange(index, 'stock', parseInt(e.target.value) || 0)}
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor={`variant-price-${index}`}>Precio (opcional)</Label>
-                              <Input
-                                id={`variant-price-${index}`}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={variant.price}
-                                onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
-                                placeholder="0.00"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor={`variant-image-${index}`}>Imagen (opcional)</Label>
-                              <Input
-                                id={`variant-image-${index}`}
-                                type="url"
-                                value={variant.image}
-                                onChange={(e) => handleVariantChange(index, 'image', e.target.value)}
-                                placeholder="https://ejemplo.com/imagen.jpg"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No hay variantes configuradas. Agrega atributos primero.</p>
-                  )}
-                </Collapsible>
-
-                <div className="mt-6">
-                  <ProductVariants productId={parseInt(id)} />
-                </div>
+                <ProductVariants productId={parseInt(id)} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -696,24 +596,7 @@ export default function EditProductPage() {
                   </div>
                 )}
 
-                {form.variants.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2">Variantes ({form.variants.length}):</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {form.variants.slice(0, 6).map((variant, index) => (
-                        <div key={index} className="p-2 border rounded text-sm">
-                          {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
-                          {variant.price && ` - $${variant.price}`}
-                        </div>
-                      ))}
-                      {form.variants.length > 6 && (
-                        <div className="p-2 border rounded text-sm text-muted-foreground">
-                          ... y {form.variants.length - 6} más
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+
               </div>
             </CardContent>
           </Card>
