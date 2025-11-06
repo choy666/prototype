@@ -116,8 +116,8 @@ export function ImageReorder({
           </Button>
         </div>
 
-        {/* Lista de imágenes - miniaturas compactas */}
-        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+        {/* Lista de imágenes - formato vertical como imagen principal */}
+        <div className="space-y-3">
           {images.map((image, index) => (
             <div
               key={index}
@@ -125,50 +125,55 @@ export function ImageReorder({
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, index)}
-              className="relative group border border-gray-200 rounded-lg overflow-hidden cursor-move hover:shadow-lg transition-all duration-200 hover:scale-105"
+              className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800 cursor-move hover:shadow-md transition-all duration-200"
             >
-              <div className="aspect-square relative">
+              {/* Indicador de orden y grip */}
+              <div className="flex flex-col items-center gap-1">
+                <GripVertical className="h-4 w-4 text-gray-400" />
+                <span className="text-xs font-semibold text-gray-500">{index + 1}</span>
+              </div>
+
+              {/* Vista previa de imagen */}
+              <div className="relative w-16 h-16 rounded-lg overflow-hidden border flex-shrink-0">
                 <Image
                   src={image}
-                  alt={`Imagen ${index + 1} del producto`}
+                  alt={`Vista previa de imagen ${index + 1}`}
                   fill
-                  sizes="(max-width: 768px) 25vw, (max-width: 1024px) 16.67vw, 12.5vw"
+                  sizes="64px"
                   className="object-cover"
                   placeholder="blur"
                   blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
                 />
-                {/* Overlay con previsualización al hacer hover */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-200 flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center gap-1">
-                    <ZoomIn className="h-4 w-4 text-white" />
-                    <span className="text-xs text-white font-medium">Vista previa</span>
-                  </div>
-                  <GripVertical className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity absolute top-1 left-1" />
-                </div>
               </div>
 
-              {/* Botón eliminar */}
-              <button
-                type="button"
-                onClick={() => onRemove(index)}
-                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                aria-label={`Eliminar imagen ${index + 1}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-
-              {/* Indicador de orden mejorado */}
-              <div className="absolute bottom-1 left-1 bg-black bg-opacity-70 text-white text-xs px-1.5 py-0.5 rounded font-semibold">
-                {index + 1}
+              {/* Información de la imagen */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Imagen Adicional {index + 1}</p>
+                <p className="text-xs text-muted-foreground truncate max-w-xs">{image}</p>
               </div>
 
-              {/* Click para previsualización */}
-              <button
-                type="button"
-                onClick={() => handleImageClick(image)}
-                className="absolute inset-0 w-full h-full cursor-pointer"
-                aria-label={`Ver imagen ${index + 1} en tamaño completo`}
-              />
+              {/* Botones de acción */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleImageClick(image)}
+                  className="min-h-[32px]"
+                >
+                  <ZoomIn className="h-3 w-3 mr-1" />
+                  Ver
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRemove(index)}
+                  className="min-h-[32px] text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
