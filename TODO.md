@@ -1,30 +1,23 @@
-# Plan de Implementación: Quitar Opción de Buscar Variantes
+# TODO: Quitar Atributos Dinámicos de Creación de Productos
 
-## Información Recopilada
-- El componente `ProductVariants.tsx` incluye una barra de búsqueda con un input que filtra variantes por atributos y precio.
-- También hay filtros de estado (Todas, Activas, Inactivas) que se mantendrán.
-- La funcionalidad de búsqueda se implementa mediante el estado `searchTerm` y la lógica de filtrado en `filteredVariants`.
+## Información Gathered
+- La página `app/admin/products/new/page.tsx` incluye funciones de Atributos Dinámicos usando `AttributeBuilder`, genera variantes automáticamente basadas en `dynamicAttributes`, y muestra una sección de Variantes en el formulario.
+- La página `app/admin/products/[id]/edit/page.tsx` mantiene los Atributos Dinámicos en una pestaña separada ("Atributos") y usa `ProductVariants` para gestionar variantes existentes.
+- El objetivo es eliminar completamente las funciones de atributos dinámicos de la creación de productos, dejando solo la edición con estas funcionalidades.
 
-## Plan de Implementación
-- Eliminar el input de búsqueda y el ícono de búsqueda de la barra de filtros.
-- Remover el estado `searchTerm` y su manejo.
-- Modificar la lógica de `filteredVariants` para quitar el filtro de búsqueda, manteniendo solo el filtro por estado (activo/inactivo).
-- Ajustar el mensaje de "No hay variantes" para que no mencione filtros de búsqueda.
-- Mantener la funcionalidad de mostrar variantes existentes, crear nuevas variantes y los filtros de estado.
+## Plan
+- [ ] Quitar import de `AttributeBuilder` en `app/admin/products/new/page.tsx`
+- [ ] Eliminar el estado `dynamicAttributes` del `ProductForm` interface y del estado inicial `form`
+- [ ] Remover el `useEffect` que genera combinaciones de variantes basadas en `dynamicAttributes`
+- [ ] Eliminar la sección "Atributos Dinámicos" del formulario (el componente `AttributeBuilder`)
+- [ ] Eliminar la sección "Variantes" del formulario (ya que sin atributos dinámicos no hay variantes automáticas)
+- [ ] Ajustar el `handleSubmit` para no enviar `dynamicAttributes` ni crear variantes automáticamente
+- [ ] Verificar que la página de edición siga funcionando correctamente con atributos dinámicos
 
-## Archivos a Modificar
-- `components/admin/ProductVariants.tsx`
+## Dependent Files to be edited
+- `app/admin/products/new/page.tsx`
 
-## Pasos de Seguimiento
-- Verificar que la página cargue correctamente sin errores.
-- Probar que las variantes se muestren y se puedan crear/editar sin problemas.
-- Confirmar que los filtros de estado funcionen correctamente.
-
-## Estado de Tareas
-- [ ] Eliminar estado `searchTerm` y su setter
-- [ ] Eliminar input de búsqueda de la barra de filtros
-- [ ] Modificar lógica de `filteredVariants` para quitar filtro de búsqueda
-- [ ] Ajustar mensaje de "No hay variantes" para no mencionar búsqueda
-- [ ] Verificar funcionamiento de la página
-- [ ] Probar creación y edición de variantes
-- [ ] Confirmar filtros de estado funcionan correctamente
+## Followup steps
+- [ ] Probar la creación de productos sin atributos dinámicos
+- [ ] Verificar que la edición de productos conserve las funciones de atributos dinámicos
+- [ ] Asegurar que no haya errores en la consola o funcionalidades rotas

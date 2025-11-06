@@ -11,17 +11,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
-import { AttributeBuilder, type DynamicAttribute } from '@/components/admin/AttributeBuilder'
+
 import { ImageReorder } from '@/components/ui/ImageReorder'
 import type { Category } from '@/lib/schema'
 
-
-interface VariantForm {
-  attributes: Record<string, string>
-  stock: number
-  price: string
-  image: string
-}
 
 interface ProductForm {
   name: string
@@ -34,8 +27,6 @@ interface ProductForm {
   weight: string
   stock: string
   destacado: boolean
-  dynamicAttributes: DynamicAttribute[]
-  variants: VariantForm[]
 }
 
 export default function NewProductPage() {
@@ -54,9 +45,7 @@ export default function NewProductPage() {
     discount: '0',
     weight: '',
     stock: '0',
-    destacado: false,
-    dynamicAttributes: [],
-    variants: []
+    destacado: false
   })
 
   useEffect(() => {
@@ -75,32 +64,7 @@ export default function NewProductPage() {
     fetchData()
   }, [])
 
-  // Generate combinations when dynamic attributes change
-  useEffect(() => {
-    const generateCombinations = (dynamicAttrs: DynamicAttribute[]) => {
-      if (dynamicAttrs.length === 0) return []
 
-      const combinations = dynamicAttrs.reduce((acc, attr) => {
-        const values = attr.values
-        if (acc.length === 0) {
-          return values.map((value: string) => ({ [attr.name]: value }))
-        }
-        return acc.flatMap(comb =>
-          values.map((value: string) => ({ ...comb, [attr.name]: value }))
-        )
-      }, [] as Record<string, string>[])
-
-      return combinations.map(attrs => ({
-        attributes: attrs,
-        stock: 0,
-        price: '',
-        image: ''
-      }))
-    }
-
-    const combinations = generateCombinations(form.dynamicAttributes)
-    setForm(prev => ({ ...prev, variants: combinations }))
-  }, [form.dynamicAttributes])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -131,26 +95,6 @@ export default function NewProductPage() {
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Failed to create product')
-      }
-
-      const product = await response.json()
-
-      // Create variants if any
-      if (form.variants.length > 0) {
-        const variantPromises = form.variants.map(variant =>
-          fetch(`/api/admin/products/${product.id}/variants`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              attributes: variant.attributes,
-              stock: variant.stock,
-              price: variant.price || undefined,
-              image: variant.image || undefined
-            })
-          })
-        )
-
-        await Promise.all(variantPromises)
       }
 
       toast({
@@ -194,14 +138,7 @@ export default function NewProductPage() {
 
 
 
-  const handleVariantChange = (index: number, field: keyof VariantForm, value: string | number) => {
-    setForm(prev => ({
-      ...prev,
-      variants: prev.variants.map((variant, i) =>
-        i === index ? { ...variant, [field]: value } : variant
-      )
-    }))
-  }
+
 
   return (
     <div className="space-y-6">
@@ -354,67 +291,7 @@ export default function NewProductPage() {
               </div>
             </div>
 
-            {/* Atributos Dinámicos */}
-            <div className="md:col-span-2">
-              <AttributeBuilder
-                attributes={form.dynamicAttributes}
-                onChange={(dynamicAttributes) => setForm(prev => ({ ...prev, dynamicAttributes }))}
-              />
-            </div>
 
-
-
-            {/* Variantes */}
-            {form.variants.length > 0 && (
-              <div className="md:col-span-2">
-                <Label htmlFor="variants">Variantes</Label>
-                <div className="space-y-4">
-                  {form.variants.map((variant, index) => (
-                    <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                      <div className="font-medium mb-2">
-                        {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div>
-                          <Label htmlFor={`variant-stock-${index}`}>Stock</Label>
-                          <Input
-                            id={`variant-stock-${index}`}
-                            type="number"
-                            min="0"
-                            value={variant.stock}
-                            onChange={(e) => handleVariantChange(index, 'stock', parseInt(e.target.value) || 0)}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`variant-price-${index}`}>Precio (opcional)</Label>
-                          <Input
-                            id={`variant-price-${index}`}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={variant.price}
-                            onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
-                            placeholder="0.00"
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor={`variant-image-${index}`}>Imagen (opcional)</Label>
-                          <Input
-                            id={`variant-image-${index}`}
-                            type="url"
-                            value={variant.image}
-                            onChange={(e) => handleVariantChange(index, 'image', e.target.value)}
-                            placeholder="https://ejemplo.com/imagen.jpg"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="flex flex-col sm:flex-row justify-end gap-4">
               <Link href="/admin/products">
