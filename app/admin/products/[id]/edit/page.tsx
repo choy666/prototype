@@ -791,14 +791,6 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
-                {/* Atributos Dinámicos */}
-                <div className="md:col-span-2">
-                  <AttributeBuilder
-                    attributes={attributes}
-                    onChange={setAttributes}
-                  />
-                </div>
-
                 <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
                   <Link href="/admin/products">
                     <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
