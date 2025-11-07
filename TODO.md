@@ -1,40 +1,79 @@
-# TODO: Corrección de Errores en Gestión de Stock
+# TODO: Auditoría y Corrección del Sistema de Stock
 
-## Problemas Identificados
-- Error "¡Ups! Algo salió mal" al intentar modificar stock en `/admin/products/[id]/stock`
-- Posible error de clave foránea en `stockLogs.userId` si `session.user.id` no es válido o usuario no existe
-- Falta logging detallado en el ErrorBoundary para capturar errores específicos
-- En `/admin/products/[id]/edit`, la pestaña de variantes muestra stock pero permite edición (debe ser solo lectura)
+## Información Gathered (del Análisis Inicial)
+- Funcionamiento: Página de stock permite updates en producto y variantes; usa adjustStock/adjustVariantStock para BD y logs.
+- Error: "¡Ups! Algo salió mal" por validaciones fallidas (userId inválido, DB errors) capturado por ErrorBoundary genérico.
+- Fortalezas: Soporte variantes, historial logs, validaciones básicas.
+- Debilidades: Sin transacciones DB (inconsistencias), logging insuficiente, no chequeo rol admin en actions, UX básica (sin bulk, warnings).
+- Entorno: Next.js 15, Drizzle+Neon, auth NextAuth; servidor en :3001 requiere login admin.
 
-## Tareas Pendientes
+## Plan Detallado (por Archivo)
+### 1. lib/actions/stock.ts
+- [ ] Implementar transacciones DB para atomicidad (update + log en tx).
+- [ ] Mejorar validaciones: Chequear rol admin (pasar como param), errores específicos para user/product no encontrados.
+- [ ] Agregar logging granular con logger.error en catch, contexto (IDs, reason).
+- [ ] Nueva función: bulkAdjustStock para múltiples variantes (UX mejora).
 
-### 1. Mejorar logging de errores
-- [x] Agregar logging detallado en `ErrorBoundary` para capturar stack trace y contexto del error
-- [x] Verificar configuración del logger para asegurar que los errores se muestren en consola de desarrollo
-- [x] Agregar try-catch específicos en `handleProductStockUpdate` y `handleVariantStockUpdate` para logging granular
+### 2. app/admin/products/[id]/stock/page.tsx
+- [ ] En handleConfirmUpdate: Chequear session.user.role === 'admin'.
+- [ ] Mejorar fetchData: Try-catch por fetch, manejar 401/404 con toast/redirección específica.
+- [ ] Optimistic update: Actualizar UI local, rollback si falla.
+- [ ] UX: Warning si newStock < current, paginación historial (>50 logs), bulk checkbox para variantes.
 
-### 2. Validar session.user.id y existencia de usuario
-- [x] Agregar validación en `stock/page.tsx` para verificar que `session.user.id` sea un número válido
-- [x] Verificar que el usuario autenticado exista en la base de datos antes de operaciones de stock
-- [x] Manejar casos donde la sesión esté expirada o inválida con redirección apropiada
+### 3. components/ui/error-boundary.tsx
+- [ ] Personalizar fallback para stock: Mensaje específico + botón recargar.
+- [ ] En componentDidCatch: Loggear URL y session status.
 
-### 3. Corregir posibles errores de base de datos
-- [x] Verificar que `productId` y `variantId` sean válidos antes de llamadas a `adjustStock` y `adjustVariantStock`
-- [x] Agregar validación de existencia de producto/variante antes de actualizar stock
-- [x] Manejar errores de conexión a base de datos con mensajes de error apropiados
+### 4. lib/schema.ts
+- [ ] Agregar índices: stockLogs.created_at, stockLogs.productId para queries rápidas.
+- [ ] Opcional: Columna isAdmin en users (usar rol existente por ahora).
 
-### 4. Corregir visualización en edit/page.tsx
-- [x] Verificar que en la pestaña "Variantes" solo se muestren valores de stock sin posibilidad de edición
-- [x] Confirmar que `stockReadOnly={true}` esté funcionando correctamente en `ProductVariants`
+### 5. app/api/admin/products/[id]/route.ts (si existe; sino crear)
+- [ ] Asegurar auth admin, error específico si producto no encontrado.
 
-### 5. Testing y Validación
-- [ ] Probar modificación de stock de producto principal con usuario válido
-- [ ] Probar modificación de stock de variantes con usuario válido
-- [ ] Verificar que los logs de stock se registren correctamente con el userId correcto
-- [ ] Confirmar que no aparezca el error "¡Ups! Algo salió mal" después de correcciones
+### 6. Migraciones y Testing
+- [ ] Generar migración para índices (drizzle-kit generate).
+- [ ] Testing: Login admin, update stock (producto/variantes), verificar logs BD/consola, no error genérico.
+- [ ] Deploy: Actualizar migraciones, test staging.
 
-### 6. Mejoras Adicionales
-- [ ] Agregar validación de sesión antes de permitir modificaciones
-- [ ] Mejorar manejo de errores en caso de sesión expirada
-- [ ] Considerar agregar confirmación antes de actualizar stock
-- [ ] Implementar rollback de stock en caso de error durante la actualización
+## Archivos Dependientes
+- Principal: lib/actions/stock.ts, app/admin/products/[id]/stock/page.tsx, components/ui/error-boundary.tsx.
+- Dependientes: lib/schema.ts (índices), lib/actions/productVariants.ts (si bulk), app/api/admin/products/[id]/route.ts (fetch).
+- No editar: lib/utils/logger.ts (ya robusto).
+
+## Followup Steps
+- [ ] Instalar deps si needed (ninguna nueva).
+- [ ] Ejecutar servidor, probar en browser (login, /admin/products/[id]/stock, updates).
+- [ ] Verificar BD: Logs insertados correctamente, transacciones atómicas.
+- [ ] Actualizar AUDITORIA_REPORTE.md con resumen de fixes.
+
+## Tareas Pendientes (Integrando Items Existentes)
+### 1. Logging y Errores (Completado Inicial)
+- [x] Logging detallado en ErrorBoundary.
+- [x] Config logger para desarrollo.
+- [x] Try-catch en handlers stock.
+
+### 2. Validaciones Básicas (Completado Inicial)
+- [x] Validar session.user.id.
+- [x] Verificar usuario en BD.
+- [x] Manejar sesión expirada.
+
+### 3. Errores DB (Completado Inicial)
+- [x] Validar IDs producto/variante.
+- [x] Existencia antes update.
+- [x] Errores conexión con mensajes.
+
+### 4. Visualización Edit Page (Completado Inicial)
+- [x] Stock read-only en variantes.
+- [x] stockReadOnly en ProductVariants.
+
+### 5. Testing Inicial
+- [ ] Probar updates producto/variantes con user válido.
+- [ ] Verificar logs con userId correcto.
+- [ ] Confirmar no error genérico.
+
+### 6. Mejoras Adicionales (Nuevas del Plan)
+- [ ] Validación sesión/rol antes mods.
+- [ ] Manejo errores sesión expirada.
+- [ ] Confirmación update con warning.
+- [ ] Rollback en errores (via transacciones).

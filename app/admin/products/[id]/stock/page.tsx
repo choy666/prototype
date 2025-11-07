@@ -11,9 +11,9 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
-import { ArrowLeft, Save, Package, History, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Save, Package, History, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { adjustStock, adjustVariantStock, getStockLogs } from '@/lib/actions/stock'
+import { adjustStock, adjustVariantStock, getStockLogs, bulkAdjustVariantStock } from '@/lib/actions/stock'
 
 interface Product {
   id: number
@@ -36,6 +36,7 @@ interface StockLog {
   change: number
   reason: string
   created_at: Date
+  userName: string | null
 }
 
 export default function ProductStockPage() {
@@ -53,10 +54,16 @@ export default function ProductStockPage() {
 
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
-    type: '' as 'product' | 'variant' | '',
+    type: '' as 'product' | 'variant' | 'bulk' | '',
     variantId: 0,
-    newStock: 0
+    newStock: 0,
+    bulkVariants: [] as Array<{ variantId: number; newStock: number }>
   })
+
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkStock, setBulkStock] = useState('')
+  const [stockLogsOffset, setStockLogsOffset] = useState(0)
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, number>>({}) // Para rollback
 
   const id = params.id as string
 
@@ -67,7 +74,26 @@ export default function ProductStockPage() {
 
         // Fetch product
         const productRes = await fetch(`/api/admin/products/${id}`)
-        if (!productRes.ok) throw new Error('Failed to fetch product')
+        if (!productRes.ok) {
+          if (productRes.status === 401) {
+            toast({
+              title: 'No autorizado',
+              description: 'Debes ser admin para acceder',
+              variant: 'destructive'
+            })
+            router.push('/admin')
+            return
+          } else if (productRes.status === 404) {
+            toast({
+              title: 'Producto no encontrado',
+              description: 'El producto solicitado no existe',
+              variant: 'destructive'
+            })
+            router.push('/admin/products')
+            return
+          }
+          throw new Error('Failed to fetch product')
+        }
         const productData = await productRes.json()
         setProduct(productData)
         setProductStock(productData.stock.toString())
@@ -82,19 +108,21 @@ export default function ProductStockPage() {
             initialVariantStocks[variant.id] = variant.stock.toString()
           })
           setVariantStocks(initialVariantStocks)
+        } else if (variantsRes.status === 404) {
+          setVariants([])
         }
 
         // Fetch stock logs
-        const logs = await getStockLogs(parseInt(id))
+        const logs = await getStockLogs(parseInt(id), 50)
         setStockLogs(logs)
       } catch (error) {
         console.error('Error fetching data:', error)
         toast({
-          title: 'Error',
-          description: 'No se pudieron cargar los datos',
+          title: 'Error de conexión',
+          description: 'No se pudieron cargar los datos. Verifica tu conexión o recarga la página.',
           variant: 'destructive'
         })
-        router.push('/admin/products')
+        // No redirigir automáticamente para permitir retry
       } finally {
         setFetchLoading(false)
       }
@@ -104,6 +132,8 @@ export default function ProductStockPage() {
   }, [id, router, toast])
 
   const confirmProductUpdate = () => {
+    if (!product) return
+
     const newStock = parseInt(productStock)
     if (isNaN(newStock) || newStock < 0) {
       toast({
@@ -114,11 +144,21 @@ export default function ProductStockPage() {
       return
     }
 
+    // Warning si reduce stock
+    if (newStock < product.stock) {
+      toast({
+        title: 'Advertencia',
+        description: 'Esto reducirá el stock disponible. ¿Continuar?',
+        variant: 'default'
+      })
+    }
+
     setConfirmDialog({
       isOpen: true,
       type: 'product',
       variantId: 0,
-      newStock
+      newStock,
+      bulkVariants: []
     })
   }
 
@@ -133,22 +173,54 @@ export default function ProductStockPage() {
       return
     }
 
+    // Warning si reduce stock
+    const currentVariantStock = variants.find(v => v.id === variantId)?.stock || 0
+    if (newStock < currentVariantStock) {
+      toast({
+        title: 'Advertencia',
+        description: 'Esto reducirá el stock de la variante. ¿Continuar?',
+        variant: 'default'
+      })
+    }
+
     setConfirmDialog({
       isOpen: true,
       type: 'variant',
       variantId,
-      newStock
+      newStock,
+      bulkVariants: []
+    })
+  }
+
+  const confirmBulkUpdate = () => {
+    const newStock = parseInt(bulkStock)
+    if (isNaN(newStock) || newStock < 0) {
+      toast({
+        title: 'Error',
+        description: 'Stock bulk inválido',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const bulkVariants = variants.map(v => ({ variantId: v.id, newStock }))
+    setConfirmDialog({
+      isOpen: true,
+      type: 'bulk',
+      variantId: 0,
+      newStock,
+      bulkVariants
     })
   }
 
   const handleConfirmUpdate = async () => {
-    if (!session?.user?.id) {
+    if (!session?.user?.id || session.user.role !== 'admin') {
       toast({
-        title: 'Error',
-        description: 'Sesión inválida o usuario no autenticado',
+        title: 'No autorizado',
+        description: 'Debes ser administrador para realizar esta acción',
         variant: 'destructive'
       })
-      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })
+      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0, bulkVariants: [] })
       return
     }
 
@@ -159,30 +231,61 @@ export default function ProductStockPage() {
         description: 'ID de usuario inválido',
         variant: 'destructive'
       })
-      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })
+      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0, bulkVariants: [] })
       return
     }
 
     setLoading(true)
     try {
+      let successMessage = ''
       if (confirmDialog.type === 'product' && product) {
+        // Optimistic update
+        setOptimisticUpdates(prev => ({ ...prev, product: confirmDialog.newStock }))
+        setProductStock(confirmDialog.newStock.toString())
+
         await adjustStock(product.id, confirmDialog.newStock, 'Actualización manual', userId)
-        toast({
-          title: 'Éxito',
-          description: 'Stock del producto actualizado correctamente'
-        })
+        successMessage = 'Stock del producto actualizado correctamente'
       } else if (confirmDialog.type === 'variant') {
+        // Optimistic update
+        setOptimisticUpdates(prev => ({ ...prev, [`variant-${confirmDialog.variantId}`]: confirmDialog.newStock }))
+        setVariantStocks(prev => ({ ...prev, [confirmDialog.variantId]: confirmDialog.newStock.toString() }))
+
         await adjustVariantStock(confirmDialog.variantId, confirmDialog.newStock, 'Actualización manual', userId)
-        toast({
-          title: 'Éxito',
-          description: 'Stock de la variante actualizado correctamente'
+        successMessage = 'Stock de la variante actualizado correctamente'
+      } else if (confirmDialog.type === 'bulk' && variants.length > 0) {
+        // Optimistic bulk
+        const bulkVariants = confirmDialog.bulkVariants
+        bulkVariants.forEach(({ variantId, newStock }) => {
+          setOptimisticUpdates(prev => ({ ...prev, [`variant-${variantId}`]: newStock }))
+          setVariantStocks(prev => ({ ...prev, [variantId]: newStock.toString() }))
         })
+
+        await bulkAdjustVariantStock(bulkVariants, 'Actualización bulk manual', userId)
+        successMessage = `Stock de ${bulkVariants.length} variantes actualizado correctamente`
       }
 
+      toast({
+        title: 'Éxito',
+        description: successMessage
+      })
+
       // Refresh logs
-      const logs = await getStockLogs(parseInt(id))
+      const logs = await getStockLogs(parseInt(id), 50)
       setStockLogs(logs)
     } catch (error) {
+      // Rollback optimistic
+      if (confirmDialog.type === 'product' && product) {
+        setProductStock(product.stock.toString())
+      } else if (confirmDialog.type === 'variant') {
+        const originalStock = variants.find(v => v.id === confirmDialog.variantId)?.stock || 0
+        setVariantStocks(prev => ({ ...prev, [confirmDialog.variantId]: originalStock.toString() }))
+      } else if (confirmDialog.type === 'bulk') {
+        variants.forEach(v => {
+          setVariantStocks(prev => ({ ...prev, [v.id]: v.stock.toString() }))
+        })
+      }
+      setOptimisticUpdates({})
+
       console.error(`Error updating ${confirmDialog.type} stock:`, error)
       toast({
         title: 'Error',
@@ -191,7 +294,16 @@ export default function ProductStockPage() {
       })
     } finally {
       setLoading(false)
-      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })
+      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0, bulkVariants: [] })
+    }
+  }
+
+  const loadMoreLogs = async () => {
+    const newOffset = stockLogsOffset + 50
+    const moreLogs = await getStockLogs(parseInt(id), 50, newOffset)
+    if (moreLogs.length > 0) {
+      setStockLogs(prev => [...prev, ...moreLogs])
+      setStockLogsOffset(newOffset)
     }
   }
 
@@ -289,7 +401,7 @@ export default function ProductStockPage() {
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Stock actual: {product.stock}
+                Stock actual: {optimisticUpdates.product || product.stock}
               </p>
             </div>
           </CardContent>
@@ -303,8 +415,43 @@ export default function ProductStockPage() {
                 <Package className="h-5 w-5" />
                 Stock de Variantes
               </CardTitle>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Modo Bulk</Label>
+                <Button
+                  variant={bulkMode ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBulkMode(!bulkMode)}
+                >
+                  {bulkMode ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  {bulkMode ? 'Desactivar' : 'Activar'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {bulkMode && (
+                <div className="border rounded-lg p-4 bg-blue-50">
+                  <Label>Stock para todas las variantes</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={bulkStock}
+                      onChange={(e) => setBulkStock(e.target.value)}
+                      placeholder="0"
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={confirmBulkUpdate}
+                      disabled={loading || !bulkStock}
+                      size="sm"
+                      className="min-h-[44px]"
+                    >
+                      <Save className="h-4 w-4" />
+                      Aplicar Bulk
+                    </Button>
+                  </div>
+                </div>
+              )}
               {variants.map((variant) => (
                 <div key={variant.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -312,15 +459,15 @@ export default function ProductStockPage() {
                       {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
                     </span>
                     <span className={`text-sm px-2 py-1 rounded ${
-                      variant.stock === 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      (optimisticUpdates[`variant-${variant.id}`] || variant.stock) === 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                     }`}>
-                      {variant.stock === 0 ? (
+                      {(optimisticUpdates[`variant-${variant.id}`] || variant.stock) === 0 ? (
                         <span className="flex items-center gap-1">
                           <AlertTriangle className="h-3 w-3" />
                           Agotado
                         </span>
                       ) : (
-                        `${variant.stock} unidades`
+                        `${optimisticUpdates[`variant-${variant.id}`] || variant.stock} unidades`
                       )}
                     </span>
                   </div>
@@ -335,10 +482,11 @@ export default function ProductStockPage() {
                       }))}
                       placeholder="0"
                       className="flex-1"
+                      disabled={bulkMode}
                     />
                     <Button
                       onClick={() => confirmVariantUpdate(variant.id)}
-                      disabled={loading}
+                      disabled={loading || bulkMode}
                       size="sm"
                       className="min-h-[44px]"
                     >
@@ -359,6 +507,11 @@ export default function ProductStockPage() {
             <History className="h-5 w-5" />
             Historial de Cambios de Stock
           </CardTitle>
+          {stockLogs.length >= 50 && (
+            <Button variant="outline" size="sm" onClick={loadMoreLogs} disabled={loading}>
+              Cargar más
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {stockLogs.length === 0 ? (
@@ -371,7 +524,7 @@ export default function ProductStockPage() {
                 <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-medium">{log.productName || 'Producto'}</p>
-                    <p className="text-sm text-gray-600">{log.reason}</p>
+                    <p className="text-sm text-gray-600">{log.reason} por {log.userName || 'Usuario desconocido'}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-medium">
@@ -397,12 +550,16 @@ export default function ProductStockPage() {
 
       <ConfirmationDialog
         isOpen={confirmDialog.isOpen}
-        title="Confirmar actualización de stock"
-        description={`¿Estás seguro de que quieres actualizar el stock a ${confirmDialog.newStock} unidades?`}
+        title={`Confirmar actualización de ${confirmDialog.type === 'bulk' ? 'stock bulk' : confirmDialog.type}`}
+        description={
+          confirmDialog.type === 'bulk'
+            ? `¿Estás seguro de que quieres actualizar el stock de ${confirmDialog.bulkVariants.length} variantes a ${confirmDialog.newStock} unidades cada una?`
+            : `¿Estás seguro de que quieres actualizar el stock a ${confirmDialog.newStock} unidades?`
+        }
         confirmText="Confirmar actualización"
         cancelText="Cancelar"
         onConfirm={handleConfirmUpdate}
-        onCancel={() => setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })}
+        onCancel={() => setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0, bulkVariants: [] })}
       />
     </div>
   )
