@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ArrowLeft, Save, Package, History, AlertTriangle } from 'lucide-react'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { adjustStock, adjustVariantStock, getStockLogs } from '@/lib/actions/stock'
 
 interface Product {
@@ -49,6 +50,13 @@ export default function ProductStockPage() {
   const [stockLogs, setStockLogs] = useState<StockLog[]>([])
   const [productStock, setProductStock] = useState('')
   const [variantStocks, setVariantStocks] = useState<Record<number, string>>({})
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    type: '' as 'product' | 'variant' | '',
+    variantId: 0,
+    newStock: 0
+  })
 
   const id = params.id as string
 
@@ -95,9 +103,7 @@ export default function ProductStockPage() {
     if (id) fetchData()
   }, [id, router, toast])
 
-  const handleProductStockUpdate = async () => {
-    if (!product || !session?.user?.id) return
-
+  const confirmProductUpdate = () => {
     const newStock = parseInt(productStock)
     if (isNaN(newStock) || newStock < 0) {
       toast({
@@ -108,32 +114,15 @@ export default function ProductStockPage() {
       return
     }
 
-    setLoading(true)
-    try {
-      await adjustStock(product.id, newStock, 'Actualización manual', parseInt(session.user.id))
-
-      toast({
-        title: 'Éxito',
-        description: 'Stock del producto actualizado correctamente'
-      })
-
-      // Refresh logs
-      const logs = await getStockLogs(parseInt(id))
-      setStockLogs(logs)
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el stock del producto',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
+    setConfirmDialog({
+      isOpen: true,
+      type: 'product',
+      variantId: 0,
+      newStock
+    })
   }
 
-  const handleVariantStockUpdate = async (variantId: number) => {
-    if (!session?.user?.id) return
-
+  const confirmVariantUpdate = (variantId: number) => {
     const newStock = parseInt(variantStocks[variantId])
     if (isNaN(newStock) || newStock < 0) {
       toast({
@@ -144,26 +133,65 @@ export default function ProductStockPage() {
       return
     }
 
+    setConfirmDialog({
+      isOpen: true,
+      type: 'variant',
+      variantId,
+      newStock
+    })
+  }
+
+  const handleConfirmUpdate = async () => {
+    if (!session?.user?.id) {
+      toast({
+        title: 'Error',
+        description: 'Sesión inválida o usuario no autenticado',
+        variant: 'destructive'
+      })
+      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })
+      return
+    }
+
+    const userId = parseInt(session.user.id)
+    if (isNaN(userId)) {
+      toast({
+        title: 'Error',
+        description: 'ID de usuario inválido',
+        variant: 'destructive'
+      })
+      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })
+      return
+    }
+
     setLoading(true)
     try {
-      await adjustVariantStock(variantId, newStock, 'Actualización manual', parseInt(session.user.id))
-
-      toast({
-        title: 'Éxito',
-        description: 'Stock de la variante actualizado correctamente'
-      })
+      if (confirmDialog.type === 'product' && product) {
+        await adjustStock(product.id, confirmDialog.newStock, 'Actualización manual', userId)
+        toast({
+          title: 'Éxito',
+          description: 'Stock del producto actualizado correctamente'
+        })
+      } else if (confirmDialog.type === 'variant') {
+        await adjustVariantStock(confirmDialog.variantId, confirmDialog.newStock, 'Actualización manual', userId)
+        toast({
+          title: 'Éxito',
+          description: 'Stock de la variante actualizado correctamente'
+        })
+      }
 
       // Refresh logs
       const logs = await getStockLogs(parseInt(id))
       setStockLogs(logs)
-    } catch {
+    } catch (error) {
+      console.error(`Error updating ${confirmDialog.type} stock:`, error)
       toast({
         title: 'Error',
-        description: 'No se pudo actualizar el stock de la variante',
+        description: error instanceof Error ? error.message : `No se pudo actualizar el stock de la ${confirmDialog.type}`,
         variant: 'destructive'
       })
     } finally {
       setLoading(false)
+      setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })
     }
   }
 
@@ -252,7 +280,7 @@ export default function ProductStockPage() {
                   placeholder="0"
                 />
                 <Button
-                  onClick={handleProductStockUpdate}
+                  onClick={confirmProductUpdate}
                   disabled={loading}
                   className="min-h-[44px]"
                 >
@@ -309,7 +337,7 @@ export default function ProductStockPage() {
                       className="flex-1"
                     />
                     <Button
-                      onClick={() => handleVariantStockUpdate(variant.id)}
+                      onClick={() => confirmVariantUpdate(variant.id)}
                       disabled={loading}
                       size="sm"
                       className="min-h-[44px]"
@@ -366,6 +394,16 @@ export default function ProductStockPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        title="Confirmar actualización de stock"
+        description={`¿Estás seguro de que quieres actualizar el stock a ${confirmDialog.newStock} unidades?`}
+        confirmText="Confirmar actualización"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmUpdate}
+        onCancel={() => setConfirmDialog({ isOpen: false, type: '', variantId: 0, newStock: 0 })}
+      />
     </div>
   )
 }

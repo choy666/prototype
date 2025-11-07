@@ -1,10 +1,26 @@
 import { db } from '@/lib/db'
-import { stockLogs, products, productVariants } from '@/lib/schema'
+import { stockLogs, products, productVariants, users } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
 
 export async function adjustStock(productId: number, newStock: number, reason: string, userId: number) {
+  // Validar que productId sea válido
+  if (!productId || isNaN(productId) || productId <= 0) {
+    throw new Error('ID de producto inválido')
+  }
+
+  // Validar que userId sea válido
+  if (!userId || isNaN(userId) || userId <= 0) {
+    throw new Error('ID de usuario inválido')
+  }
+
+  // Verificar que el usuario existe
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!user.length) {
+    throw new Error('Usuario no encontrado')
+  }
+
   const product = await db.select().from(products).where(eq(products.id, productId)).limit(1)
-  if (!product.length) throw new Error('Product not found')
+  if (!product.length) throw new Error('Producto no encontrado')
 
   const oldStock = product[0].stock
   const change = newStock - oldStock
@@ -26,8 +42,24 @@ export async function adjustStock(productId: number, newStock: number, reason: s
 }
 
 export async function adjustVariantStock(variantId: number, newStock: number, reason: string, userId: number) {
+  // Validar que variantId sea válido
+  if (!variantId || isNaN(variantId) || variantId <= 0) {
+    throw new Error('ID de variante inválido')
+  }
+
+  // Validar que userId sea válido
+  if (!userId || isNaN(userId) || userId <= 0) {
+    throw new Error('ID de usuario inválido')
+  }
+
+  // Verificar que el usuario existe
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!user.length) {
+    throw new Error('Usuario no encontrado')
+  }
+
   const variant = await db.select().from(productVariants).where(eq(productVariants.id, variantId)).limit(1)
-  if (!variant.length) throw new Error('Variant not found')
+  if (!variant.length) throw new Error('Variante no encontrada')
 
   const oldStock = variant[0].stock
   const change = newStock - oldStock

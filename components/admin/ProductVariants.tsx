@@ -328,8 +328,11 @@ export function ProductVariants({ productId, stockReadOnly = false }: ProductVar
                   onChange={(e) => setFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
                   readOnly={stockReadOnly}
-                  className={stockReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}
+                  className={stockReadOnly ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}
                 />
+                {stockReadOnly && (
+                  <p className="text-xs text-gray-500 mt-1">Solo lectura - Editar en Gestión de Stock</p>
+                )}
               </div>
 
               <div className="md:col-span-2">

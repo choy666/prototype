@@ -28,7 +28,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     logger.error('Error capturado por ErrorBoundary global', {
       error: error.message,
       stack: error.stack,
-      componentStack: errorInfo.componentStack
+      componentStack: errorInfo.componentStack,
+      url: typeof window !== 'undefined' ? window.location.href : 'server-side',
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'server-side',
+      timestamp: new Date().toISOString(),
+      additionalContext: 'Error en componente React'
     });
   }
 
