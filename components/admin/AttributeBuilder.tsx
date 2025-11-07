@@ -156,12 +156,15 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <GripVertical className="h-5 w-5 text-gray-400 group-hover:text-gray-600" />
-                    <Input
-                      value={attribute.name}
-                      onChange={(e) => updateAttribute(index, 'name', e.target.value)}
-                      placeholder="Nombre del atributo (ej: Talla)"
-                      className="font-semibold text-lg border-none bg-transparent p-0 focus:ring-0"
-                    />
+                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-gray-800 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:scale-[1.02]">
+                      <Tag className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                      <Input
+                        value={attribute.name}
+                        onChange={(e) => updateAttribute(index, 'name', e.target.value)}
+                        placeholder="Ej: Color, Talla, Material..."
+                        className="font-semibold text-lg border-none bg-transparent p-0 focus:ring-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
+                      />
+                    </div>
                   </div>
                   <Button
                     type="button"
