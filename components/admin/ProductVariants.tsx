@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X, AlertTriangle, Check } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X, AlertTriangle, Check, Tag } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 
 interface ProductVariant {
@@ -42,6 +42,8 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   const [selectedVariants, setSelectedVariants] = useState<number[]>([])
   const [inlineEditing, setInlineEditing] = useState<{ [key: number]: { field: string; value: string | number } }>({})
   const [inlineLoading, setInlineLoading] = useState<{ [key: number]: boolean }>({})
+  const [newAttributeName, setNewAttributeName] = useState('')
+  const [newAttributeValue, setNewAttributeValue] = useState('')
   const { toast } = useToast()
 
   const fetchData = useCallback(async () => {
@@ -256,8 +258,35 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
       stock: 0,
       images: []
     })
+    setNewAttributeName('')
+    setNewAttributeValue('')
     setEditingVariant(null)
     setShowForm(false)
+  }
+
+  const addAttributeToVariant = () => {
+    if (!newAttributeName.trim() || !newAttributeValue.trim()) return
+
+    const attrName = newAttributeName.trim()
+    if (formData.attributes[attrName]) {
+      toast({
+        title: 'Error',
+        description: 'Este atributo ya existe',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        [attrName]: newAttributeValue.trim()
+      }
+    }))
+
+    setNewAttributeName('')
+    setNewAttributeValue('')
   }
 
   const startEdit = (variant: ProductVariant) => {
@@ -386,55 +415,103 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
             </div>
 
             {/* Atributos Dinámicos */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Atributos</label>
-              <div className="space-y-2">
-                {Object.keys(formData.attributes).map((attrName) => (
-                  <div key={attrName} className="flex items-center gap-2">
-                    <span className="text-sm font-medium min-w-[100px]">{attrName}:</span>
-                    <Input
-                      value={formData.attributes[attrName] || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        attributes: {
-                          ...prev.attributes,
-                          [attrName]: e.target.value
-                        }
-                      }))}
-                      placeholder={`Valor para ${attrName}`}
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFormData(prev => {
-                        const newAttributes = { ...prev.attributes }
-                        delete newAttributes[attrName]
-                        return { ...prev, attributes: newAttributes }
-                      })}
-                      className="min-h-[36px]"
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <Tag className="h-5 w-5 text-blue-600" />
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Atributos de la Variante</h4>
+                <span className="text-sm text-gray-500">({Object.keys(formData.attributes).length} atributos)</span>
+              </div>
+
+              {/* Lista de atributos existentes */}
+              {Object.keys(formData.attributes).length > 0 && (
+                <div className="space-y-4">
+                  {Object.keys(formData.attributes).map((attrName) => (
+                    <div
+                      key={attrName}
+                      className="p-6 border-2 rounded-xl transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2 bg-white dark:bg-gray-800 hover:border-blue-300 hover:shadow-md hover:scale-[1.02] focus-within:ring-2 focus-within:ring-blue-500/20"
                     >
-                      <X className="h-4 w-4" />
-                    </Button>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-gray-800 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:scale-[1.02]">
+                            <Tag className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                            <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">{attrName}</span>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFormData(prev => {
+                            const newAttributes = { ...prev.attributes }
+                            delete newAttributes[attrName]
+                            return { ...prev, attributes: newAttributes }
+                          })}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 min-h-[36px]"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Valor del Atributo
+                          </label>
+                        </div>
+
+                        <Input
+                          value={formData.attributes[attrName] || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            attributes: {
+                              ...prev.attributes,
+                              [attrName]: e.target.value
+                            }
+                          }))}
+                          placeholder={`Valor para ${attrName}`}
+                          className="transition-colors focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Formulario para agregar nuevo atributo */}
+              <div className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <h5 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Agregar Nuevo Atributo</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
+                      Nombre del Atributo *
+                    </label>
+                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-gray-800 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:scale-[1.02]">
+                      <Tag className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                      <Input
+                        value={newAttributeName}
+                        onChange={(e) => setNewAttributeName(e.target.value)}
+                        placeholder="Ej: Color, Talla, Material..."
+                        className="font-semibold text-lg border-none bg-transparent p-0 focus:ring-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
+                      />
+                    </div>
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Valor del Atributo *
+                    </label>
+                    <Input
+                      value={newAttributeValue}
+                      onChange={(e) => setNewAttributeValue(e.target.value)}
+                      placeholder="ej: Rojo"
+                      className="transition-colors focus:border-blue-500"
+                    />
+                  </div>
+                </div>
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => {
-                    const attrName = prompt('Nombre del atributo:')
-                    if (attrName && !formData.attributes[attrName]) {
-                      setFormData(prev => ({
-                        ...prev,
-                        attributes: {
-                          ...prev.attributes,
-                          [attrName]: ''
-                        }
-                      }))
-                    }
-                  }}
-                  className="w-full min-h-[44px]"
+                  onClick={addAttributeToVariant}
+                  disabled={!newAttributeName.trim() || !newAttributeValue.trim()}
+                  className="min-h-[44px] bg-blue-600 hover:bg-blue-700 transition-colors"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar Atributo
