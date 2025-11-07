@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -39,6 +40,7 @@ interface StockLog {
 export default function ProductStockPage() {
   const router = useRouter()
   const params = useParams()
+  const { data: session } = useSession()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
@@ -94,7 +96,7 @@ export default function ProductStockPage() {
   }, [id, router, toast])
 
   const handleProductStockUpdate = async () => {
-    if (!product) return
+    if (!product || !session?.user?.id) return
 
     const newStock = parseInt(productStock)
     if (isNaN(newStock) || newStock < 0) {
@@ -108,7 +110,7 @@ export default function ProductStockPage() {
 
     setLoading(true)
     try {
-      await adjustStock(product.id, newStock, 'Actualización manual', 1) // TODO: Get actual user ID
+      await adjustStock(product.id, newStock, 'Actualización manual', parseInt(session.user.id))
 
       toast({
         title: 'Éxito',
@@ -130,6 +132,8 @@ export default function ProductStockPage() {
   }
 
   const handleVariantStockUpdate = async (variantId: number) => {
+    if (!session?.user?.id) return
+
     const newStock = parseInt(variantStocks[variantId])
     if (isNaN(newStock) || newStock < 0) {
       toast({
@@ -142,7 +146,7 @@ export default function ProductStockPage() {
 
     setLoading(true)
     try {
-      await adjustVariantStock(variantId, newStock, 'Actualización manual', 1) // TODO: Get actual user ID
+      await adjustVariantStock(variantId, newStock, 'Actualización manual', parseInt(session.user.id))
 
       toast({
         title: 'Éxito',

@@ -1,34 +1,34 @@
-# TODO: Gestión de Stock para Productos y Variantes
+# TODO: Corrección de Errores en Gestión de Stock
 
-## Objetivo
-Permitir editar el stock del producto y sus variantes en una página dedicada (`app/admin/products/id/stock`), con historial de cambios. Además, hacer que el campo de stock sea de solo lectura en `components/admin/ProductVariants.tsx` cuando se usa en la página de edición.
+## Problemas Identificados
+- Error "¡Ups! Algo salió mal" al intentar modificar stock en `/admin/products/[id]/stock`
+- `userId` hardcodeado como `1` en funciones de ajuste de stock, causando errores de referencia de clave foránea
+- Falta obtener `userId` dinámicamente del usuario autenticado
+- En `/admin/products/[id]/edit`, la pestaña de variantes muestra stock pero permite edición (debe ser solo lectura)
 
-## Pasos a Realizar
+## Tareas Pendientes
 
-### 1. Crear Página de Gestión de Stock
-- [ ] Crear `app/admin/products/[id]/stock/page.tsx`
-- [ ] Implementar interfaz para editar stock del producto principal
-- [ ] Implementar interfaz para editar stock de variantes existentes
-- [ ] Agregar historial de cambios de stock (usando `getStockLogs`)
-- [ ] Integrar con acciones de `lib/actions/stock.ts` para logging
+### 1. Corregir userId hardcodeado en stock/page.tsx
+- [ ] Agregar import de `useSession` de `next-auth/react`
+- [ ] Obtener `userId` de la sesión del usuario autenticado
+- [ ] Reemplazar `userId: 1` con el `userId` dinámico en `handleProductStockUpdate` y `handleVariantStockUpdate`
+- [ ] Manejar casos donde la sesión no esté disponible (fallback seguro)
 
-### 2. Modificar Componente ProductVariants
-- [ ] Agregar prop `stockReadOnly` a `components/admin/ProductVariants.tsx`
-- [ ] Hacer el campo de stock de solo lectura cuando `stockReadOnly={true}`
-- [ ] Actualizar uso en `app/admin/products/[id]/edit/page.tsx` para pasar `stockReadOnly={true}`
+### 2. Verificar permisos de edición de stock
+- [ ] Confirmar que solo usuarios con rol 'admin' pueden acceder a la página de stock
+- [ ] Asegurar que cualquier admin pueda modificar stock, no solo usuario ID 1
 
-### 3. Verificación y Testing
-- [ ] Probar edición de stock en la nueva página
-- [ ] Verificar que el historial se registre correctamente
-- [ ] Confirmar que el campo de stock es de solo lectura en edición
-- [ ] Verificar navegación y permisos
+### 3. Corregir visualización en edit/page.tsx
+- [ ] Verificar que en la pestaña "Variantes" solo se muestren valores de stock sin posibilidad de edición
+- [ ] Confirmar que `stockReadOnly={true}` esté funcionando correctamente en `ProductVariants`
 
-## Archivos Involucrados
-- `app/admin/products/[id]/stock/page.tsx` (nuevo)
-- `components/admin/ProductVariants.tsx` (modificar)
-- `app/admin/products/[id]/edit/page.tsx` (modificar uso)
-- `lib/actions/stock.ts` (usar existente)
+### 4. Testing y Validación
+- [ ] Probar modificación de stock de producto principal
+- [ ] Probar modificación de stock de variantes
+- [ ] Verificar que los logs de stock se registren correctamente con el userId correcto
+- [ ] Confirmar que no aparezca el error "¡Ups! Algo salió mal"
 
-## Dependencias
-- Requiere `lib/actions/stock.ts` para ajustar stock con logging
-- Usa `getStockLogs` para mostrar historial
+### 5. Mejoras Adicionales
+- [ ] Agregar validación de sesión antes de permitir modificaciones
+- [ ] Mejorar manejo de errores en caso de sesión expirada
+- [ ] Considerar agregar confirmación antes de actualizar stock
