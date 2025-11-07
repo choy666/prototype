@@ -236,7 +236,8 @@ export const productVariants = pgTable("product_variants", {
   attributes: jsonb("attributes").notNull(), // ej: { "Talla": "M", "Color": "Rojo" }
   price: decimal("price", { precision: 10, scale: 2 }), // precio específico de variante, opcional
   stock: integer("stock").default(0).notNull(),
-  image: text("image"), // imagen específica de variante
+  image: text("image"), // imagen específica de variante (para compatibilidad hacia atrás)
+  images: jsonb("images"), // array de urls de imágenes adicionales
   isActive: boolean("is_active").default(true).notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),

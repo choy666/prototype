@@ -8,6 +8,7 @@ const createVariantSchema = z.object({
   stock: z.number().min(0).default(0),
   price: z.string().optional(), // precio específico opcional
   image: z.string().optional(),
+  images: z.array(z.string()).optional(),
 })
 
 export async function GET(
@@ -60,6 +61,7 @@ export async function POST(
       stock: validatedData.stock,
       price: validatedData.price,
       image: validatedData.image,
+      images: validatedData.images,
     }
 
     const variant = await createProductVariant(variantData)

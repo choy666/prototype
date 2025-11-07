@@ -45,6 +45,7 @@ export async function getProductVariants(productId: number): Promise<ProductVari
         price: productVariants.price,
         stock: productVariants.stock,
         image: productVariants.image,
+        images: productVariants.images,
         isActive: productVariants.isActive,
         created_at: productVariants.created_at,
         updated_at: productVariants.updated_at,
@@ -57,6 +58,7 @@ export async function getProductVariants(productId: number): Promise<ProductVari
     return variants.map(variant => ({
       ...variant,
       attributes: variant.attributes as Record<string, string>,
+      images: variant.images as string[] | undefined,
     }));
   } catch (error) {
     console.error('Error fetching product variants:', error);
