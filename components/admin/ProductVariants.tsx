@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X, AlertTriangle, CheckCircle, EyeOff, Check } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X, AlertTriangle, Check } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 
 interface ProductVariant {
@@ -39,7 +39,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     images: [] as string[]
   })
 
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [selectedVariants, setSelectedVariants] = useState<number[]>([])
   const [inlineEditing, setInlineEditing] = useState<{ [key: number]: { field: string; value: string | number } }>({})
   const [inlineLoading, setInlineLoading] = useState<{ [key: number]: boolean }>({})
@@ -66,14 +65,8 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     }
   }, [productId, toast])
 
-  // Filtrar variantes basado en estado
-  const filteredVariants = variants.filter(variant => {
-    const matchesStatus = filterStatus === 'all' ||
-      (filterStatus === 'active' && variant.isActive) ||
-      (filterStatus === 'inactive' && !variant.isActive)
-
-    return matchesStatus
-  })
+  // Usar todas las variantes sin filtro
+  const filteredVariants = variants
 
   // Funciones para edición en línea
   const startInlineEdit = (variantId: number, field: string, currentValue: string | number) => {
@@ -157,57 +150,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     setSelectedVariants([])
   }
 
-  const bulkActivate = async () => {
-    try {
-      await Promise.all(selectedVariants.map(variantId =>
-        fetch(`/api/admin/products/${productId}/variants`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ variantId, isActive: true })
-        })
-      ))
 
-      toast({
-        title: 'Éxito',
-        description: `${selectedVariants.length} variantes activadas`
-      })
-
-      fetchData()
-      clearSelection()
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'Error al activar variantes',
-        variant: 'destructive'
-      })
-    }
-  }
-
-  const bulkDeactivate = async () => {
-    try {
-      await Promise.all(selectedVariants.map(variantId =>
-        fetch(`/api/admin/products/${productId}/variants`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ variantId, isActive: false })
-        })
-      ))
-
-      toast({
-        title: 'Éxito',
-        description: `${selectedVariants.length} variantes desactivadas`
-      })
-
-      fetchData()
-      clearSelection()
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'Error al desactivar variantes',
-        variant: 'destructive'
-      })
-    }
-  }
 
   const bulkDelete = async () => {
     try {
@@ -328,33 +271,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     setShowForm(true)
   }
 
-  const toggleVariantStatus = async (variantId: number, currentStatus: boolean) => {
-    try {
-      const response = await fetch(`/api/admin/products/${productId}/variants`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          variantId,
-          isActive: !currentStatus
-        })
-      })
 
-      if (!response.ok) throw new Error('Error al cambiar estado')
-
-      toast({
-        title: 'Éxito',
-        description: `Variante ${!currentStatus ? 'activada' : 'desactivada'} correctamente`
-      })
-
-      fetchData()
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'No se pudo cambiar el estado de la variante',
-        variant: 'destructive'
-      })
-    }
-  }
 
   if (loading) {
     return (
@@ -388,30 +305,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Filtros */}
-        <div className="flex gap-2">
-          <Button
-            variant={filterStatus === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterStatus('all')}
-          >
-            Todas
-          </Button>
-          <Button
-            variant={filterStatus === 'active' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterStatus('active')}
-          >
-            Activas
-          </Button>
-          <Button
-            variant={filterStatus === 'inactive' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterStatus('inactive')}
-          >
-            Inactivas
-          </Button>
-        </div>
+
 
         {/* Acciones masivas */}
         {selectedVariants.length > 0 && (
@@ -420,24 +314,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
               {selectedVariants.length} variante{selectedVariants.length !== 1 ? 's' : ''} seleccionada{selectedVariants.length !== 1 ? 's' : ''}
             </span>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={bulkActivate}
-                className="min-h-[36px]"
-              >
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Activar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={bulkDeactivate}
-                className="min-h-[36px]"
-              >
-                <EyeOff className="h-3 w-3 mr-1" />
-                Desactivar
-              </Button>
               <Button
                 variant="destructive"
                 size="sm"
@@ -584,16 +460,13 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
               <Package className="mx-auto h-16 w-16 mb-4 text-gray-300" />
               <p className="text-lg font-medium mb-2">No hay variantes configuradas</p>
               <p className="text-sm">
-                {filterStatus !== 'all'
-                  ? 'No se encontraron variantes con los filtros aplicados.'
-                  : 'Comienza creando tu primera variante para este producto.'
-                }
+                Comienza creando tu primera variante para este producto.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {/* Header de tabla */}
-              <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg font-medium text-sm">
+              <div className="grid grid-cols-10 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg font-medium text-sm">
                 <div className="col-span-1">
                   <input
                     type="checkbox"
@@ -605,13 +478,12 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                 <div className="col-span-4">Atributos</div>
                 <div className="col-span-2">Precio</div>
                 <div className="col-span-2">Stock</div>
-                <div className="col-span-2">Estado</div>
                 <div className="col-span-1">Acciones</div>
               </div>
 
               {/* Filas de variantes */}
               {filteredVariants.map((variant) => (
-                <div key={variant.id} className="grid grid-cols-12 gap-4 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <div key={variant.id} className="grid grid-cols-10 gap-4 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <div className="col-span-1 flex items-center">
                     <input
                       type="checkbox"
@@ -742,26 +614,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                         )}
                       </span>
                     )}
-                  </div>
-
-                  <div className="col-span-2 flex items-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleVariantStatus(variant.id, variant.isActive)}
-                      className={`min-h-[32px] ${
-                        variant.isActive
-                          ? 'text-green-600 hover:text-green-700'
-                          : 'text-gray-400 hover:text-gray-500'
-                      }`}
-                    >
-                      {variant.isActive ? (
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                      ) : (
-                        <EyeOff className="h-4 w-4 mr-1" />
-                      )}
-                      {variant.isActive ? 'Activa' : 'Inactiva'}
-                    </Button>
                   </div>
 
                   <div className="col-span-1 flex items-center gap-1">
