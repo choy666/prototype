@@ -148,17 +148,26 @@ export default function ProductStockPage() {
     if (isNaN(newStock) || newStock < 0) {
       toast({
         title: 'Error',
-        description: 'Stock inválido',
+        description: 'Stock inválido. Debe ser un número positivo.',
         variant: 'destructive'
       })
       return
     }
 
-    // Warning si reduce stock
-    if (newStock < product.stock) {
+    if (newStock > 999999) {
+      toast({
+        title: 'Error',
+        description: 'El stock no puede exceder 999,999 unidades.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Warning si reduce stock significativamente
+    if (newStock < product.stock * 0.5 && product.stock > 10) {
       toast({
         title: 'Advertencia',
-        description: 'Esto reducirá el stock disponible. ¿Continuar?',
+        description: 'Esto reducirá significativamente el stock disponible. ¿Continuar?',
         variant: 'default'
       })
     }
@@ -177,18 +186,27 @@ export default function ProductStockPage() {
     if (isNaN(newStock) || newStock < 0) {
       toast({
         title: 'Error',
-        description: 'Stock inválido',
+        description: 'Stock inválido. Debe ser un número positivo.',
         variant: 'destructive'
       })
       return
     }
 
-    // Warning si reduce stock
+    if (newStock > 999999) {
+      toast({
+        title: 'Error',
+        description: 'El stock no puede exceder 999,999 unidades.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Warning si reduce stock significativamente
     const currentVariantStock = variants.find(v => v.id === variantId)?.stock || 0
-    if (newStock < currentVariantStock) {
+    if (newStock < currentVariantStock * 0.5 && currentVariantStock > 10) {
       toast({
         title: 'Advertencia',
-        description: 'Esto reducirá el stock de la variante. ¿Continuar?',
+        description: 'Esto reducirá significativamente el stock de la variante. ¿Continuar?',
         variant: 'default'
       })
     }
@@ -207,7 +225,16 @@ export default function ProductStockPage() {
     if (isNaN(newStock) || newStock < 0) {
       toast({
         title: 'Error',
-        description: 'Stock bulk inválido',
+        description: 'Stock bulk inválido. Debe ser un número positivo.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (newStock > 999999) {
+      toast({
+        title: 'Error',
+        description: 'El stock bulk no puede exceder 999,999 unidades.',
         variant: 'destructive'
       })
       return

@@ -4,107 +4,195 @@ import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/utils/logger'
 
 export async function adjustStock(productId: number, newStock: number, reason: string, userId: number) {
-  // Validar que productId sea válido
+  // Validaciones más estrictas
   if (!productId || isNaN(productId) || productId <= 0) {
     throw new Error('ID de producto inválido')
   }
-
-  // Validar que userId sea válido
   if (!userId || isNaN(userId) || userId <= 0) {
     throw new Error('ID de usuario inválido')
   }
+  if (newStock < 0) {
+    throw new Error('El stock no puede ser negativo')
+  }
+  if (newStock > 999999) {
+    throw new Error('El stock no puede exceder 999,999 unidades')
+  }
+  if (!reason || reason.trim().length === 0) {
+    throw new Error('La razón del cambio es requerida')
+  }
 
-  try {
-    return await db.transaction(async (tx) => {
-      // Verificar que el usuario existe
-      const user = await tx.select().from(users).where(eq(users.id, userId)).limit(1)
-      if (!user.length) {
-        throw new Error('Usuario no encontrado')
-      }
+  const maxRetries = 3
+  let lastError: Error | null = null
 
-      const product = await tx.select().from(products).where(eq(products.id, productId)).limit(1)
-      if (!product.length) throw new Error('Producto no encontrado')
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        // Verificar que el usuario existe
+        const user = await tx.select().from(users).where(eq(users.id, userId)).limit(1)
+        if (!user.length) {
+          throw new Error('Usuario no encontrado')
+        }
 
-      const oldStock = product[0].stock
-      const change = newStock - oldStock
+        // Lock optimista: verificar stock actual
+        const product = await tx.select().from(products).where(eq(products.id, productId)).limit(1)
+        if (!product.length) throw new Error('Producto no encontrado')
 
-      // Actualizar stock del producto
-      await tx.update(products).set({ stock: newStock }).where(eq(products.id, productId))
+        const oldStock = product[0].stock
+        const change = newStock - oldStock
 
-      // Registrar en el historial
-      await tx.insert(stockLogs).values({
+        // Actualizar stock del producto
+        await tx.update(products).set({ stock: newStock }).where(eq(products.id, productId))
+
+        // Registrar en el historial con metadata adicional
+        await tx.insert(stockLogs).values({
+          productId,
+          oldStock,
+          newStock,
+          change,
+          reason: reason.trim(),
+          userId,
+        })
+
+        // Log detallado de la operación
+        logger.info('Stock adjusted successfully', {
+          productId,
+          oldStock,
+          newStock,
+          change,
+          reason: reason.trim(),
+          userId,
+          attempt,
+          operation: 'adjustStock'
+        })
+
+        return { oldStock, newStock, change }
+      })
+    } catch (error) {
+      lastError = error as Error
+      logger.warn('Stock adjustment attempt failed', {
         productId,
-        oldStock,
         newStock,
-        change,
         reason,
         userId,
+        attempt,
+        error: error instanceof Error ? error.message : 'Unknown error'
       })
 
-      return { oldStock, newStock, change }
-    })
-  } catch (error) {
-    logger.error('Error adjusting stock for product', {
-      productId,
-      newStock,
-      reason,
-      userId,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
-    throw error
+      // Si es el último intento, lanzar el error
+      if (attempt === maxRetries) {
+        logger.error('Stock adjustment failed after all retries', {
+          productId,
+          newStock,
+          reason,
+          userId,
+          attempts: maxRetries,
+          error: lastError.message
+        })
+        throw lastError
+      }
+
+      // Esperar antes del siguiente intento (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100))
+    }
   }
+
+  throw lastError || new Error('Error desconocido en ajuste de stock')
 }
 
 export async function adjustVariantStock(variantId: number, newStock: number, reason: string, userId: number) {
-  // Validar que variantId sea válido
+  // Validaciones más estrictas
   if (!variantId || isNaN(variantId) || variantId <= 0) {
     throw new Error('ID de variante inválido')
   }
-
-  // Validar que userId sea válido
   if (!userId || isNaN(userId) || userId <= 0) {
     throw new Error('ID de usuario inválido')
   }
+  if (newStock < 0) {
+    throw new Error('El stock no puede ser negativo')
+  }
+  if (newStock > 999999) {
+    throw new Error('El stock no puede exceder 999,999 unidades')
+  }
+  if (!reason || reason.trim().length === 0) {
+    throw new Error('La razón del cambio es requerida')
+  }
 
-  try {
-    return await db.transaction(async (tx) => {
-      // Verificar que el usuario existe
-      const user = await tx.select().from(users).where(eq(users.id, userId)).limit(1)
-      if (!user.length) {
-        throw new Error('Usuario no encontrado')
-      }
+  const maxRetries = 3
+  let lastError: Error | null = null
 
-      const variant = await tx.select().from(productVariants).where(eq(productVariants.id, variantId)).limit(1)
-      if (!variant.length) throw new Error('Variante no encontrada')
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        // Verificar que el usuario existe
+        const user = await tx.select().from(users).where(eq(users.id, userId)).limit(1)
+        if (!user.length) {
+          throw new Error('Usuario no encontrado')
+        }
 
-      const oldStock = variant[0].stock
-      const change = newStock - oldStock
+        const variant = await tx.select().from(productVariants).where(eq(productVariants.id, variantId)).limit(1)
+        if (!variant.length) throw new Error('Variante no encontrada')
 
-      // Actualizar stock de la variante
-      await tx.update(productVariants).set({ stock: newStock }).where(eq(productVariants.id, variantId))
+        const oldStock = variant[0].stock
+        const change = newStock - oldStock
 
-      // Registrar en el historial (usando productId de la variante)
-      await tx.insert(stockLogs).values({
-        productId: variant[0].productId,
-        oldStock,
+        // Actualizar stock de la variante
+        await tx.update(productVariants).set({ stock: newStock }).where(eq(productVariants.id, variantId))
+
+        // Registrar en el historial (usando productId de la variante)
+        await tx.insert(stockLogs).values({
+          productId: variant[0].productId,
+          oldStock,
+          newStock,
+          change,
+          reason: reason.trim(),
+          userId,
+        })
+
+        // Log detallado de la operación
+        logger.info('Variant stock adjusted successfully', {
+          variantId,
+          productId: variant[0].productId,
+          oldStock,
+          newStock,
+          change,
+          reason: reason.trim(),
+          userId,
+          attempt,
+          operation: 'adjustVariantStock'
+        })
+
+        return { oldStock, newStock, change }
+      })
+    } catch (error) {
+      lastError = error as Error
+      logger.warn('Variant stock adjustment attempt failed', {
+        variantId,
         newStock,
-        change,
         reason,
         userId,
+        attempt,
+        error: error instanceof Error ? error.message : 'Unknown error'
       })
 
-      return { oldStock, newStock, change }
-    })
-  } catch (error) {
-    logger.error('Error adjusting stock for variant', {
-      variantId,
-      newStock,
-      reason,
-      userId,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
-    throw error
+      // Si es el último intento, lanzar el error
+      if (attempt === maxRetries) {
+        logger.error('Variant stock adjustment failed after all retries', {
+          variantId,
+          newStock,
+          reason,
+          userId,
+          attempts: maxRetries,
+          error: lastError.message
+        })
+        throw lastError
+      }
+
+      // Esperar antes del siguiente intento (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100))
+    }
   }
+
+  throw lastError || new Error('Error desconocido en ajuste de stock de variante')
 }
 
 export async function deductStock(productId: number, variantId: number | null, quantity: number, userId: number) {
@@ -175,59 +263,106 @@ export async function bulkAdjustVariantStock(
     throw new Error('No variants provided for bulk update')
   }
 
-  // Validar userId
+  // Validaciones más estrictas
   if (!userId || isNaN(userId) || userId <= 0) {
     throw new Error('ID de usuario inválido')
   }
+  if (!reason || reason.trim().length === 0) {
+    throw new Error('La razón del cambio es requerida')
+  }
 
-  try {
-    const results = await db.transaction(async (tx) => {
-      // Verificar usuario
-      const user = await tx.select().from(users).where(eq(users.id, userId)).limit(1)
-      if (!user.length) {
-        throw new Error('Usuario no encontrado')
-      }
+  // Validar todas las variantes antes de procesar
+  for (const { variantId, newStock } of variants) {
+    if (!variantId || isNaN(variantId) || variantId <= 0) {
+      throw new Error(`ID de variante inválido: ${variantId}`)
+    }
+    if (newStock < 0) {
+      throw new Error(`El stock no puede ser negativo para variante ${variantId}`)
+    }
+    if (newStock > 999999) {
+      throw new Error(`El stock no puede exceder 999,999 unidades para variante ${variantId}`)
+    }
+  }
 
-      const updateResults: Array<{ variantId: number; oldStock: number; newStock: number; change: number }> = []
+  const maxRetries = 3
+  let lastError: Error | null = null
 
-      for (const { variantId, newStock } of variants) {
-        if (!variantId || isNaN(variantId) || variantId <= 0) {
-          throw new Error(`ID de variante inválido: ${variantId}`)
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const results = await db.transaction(async (tx) => {
+        // Verificar usuario
+        const user = await tx.select().from(users).where(eq(users.id, userId)).limit(1)
+        if (!user.length) {
+          throw new Error('Usuario no encontrado')
         }
 
-        const variant = await tx.select().from(productVariants).where(eq(productVariants.id, variantId)).limit(1)
-        if (!variant.length) throw new Error(`Variante no encontrada: ${variantId}`)
+        const updateResults: Array<{ variantId: number; oldStock: number; newStock: number; change: number }> = []
 
-        const oldStock = variant[0].stock
-        const change = newStock - oldStock
+        for (const { variantId, newStock } of variants) {
+          const variant = await tx.select().from(productVariants).where(eq(productVariants.id, variantId)).limit(1)
+          if (!variant.length) throw new Error(`Variante no encontrada: ${variantId}`)
 
-        // Actualizar
-        await tx.update(productVariants).set({ stock: newStock }).where(eq(productVariants.id, variantId))
+          const oldStock = variant[0].stock
+          const change = newStock - oldStock
 
-        // Log
-        await tx.insert(stockLogs).values({
-          productId: variant[0].productId,
-          oldStock,
-          newStock,
-          change,
+          // Actualizar
+          await tx.update(productVariants).set({ stock: newStock }).where(eq(productVariants.id, variantId))
+
+          // Log
+          await tx.insert(stockLogs).values({
+            productId: variant[0].productId,
+            oldStock,
+            newStock,
+            change,
+            reason: reason.trim(),
+            userId,
+          })
+
+          updateResults.push({ variantId, oldStock, newStock, change })
+        }
+
+        return updateResults
+      })
+
+      // Log detallado de la operación bulk
+      logger.info('Bulk variant stock adjusted successfully', {
+        variantCount: variants.length,
+        variants: variants.map(v => ({ variantId: v.variantId, newStock: v.newStock })),
+        reason: reason.trim(),
+        userId,
+        attempt,
+        operation: 'bulkAdjustVariantStock'
+      })
+
+      return results
+    } catch (error) {
+      lastError = error as Error
+      logger.warn('Bulk variant stock adjustment attempt failed', {
+        variantCount: variants.length,
+        variants: variants.map(v => ({ variantId: v.variantId, newStock: v.newStock })),
+        reason,
+        userId,
+        attempt,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+
+      // Si es el último intento, lanzar el error
+      if (attempt === maxRetries) {
+        logger.error('Bulk variant stock adjustment failed after all retries', {
+          variantCount: variants.length,
+          variants: variants.map(v => ({ variantId: v.variantId, newStock: v.newStock })),
           reason,
           userId,
+          attempts: maxRetries,
+          error: lastError.message
         })
-
-        updateResults.push({ variantId, oldStock, newStock, change })
+        throw lastError
       }
 
-      return updateResults
-    })
-
-    return results
-  } catch (error) {
-    logger.error('Error in bulk adjust variant stock', {
-      variants: variants.map(v => ({ variantId: v.variantId, newStock: v.newStock })),
-      reason,
-      userId,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
-    throw error
+      // Esperar antes del siguiente intento (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100))
+    }
   }
+
+  throw lastError || new Error('Error desconocido en ajuste bulk de stock de variantes')
 }
