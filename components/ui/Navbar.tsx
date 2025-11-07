@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingCart, Menu, X, House, User, LayoutDashboard, Package, ShoppingCart as ShoppingCartIcon, Users, BarChart3, Settings, Tag } from 'lucide-react';
+import { ShoppingCart, Menu, X, House, User, LayoutDashboard, Package, ShoppingCart as ShoppingCartIcon, Users, BarChart3, Tag } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 import { Button } from '@/components/ui/Button';
@@ -36,7 +36,6 @@ const Navbar = () => {
     { name: 'Pedidos', href: '/admin/orders', icon: ShoppingCartIcon },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
-    { name: 'Configuración', href: '/admin/settings', icon: Settings },
   ] : [
     { name: 'Inicio', href: '/' },
     { name: 'Productos', href: '/products' },
