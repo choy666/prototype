@@ -44,7 +44,6 @@ export async function getProductVariants(productId: number): Promise<ProductVari
         attributes: productVariants.attributes,
         price: productVariants.price,
         stock: productVariants.stock,
-        image: productVariants.image,
         images: productVariants.images,
         isActive: productVariants.isActive,
         created_at: productVariants.created_at,

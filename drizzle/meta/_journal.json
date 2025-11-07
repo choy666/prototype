@@ -106,6 +106,13 @@
       "when": 1762484145389,
       "tag": "0014_huge_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1762487094122,
+      "tag": "0015_secret_lord_hawal",
+      "breakpoints": true
     }
   ]
 }
