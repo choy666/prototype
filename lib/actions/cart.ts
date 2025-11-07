@@ -39,7 +39,7 @@ export async function getUserCart(userId: number) {
         attributes: productVariants.attributes,
         price: productVariants.price,
         stock: productVariants.stock,
-        images: productVariants.images,
+        image: productVariants.image,
       },
     })
     .from(cartItems)

@@ -38,7 +38,17 @@ export async function createProductVariant(
 export async function getProductVariants(productId: number): Promise<ProductVariant[]> {
   try {
     const variants = await db
-      .select()
+      .select({
+        id: productVariants.id,
+        productId: productVariants.productId,
+        attributes: productVariants.attributes,
+        price: productVariants.price,
+        stock: productVariants.stock,
+        image: productVariants.image,
+        isActive: productVariants.isActive,
+        created_at: productVariants.created_at,
+        updated_at: productVariants.updated_at,
+      })
       .from(productVariants)
       .where(and(eq(productVariants.productId, productId), eq(productVariants.isActive, true)))
       .orderBy(productVariants.created_at);
