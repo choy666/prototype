@@ -14,6 +14,7 @@ import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ArrowLeft, Save, Package, History, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { adjustStock, adjustVariantStock, getStockLogs, bulkAdjustVariantStock } from '@/lib/actions/stock'
+import { logger } from '@/lib/utils/logger'
 
 interface Product {
   id: number
@@ -115,6 +116,15 @@ export default function ProductStockPage() {
         // Fetch stock logs
         const logs = await getStockLogs(parseInt(id), 50)
         setStockLogs(logs)
+
+        // Log access to product stock
+        logger.info('Access to product stock page', {
+          productId: parseInt(id),
+          productName: productData.name,
+          stock: productData.stock,
+          userId: session?.user?.id,
+          userRole: session?.user?.role
+        })
       } catch (error) {
         console.error('Error fetching data:', error)
         toast({
@@ -129,7 +139,7 @@ export default function ProductStockPage() {
     }
 
     if (id) fetchData()
-  }, [id, router, toast])
+  }, [id, router, toast, session])
 
   const confirmProductUpdate = () => {
     if (!product) return
