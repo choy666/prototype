@@ -6,9 +6,12 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, Save, History } from 'lucide-react'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { ArrowLeft, Save, Package, History, AlertTriangle } from 'lucide-react'
+import { adjustStock, adjustVariantStock, getStockLogs } from '@/lib/actions/stock'
 
 interface Product {
   id: number
@@ -16,14 +19,21 @@ interface Product {
   stock: number
 }
 
+interface ProductVariant {
+  id: number
+  attributes: Record<string, string>
+  stock: number
+}
+
 interface StockLog {
   id: number
-  productName: string
+  productId: number
+  productName: string | null
   oldStock: number
   newStock: number
   change: number
   reason: string
-  created_at: string
+  created_at: Date
 }
 
 export default function ProductStockPage() {
@@ -33,32 +43,45 @@ export default function ProductStockPage() {
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [product, setProduct] = useState<Product | null>(null)
-  const [newStock, setNewStock] = useState('')
-  const [reason, setReason] = useState('')
+  const [variants, setVariants] = useState<ProductVariant[]>([])
   const [stockLogs, setStockLogs] = useState<StockLog[]>([])
+  const [productStock, setProductStock] = useState('')
+  const [variantStocks, setVariantStocks] = useState<Record<number, string>>({})
 
   const id = params.id as string
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setFetchLoading(true)
+
         // Fetch product
-        const productResponse = await fetch(`/api/admin/products/${id}`)
-        if (!productResponse.ok) throw new Error('Failed to fetch product')
-        const productData: Product = await productResponse.json()
+        const productRes = await fetch(`/api/admin/products/${id}`)
+        if (!productRes.ok) throw new Error('Failed to fetch product')
+        const productData = await productRes.json()
         setProduct(productData)
-        setNewStock(productData.stock.toString())
+        setProductStock(productData.stock.toString())
+
+        // Fetch variants
+        const variantsRes = await fetch(`/api/admin/products/${id}/variants`)
+        if (variantsRes.ok) {
+          const variantsData = await variantsRes.json()
+          setVariants(variantsData)
+          const initialVariantStocks: Record<number, string> = {}
+          variantsData.forEach((variant: ProductVariant) => {
+            initialVariantStocks[variant.id] = variant.stock.toString()
+          })
+          setVariantStocks(initialVariantStocks)
+        }
 
         // Fetch stock logs
-        const logsResponse = await fetch(`/api/admin/stock?productId=${id}`)
-        if (logsResponse.ok) {
-          const logsData: StockLog[] = await logsResponse.json()
-          setStockLogs(logsData)
-        }
-      } catch {
+        const logs = await getStockLogs(parseInt(id))
+        setStockLogs(logs)
+      } catch (error) {
+        console.error('Error fetching data:', error)
         toast({
           title: 'Error',
-          description: 'No se pudo cargar la información del producto',
+          description: 'No se pudieron cargar los datos',
           variant: 'destructive'
         })
         router.push('/admin/products')
@@ -70,68 +93,69 @@ export default function ProductStockPage() {
     if (id) fetchData()
   }, [id, router, toast])
 
-  const handleAdjustStock = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleProductStockUpdate = async () => {
     if (!product) return
 
-    const stockValue = parseInt(newStock)
-    if (isNaN(stockValue) || stockValue < 0) {
+    const newStock = parseInt(productStock)
+    if (isNaN(newStock) || newStock < 0) {
       toast({
         title: 'Error',
-        description: 'Stock debe ser un número válido mayor o igual a 0',
-        variant: 'destructive'
-      })
-      return
-    }
-
-    if (!reason.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Debe proporcionar una razón para el ajuste',
+        description: 'Stock inválido',
         variant: 'destructive'
       })
       return
     }
 
     setLoading(true)
-
     try {
-      const response = await fetch('/api/admin/stock', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          productId: product.id,
-          newStock: stockValue,
-          reason: reason.trim()
-        })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to adjust stock')
-      }
+      await adjustStock(product.id, newStock, 'Actualización manual', 1) // TODO: Get actual user ID
 
       toast({
         title: 'Éxito',
-        description: 'Stock ajustado correctamente'
+        description: 'Stock del producto actualizado correctamente'
       })
 
-      // Refresh data
-      setProduct(prev => prev ? { ...prev, stock: stockValue } : null)
-      setReason('')
-
       // Refresh logs
-      const logsResponse = await fetch(`/api/admin/stock?productId=${id}`)
-      if (logsResponse.ok) {
-        const logsData: StockLog[] = await logsResponse.json()
-        setStockLogs(logsData)
-      }
-    } catch (error) {
+      const logs = await getStockLogs(parseInt(id))
+      setStockLogs(logs)
+    } catch {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo ajustar el stock',
+        description: 'No se pudo actualizar el stock del producto',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVariantStockUpdate = async (variantId: number) => {
+    const newStock = parseInt(variantStocks[variantId])
+    if (isNaN(newStock) || newStock < 0) {
+      toast({
+        title: 'Error',
+        description: 'Stock inválido',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    setLoading(true)
+    try {
+      await adjustVariantStock(variantId, newStock, 'Actualización manual', 1) // TODO: Get actual user ID
+
+      toast({
+        title: 'Éxito',
+        description: 'Stock de la variante actualizado correctamente'
+      })
+
+      // Refresh logs
+      const logs = await getStockLogs(parseInt(id))
+      setStockLogs(logs)
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el stock de la variante',
         variant: 'destructive'
       })
     } finally {
@@ -170,115 +194,174 @@ export default function ProductStockPage() {
 
   if (!product) {
     return (
-      <div className="text-center py-8">
-        <p>Producto no encontrado</p>
+      <div className="text-center py-12">
+        <p className="text-gray-500">Producto no encontrado</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-4">
-        <Link href={`/admin/products/${id}/edit`}>
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ajustar Stock</h1>
-          <p className="text-muted-foreground">
-            Gestiona el stock de: {product.name}
-          </p>
+      <Breadcrumb items={[
+        { label: 'Productos', href: '/admin/products' },
+        { label: product.name, href: `/admin/products/${id}/edit` },
+        { label: 'Gestión de Stock' }
+      ]} />
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Link href={`/admin/products/${id}/edit`}>
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gestión de Stock</h1>
+            <p className="text-muted-foreground">
+              Gestiona el stock de {product.name}
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Product Stock */}
         <Card>
           <CardHeader>
-            <CardTitle>Ajuste Manual de Stock</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Stock del Producto
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdjustStock} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Stock Actual</label>
-                <div className="text-2xl font-bold text-blue-600">{product.stock}</div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Nuevo Stock *</label>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="productStock">Stock Actual</Label>
+              <div className="flex gap-2 mt-2">
                 <Input
+                  id="productStock"
                   type="number"
                   min="0"
-                  value={newStock}
-                  onChange={(e) => setNewStock(e.target.value)}
+                  value={productStock}
+                  onChange={(e) => setProductStock(e.target.value)}
                   placeholder="0"
-                  required
                 />
+                <Button
+                  onClick={handleProductStockUpdate}
+                  disabled={loading}
+                  className="min-h-[44px]"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Actualizar
+                </Button>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Razón del Ajuste *</label>
-                <Input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Ej: Recepción de mercancía, Corrección de inventario..."
-                  required
-                />
-              </div>
-
-              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-                <Save className="mr-2 h-4 w-4" />
-                {loading ? 'Ajustando...' : 'Ajustar Stock'}
-              </Button>
-            </form>
+              <p className="text-sm text-muted-foreground mt-1">
+                Stock actual: {product.stock}
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Historial de Movimientos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stockLogs.length === 0 ? (
-              <div className="text-center py-8">
-                <History className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-2 text-sm font-semibold text-gray-900">No hay movimientos</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Los ajustes de stock aparecerán aquí.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {stockLogs.map((log) => (
-                  <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{log.reason}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(log.created_at).toLocaleDateString('es-ES', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${log.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {log.change > 0 ? '+' : ''}{log.change}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {log.oldStock} → {log.newStock}
-                      </p>
-                    </div>
+        {/* Variants Stock */}
+        {variants.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Stock de Variantes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {variants.map((variant) => (
+                <div key={variant.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">
+                      {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                    </span>
+                    <span className={`text-sm px-2 py-1 rounded ${
+                      variant.stock === 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {variant.stock === 0 ? (
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Agotado
+                        </span>
+                      ) : (
+                        `${variant.stock} unidades`
+                      )}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={variantStocks[variant.id] || ''}
+                      onChange={(e) => setVariantStocks(prev => ({
+                        ...prev,
+                        [variant.id]: e.target.value
+                      }))}
+                      placeholder="0"
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={() => handleVariantStockUpdate(variant.id)}
+                      disabled={loading}
+                      size="sm"
+                      className="min-h-[44px]"
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Stock History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Historial de Cambios de Stock
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stockLogs.length === 0 ? (
+            <p className="text-center py-8 text-gray-500">
+              No hay registros de cambios de stock
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {stockLogs.map((log) => (
+                <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">{log.productName || 'Producto'}</p>
+                    <p className="text-sm text-gray-600">{log.reason}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">
+                      {log.oldStock} → {log.newStock}
+                      <span className={`ml-2 px-2 py-1 text-xs rounded ${
+                        log.change > 0 ? 'bg-green-100 text-green-800' :
+                        log.change < 0 ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {log.change > 0 ? '+' : ''}{log.change}
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(log.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -536,7 +536,7 @@ export default function EditProductPage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <ProductVariants productId={parseInt(id)} />
+                <ProductVariants productId={parseInt(id)} stockReadOnly={true} />
               </CardContent>
             </Card>
           </TabsContent>

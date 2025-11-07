@@ -21,9 +21,10 @@ interface ProductVariant {
 
 interface ProductVariantsProps {
   productId: number
+  stockReadOnly?: boolean
 }
 
-export function ProductVariants({ productId }: ProductVariantsProps) {
+export function ProductVariants({ productId, stockReadOnly = false }: ProductVariantsProps) {
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -326,6 +327,8 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                   value={formData.stock}
                   onChange={(e) => setFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
+                  readOnly={stockReadOnly}
+                  className={stockReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}
                 />
               </div>
 
