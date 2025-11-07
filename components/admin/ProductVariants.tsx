@@ -1,20 +1,21 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X, ImageIcon, AlertTriangle, CheckCircle, EyeOff, Check } from 'lucide-react'
-import Image from 'next/image'
+import { Plus, Edit, Trash2, Package, X, AlertTriangle, CheckCircle, EyeOff, Check } from 'lucide-react'
+import { ImageReorder } from '@/components/ui/ImageReorder'
 
 interface ProductVariant {
   id: number
   attributes: Record<string, string>
   price?: string
   stock: number
-  image?: string
+  images?: string[]
   isActive: boolean
 }
 
@@ -35,10 +36,8 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     attributes: {} as Record<string, string>,
     price: '',
     stock: 0,
-    image: ''
+    images: [] as string[]
   })
-  const [availableImages, setAvailableImages] = useState<string[]>([])
-  const [showImageSuggestions, setShowImageSuggestions] = useState(false)
 
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [selectedVariants, setSelectedVariants] = useState<number[]>([])
@@ -49,19 +48,11 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [variantsRes, imagesRes] = await Promise.all([
-        fetch(`/api/admin/products/${productId}/variants`),
-        fetch(`/api/admin/products/${productId}/variants?suggestions=true`)
-      ])
+      const variantsRes = await fetch(`/api/admin/products/${productId}/variants`)
 
       if (variantsRes.ok) {
         const variantsData = await variantsRes.json()
         setVariants(variantsData)
-      }
-
-      if (imagesRes.ok) {
-        const imagesData = await imagesRes.json()
-        setAvailableImages(imagesData.images || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -320,7 +311,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
       attributes: {},
       price: '',
       stock: 0,
-      image: ''
+      images: []
     })
     setEditingVariant(null)
     setShowForm(false)
@@ -331,7 +322,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
       attributes: variant.attributes,
       price: variant.price || '',
       stock: variant.stock,
-      image: variant.image || ''
+      images: variant.images || []
     })
     setEditingVariant(variant)
     setShowForm(true)
@@ -501,47 +492,20 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Imagen (opcional)</label>
-                <Input
-                  type="url"
-                  value={formData.image}
-                  onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
-                  placeholder="https://ejemplo.com/imagen.jpg"
+                <label className="block text-sm font-medium mb-2">Imágenes (opcional)</label>
+                <ImageReorder
+                  images={formData.images}
+                  onReorder={(images) => setFormData(prev => ({ ...prev, images }))}
+                  onRemove={(index) => setFormData(prev => ({
+                    ...prev,
+                    images: prev.images.filter((_, i) => i !== index)
+                  }))}
+                  onAdd={(imageUrl) => setFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, imageUrl]
+                  }))}
+                  maxImages={10}
                 />
-                {availableImages.length > 0 && (
-                  <div className="mt-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowImageSuggestions(!showImageSuggestions)}
-                      className="mb-2"
-                    >
-                      <ImageIcon className="h-4 w-4 mr-2" />
-                      {showImageSuggestions ? 'Ocultar' : 'Mostrar'} Imágenes Disponibles
-                    </Button>
-                    {showImageSuggestions && (
-                      <div className="grid grid-cols-4 gap-2 p-2 border rounded">
-                        {availableImages.map((imageUrl, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, image: imageUrl }))}
-                            className="relative group"
-                          >
-                            <Image
-                              src={imageUrl}
-                              alt={`Imagen ${index + 1}`}
-                              width={60}
-                              height={60}
-                              className="w-15 h-15 object-cover rounded border-2 border-transparent group-hover:border-blue-500"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -658,14 +622,24 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                   </div>
 
                   <div className="col-span-4 flex items-center gap-3">
-                    {variant.image && (
-                      <Image
-                        src={variant.image}
-                        alt="Variante"
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 object-cover rounded border"
-                      />
+                    {variant.images && variant.images.length > 0 && (
+                      <div className="flex gap-1">
+                        {variant.images.slice(0, 3).map((image, index) => (
+                          <Image
+                            key={index}
+                            src={image}
+                            alt={`Variante ${index + 1}`}
+                            width={30}
+                            height={30}
+                            className="w-7.5 h-7.5 object-cover rounded border"
+                          />
+                        ))}
+                        {variant.images.length > 3 && (
+                          <div className="w-7.5 h-7.5 bg-gray-200 rounded border flex items-center justify-center text-xs font-medium">
+                            +{variant.images.length - 3}
+                          </div>
+                        )}
+                      </div>
                     )}
                     <div>
                       <p className="font-medium text-sm">

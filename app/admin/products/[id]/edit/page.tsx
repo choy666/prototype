@@ -565,7 +565,7 @@ export default function EditProductPage() {
 
                 {attributes.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2">Atributos Disponibles:</h4>
+                    <h4 className="font-medium mb-2">Caracteristicas:</h4>
                     <div className="flex flex-wrap gap-2">
                       {attributes.map((attr, index) => (
                         <div key={index} className="text-sm">
