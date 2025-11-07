@@ -264,15 +264,18 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
         <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Agregar Nuevo Atributo</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+            <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
               Nombre del Atributo *
             </label>
-            <Input
-              value={newAttributeName}
-              onChange={(e) => setNewAttributeName(e.target.value)}
-              placeholder="ej: Color, Material, Estilo"
-              className="transition-colors focus:border-blue-500"
-            />
+            <div className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-gray-800 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:scale-[1.02]">
+              <Tag className="h-5 w-5 text-blue-600 flex-shrink-0" />
+              <Input
+                value={newAttributeName}
+                onChange={(e) => setNewAttributeName(e.target.value)}
+                placeholder="Ej: Color, Talla, Material..."
+                className="font-semibold text-lg border-none bg-transparent p-0 focus:ring-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
