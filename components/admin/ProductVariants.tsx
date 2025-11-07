@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/use-toast'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
-import { Plus, Edit, Trash2, Package, X, AlertTriangle, Check, Tag } from 'lucide-react'
+import { Plus, Edit, Trash2, Package, X, AlertTriangle, Tag } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
 
 interface ProductVariant {
@@ -40,8 +40,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   })
 
   const [selectedVariants, setSelectedVariants] = useState<number[]>([])
-  const [inlineEditing, setInlineEditing] = useState<{ [key: number]: { field: string; value: string | number } }>({})
-  const [inlineLoading, setInlineLoading] = useState<{ [key: number]: boolean }>({})
   const [newAttributeName, setNewAttributeName] = useState('')
   const [newAttributeValue, setNewAttributeValue] = useState('')
   const { toast } = useToast()
@@ -69,71 +67,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
 
   // Usar todas las variantes sin filtro
   const filteredVariants = variants
-
-  // Funciones para edición en línea
-  const startInlineEdit = (variantId: number, field: string, currentValue: string | number) => {
-    setInlineEditing(prev => ({
-      ...prev,
-      [variantId]: { field, value: currentValue }
-    }))
-  }
-
-
-
-  const saveInlineEdit = async (variantId: number) => {
-    const editData = inlineEditing[variantId]
-    if (!editData) return
-
-    setInlineLoading(prev => ({ ...prev, [variantId]: true }))
-
-    try {
-      const response = await fetch(`/api/admin/products/${productId}/variants`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          variantId,
-          [editData.field]: editData.value
-        })
-      })
-
-      if (!response.ok) throw new Error('Error al actualizar')
-
-      toast({
-        title: 'Éxito',
-        description: 'Variante actualizada correctamente'
-      })
-
-      fetchData()
-      setInlineEditing(prev => {
-        const newState = { ...prev }
-        delete newState[variantId]
-        return newState
-      })
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar la variante',
-        variant: 'destructive'
-      })
-    } finally {
-      setInlineLoading(prev => ({ ...prev, [variantId]: false }))
-    }
-  }
-
-  const cancelInlineEdit = (variantId: number) => {
-    setInlineEditing(prev => {
-      const newState = { ...prev }
-      delete newState[variantId]
-      return newState
-    })
-  }
-
-  const updateInlineValue = (variantId: number, value: string | number) => {
-    setInlineEditing(prev => ({
-      ...prev,
-      [variantId]: { ...prev[variantId], value }
-    }))
-  }
 
   // Funciones para acciones masivas
   const toggleVariantSelection = (variantId: number) => {
@@ -598,99 +531,22 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                   </div>
 
                   <div className="col-span-2 flex items-center">
-                    {inlineEditing[variant.id]?.field === 'price' ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={inlineEditing[variant.id].value}
-                          onChange={(e) => updateInlineValue(variant.id, parseFloat(e.target.value) || 0)}
-                          className="w-20 h-8"
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => saveInlineEdit(variant.id)}
-                          className="h-8 w-8 p-0"
-                          disabled={inlineLoading[variant.id]}
-                        >
-                          {inlineLoading[variant.id] ? (
-                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
-                          ) : (
-                            <Check className="h-3 w-3" />
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => cancelInlineEdit(variant.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <span
-                        className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded"
-                        onClick={() => startInlineEdit(variant.id, 'price', variant.price || 0)}
-                      >
-                        {variant.price ? `$${parseFloat(variant.price).toFixed(2)}` : 'Sin precio'}
-                      </span>
-                    )}
+                    <span className="px-2 py-1">
+                      {variant.price ? `$${parseFloat(variant.price).toFixed(2)}` : 'Sin precio'}
+                    </span>
                   </div>
 
                   <div className="col-span-2 flex items-center">
-                    {inlineEditing[variant.id]?.field === 'stock' ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={inlineEditing[variant.id].value}
-                          onChange={(e) => updateInlineValue(variant.id, parseInt(e.target.value) || 0)}
-                          className="w-20 h-8"
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => saveInlineEdit(variant.id)}
-                          className="h-8 w-8 p-0"
-                          disabled={inlineLoading[variant.id]}
-                        >
-                          {inlineLoading[variant.id] ? (
-                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
-                          ) : (
-                            <Check className="h-3 w-3" />
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => cancelInlineEdit(variant.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <span
-                        className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded ${
-                          variant.stock === 0 ? 'text-red-600 font-medium' : ''
-                        }`}
-                        onClick={() => startInlineEdit(variant.id, 'stock', variant.stock)}
-                      >
-                        {variant.stock === 0 ? (
-                          <span className="flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" />
-                            Agotado
-                          </span>
-                        ) : (
-                          variant.stock
-                        )}
-                      </span>
-                    )}
+                    <span className={`px-2 py-1 ${variant.stock === 0 ? 'text-red-600 font-medium' : ''}`}>
+                      {variant.stock === 0 ? (
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Agotado
+                        </span>
+                      ) : (
+                        variant.stock
+                      )}
+                    </span>
                   </div>
 
                   <div className="col-span-1 flex items-center gap-1">
