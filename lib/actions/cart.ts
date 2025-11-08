@@ -100,6 +100,16 @@ export async function addToCart(
     if (!variant.length) {
       throw new Error('Variante no encontrada')
     }
+
+    // Verificar stock de la variante
+    if (variant[0].stock < quantity) {
+      throw new Error('Stock insuficiente para la variante seleccionada')
+    }
+  } else {
+    // Verificar stock del producto base
+    if (product[0].stock < quantity) {
+      throw new Error('Stock insuficiente para el producto')
+    }
   }
 
   // Obtener o crear carrito del usuario

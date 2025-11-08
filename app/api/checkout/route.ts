@@ -3,7 +3,7 @@ import { MercadoPagoConfig, Preference } from "mercadopago";
 import { checkoutSchema } from "@/lib/validations/checkout";
 import { calculateShippingCost, calculateTotalWeight } from "@/lib/utils/shipping";
 import { db } from "@/lib/db";
-import { shippingMethods, users } from "@/lib/schema";
+import { shippingMethods, users, products, productVariants } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "@/lib/utils/logger";
 
@@ -59,6 +59,68 @@ export async function POST(req: NextRequest) {
     }
 
     logger.info('Checkout: Usuario verificado correctamente', { userId, userEmail: userExists[0].email });
+
+    // Verificar stock de todos los items antes de crear preferencia
+    logger.info('Checkout: Verificando stock de items', { itemCount: items.length });
+    for (const item of items) {
+      if (item.variantId) {
+        // Verificar stock de variante
+        const variant = await db
+          .select({ stock: productVariants.stock, productId: productVariants.productId })
+          .from(productVariants)
+          .where(eq(productVariants.id, item.variantId))
+          .limit(1);
+
+        if (!variant.length) {
+          logger.error('Checkout: Variante no encontrada', { variantId: item.variantId });
+          return NextResponse.json(
+            { error: `Variante no encontrada para producto ${item.id}` },
+            { status: 400 }
+          );
+        }
+
+        if (variant[0].stock < item.quantity) {
+          logger.error('Checkout: Stock insuficiente para variante', {
+            variantId: item.variantId,
+            availableStock: variant[0].stock,
+            requestedQuantity: item.quantity
+          });
+          return NextResponse.json(
+            { error: `Stock insuficiente para la variante seleccionada` },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Verificar stock del producto base
+        const product = await db
+          .select({ stock: products.stock })
+          .from(products)
+          .where(eq(products.id, item.id))
+          .limit(1);
+
+        if (!product.length) {
+          logger.error('Checkout: Producto no encontrado', { productId: item.id });
+          return NextResponse.json(
+            { error: `Producto no encontrado: ${item.id}` },
+            { status: 400 }
+          );
+        }
+
+        if (product[0].stock < item.quantity) {
+          logger.error('Checkout: Stock insuficiente para producto', {
+            productId: item.id,
+            availableStock: product[0].stock,
+            requestedQuantity: item.quantity
+          });
+          return NextResponse.json(
+            { error: `Stock insuficiente para el producto` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    logger.info('Checkout: Verificación de stock completada exitosamente');
 
     // Obtener método de envío de la BD
     const shippingMethodData = await db

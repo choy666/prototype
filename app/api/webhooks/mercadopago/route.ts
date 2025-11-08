@@ -419,6 +419,32 @@ async function createOrderFromPayment(payment: any) {
     await db.insert(orderItems).values(orderItemsData);
     logger.info('Items de orden creados', { orderId, itemsCount: orderItemsData.length });
 
+    // Deducción de stock después de crear la orden exitosamente
+    logger.info('Deducir stock para orden creada', { orderId, itemsCount: items.length });
+    for (const item of items) {
+      if (item.variantId) {
+        // Deducción de stock de variante
+        const { adjustVariantStock } = await import('@/lib/actions/stock');
+        await adjustVariantStock({
+          variantId: item.variantId,
+          change: -item.quantity,
+          reason: `Venta - Orden ${orderId}`
+        });
+        logger.info('Stock de variante deducido', { variantId: item.variantId, quantity: item.quantity });
+      } else {
+        // Deducción de stock del producto base
+        const { adjustProductStock } = await import('@/lib/actions/stock');
+        await adjustProductStock({
+          productId: parseInt(item.id),
+          change: -item.quantity,
+          reason: `Venta - Orden ${orderId}`
+        });
+        logger.info('Stock de producto deducido', { productId: item.id, quantity: item.quantity });
+      }
+    }
+
+    logger.info('Deducción de stock completada para orden', { orderId });
+
   } catch (error) {
     logger.error('Error creando orden desde pago', {
       paymentId: payment.id,

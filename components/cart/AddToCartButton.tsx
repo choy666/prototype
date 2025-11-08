@@ -18,6 +18,7 @@ type AddToCartButtonProps = {
     stock: number
     variantId?: number  // ID de la variante seleccionada
     variantAttributes?: Record<string, string> // atributos de la variante
+    variantStock?: number // stock de la variante si aplica
   }
   quantity?: number
   className?: string
@@ -41,8 +42,10 @@ export function AddToCartButton({
     item.variantId === product.variantId
   )
   const currentQuantity = cartItem?.quantity ?? 0
-  const isOutOfStock = product.stock <= 0
-  const isMaxedOut = currentQuantity + quantity > product.stock
+  // Usar stock de variante si existe, sino stock del producto base
+  const availableStock = product.variantId ? (product.variantStock ?? product.stock) : product.stock
+  const isOutOfStock = availableStock <= 0
+  const isMaxedOut = currentQuantity + quantity > availableStock
 
   const handleAddToCart = async () => {
     if (!product?.id || product.price <= 0 || isOutOfStock || isMaxedOut) {

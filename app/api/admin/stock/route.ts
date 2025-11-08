@@ -54,6 +54,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(products)
     }
 
+    if (!productId) {
+      return NextResponse.json({ error: 'productId is required for stock logs' }, { status: 400 })
+    }
+
     const logs = await getStockLogs(productId, limit)
     return NextResponse.json(logs)
   } catch (error) {
