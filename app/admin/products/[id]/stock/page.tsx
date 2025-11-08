@@ -72,6 +72,7 @@ export default function ProductStockPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      let variantsCount = 0
       try {
         setFetchLoading(true)
         setFetchError(null)
@@ -168,6 +169,7 @@ export default function ProductStockPage() {
               validVariantsCount: validVariants.length
             })
             setVariants(validVariants)
+            variantsCount = validVariants.length
 
             const initialVariantStocks: Record<number, string> = {}
             validVariants.forEach((variant: ProductVariant) => {
@@ -222,7 +224,7 @@ export default function ProductStockPage() {
           productId: parseInt(id),
           productName: productData.name,
           stock: productData.stock,
-          variantsCount: variants.length,
+          variantsCount,
           userId: session?.user?.id,
           userRole: session?.user?.role
         })
@@ -249,7 +251,7 @@ export default function ProductStockPage() {
     }
 
     if (id) fetchData()
-  }, [id, router, toast, session, variants.length])
+  }, [id, router, toast, session])
 
   const confirmProductUpdate = () => {
     if (!product) return
@@ -528,7 +530,7 @@ export default function ProductStockPage() {
       <div className="space-y-6">
         <Breadcrumb items={[
           { label: 'Productos', href: '/admin/products' },
-          { label: product.name, href: `/admin/products/${id}/edit` },
+          { label: product!.name, href: `/admin/products/${id}/edit` },
           { label: 'Gestión de Stock' }
         ]} />
 
@@ -544,7 +546,7 @@ export default function ProductStockPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Gestión de Stock</h1>
               <p className="text-muted-foreground">
-                Gestiona el stock de {product.name}
+                Gestiona el stock de {product!.name}
               </p>
             </div>
           </div>
@@ -581,7 +583,7 @@ export default function ProductStockPage() {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Stock actual: {optimisticUpdates.product || product.stock}
+                  Stock actual: {optimisticUpdates.product || product!.stock}
                 </p>
               </div>
             </CardContent>
