@@ -19,6 +19,12 @@ export async function GET(
   const productId = parseInt(id)
 
   try {
+    logger.info('API request to get product variants', {
+      productId,
+      path: request.nextUrl.pathname,
+      method: request.method
+    })
+
     const session = await auth()
     if (!session || session.user.role !== 'admin') {
       logger.warn('Unauthorized access to product variants', {
@@ -41,9 +47,10 @@ export async function GET(
       return NextResponse.json({ error: 'ID de producto inválido' }, { status: 400 })
     }
 
+    logger.info('Calling getProductVariants function', { productId })
     const variants = await getProductVariants(productId)
 
-    logger.info('Product variants fetched successfully', {
+    logger.info('Product variants API response successful', {
       productId,
       variantCount: variants.length,
       userId: session.user.id,
@@ -52,7 +59,7 @@ export async function GET(
 
     return NextResponse.json(variants)
   } catch (error) {
-    logger.error('Error fetching product variants', {
+    logger.error('Error in product variants API', {
       productId,
       userId: (await auth())?.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error',

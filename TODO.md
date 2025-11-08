@@ -1,18 +1,34 @@
-# TODO: Solución para acceso a página de stock en admin
+# TODO: Solución Error en Gestión de Stock
 
-## Pasos del plan aprobado
+## Problema
+- Error genérico "¡Ups! Algo salió mal" al acceder a `/admin/products/id/stock`
+- Logs muestran status=200 para products, pero error en la página
+- No se puede acceder al stock de ningún producto
 
-1. [x] Editar app/admin/products/[id]/stock/page.tsx:
-   - [x] Agregar guards safe en el map de variants: usar Object.entries(variant.attributes || {}) para evitar throws si attributes es null/undefined.
-   - [x] Agregar fallback 'Sin atributos' si no hay entries.
-   - [x] En el map de stockLogs, usar new Date(log.created_at || new Date()) para manejar null.
-   - [x] Opcional: agregar console.error en useEffect después de setVariants si hay variants con attributes inválidos.
+## Análisis
+- El fetch de product funciona (status=200)
+- Posible error en fetch de variants o en el render de la página
+- Necesario agregar más logging para identificar el punto exacto del error
 
-2. [x] Probar la página:
-   - [x] Navegar a /admin/products/24/stock después de login como admin.
-   - [x] Verificar que carga sin error genérico: muestra producto, variants (con attributes safe), y logs.
-   - [x] Probar edge cases: ID sin variants (debe mostrar [] sin crash), ID sin logs ([] OK), ID inválido (fetchError OK).
+## Plan de Solución
 
-3. [x] Verificar logs/consola: no hay errores en client/server al cargar.
+### 1. Agregar Logging Detallado en Página de Stock
+- [ ] Agregar logging en cada paso del fetchData
+- [ ] Logging específico para fetch de variants
+- [ ] Logging en el render de componentes
+- [ ] Capturar errores en validación de variants
 
-4. [x] Si OK, marcar completado y limpiar TODO.md.
+### 2. Mejorar Manejo de Errores en Variants
+- [ ] Agregar try-catch más específico en getProductVariants
+- [ ] Validar estructura de attributes antes de procesar
+- [ ] Manejar errores de base de datos en variants
+
+### 3. Agregar Validaciones Robustas
+- [ ] Verificar que attributes sea un objeto válido
+- [ ] Manejar variants con attributes null/undefined
+- [ ] Agregar fallback para variants malformadas
+
+### 4. Testing y Verificación
+- [ ] Probar con productos que tienen variants
+- [ ] Probar con productos sin variants
+- [ ] Verificar logs para identificar errores específicos

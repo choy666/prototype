@@ -3,6 +3,7 @@
 import { db } from '../db';
 import { productVariants, products } from '../schema';
 import { eq, and } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 import type { NewProductVariant, ProductVariant } from '../schema';
 
 
@@ -37,6 +38,8 @@ export async function createProductVariant(
 // ✅ Obtener variantes de un producto
 export async function getProductVariants(productId: number): Promise<ProductVariant[]> {
   try {
+    logger.info('Fetching product variants from database', { productId })
+
     const variants = await db
       .select({
         id: productVariants.id,
@@ -53,13 +56,49 @@ export async function getProductVariants(productId: number): Promise<ProductVari
       .where(and(eq(productVariants.productId, productId), eq(productVariants.isActive, true)))
       .orderBy(productVariants.created_at);
 
-    // Asegurar que attributes sea Record<string, string>
-    return variants.map(variant => ({
-      ...variant,
-      attributes: variant.attributes as Record<string, string>,
-      images: variant.images as string[] | undefined,
-    }));
+    logger.info('Product variants fetched from database', {
+      productId,
+      variantsCount: variants.length
+    })
+
+    // Asegurar que attributes sea Record<string, string> o null
+    const processedVariants = variants.map(variant => {
+      let processedAttributes: Record<string, string> | null = null
+
+      if (variant.attributes && typeof variant.attributes === 'object') {
+        try {
+          // Si attributes es un objeto JSON, procesarlo
+          processedAttributes = variant.attributes as Record<string, string>
+        } catch (attrError) {
+          logger.warn('Error processing variant attributes', {
+            productId,
+            variantId: variant.id,
+            attributes: variant.attributes,
+            error: attrError instanceof Error ? attrError.message : 'Unknown error'
+          })
+          processedAttributes = null
+        }
+      }
+
+      return {
+        ...variant,
+        attributes: processedAttributes,
+        images: variant.images as string[] | undefined,
+      }
+    })
+
+    logger.info('Product variants processed successfully', {
+      productId,
+      processedVariantsCount: processedVariants.length
+    })
+
+    return processedVariants
   } catch (error) {
+    logger.error('Error fetching product variants', {
+      productId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
     console.error('Error fetching product variants:', error);
     throw new Error('No se pudieron obtener las variantes del producto');
   }

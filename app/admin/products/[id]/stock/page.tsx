@@ -76,9 +76,21 @@ export default function ProductStockPage() {
         setFetchLoading(true)
         setFetchError(null)
 
+        logger.info('Starting fetch data for stock page', {
+          productId: parseInt(id),
+          userId: session?.user?.id,
+          userRole: session?.user?.role
+        })
+
         // Fetch product
+        logger.info('Fetching product data', { productId: parseInt(id) })
         const productRes = await fetch(`/api/admin/products/${id}`)
         if (!productRes.ok) {
+          logger.warn('Product fetch failed', {
+            productId: parseInt(id),
+            status: productRes.status,
+            statusText: productRes.statusText
+          })
           if (productRes.status === 401) {
             toast({
               title: 'No autorizado',
@@ -96,31 +108,79 @@ export default function ProductStockPage() {
             router.push('/admin/products')
             return
           }
-          throw new Error('Failed to fetch product')
+          throw new Error(`Failed to fetch product: ${productRes.status} ${productRes.statusText}`)
         }
         const productData = await productRes.json()
+        logger.info('Product data fetched successfully', {
+          productId: productData.id,
+          productName: productData.name,
+          stock: productData.stock
+        })
         setProduct(productData)
         setProductStock(productData.stock.toString())
 
         // Fetch variants
+        logger.info('Fetching variants data', { productId: parseInt(id) })
         try {
           const variantsRes = await fetch(`/api/admin/products/${id}/variants`)
+          logger.info('Variants response received', {
+            productId: parseInt(id),
+            status: variantsRes.status,
+            statusText: variantsRes.statusText
+          })
+
           if (variantsRes.ok) {
             const variantsData = await variantsRes.json()
+            logger.info('Variants data parsed', {
+              productId: parseInt(id),
+              variantsCount: variantsData.length
+            })
+
             // Validar y filtrar variants con attributes válidos
-            const validVariants = variantsData.filter((variant: ProductVariant) => 
-              variant && typeof variant === 'object' && variant.id && (typeof variant.attributes === 'object' || variant.attributes === null)
-            )
+            const validVariants = variantsData.filter((variant: ProductVariant) => {
+              const isValid = variant &&
+                typeof variant === 'object' &&
+                variant.id &&
+                (typeof variant.attributes === 'object' || variant.attributes === null)
+
+              if (!isValid) {
+                logger.warn('Invalid variant found', {
+                  productId: parseInt(id),
+                  variant,
+                  hasId: !!variant?.id,
+                  attributesType: typeof variant?.attributes
+                })
+              }
+              return isValid
+            })
+
             if (variantsData.length !== validVariants.length) {
-              console.error('Invalid attributes in some variants:', variantsData.filter((v: ProductVariant) => !validVariants.includes(v)))
+              logger.warn('Some variants filtered out due to invalid attributes', {
+                productId: parseInt(id),
+                originalCount: variantsData.length,
+                validCount: validVariants.length,
+                invalidVariants: variantsData.filter((v: ProductVariant) => !validVariants.includes(v))
+              })
             }
+
+            logger.info('Setting valid variants', {
+              productId: parseInt(id),
+              validVariantsCount: validVariants.length
+            })
             setVariants(validVariants)
+
             const initialVariantStocks: Record<number, string> = {}
             validVariants.forEach((variant: ProductVariant) => {
               initialVariantStocks[variant.id] = variant.stock.toString()
             })
             setVariantStocks(initialVariantStocks)
+
+            logger.info('Variant stocks initialized', {
+              productId: parseInt(id),
+              variantStocksCount: Object.keys(initialVariantStocks).length
+            })
           } else if (variantsRes.status === 404) {
+            logger.info('No variants found for product', { productId: parseInt(id) })
             setVariants([])
           } else {
             logger.warn('Failed to fetch variants', {
@@ -133,28 +193,36 @@ export default function ProductStockPage() {
         } catch (variantError) {
           logger.error('Error fetching variants', {
             productId: parseInt(id),
-            error: variantError instanceof Error ? variantError.message : 'Unknown error'
+            error: variantError instanceof Error ? variantError.message : 'Unknown error',
+            stack: variantError instanceof Error ? variantError.stack : undefined
           })
           setVariants([])
         }
 
         // Fetch stock logs
+        logger.info('Fetching stock logs', { productId: parseInt(id) })
         try {
           const logs = await getStockLogs(parseInt(id), 50)
+          logger.info('Stock logs fetched', {
+            productId: parseInt(id),
+            logsCount: logs.length
+          })
           setStockLogs(logs)
         } catch (logError) {
           logger.error('Error fetching stock logs', {
             productId: parseInt(id),
-            error: logError instanceof Error ? logError.message : 'Unknown error'
+            error: logError instanceof Error ? logError.message : 'Unknown error',
+            stack: logError instanceof Error ? logError.stack : undefined
           })
           setStockLogs([])
         }
 
         // Log access to product stock
-        logger.info('Access to product stock page', {
+        logger.info('Access to product stock page completed successfully', {
           productId: parseInt(id),
           productName: productData.name,
           stock: productData.stock,
+          variantsCount: variants.length,
           userId: session?.user?.id,
           userRole: session?.user?.role
         })
@@ -162,6 +230,7 @@ export default function ProductStockPage() {
         logger.error('Error fetching product data', {
           productId: parseInt(id),
           error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
           userId: session?.user?.id
         })
         console.error('Error fetching data:', error)
@@ -175,11 +244,12 @@ export default function ProductStockPage() {
         // No redirigir automáticamente para permitir retry
       } finally {
         setFetchLoading(false)
+        logger.info('Fetch data completed', { productId: parseInt(id) })
       }
     }
 
     if (id) fetchData()
-  }, [id, router, toast, session])
+  }, [id, router, toast, session, variants.length])
 
   const confirmProductUpdate = () => {
     if (!product) return
