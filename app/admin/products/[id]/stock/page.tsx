@@ -16,6 +16,7 @@ import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { adjustStock, adjustVariantStock, getStockLogs, bulkAdjustVariantStock } from '@/lib/actions/stock'
 import { logger } from '@/lib/utils/logger'
 import { StockErrorBoundary } from '@/components/ui/stock-error-boundary'
+import { safeToLocaleString } from '@/lib/utils/date'
 
 interface Product {
   id: number
@@ -723,7 +724,7 @@ export default function ProductStockPage() {
                         </span>
                       </p>
                       <p className="text-xs text-gray-500">
-                        {new Date(log.created_at || new Date()).toLocaleString()}
+                        {safeToLocaleString(log.created_at)}
                       </p>
                     </div>
                   </div>
