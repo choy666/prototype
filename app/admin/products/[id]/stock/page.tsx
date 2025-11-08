@@ -425,7 +425,7 @@ export default function ProductStockPage() {
         <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
         <h2 className="mt-4 text-xl font-semibold">¡Ups! Algo salió mal</h2>
         <p className="mt-2 text-gray-600">
-          Error inesperado al intentar cargar la información de stock.
+        Se produjo un error inesperado al cargar los datos.
         </p>
         <p className="mt-2 text-sm text-gray-500">
           {fetchError}
