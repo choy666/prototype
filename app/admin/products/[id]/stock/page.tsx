@@ -107,9 +107,16 @@ export default function ProductStockPage() {
           const variantsRes = await fetch(`/api/admin/products/${id}/variants`)
           if (variantsRes.ok) {
             const variantsData = await variantsRes.json()
-            setVariants(variantsData)
+            // Validar y filtrar variants con attributes válidos
+            const validVariants = variantsData.filter((variant: ProductVariant) => 
+              variant && typeof variant === 'object' && variant.id && (typeof variant.attributes === 'object' || variant.attributes === null)
+            )
+            if (variantsData.length !== validVariants.length) {
+              console.error('Invalid attributes in some variants:', variantsData.filter((v: ProductVariant) => !validVariants.includes(v)))
+            }
+            setVariants(validVariants)
             const initialVariantStocks: Record<number, string> = {}
-            variantsData.forEach((variant: ProductVariant) => {
+            validVariants.forEach((variant: ProductVariant) => {
               initialVariantStocks[variant.id] = variant.stock.toString()
             })
             setVariantStocks(initialVariantStocks)
@@ -559,7 +566,10 @@ export default function ProductStockPage() {
                   <div key={variant.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium">
-                        {Object.entries(variant.attributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                        {Object.entries(variant.attributes || {}).length > 0 
+                          ? Object.entries(variant.attributes || {}).map(([key, value]) => `${key}: ${value}`).join(', ')
+                          : 'Sin atributos'
+                        }
                       </span>
                       <span className={`text-sm px-2 py-1 rounded ${
                         (optimisticUpdates[`variant-${variant.id}`] || variant.stock) === 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
@@ -641,7 +651,7 @@ export default function ProductStockPage() {
                         </span>
                       </p>
                       <p className="text-xs text-gray-500">
-                        {new Date(log.created_at).toLocaleString()}
+                        {new Date(log.created_at || new Date()).toLocaleString()}
                       </p>
                     </div>
                   </div>
