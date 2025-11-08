@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
-import { ArrowLeft, Save, Package, History, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, Package, History, AlertTriangle, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { adjustStock, adjustVariantStock, getStockLogs, bulkAdjustVariantStock } from '@/lib/actions/stock'
 import { logger } from '@/lib/utils/logger'
@@ -48,6 +48,7 @@ export default function ProductStockPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [stockLogs, setStockLogs] = useState<StockLog[]>([])
@@ -73,6 +74,7 @@ export default function ProductStockPage() {
     const fetchData = async () => {
       try {
         setFetchLoading(true)
+        setFetchError(null)
 
         // Fetch product
         const productRes = await fetch(`/api/admin/products/${id}`)
@@ -156,6 +158,8 @@ export default function ProductStockPage() {
           userId: session?.user?.id
         })
         console.error('Error fetching data:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+        setFetchError(errorMessage)
         toast({
           title: 'Error de conexión',
           description: 'No se pudieron cargar los datos. Verifica tu conexión o recarga la página.',
@@ -411,6 +415,25 @@ export default function ProductStockPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
+        <h2 className="mt-4 text-xl font-semibold">¡Ups! Algo salió mal</h2>
+        <p className="mt-2 text-gray-600">
+          Error inesperado al intentar cargar la información de stock.
+        </p>
+        <p className="mt-2 text-sm text-gray-500">
+          {fetchError}
+        </p>
+        <Button onClick={() => window.location.reload()} className="mt-6">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Recargar la página
+        </Button>
       </div>
     )
   }
