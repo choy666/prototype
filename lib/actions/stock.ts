@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { stockLogs, products, productVariants, users } from '@/lib/schema'
-import { eq } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { logger } from '@/lib/utils/logger'
 
 export async function adjustStock(productId: number, newStock: number, reason: string, userId: number) {
@@ -232,7 +232,7 @@ export async function getStockLogs(productId?: number, limit = 50, offset = 0) {
     .from(stockLogs)
     .leftJoin(products, eq(stockLogs.productId, products.id))
     .leftJoin(users, eq(stockLogs.userId, users.id))
-    .orderBy(stockLogs.created_at)
+    .orderBy(desc(stockLogs.created_at))
 
   if (productId) {
     query.where(eq(stockLogs.productId, productId))
