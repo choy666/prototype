@@ -17,11 +17,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { ArrowLeft, Save, FileText, Tag, Package, Eye, Image as ImageIcon } from 'lucide-react'
 import { ImageReorder } from '@/components/ui/ImageReorder'
-import { ProductVariantsNew as ProductVariants } from '@/components/admin/ProductVariants'
+import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
 import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
-import type { ProductVariant } from '@/components/admin/ProductVariants'
+import type { ProductVariant } from '@/components/admin/ProductVariantsNew'
 
 
 interface Product {
@@ -536,7 +536,12 @@ export default function EditProductPage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <ProductVariants attributes={attributes} variants={variants} onChange={setVariants} />
+                <ProductVariantsNew
+                  productId={parseInt(id)}
+                  parentAttributes={attributes.reduce((acc, attr) => ({ ...acc, [attr.name]: attr.values.join(', ') }), {})}
+                  variants={variants}
+                  onChange={setVariants}
+                />
               </CardContent>
             </Card>
           </TabsContent>

@@ -27,8 +27,13 @@ async function getProductData(productId: number) {
   const variants = await db
     .select({
       id: productVariants.id,
+      name: productVariants.name,
+      description: productVariants.description,
       attributes: productVariants.attributes,
+      additionalAttributes: productVariants.additionalAttributes,
+      price: productVariants.price,
       stock: productVariants.stock,
+      images: productVariants.images,
       isActive: productVariants.isActive,
     })
     .from(productVariants)
@@ -41,7 +46,12 @@ async function getProductData(productId: number) {
     product: product[0],
     variants: variants.map(v => ({
       ...v,
+      name: v.name || undefined,
+      description: v.description || undefined,
+      price: v.price ? parseFloat(v.price) : undefined,
       attributes: v.attributes as Record<string, string>,
+      additionalAttributes: v.additionalAttributes as Record<string, string> | undefined,
+      images: v.images as string[] | undefined,
     })),
   };
 }
@@ -63,11 +73,11 @@ export default async function StockPage({ params }: PageProps) {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold">
           Gestión de Stock - {data.product.name}
         </h1>
         <p className="text-gray-600 mt-2">
-          Administra el stock del producto y sus variantes
+          Administra el stock del producto y sus variantes con nombres personalizados
         </p>
       </div>
 

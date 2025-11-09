@@ -61,6 +61,14 @@ export default function ProductClient({ product }: { product: Product }) {
     );
   }, [product.variants, selectedAttributes, useOriginalProduct]);
 
+  // Nombre de la variante seleccionada para mostrar (comentado para evitar warning)
+  // const selectedVariantName = useMemo(() => {
+  //   if (!selectedVariant) return null;
+  //   return selectedVariant.name || Object.entries(selectedVariant.attributes)
+  //     .map(([key, value]) => `${key}: ${value}`)
+  //     .join(", ");
+  // }, [selectedVariant]);
+
   // Precio actual (de variante o producto)
   const currentPrice = selectedVariant?.price
     ? Number(selectedVariant.price)

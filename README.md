@@ -265,4 +265,19 @@ Contraseña: TemH1Q4tCP
 Tarjeta: 5031 7557 3453 0604 (11/30, CVV 123)
 Completar el pago y verificar redirección y estado de orden
 
-$ npx drizzle-kit push
+🧪 Resumen de Comandos de Drizzle Kit
+🔧 Comandos Principales
+🛠️ npx drizzle-kit generate Genera archivos de migración SQL basados en los cambios en lib/schema.ts. 📁 Crea un archivo en la carpeta drizzle/ con el SQL necesario.
+
+🚚 npx drizzle-kit migrate Aplica las migraciones pendientes a la base de datos conectada (DATABASE_URL). 📜 Ejecuta los archivos SQL generados en orden.
+
+⚡ npx drizzle-kit push Sincroniza directamente el schema actual con la base de datos. 🚀 Ideal para desarrollo rápido o cuando las migraciones fallan.
+
+🔍 npx drizzle-kit check Verifica que el schema en el código coincida con la base de datos actual. ✅ Útil para confirmar antes de desplegar.
+
+🚀 Flujo Usado en Este Despliegue
+🧬 Generate → Se creó la migración localmente.
+
+🧨 Push → Se aplicaron los cambios directamente en producción (por problemas con migraciones faltantes).
+
+🕵️‍♂️ Check → Se validó que el estado del schema y la base de datos coincidieran.

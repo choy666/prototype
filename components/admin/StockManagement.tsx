@@ -17,7 +17,12 @@ interface StockManagementProps {
   productStock: number;
   variants: Array<{
     id: number;
+    name?: string;
+    description?: string;
     attributes: Record<string, string>;
+    additionalAttributes?: Record<string, string>;
+    price?: number;
+    images?: string[];
     stock: number;
     isActive: boolean;
   }>;
@@ -266,7 +271,12 @@ export function StockManagement({ productId, productStock: initialProductStock, 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {variants.map((variant) => (
                     <div key={variant.id} className="p-4 border rounded-lg">
-                      <p className="font-medium text-sm">{formatAttributes(variant.attributes)}</p>
+                      <p className="font-medium text-sm">
+                        {variant.name || formatAttributes(variant.attributes)}
+                      </p>
+                      {variant.price && (
+                        <p className="text-sm text-gray-600">Precio: ${variant.price}</p>
+                      )}
                       <p className="text-lg font-bold">{variant.stock} unidades</p>
                       <Badge variant={variant.stock > 0 ? "default" : "destructive"} className="mt-1">
                         {variant.stock > 0 ? "Disponible" : "Agotado"}
@@ -297,7 +307,7 @@ export function StockManagement({ productId, productStock: initialProductStock, 
                   <Card key={variant.id}>
                     <CardHeader>
                       <CardTitle className="text-lg">
-                        Variante: {formatAttributes(variant.attributes)}
+                        Variante: {variant.name || formatAttributes(variant.attributes)}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
