@@ -107,7 +107,7 @@ export default function AdminCategoriesPage() {
           </p>
         </div>
         <Link href="/admin/categories/new">
-          <Button className="w-full sm:w-auto min-h-[44px]">
+          <Button className="w-full sm:w-auto min-h-[44px] border">
             <Plus className="mr-2 h-4 w-4" />
             Nueva Categoría
           </Button>
