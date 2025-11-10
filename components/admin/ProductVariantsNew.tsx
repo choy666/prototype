@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Edit3, Check, X, Package, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { ImageReorder } from "@/components/ui/ImageReorder";
 
 
 export interface ProductVariant {
@@ -39,6 +40,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
   const [newVariantForm, setNewVariantForm] = useState<Partial<ProductVariant>>({
     attributes: parentAttributes,
     stock: 0,
+    images: [],
     isActive: true,
   });
 
@@ -62,6 +64,34 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
   }, [productId, onChange]);
 
   const handleCreateVariant = async () => {
+    // Validación de campos obligatorios
+    if (!newVariantForm.name?.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre de la variante es obligatorio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newVariantForm.price || newVariantForm.price <= 0) {
+      toast({
+        title: "Error",
+        description: "El precio específico es obligatorio y debe ser mayor a 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newVariantForm.images || newVariantForm.images.length === 0) {
+      toast({
+        title: "Error",
+        description: "Debe agregar al menos una imagen",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const response = await fetch(`/api/admin/products/${productId}/variants`, {
         method: "POST",
@@ -75,6 +105,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
         setNewVariantForm({
           attributes: parentAttributes,
           stock: 0,
+          images: [],
           isActive: true,
         });
         setShowCreateForm(false);
@@ -249,16 +280,17 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="variant-name">Nombre de la Variante (opcional)</Label>
+                <Label htmlFor="variant-name">Nombre de la Variante *</Label>
                 <Input
                   id="variant-name"
                   value={newVariantForm.name || ""}
                   onChange={(e) => setNewVariantForm(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Ej: Versión Premium"
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="variant-price">Precio Específico (opcional)</Label>
+                <Label htmlFor="variant-price">Precio Específico *</Label>
                 <Input
                   id="variant-price"
                   type="number"
@@ -268,7 +300,8 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
                     ...prev,
                     price: e.target.value ? parseFloat(e.target.value) : undefined
                   }))}
-                  placeholder="Deja vacío para usar precio base"
+                  placeholder="Precio específico de la variante"
+                  required
                 />
               </div>
             </div>
@@ -289,6 +322,23 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm">{formatAttributes(parentAttributes)}</p>
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="variant-images">Imágenes *</Label>
+              <ImageReorder
+                images={newVariantForm.images || []}
+                onReorder={(images) => setNewVariantForm(prev => ({ ...prev, images }))}
+                onRemove={(index) => setNewVariantForm(prev => ({
+                  ...prev,
+                  images: prev.images?.filter((_, i) => i !== index) || []
+                }))}
+                onAdd={(imageUrl) => setNewVariantForm(prev => ({
+                  ...prev,
+                  images: [...(prev.images || []), imageUrl]
+                }))}
+                maxImages={10}
+              />
             </div>
 
             <div>

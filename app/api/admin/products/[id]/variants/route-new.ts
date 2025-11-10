@@ -7,13 +7,13 @@ import { z } from "zod";
 
 // Schema de validación para crear variante
 const createVariantSchema = z.object({
-  name: z.string().optional(),
+  name: z.string(),
   description: z.string().optional(),
   attributes: z.record(z.string(), z.string()),
   additionalAttributes: z.record(z.string(), z.string()).optional(),
-  price: z.string().optional(),
+  price: z.string(),
   stock: z.number().min(0).default(0),
-  images: z.array(z.string()).optional(),
+  images: z.array(z.string()).min(1),
   isActive: z.boolean().default(true),
 });
 
