@@ -99,7 +99,7 @@ function AdditionalAttributesBuilder({
       <Label>Atributos Adicionales Exclusivos</Label>
       <div className="space-y-2">
         {Object.entries(attributes).map(([key, value]) => (
-          <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+          <div key={key} className="flex items-center gap-2 p-2 bg-gray-900 rounded">
             <Tag className="h-4 w-4 text-blue-600" />
             <span className="font-medium">{key}:</span>
             <span>{value}</span>
