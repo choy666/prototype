@@ -1,23 +1,20 @@
-# Tarea: Cambiar estado de variante basado en stock
+# TODO: Agregar Atributos Exclusivos a Variantes
 
-## Descripción
-Implementar lógica automática para desactivar variantes cuando su stock llegue a 0 y activarlas cuando tengan stock positivo (> 0).
+## Información Recopilada
+- La tabla `productVariants` ya tiene `additionalAttributes: jsonb("additional_attributes")` para atributos específicos de variante.
+- El componente `ProductVariantsNew.tsx` maneja creación y edición de variantes, pero no incluye UI para `additionalAttributes`.
+- La API en `route.ts` ya soporta `additionalAttributes` en POST y PUT.
+- `AttributeBuilder.tsx` existe pero es para atributos dinámicos con múltiples valores; necesitamos algo más simple para clave-valor.
 
-## Pasos a completar
+## Plan
+1. Crear un componente simple `AdditionalAttributesBuilder` para manejar atributos clave-valor en `ProductVariantsNew.tsx`.
+2. Agregar el campo `AdditionalAttributesBuilder` al formulario de creación de variantes.
+3. Agregar el campo `AdditionalAttributesBuilder` al formulario de edición de variantes.
+4. Actualizar el display de variantes para mostrar los `additionalAttributes`.
+5. Verificar que la API maneje correctamente los datos.
 
-### 1. Modificar función adjustVariantStock en lib/actions/stock.ts
-- [x] Agregar lógica para setear isActive = false cuando stock = 0
-- [x] Agregar lógica para setear isActive = true cuando stock > 0
-
-### 2. Modificar rutas API de variantes
-- [x] Actualizar app/api/admin/products/[id]/variants/route.ts (PUT)
-- [x] Actualizar app/api/admin/products/[id]/variants/route-new.ts (PUT)
-- [x] Agregar lógica automática de activación/desactivación en actualizaciones
-
-### 3. Verificar componentes
-- [x] Revisar si ProductVariantsNew.tsx necesita cambios (probablemente no, ya maneja activación manual)
-
-### 4. Testing
-- [ ] Probar que las variantes se desactiven automáticamente cuando stock = 0
-- [ ] Probar que las variantes se activen automáticamente cuando stock > 0
-- [ ] Verificar que la lógica funcione en ajustes de stock desde admin
+## Pasos a Completar
+- [ ] Modificar `ProductVariantsNew.tsx` para incluir `AdditionalAttributesBuilder` en creación
+- [ ] Modificar `ProductVariantsNew.tsx` para incluir `AdditionalAttributesBuilder` en edición
+- [ ] Actualizar el display de variantes para mostrar atributos adicionales
+- [ ] Probar la funcionalidad completa

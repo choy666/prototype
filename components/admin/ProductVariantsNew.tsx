@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Edit3, Check, X, Package, Plus } from "lucide-react";
+import { Trash2, Edit3, Check, X, Package, Plus, Tag } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { ImageReorder } from "@/components/ui/ImageReorder";
 
@@ -32,6 +32,78 @@ interface ProductVariantsNewProps {
   onChange: (variants: ProductVariant[]) => void;
 }
 
+// Componente simple para atributos adicionales clave-valor
+function AdditionalAttributesBuilder({
+  attributes,
+  onChange
+}: {
+  attributes: Record<string, string>;
+  onChange: (attributes: Record<string, string>) => void;
+}) {
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+
+  const addAttribute = () => {
+    if (!newKey.trim() || !newValue.trim()) return;
+    const updated = { ...attributes, [newKey.trim()]: newValue.trim() };
+    onChange(updated);
+    setNewKey("");
+    setNewValue("");
+  };
+
+  const removeAttribute = (key: string) => {
+    const updated = { ...attributes };
+    delete updated[key];
+    onChange(updated);
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label>Atributos Adicionales Exclusivos</Label>
+      <div className="space-y-2">
+        {Object.entries(attributes).map(([key, value]) => (
+          <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+            <Tag className="h-4 w-4 text-blue-600" />
+            <span className="font-medium">{key}:</span>
+            <span>{value}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => removeAttribute(key)}
+              className="ml-auto h-6 w-6 p-0 text-red-500 hover:text-red-700"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Input
+          placeholder="Nombre del atributo"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+        />
+        <Input
+          placeholder="Valor"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+        />
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={addAttribute}
+        disabled={!newKey.trim() || !newValue.trim()}
+      >
+        <Plus className="h-3 w-3 mr-1" />
+        Agregar Atributo
+      </Button>
+    </div>
+  );
+}
+
 export function ProductVariantsNew({ productId, parentAttributes, variants, onChange }: ProductVariantsNewProps) {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -39,6 +111,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
   const [editForm, setEditForm] = useState<Partial<ProductVariant>>({});
   const [newVariantForm, setNewVariantForm] = useState<Partial<ProductVariant>>({
     attributes: parentAttributes,
+    additionalAttributes: {},
     stock: 0,
     images: [],
     isActive: true,
@@ -332,6 +405,14 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
               </div>
             </div>
 
+            <AdditionalAttributesBuilder
+              attributes={newVariantForm.additionalAttributes || {}}
+              onChange={(attributes) => setNewVariantForm(prev => ({
+                ...prev,
+                additionalAttributes: attributes
+              }))}
+            />
+
             <div>
               <Label htmlFor="variant-images">Imágenes *</Label>
               <ImageReorder
@@ -452,6 +533,14 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
                       }))}
                     />
                   </div>
+
+                  <AdditionalAttributesBuilder
+                    attributes={editForm.additionalAttributes || {}}
+                    onChange={(attributes) => setEditForm(prev => ({
+                      ...prev,
+                      additionalAttributes: attributes
+                    }))}
+                  />
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
