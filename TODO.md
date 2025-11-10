@@ -1,19 +1,16 @@
-# Tareas para Agregar Edición de Atributos Heredados en Variantes
+# Cambiar bg-blue-50 por bg-gray-900
 
-## Información Recopilada
-- Las variantes tienen `attributes` (heredados del padre) y `additionalAttributes` (específicos).
-- Actualmente, solo se editan `additionalAttributes` en el formulario de edición.
-- La API ya permite actualizar `attributes` en variantes sin afectar al padre.
-- El componente `ProductVariantsNew.tsx` maneja la edición de variantes.
+## Archivos a modificar:
+- [x] components/ui/ImageUpload.tsx: Cambiar bg-blue-50 en línea 58
+- [x] components/admin/ProductVariantsNew.tsx: Cambiar bg-blue-50 en línea 58
+- [x] components/admin/AttributeBuilder.tsx: Cambiar bg-blue-50 en línea 108
+- [x] components/orders/OrderTimeline.tsx: Cambiar bg-blue-50 en línea 58
+- [x] components/checkout/ShippingMethodSelector.tsx: Cambiar bg-blue-50 en línea 58
+- [x] components/checkout/AddressSelector.tsx: Cambiar bg-blue-50 en línea 58
+- [x] app/products/page.tsx: Cambiar bg-blue-50 en línea 58
+- [x] app/(protected)/dashboard/page.tsx: Cambiar bg-blue-50 en línea 58
 
-## Plan
-- [ ] Crear componente `InheritedAttributesBuilder` para editar atributos heredados.
-- [ ] Agregar sección en formulario de edición para modificar `attributes` de la variante.
-- [ ] Inicializar `editForm` con `attributes` de la variante.
-- [ ] Agregar nota explicativa sobre que los cambios solo afectan a la variante.
-
-## Archivos a Editar
-- `components/admin/ProductVariantsNew.tsx`
-
-## Pasos de Seguimiento
-- [ ] Probar la funcionalidad después de implementar.
+## Consideraciones:
+- Verificar variantes de dark mode (dark:bg-blue-900/20, dark:bg-blue-900/30)
+- Asegurar consistencia visual después de los cambios
+- Probar los cambios para verificar que no afecten la funcionalidad

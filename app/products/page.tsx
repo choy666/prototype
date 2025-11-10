@@ -28,7 +28,7 @@ export default function ProductsPage() {
           <Button
             onClick={refresh}
             variant="outline"
-            className="bg-blue-50 hover:bg-blue-100 text-blue-700"
+            className="bg-gray-900 hover:bg-gray-800 text-blue-700"
           >
             Reintentar
           </Button>

@@ -149,7 +149,7 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
                 onDragEnd={handleDragEnd}
                 className={`p-6 border-2 rounded-xl transition-all duration-300 cursor-move group animate-in fade-in slide-in-from-bottom-2 ${
                   draggedIndex === index
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg scale-105'
+                    ? 'border-blue-500 bg-gray-900 dark:bg-blue-900/20 shadow-lg scale-105'
                     : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 hover:shadow-md hover:scale-[1.02] focus-within:ring-2 focus-within:ring-blue-500/20'
                 } ${errors.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : ''} ${animatingItems.has(index) ? 'animate-pulse' : ''}`}
               >

@@ -86,7 +86,7 @@ export function ImageUpload({
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-blue-500 bg-blue-50'
+            ? 'border-blue-500 bg-gray-900'
             : 'border-gray-300 hover:border-gray-400'
         } ${uploading || images.length >= maxFiles ? 'opacity-50 cursor-not-allowed' : ''}`}
       >

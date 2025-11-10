@@ -72,9 +72,9 @@ export function ShippingMethodSelector({
           return (
             <div
               key={method.id}
-              className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
                 isSelected
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-blue-500 bg-gray-900'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
               onClick={() => onMethodSelect(method)}

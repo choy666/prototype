@@ -80,7 +80,7 @@ export default function OrderTimeline({ currentStatus, createdAt, trackingNumber
       </h3>
 
       {trackingNumber && (
-        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div className="mb-6 p-4 bg-gray-900 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <span className="font-medium text-blue-800 dark:text-blue-200">

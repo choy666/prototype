@@ -95,7 +95,7 @@ export default function DashboardPage() {
 
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           {/* Tarjeta de Resumen */}
-          <div className='bg-blue-50 dark:bg-blue-900/30 rounded-lg p-6 border border-blue-100 dark:border-blue-800'>
+          <div className='bg-gray-900 dark:bg-blue-900/30 rounded-lg p-6 border border-blue-100 dark:border-blue-800'>
             <h3 className='text-lg font-medium text-blue-800 dark:text-blue-200'>Resumen</h3>
             <p className='mt-2 text-blue-600 dark:text-blue-300'>Contenido del resumen irá aquí.</p>
           </div>

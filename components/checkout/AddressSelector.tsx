@@ -137,7 +137,7 @@ export function AddressSelector({
               key={address.id}
               className={`p-4 cursor-pointer transition-all ${
                 selectedAddressId === address.id
-                  ? 'ring-2 ring-blue-500 bg-blue-50'
+                  ? 'ring-2 ring-blue-500 bg-gray-900'
                   : 'hover:shadow-md'
               }`}
               onClick={() => onAddressSelect(address)}

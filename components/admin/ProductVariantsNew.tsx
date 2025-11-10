@@ -53,7 +53,7 @@ function InheritedAttributesBuilder({
       </p>
       <div className="space-y-2">
         {Object.entries(attributes).map(([key, value]) => (
-          <div key={key} className="flex items-center gap-2 p-2 bg-blue-50 rounded">
+          <div key={key} className="flex items-center gap-2 p-2 bg-gray-900 rounded">
             <Tag className="h-4 w-4 text-blue-600" />
             <span className="font-medium min-w-0 flex-shrink-0">{key}:</span>
             <Input
@@ -438,7 +438,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
 
             <div>
               <Label>Atributos Heredados del Padre</Label>
-              <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="p-3 bg-gray-900 rounded-lg">
                 <p className="text-sm">{formatAttributes(parentAttributes)}</p>
               </div>
             </div>
