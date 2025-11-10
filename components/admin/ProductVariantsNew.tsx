@@ -19,7 +19,7 @@ export interface ProductVariant {
   description?: string;
   attributes: Record<string, string>;
   additionalAttributes?: Record<string, string>;
-  price?: number;
+  price?: string;
   stock: number;
   images?: string[];
   isActive: boolean;
@@ -74,7 +74,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
       return;
     }
 
-    if (!newVariantForm.price || newVariantForm.price <= 0) {
+    if (!newVariantForm.price || parseFloat(newVariantForm.price) <= 0) {
       toast({
         title: "Error",
         description: "El precio específico es obligatorio y debe ser mayor a 0",
@@ -298,7 +298,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
                   value={newVariantForm.price || ""}
                   onChange={(e) => setNewVariantForm(prev => ({
                     ...prev,
-                    price: e.target.value ? parseFloat(e.target.value) : undefined
+                    price: e.target.value || undefined
                   }))}
                   placeholder="Precio específico de la variante"
                   required
@@ -416,7 +416,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
                         value={editForm.price || ""}
                         onChange={(e) => setEditForm(prev => ({
                           ...prev,
-                          price: e.target.value ? parseFloat(e.target.value) : undefined
+                          price: e.target.value ? e.target.value : undefined
                         }))}
                         placeholder="Deja vacío para usar precio base"
                       />
