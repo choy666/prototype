@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { stockLogs, products, productVariants } from "@/lib/schema";
 import { eq, and, desc, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/actions/auth";
 import { z } from "zod";
 
 // Validaciones

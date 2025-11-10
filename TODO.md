@@ -1,20 +1,13 @@
-# TODO: Solucionar errores y advertencias de compilación
+# TODO: Resolver errores de autenticación en funciones de stock
 
-## Errores y Advertencias a Resolver
+## Problema
+Los errores "Usuario no autenticado" ocurren en las funciones de stock porque usan una configuración de auth básica que no maneja correctamente las cookies en producción/entornos con proxy.
 
-### Advertencias de variables no usadas
-- [ ] Remover importación 'products' no usada en `app/api/admin/products/[id]/variants/route-new.ts`
-- [ ] Remover importación 'products' no usada en `app/api/admin/products/[id]/variants/route.ts`
-- [ ] Remover o usar variable 'selectedVariantName' en `app/products/[id]/ProductClient.tsx`
-- [ ] Remover importación 'ImageIcon' no usada en `components/admin/ProductVariantsNew.tsx`
-- [ ] Remover importación 'ImageReorder' no usada en `components/admin/ProductVariantsNew.tsx`
+## Solución
+Cambiar los imports de `auth` de `@/lib/auth` a `@/lib/actions/auth` para usar la configuración más robusta con `trustHost: true` y cookies personalizadas.
 
-### Errores de entidades no escapadas
-- [ ] Escapar comillas dobles en línea 452 de `components/admin/ProductVariantsNew.tsx`
-
-## Pasos de Implementación
-1. Editar `route-new.ts` para remover importación 'products'
-2. Editar `route.ts` para remover importación 'products'
-3. Editar `ProductClient.tsx` para remover o usar 'selectedVariantName'
-4. Editar `ProductVariantsNew.tsx` para remover importaciones no usadas y escapar comillas
-5. Verificar que la compilación pase sin errores
+## Pasos
+- [ ] Cambiar import en `lib/actions/stock.ts`
+- [ ] Cambiar import en `app/api/admin/products/[id]/variants/route.ts`
+- [ ] Cambiar import en `app/api/admin/products/[id]/variants/route-new.ts`
+- [ ] Probar que las funciones de stock funcionen correctamente
