@@ -562,14 +562,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
 
                   <div>
                     <Label>Stock</Label>
-                    <Input
-                      type="number"
-                      value={editForm.stock || 0}
-                      onChange={(e) => setEditForm(prev => ({
-                        ...prev,
-                        stock: parseInt(e.target.value) || 0
-                      }))}
-                    />
+                    <p className="text-sm text-gray-600 mt-1">{editForm.stock || 0} unidades</p>
                   </div>
 
                   <InheritedAttributesBuilder

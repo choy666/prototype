@@ -1,16 +1,10 @@
-# Cambiar bg-blue-50 por bg-gray-900
+# TODO: Quitar modificación de stock en edición de variantes
 
-## Archivos a modificar:
-- [x] components/ui/ImageUpload.tsx: Cambiar bg-blue-50 en línea 58
-- [x] components/admin/ProductVariantsNew.tsx: Cambiar bg-blue-50 en línea 58
-- [x] components/admin/AttributeBuilder.tsx: Cambiar bg-blue-50 en línea 108
-- [x] components/orders/OrderTimeline.tsx: Cambiar bg-blue-50 en línea 58
-- [x] components/checkout/ShippingMethodSelector.tsx: Cambiar bg-blue-50 en línea 58
-- [x] components/checkout/AddressSelector.tsx: Cambiar bg-blue-50 en línea 58
-- [x] app/products/page.tsx: Cambiar bg-blue-50 en línea 58
-- [x] app/(protected)/dashboard/page.tsx: Cambiar bg-blue-50 en línea 58
+## Tareas Pendientes
+- [ ] Modificar ProductVariantsNew.tsx: Cambiar el campo Stock en edición de variante de Input editable a display solo del valor actual.
+- [ ] Verificar que la creación de variante mantenga el stock editable.
+- [ ] Probar la funcionalidad para asegurar que no se pueda modificar stock en edición.
 
-## Consideraciones:
-- Verificar variantes de dark mode (dark:bg-blue-900/20, dark:bg-blue-900/30)
-- Asegurar consistencia visual después de los cambios
-- Probar los cambios para verificar que no afecten la funcionalidad
+## Notas
+- El stock inicial en creación de variante permanece editable.
+- Solo se quita la opción de modificar stock en la edición existente de variantes.
