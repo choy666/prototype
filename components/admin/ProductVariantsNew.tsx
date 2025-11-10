@@ -32,6 +32,43 @@ interface ProductVariantsNewProps {
   onChange: (variants: ProductVariant[]) => void;
 }
 
+// Componente para editar atributos heredados del padre
+function InheritedAttributesBuilder({
+  attributes,
+  onChange
+}: {
+  attributes: Record<string, string>;
+  onChange: (attributes: Record<string, string>) => void;
+}) {
+  const handleAttributeChange = (key: string, value: string) => {
+    const updated = { ...attributes, [key]: value };
+    onChange(updated);
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label>Atributos Heredados (Editables para esta Variante)</Label>
+      <p className="text-sm text-muted-foreground">
+        Estos atributos se heredan del producto padre, pero puedes modificarlos específicamente para esta variante.
+      </p>
+      <div className="space-y-2">
+        {Object.entries(attributes).map(([key, value]) => (
+          <div key={key} className="flex items-center gap-2 p-2 bg-blue-50 rounded">
+            <Tag className="h-4 w-4 text-blue-600" />
+            <span className="font-medium min-w-0 flex-shrink-0">{key}:</span>
+            <Input
+              value={value}
+              onChange={(e) => handleAttributeChange(key, e.target.value)}
+              className="flex-1"
+              placeholder="Valor del atributo"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Componente simple para atributos adicionales clave-valor
 function AdditionalAttributesBuilder({
   attributes,
@@ -212,6 +249,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
       name: variant.name ?? undefined,
       description: variant.description ?? undefined,
       price: variant.price ?? undefined,
+      attributes: variant.attributes ?? {},
       additionalAttributes: variant.additionalAttributes ?? undefined,
       images: variant.images ?? undefined,
     });
@@ -533,6 +571,14 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
                       }))}
                     />
                   </div>
+
+                  <InheritedAttributesBuilder
+                    attributes={editForm.attributes || {}}
+                    onChange={(attributes) => setEditForm(prev => ({
+                      ...prev,
+                      attributes: attributes
+                    }))}
+                  />
 
                   <AdditionalAttributesBuilder
                     attributes={editForm.additionalAttributes || {}}
