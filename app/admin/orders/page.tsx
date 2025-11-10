@@ -154,7 +154,7 @@ export default function AdminOrdersPage() {
                 className="w-full"
               />
             </div>
-            <Button type="submit" className="w-full sm:w-auto min-h-[44px]">
+            <Button type="submit" className="w-full sm:w-auto min-h-[44px] border">
               <Search className="mr-2 h-4 w-4" />
               Buscar
             </Button>
