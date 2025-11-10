@@ -86,7 +86,7 @@ export async function adjustVariantStock(data: z.infer<typeof adjustVariantStock
 
     // Obtener stock actual de la variante
     const variant = await db
-      .select({ stock: productVariants.stock, productId: productVariants.productId })
+      .select({ stock: productVariants.stock, productId: productVariants.productId, isActive: productVariants.isActive })
       .from(productVariants)
       .where(eq(productVariants.id, validatedData.variantId))
       .limit(1);
@@ -98,10 +98,17 @@ export async function adjustVariantStock(data: z.infer<typeof adjustVariantStock
     const currentStock = variant[0].stock;
     const newStock = Math.max(0, currentStock + validatedData.change); // No permitir stock negativo
 
-    // Actualizar stock de la variante
+    // Determinar si la variante debe estar activa o inactiva basado en el nuevo stock
+    const shouldBeActive = newStock > 0;
+
+    // Actualizar stock de la variante y estado activo/inactivo
     await db
       .update(productVariants)
-      .set({ stock: newStock, updated_at: new Date() })
+      .set({
+        stock: newStock,
+        isActive: shouldBeActive,
+        updated_at: new Date()
+      })
       .where(eq(productVariants.id, validatedData.variantId));
 
     // Registrar en logs (usando productId de la variante)
@@ -117,7 +124,7 @@ export async function adjustVariantStock(data: z.infer<typeof adjustVariantStock
     revalidatePath(`/admin/products/${variant[0].productId}/stock`);
     revalidatePath(`/admin/products/${variant[0].productId}/edit`);
 
-    return { success: true, newStock };
+    return { success: true, newStock, isActive: shouldBeActive };
   } catch (error) {
     console.error("Error ajustando stock de variante:", error);
     throw new Error("Error al ajustar el stock de la variante");

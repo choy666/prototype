@@ -155,9 +155,15 @@ export async function PUT(
     const body = await request.json();
     const validatedData = updateVariantSchema.parse(body);
 
+    // Si se está actualizando el stock, determinar automáticamente el estado activo/inactivo
+    const finalData = { ...validatedData };
+    if (validatedData.stock !== undefined) {
+      finalData.isActive = validatedData.stock > 0;
+    }
+
     const updatedVariant = await db
       .update(productVariants)
-      .set(validatedData)
+      .set(finalData)
       .where(
         and(
           eq(productVariants.id, parseInt(variantId)),
