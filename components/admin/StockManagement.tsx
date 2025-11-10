@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { Plus, Minus, History, Package } from "lucide-react";
 import { useCallback } from "react";
 import { adjustProductStock, adjustVariantStock, getStockHistory } from "@/lib/actions/stock";
@@ -247,18 +248,45 @@ export function StockManagement({ productId, productStock: initialProductStock, 
                 </div>
               </div>
 
-              <Button
-                onClick={handleProductStockAdjustment}
-                disabled={isLoading || !productAdjustment.change || !productAdjustment.reason.trim()}
-                className="w-full"
+              <Tooltip
+                content={
+                  productAdjustment.change > 0
+                    ? "Aumentará el stock del producto base"
+                    : productAdjustment.change < 0
+                    ? "Reducirá el stock del producto base"
+                    : "No hay cambio especificado"
+                }
               >
-                {productAdjustment.change > 0 ? (
-                  <Plus className="h-4 w-4 mr-2" />
-                ) : (
-                  <Minus className="h-4 w-4 mr-2" />
-                )}
-                Ajustar Stock ({productAdjustment.change > 0 ? '+' : ''}{productAdjustment.change})
-              </Button>
+                <Button
+                  onClick={handleProductStockAdjustment}
+                  disabled={isLoading || !productAdjustment.change || !productAdjustment.reason.trim()}
+                  variant={
+                    productAdjustment.change > 0
+                      ? "default"
+                      : productAdjustment.change < 0
+                      ? "destructive"
+                      : "secondary"
+                  }
+                  className={`w-full transition-all duration-200 ${
+                    productAdjustment.change > 0
+                      ? "hover:bg-green-600"
+                      : productAdjustment.change < 0
+                      ? "hover:bg-red-600"
+                      : ""
+                  }`}
+                >
+                  {productAdjustment.change > 0 ? (
+                    <Plus className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Minus className="h-4 w-4 mr-2" />
+                  )}
+                  {productAdjustment.change > 0
+                    ? `Aumentar Stock (+${productAdjustment.change})`
+                    : productAdjustment.change < 0
+                    ? `Reducir Stock (${productAdjustment.change})`
+                    : "Ajustar Stock (0)"}
+                </Button>
+              </Tooltip>
             </CardContent>
           </Card>
 
@@ -353,18 +381,45 @@ export function StockManagement({ productId, productStock: initialProductStock, 
                         </div>
                       </div>
 
-                      <Button
-                        onClick={() => handleVariantStockAdjustment(variant.id)}
-                        disabled={isLoading || !(variantAdjustments[variant.id]?.change) || !(variantAdjustments[variant.id]?.reason?.trim())}
-                        className="w-full"
+                      <Tooltip
+                        content={
+                          (variantAdjustments[variant.id]?.change || 0) > 0
+                            ? "Aumentará el stock de esta variante"
+                            : (variantAdjustments[variant.id]?.change || 0) < 0
+                            ? "Reducirá el stock de esta variante"
+                            : "No hay cambio especificado"
+                        }
                       >
-                        {(variantAdjustments[variant.id]?.change || 0) > 0 ? (
-                          <Plus className="h-4 w-4 mr-2" />
-                        ) : (
-                          <Minus className="h-4 w-4 mr-2" />
-                        )}
-                        Ajustar Stock ({(variantAdjustments[variant.id]?.change || 0) > 0 ? '+' : ''}{(variantAdjustments[variant.id]?.change || 0)})
-                      </Button>
+                        <Button
+                          onClick={() => handleVariantStockAdjustment(variant.id)}
+                          disabled={isLoading || !(variantAdjustments[variant.id]?.change) || !(variantAdjustments[variant.id]?.reason?.trim())}
+                          variant={
+                            (variantAdjustments[variant.id]?.change || 0) > 0
+                              ? "default"
+                              : (variantAdjustments[variant.id]?.change || 0) < 0
+                              ? "destructive"
+                              : "secondary"
+                          }
+                          className={`w-full transition-all duration-200 ${
+                            (variantAdjustments[variant.id]?.change || 0) > 0
+                              ? "hover:bg-green-600"
+                              : (variantAdjustments[variant.id]?.change || 0) < 0
+                              ? "hover:bg-red-600"
+                              : ""
+                          }`}
+                        >
+                          {(variantAdjustments[variant.id]?.change || 0) > 0 ? (
+                            <Plus className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Minus className="h-4 w-4 mr-2" />
+                          )}
+                          {(variantAdjustments[variant.id]?.change || 0) > 0
+                            ? `Aumentar Stock (+${variantAdjustments[variant.id]?.change})`
+                            : (variantAdjustments[variant.id]?.change || 0) < 0
+                            ? `Reducir Stock (${variantAdjustments[variant.id]?.change})`
+                            : "Ajustar Stock (0)"}
+                        </Button>
+                      </Tooltip>
                     </CardContent>
                   </Card>
                 ))}

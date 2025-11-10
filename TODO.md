@@ -1,10 +1,23 @@
-# TODO: Quitar modificación de stock en edición de variantes
+# Mejoras Visuales a Botones "Ajustar Stock"
 
 ## Tareas Pendientes
-- [ ] Modificar ProductVariantsNew.tsx: Cambiar el campo Stock en edición de variante de Input editable a display solo del valor actual.
-- [ ] Verificar que la creación de variante mantenga el stock editable.
-- [ ] Probar la funcionalidad para asegurar que no se pueda modificar stock en edición.
+- [ ] Importar componente Tooltip en StockManagement.tsx
+- [ ] Mejorar botón en sección "Vista General": variante dinámica, tooltip, texto descriptivo, transición
+- [ ] Mejorar botones en sección "Variantes": variante dinámica, tooltip, texto descriptivo, transición para cada variante
+- [ ] Verificar cambios visuales y funcionalidad
 
-## Notas
-- El stock inicial en creación de variante permanece editable.
-- Solo se quita la opción de modificar stock en la edición existente de variantes.
+## Información Recopilada
+- Archivo principal: components/admin/StockManagement.tsx
+- Botones ubicados en pestañas "overview" y "variants"
+- Usar variantes de Button: default (verde para +), destructive (rojo para -), secondary (gris para 0)
+- Agregar tooltips explicativos
+- Texto dinámico: "Aumentar Stock" o "Reducir Stock"
+- Transiciones suaves con CSS
+
+## Archivos Dependientes
+- components/admin/StockManagement.tsx (editar)
+- components/ui/Tooltip.tsx (ya existe, importar)
+
+## Pasos de Seguimiento
+- Probar en navegador para verificar colores y tooltips
+- Verificar accesibilidad con tooltips
