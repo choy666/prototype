@@ -133,7 +133,15 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
 
   const handleEditVariant = (index: number) => {
     setEditingVariant(index);
-    setEditForm({ ...variants[index] });
+    const variant = variants[index];
+    setEditForm({
+      ...variant,
+      name: variant.name ?? undefined,
+      description: variant.description ?? undefined,
+      price: variant.price ?? undefined,
+      additionalAttributes: variant.additionalAttributes ?? undefined,
+      images: variant.images ?? undefined,
+    });
   };
 
   const handleSaveEdit = async () => {
