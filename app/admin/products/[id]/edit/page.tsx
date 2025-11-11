@@ -62,6 +62,7 @@ export default function EditProductPage() {
   const params = useParams()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [loadingAttributes, setLoadingAttributes] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
@@ -204,6 +205,8 @@ export default function EditProductPage() {
 
 
 
+
+
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
@@ -224,6 +227,38 @@ export default function EditProductPage() {
       ...prev,
       images: [...prev.images, imageUrl]
     }))
+  }
+
+  const handleUpdateAttributes = async () => {
+    setLoadingAttributes(true)
+
+    try {
+      const response = await fetch(`/api/admin/products/${id}/attributes`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ attributes })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update attributes')
+      }
+
+      toast({
+        title: 'Éxito',
+        description: 'Atributos dinámicos actualizados correctamente'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudieron actualizar los atributos',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoadingAttributes(false)
+    }
   }
 
 
@@ -523,6 +558,15 @@ export default function EditProductPage() {
                   attributes={attributes}
                   onChange={setAttributes}
                 />
+                <div className="flex justify-end mt-6">
+                  <Button
+                    onClick={handleUpdateAttributes}
+                    disabled={loadingAttributes}
+                    className="min-h-[44px]"
+                  >
+                    {loadingAttributes ? 'Actualizando...' : 'Actualizar Atributos Dinámicos'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
