@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { db } from '@/lib/db'
-import { products, productVariants } from '@/lib/schema'
+import { products } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/utils/logger'
 
@@ -78,57 +78,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
     }
 
-    // Actualizar atributos heredados en variantes existentes
-    try {
-      // Obtener todas las variantes del producto
-      const existingVariants = await db
-        .select()
-        .from(productVariants)
-        .where(eq(productVariants.productId, productId))
-
-      if (existingVariants.length > 0) {
-        logger.info('Updating inherited attributes for variants', {
-          productId,
-          variantCount: existingVariants.length,
-          userId: session.user.id
-        })
-
-        // Para cada variante, actualizar los atributos heredados
-        // Mantener los atributos adicionales específicos de cada variante
-        const updatePromises = existingVariants.map(variant => {
-          // Los atributos heredados son los del padre, pero cada variante puede tener modificaciones específicas
-          // Por simplicidad, actualizamos los atributos base heredados
-          // En el futuro, podríamos implementar lógica más compleja para merges
-          return db
-            .update(productVariants)
-            .set({
-              attributes: body.attributes, // Actualizar atributos heredados
-              updated_at: new Date()
-            })
-            .where(eq(productVariants.id, variant.id))
-        })
-
-        await Promise.all(updatePromises)
-
-        logger.info('Successfully updated inherited attributes for all variants', {
-          productId,
-          variantsUpdated: existingVariants.length,
-          userId: session.user.id
-        })
-      } else {
-        logger.info('No variants found for product, skipping variant updates', {
-          productId,
-          userId: session.user.id
-        })
-      }
-    } catch (variantUpdateError) {
-      logger.error('Error updating inherited attributes in variants', {
-        productId,
-        error: variantUpdateError instanceof Error ? variantUpdateError.message : 'Unknown error',
-        userId: session.user.id
-      })
-      // No fallar la operación completa por error en variantes, pero loggear
-    }
+    // NOTA: No actualizar atributos de variantes existentes al cambiar atributos del padre
+    // Las variantes deben mantener sus atributos específicos (Record<string, string>)
+    // independientemente de los cambios en los atributos dinámicos del producto padre
+    logger.info('Skipping variant attributes update - variants maintain their specific attributes', {
+      productId,
+      userId: session.user.id
+    })
 
     logger.info('Product attributes updated successfully', {
       productId,

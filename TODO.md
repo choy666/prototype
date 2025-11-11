@@ -1,23 +1,17 @@
-# Mejoras Visuales a Botones "Ajustar Stock"
+# Corrección de Atributos en Variantes de Producto
 
-## Tareas Pendientes
-- [ ] Importar componente Tooltip en StockManagement.tsx
-- [ ] Mejorar botón en sección "Vista General": variante dinámica, tooltip, texto descriptivo, transición
-- [ ] Mejorar botones en sección "Variantes": variante dinámica, tooltip, texto descriptivo, transición para cada variante
-- [ ] Verificar cambios visuales y funcionalidad
+## Problema
+Al crear un nuevo Atributo Dinámico en un producto con variantes existentes, se genera un error en los Atributos Heredados mostrando "[object Object]". El API está guardando el array de DynamicAttribute directamente en variant.attributes en lugar de mantener el formato Record<string, string> esperado.
 
-## Información Recopilada
-- Archivo principal: components/admin/StockManagement.tsx
-- Botones ubicados en pestañas "overview" y "variants"
-- Usar variantes de Button: default (verde para +), destructive (rojo para -), secondary (gris para 0)
-- Agregar tooltips explicativos
-- Texto dinámico: "Aumentar Stock" o "Reducir Stock"
-- Transiciones suaves con CSS
+## Pasos a Realizar
+- [x] Modificar `app/api/admin/products/[id]/attributes/route.ts` para no sobrescribir attributes de variantes existentes
+- [x] Mantener los atributos específicos de cada variante intactos
+- [x] Limpiar importaciones no utilizadas (productVariants)
+- [ ] Probar que las variantes existentes mantengan sus atributos correctos después de actualizar el padre
 
-## Archivos Dependientes
-- components/admin/StockManagement.tsx (editar)
-- components/ui/Tooltip.tsx (ya existe, importar)
-
-## Pasos de Seguimiento
-- Probar en navegador para verificar colores y tooltips
-- Verificar accesibilidad con tooltips
+## Estado Actual
+- [x] Análisis del código completado
+- [x] Plan aprobado por usuario
+- [x] Implementación completada - Eliminada la lógica que sobrescribía atributos de variantes
+- [x] Limpieza de código completada
+- [ ] Pruebas pendientes
