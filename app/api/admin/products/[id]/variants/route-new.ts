@@ -105,11 +105,18 @@ export async function POST(
       }
     }
 
+    // Preparar datos para insertar, tratando additionalAttributes vacío como null
+    const dataToInsert = { ...validatedData };
+    if (validatedData.additionalAttributes && Object.keys(validatedData.additionalAttributes).length === 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (dataToInsert as any).additionalAttributes = null;
+    }
+
     const newVariant = await db
       .insert(productVariants)
       .values({
         productId,
-        ...validatedData,
+        ...dataToInsert,
       })
       .returning();
 
@@ -161,6 +168,12 @@ export async function PUT(
     const finalData = { ...validatedData };
     if (validatedData.stock !== undefined) {
       finalData.isActive = validatedData.stock > 0;
+    }
+
+    // Preparar datos para actualizar, tratando additionalAttributes vacío como null
+    if (validatedData.additionalAttributes && Object.keys(validatedData.additionalAttributes).length === 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      finalData.additionalAttributes = null as any;
     }
 
     const updatedVariant = await db

@@ -57,24 +57,24 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
 
   const hasActiveVariants = product.variants?.some(v => v.isActive) ?? false;
 
-  // Atributos disponibles de las variantes
-  const availableAttributes = useMemo(() => {
-    if (!product.variants?.length) return {};
+  // Atributos disponibles de las variantes (comentado para evitar warning de unused)
+  // const availableAttributes = useMemo(() => {
+  //   if (!product.variants?.length) return {};
 
-    const attrs: Record<string, Set<string>> = {};
-    product.variants.filter(v => v.isActive).forEach((variant) => {
-      if (variant.attributes) {
-        Object.entries(variant.attributes).forEach(([key, value]) => {
-          if (!attrs[key]) attrs[key] = new Set();
-          attrs[key].add(value);
-        });
-      }
-    });
+  //   const attrs: Record<string, Set<string>> = {};
+  //   product.variants.filter(v => v.isActive).forEach((variant) => {
+  //     if (variant.attributes) {
+  //       Object.entries(variant.attributes).forEach(([key, value]) => {
+  //         if (!attrs[key]) attrs[key] = new Set();
+  //         attrs[key].add(value);
+  //       });
+  //     }
+  //   });
 
-    return Object.fromEntries(
-      Object.entries(attrs).map(([key, values]) => [key, Array.from(values)])
-    );
-  }, [product.variants]);
+  //   return Object.fromEntries(
+  //     Object.entries(attrs).map(([key, values]) => [key, Array.from(values)])
+  //   );
+  // }, [product.variants]);
 
 
 
