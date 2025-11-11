@@ -193,7 +193,7 @@ export default function ProductClient({ product }: { product: Product }) {
     <div className='container max-w-4xl mx-auto px-8 sm:px-7 py-4 sm:py-6'>
       <div className='grid md:grid-cols-2 gap-4 sm:gap-6 justify-center'>
         {/* Imágenes */}
-        <div className='space-y-3 sm:space-y-4 p-5 bg-black rounded-2xl'>
+        <div className='space-y-3 sm:space-y-4 p-5 bg-black rounded-2xl h-fit'>
           <div className='relative aspect-square overflow-hidden rounded-lg bg-gray-100'>
             <Image
               src={currentImageSrc}
