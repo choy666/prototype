@@ -39,7 +39,15 @@ export default async function ProductDetailPage({
     // Obtener variantes del producto
     const variants = await getProductVariants(productId)
 
-    return <ProductClient product={{ ...product, variants: (variants as ProductVariant[]) || [], images: product.images as string[] || [] }} />
+    // Cast attributes to proper type
+    const productWithAttributes = {
+      ...product,
+      attributes: product.attributes as Record<string, string> || undefined,
+      variants: (variants as ProductVariant[]) || [],
+      images: product.images as string[] || []
+    }
+
+    return <ProductClient product={productWithAttributes} />
   } catch (error) {
     console.error('Error loading product:', error)
     return notFound()

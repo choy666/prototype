@@ -16,6 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+} from '@/components/ui/Collapsible';
 
 export default function ProductClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
@@ -309,6 +312,26 @@ export default function ProductClient({ product }: { product: Product }) {
           </div>
 
           <p className='text-gray-600'>{product.description}</p>
+
+          {/* Características del producto */}
+          {product.attributes && Object.keys(product.attributes).length > 0 && (
+            <Collapsible
+              title="Características del producto"
+              defaultOpen={false}
+              className="bg-black/20 rounded-xl border border-gray-700"
+              headerClassName="p-4"
+              contentClassName="p-4 space-y-2"
+            >
+              <dl className={`grid gap-2 ${Object.keys(product.attributes).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                {Object.entries(product.attributes).map(([key, value]) => (
+                  <div key={key} className='flex flex-col'>
+                    <dt className='font-medium text-white text-xs capitalize'>{key.replace(/_/g, ' ')}</dt>
+                    <dd className='text-gray-400 text-sm'>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Collapsible>
+          )}
 
           {/* Toggle entre Producto Original y Variantes */}
           {Object.keys(availableAttributes).length > 0 && (

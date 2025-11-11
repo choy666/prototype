@@ -29,6 +29,7 @@ export interface Product {
   price: string;
   image?: string | string[] | null;
   images?: string[]; // Array de imágenes secundarias
+  attributes?: Record<string, string>;
   category: string;
   destacado: boolean;
   stock: number;
