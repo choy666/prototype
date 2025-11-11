@@ -27,47 +27,11 @@ export interface ProductVariant {
 
 interface ProductVariantsNewProps {
   productId: number;
-  parentAttributes: Record<string, string>; // Atributos heredados del padre
   variants: ProductVariant[];
   onChange: (variants: ProductVariant[]) => void;
 }
 
-// Componente para editar atributos heredados del padre
-function InheritedAttributesBuilder({
-  attributes,
-  onChange
-}: {
-  attributes: Record<string, string>;
-  onChange: (attributes: Record<string, string>) => void;
-}) {
-  const handleAttributeChange = (key: string, value: string) => {
-    const updated = { ...attributes, [key]: value };
-    onChange(updated);
-  };
 
-  return (
-    <div className="space-y-3">
-      <Label>Atributos Heredados (Editables para esta Variante)</Label>
-      <p className="text-sm text-muted-foreground">
-        Estos atributos se heredan del producto padre, pero puedes modificarlos específicamente para esta variante.
-      </p>
-      <div className="space-y-2">
-        {Object.entries(attributes).map(([key, value]) => (
-          <div key={key} className="flex items-center gap-2 p-2 bg-gray-900 rounded">
-            <Tag className="h-4 w-4 text-blue-600" />
-            <span className="font-medium min-w-0 flex-shrink-0">{key}:</span>
-            <Input
-              value={value}
-              onChange={(e) => handleAttributeChange(key, e.target.value)}
-              className="flex-1"
-              placeholder="Valor del atributo"
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // Componente simple para atributos adicionales clave-valor
 function AdditionalAttributesBuilder({
@@ -141,13 +105,13 @@ function AdditionalAttributesBuilder({
   );
 }
 
-export function ProductVariantsNew({ productId, parentAttributes, variants, onChange }: ProductVariantsNewProps) {
+export function ProductVariantsNew({ productId, variants, onChange }: ProductVariantsNewProps) {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingVariant, setEditingVariant] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<ProductVariant>>({});
   const [newVariantForm, setNewVariantForm] = useState<Partial<ProductVariant>>({
-    attributes: parentAttributes,
+    attributes: {},
     additionalAttributes: {},
     stock: 0,
     images: [],
@@ -213,7 +177,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
         const newVariant = await response.json();
         onChange([...variants, newVariant]);
         setNewVariantForm({
-          attributes: parentAttributes,
+          attributes: {},
           stock: 0,
           images: [],
           isActive: true,
@@ -436,12 +400,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
               />
             </div>
 
-            <div>
-              <Label>Atributos Heredados del Padre</Label>
-              <div className="p-3 bg-gray-900 rounded-lg">
-                <p className="text-sm">{formatAttributes(parentAttributes)}</p>
-              </div>
-            </div>
+
 
             <AdditionalAttributesBuilder
               attributes={newVariantForm.additionalAttributes || {}}
@@ -565,13 +524,7 @@ export function ProductVariantsNew({ productId, parentAttributes, variants, onCh
                     <p className="text-sm text-gray-600 mt-1">{editForm.stock || 0} unidades</p>
                   </div>
 
-                  <InheritedAttributesBuilder
-                    attributes={editForm.attributes || {}}
-                    onChange={(attributes) => setEditForm(prev => ({
-                      ...prev,
-                      attributes: attributes
-                    }))}
-                  />
+
 
                   <AdditionalAttributesBuilder
                     attributes={editForm.additionalAttributes || {}}

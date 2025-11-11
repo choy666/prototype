@@ -9,7 +9,7 @@ import { z } from "zod";
 const createVariantSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
-  attributes: z.record(z.string(), z.string()),
+  attributes: z.record(z.string(), z.string()).optional(),
   additionalAttributes: z.record(z.string(), z.string()).optional(),
   price: z.string(),
   stock: z.number().min(0).default(0),
@@ -84,23 +84,25 @@ export async function POST(
     const body = await request.json();
     const validatedData = createVariantSchema.parse(body);
 
-    // Verificar que no exista una variante con los mismos atributos
-    const existingVariant = await db
-      .select()
-      .from(productVariants)
-      .where(
-        and(
-          eq(productVariants.productId, productId),
-          eq(productVariants.attributes, validatedData.attributes)
+    // Verificar que no exista una variante con los mismos atributos (solo si attributes está presente)
+    if (validatedData.attributes) {
+      const existingVariant = await db
+        .select()
+        .from(productVariants)
+        .where(
+          and(
+            eq(productVariants.productId, productId),
+            eq(productVariants.attributes, validatedData.attributes)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existingVariant.length > 0) {
-      return NextResponse.json(
-        { error: "Ya existe una variante con estos atributos" },
-        { status: 400 }
-      );
+      if (existingVariant.length > 0) {
+        return NextResponse.json(
+          { error: "Ya existe una variante con estos atributos" },
+          { status: 400 }
+        );
+      }
     }
 
     const newVariant = await db

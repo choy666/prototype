@@ -582,7 +582,6 @@ export default function EditProductPage() {
               <CardContent>
                 <ProductVariantsNew
                   productId={parseInt(id)}
-                  parentAttributes={attributes.reduce((acc, attr) => ({ ...acc, [attr.name]: attr.values.join(', ') }), {})}
                   variants={variants}
                   onChange={setVariants}
                 />

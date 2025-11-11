@@ -30,10 +30,12 @@ export default function ProductClient({ product }: { product: Product }) {
 
     const attrs: Record<string, Set<string>> = {};
     product.variants.forEach((variant) => {
-      Object.entries(variant.attributes).forEach(([key, value]) => {
-        if (!attrs[key]) attrs[key] = new Set();
-        attrs[key].add(value);
-      });
+      if (variant.attributes) {
+        Object.entries(variant.attributes).forEach(([key, value]) => {
+          if (!attrs[key]) attrs[key] = new Set();
+          attrs[key].add(value);
+        });
+      }
     });
 
     return Object.fromEntries(
@@ -54,8 +56,9 @@ export default function ProductClient({ product }: { product: Product }) {
 
     return (
       product.variants.find((variant) =>
+        variant.attributes &&
         Object.entries(selectedAttributes).every(
-          ([key, value]) => variant.attributes[key] === value
+          ([key, value]) => variant.attributes![key] === value
         )
       ) || null
     );
@@ -236,7 +239,7 @@ export default function ProductClient({ product }: { product: Product }) {
                       // Auto-selección de variante al clic en imagen de variante
                       if (img.type === 'variant') {
                         const variant = product.variants?.find((v) => v.image === img.src);
-                        if (variant) {
+                        if (variant && variant.attributes) {
                           // Cambiar a modo variantes y seleccionar atributos
                           setUseOriginalProduct(false);
                           setSelectedAttributes(variant.attributes);

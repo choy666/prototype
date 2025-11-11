@@ -235,7 +235,7 @@ export const productVariants = pgTable("product_variants", {
   productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
   name: text("name"), // Nombre personalizado de variante
   description: text("description"), // Descripción específica de variante
-  attributes: jsonb("attributes").notNull(), // ej: { "Talla": "M", "Color": "Rojo" }
+  attributes: jsonb("attributes"), // ej: { "Talla": "M", "Color": "Rojo" } - ahora opcional
   additionalAttributes: jsonb("additional_attributes"), // Atributos adicionales específicos
   price: decimal("price", { precision: 10, scale: 2 }), // precio específico de variante, opcional
   stock: integer("stock").default(0).notNull(),
