@@ -1,24 +1,15 @@
-# TODO: Implementar Selección de Variantes por Nombre en Página de Producto
+# Tareas para mostrar variantes activas en todos los productos
 
-## Pasos del Plan
+## Información del problema
+- Las variantes del producto ID 23 se muestran porque tienen atributos.
+- Para ID 27, la sección no aparece porque availableAttributes está vacío (sin atributos en variantes).
+- Solución: Cambiar condición de renderizado a hasActiveVariants (cualquier variante activa), para mostrar Select por nombre incluso sin atributos.
 
-### 1. Modificar ProductClient.tsx
-- [x] Cambiar la sección de selección de variantes: reemplazar los selects de atributos individuales con un select que liste los nombres de las variantes existentes.
-- [x] Actualizar la lógica de selectedVariant para seleccionar por nombre de variante en lugar de combinar atributos.
-- [x] Agregar estado para la variante seleccionada por nombre (selectedVariantName).
-- [x] Mantener el toggle entre Producto Original y Variantes.
-- [x] Al seleccionar una variante por nombre, mostrar sus atributos dinámicos en un Collapsible con el mismo estilo que el producto padre.
+## Pasos del plan
+- [x] 1. En app/products/[id]/ProductClient.tsx: Agregar const hasActiveVariants = product.variants?.some(v => v.isActive) ?? false; después de los useState.
+- [x] 2. Cambiar la condición if (Object.keys(availableAttributes).length > 0) a if (hasActiveVariants) para la sección "Selección de producto".
+- [x] 3. Mantener availableAttributes para selects de atributos si existen, pero asegurar que el Select muestre solo activas (ya filtrado).
+- [x] 4. Verificar en navegador: Recargar /products/27 y confirmar que aparece la sección con variantes por nombre.
+- [x] 5. Si OK, marcar completado y cerrar tarea.
 
-### 2. Actualizar Tipos
-- [x] Agregar propiedad 'name' a la interfaz ProductVariant en types/index.ts.
-
-### 2. Pruebas y Verificación
-- [ ] Verificar que el select muestre correctamente los nombres de las variantes.
-- [ ] Confirmar que al seleccionar una variante, se muestren sus atributos en Collapsible.
-- [ ] Asegurar que el precio, stock e imagen se actualicen correctamente según la variante seleccionada.
-- [ ] Probar el toggle entre Producto Original y Variantes.
-- [ ] Verificar compatibilidad con AddToCartButton.
-
-### 3. Limpieza y Optimización
-- [ ] Remover código comentado o no utilizado relacionado con la selección anterior.
-- [ ] Asegurar que la lógica sea eficiente y no cause re-renders innecesarios.
+Dependencias: Ninguna. Solo editar ProductClient.tsx.

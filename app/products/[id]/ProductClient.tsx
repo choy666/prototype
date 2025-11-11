@@ -53,14 +53,16 @@ export default function ProductClient({ product }: { product: Product }) {
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [useOriginalProduct, setUseOriginalProduct] = useState(true); // Estado para alternar entre original y variantes
-  const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // Estado para la variante seleccionada por nombre
+const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // Estado para la variante seleccionada por nombre
+
+  const hasActiveVariants = product.variants?.some(v => v.isActive) ?? false;
 
   // Atributos disponibles de las variantes
   const availableAttributes = useMemo(() => {
     if (!product.variants?.length) return {};
 
     const attrs: Record<string, Set<string>> = {};
-    product.variants.forEach((variant) => {
+    product.variants.filter(v => v.isActive).forEach((variant) => {
       if (variant.attributes) {
         Object.entries(variant.attributes).forEach(([key, value]) => {
           if (!attrs[key]) attrs[key] = new Set();
@@ -358,7 +360,7 @@ export default function ProductClient({ product }: { product: Product }) {
           })()}
 
           {/* Toggle entre Producto Original y Variantes */}
-          {Object.keys(availableAttributes).length > 0 && (
+          {hasActiveVariants && (
             <div className='space-y-4'>
               <h3 className='font-semibold text-white'>Selección de producto</h3>
               <div className='flex gap-2'>
