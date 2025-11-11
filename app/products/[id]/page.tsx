@@ -42,7 +42,7 @@ export default async function ProductDetailPage({
     // Cast attributes to proper type
     const productWithAttributes = {
       ...product,
-      attributes: product.attributes as Record<string, string> || undefined,
+      attributes: product.attributes as Record<string, string> || {},
       variants: (variants as ProductVariant[]) || [],
       images: product.images as string[] || []
     }

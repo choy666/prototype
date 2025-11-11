@@ -11,6 +11,7 @@ export interface User {
 export interface ProductVariant {
   id: number;
   productId: number;
+  name: string;
   sku?: string | null;
   attributes?: Record<string, string>;
   price?: string | null;
@@ -19,6 +20,11 @@ export interface ProductVariant {
   isActive: boolean;
   created_at: Date | string;
   updated_at: Date | string;
+}
+
+export interface ProductAttribute {
+  name: string;
+  values: string[];
 }
 
 export interface Product {

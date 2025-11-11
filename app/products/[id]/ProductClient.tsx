@@ -9,6 +9,7 @@ import { AddToCartButton } from '@/components/cart/AddToCartButton';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import { getDiscountedPrice } from '@/lib/utils/pricing';
 
+
 import {
   Select,
   SelectContent,
@@ -20,12 +21,39 @@ import {
   Collapsible,
 } from '@/components/ui/Collapsible';
 
+// Función helper para normalizar atributos
+const normalizeAttributes = (attributes: unknown): Record<string, string> => {
+  if (!attributes) return {};
+
+  // Si ya es un objeto plano Record<string, string>
+  if (typeof attributes === 'object' && !Array.isArray(attributes)) {
+    return attributes as Record<string, string>;
+  }
+
+  // Si es un array de objetos {name, values}
+  if (Array.isArray(attributes)) {
+    const normalized: Record<string, string> = {};
+    attributes.forEach((attr: unknown) => {
+      if (attr && typeof attr === 'object' && 'name' in attr && 'values' in attr) {
+        const attrObj = attr as { name: string; values: string[] };
+        if (attrObj.name && Array.isArray(attrObj.values) && attrObj.values.length > 0) {
+          normalized[attrObj.name] = attrObj.values.join(', ');
+        }
+      }
+    });
+    return normalized;
+  }
+
+  return {};
+};
+
 export default function ProductClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [useOriginalProduct, setUseOriginalProduct] = useState(true); // Estado para alternar entre original y variantes
+  const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // Estado para la variante seleccionada por nombre
 
   // Atributos disponibles de las variantes
   const availableAttributes = useMemo(() => {
@@ -55,17 +83,10 @@ export default function ProductClient({ product }: { product: Product }) {
       return null;
     }
 
-    if (!product.variants?.length || Object.keys(selectedAttributes).length === 0) return null;
+    if (!product.variants?.length || !selectedVariantName) return null;
 
-    return (
-      product.variants.find((variant) =>
-        variant.attributes &&
-        Object.entries(selectedAttributes).every(
-          ([key, value]) => variant.attributes![key] === value
-        )
-      ) || null
-    );
-  }, [product.variants, selectedAttributes, useOriginalProduct]);
+    return product.variants.find((variant) => variant.name === selectedVariantName) || null;
+  }, [product.variants, selectedVariantName, useOriginalProduct]);
 
   // Nombre de la variante seleccionada para mostrar (comentado para evitar warning)
   // const selectedVariantName = useMemo(() => {
@@ -314,24 +335,27 @@ export default function ProductClient({ product }: { product: Product }) {
           <p className='text-gray-600'>{product.description}</p>
 
           {/* Características del producto */}
-          {product.attributes && Object.keys(product.attributes).length > 0 && (
-            <Collapsible
-              title="Características del producto"
-              defaultOpen={false}
-              className="bg-black/20 rounded-xl border border-gray-700"
-              headerClassName="p-4"
-              contentClassName="p-4 space-y-2"
-            >
-              <dl className={`grid gap-2 ${Object.keys(product.attributes).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                {Object.entries(product.attributes).map(([key, value]) => (
-                  <div key={key} className='flex flex-col'>
-                    <dt className='font-medium text-white text-xs capitalize'>{key.replace(/_/g, ' ')}</dt>
-                    <dd className='text-gray-400 text-sm'>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Collapsible>
-          )}
+          {(() => {
+            const normalizedAttrs = normalizeAttributes(product.attributes);
+            return normalizedAttrs && Object.keys(normalizedAttrs).length > 0 && (
+              <Collapsible
+                title="Características del producto"
+                defaultOpen={false}
+                className="bg-black/20 rounded-xl border border-gray-700"
+                headerClassName="p-4"
+                contentClassName="p-4 space-y-2"
+              >
+                <dl className={`grid gap-2 ${Object.keys(normalizedAttrs).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                  {Object.entries(normalizedAttrs).map(([key, value]) => (
+                    <div key={key} className='flex flex-col'>
+                      <dt className='font-medium text-white text-xs capitalize'>{key.replace(/_/g, ' ')}</dt>
+                      <dd className='text-gray-400 text-sm'>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Collapsible>
+            );
+          })()}
 
           {/* Toggle entre Producto Original y Variantes */}
           {Object.keys(availableAttributes).length > 0 && (
@@ -353,7 +377,10 @@ export default function ProductClient({ product }: { product: Product }) {
                   Producto Original
                 </button>
                 <button
-                  onClick={() => setUseOriginalProduct(false)}
+                  onClick={() => {
+                    setUseOriginalProduct(false);
+                    setSelectedVariantName(''); // Resetear selección de variante
+                  }}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     !useOriginalProduct
                       ? 'bg-primary text-white'
@@ -364,37 +391,50 @@ export default function ProductClient({ product }: { product: Product }) {
                 </button>
               </div>
 
-              {/* Selección de atributos solo si no es producto original */}
+              {/* Selección de variante por nombre solo si no es producto original */}
               {!useOriginalProduct && (
                 <div className='space-y-4'>
                   <h4 className='font-medium text-white'>Seleccionar opciones</h4>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                    {Object.entries(availableAttributes).map(([attrKey]) => (
-                      <div key={attrKey} className='space-y-2'>
-                        <label className='text-sm font-medium text-white capitalize'>{attrKey}</label>
-                        <Select
-                          value={selectedAttributes[attrKey] || ''}
-                          onValueChange={(value) => {
-                            setSelectedAttributes((prev) => ({
-                              ...prev,
-                              [attrKey]: value,
-                            }));
-                          }}
-                        >
-                          <SelectTrigger className='w-full'>
-                            <SelectValue placeholder={`Seleccionar ${attrKey}`} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableAttributes[attrKey].map((value) => (
-                              <SelectItem key={value} value={value}>
-                                {value}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ))}
+                  <div className='space-y-2'>
+                    <label className='text-sm font-medium text-white'>Variante</label>
+                    <Select
+                      value={selectedVariantName}
+                      onValueChange={(value) => {
+                        setSelectedVariantName(value);
+                      }}
+                    >
+                      <SelectTrigger className='w-full'>
+                        <SelectValue placeholder="Seleccionar variante" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {product.variants?.filter(v => v.isActive).map((variant) => (
+                          <SelectItem key={variant.id} value={variant.name}>
+                            {variant.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {/* Mostrar atributos de la variante seleccionada */}
+                  {selectedVariant && selectedVariant.attributes && (
+                    <Collapsible
+                      title="Características de la variante"
+                      defaultOpen={true}
+                      className="bg-black/20 rounded-xl border border-gray-700"
+                      headerClassName="p-4"
+                      contentClassName="p-4 space-y-2"
+                    >
+                      <dl className={`grid gap-2 ${Object.keys(selectedVariant.attributes).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                        {Object.entries(selectedVariant.attributes).map(([key, value]) => (
+                          <div key={key} className='flex flex-col'>
+                            <dt className='font-medium text-white text-xs capitalize'>{key.replace(/_/g, ' ')}</dt>
+                            <dd className='text-gray-400 text-sm'>{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </Collapsible>
+                  )}
                 </div>
               )}
             </div>
