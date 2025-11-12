@@ -189,7 +189,7 @@ export async function getProductStockInfo(productId: number) {
     const variantsStock = await db
       .select({
         id: productVariants.id,
-        attributes: productVariants.attributes,
+        additionalAttributes: productVariants.additionalAttributes,
         stock: productVariants.stock,
         isActive: productVariants.isActive,
       })

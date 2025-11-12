@@ -265,10 +265,10 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                       // Auto-selección de variante al clic en imagen de variante
                       if (img.type === 'variant') {
                         const variant = product.variants?.find((v) => v.image === img.src);
-                        if (variant && variant.attributes) {
+                        if (variant && variant.additionalAttributes) {
                           // Cambiar a modo variantes y seleccionar atributos
                           setUseOriginalProduct(false);
-                          setSelectedAttributes(variant.attributes);
+                          setSelectedAttributes(variant.additionalAttributes);
                           // Pequeño delay para asegurar que los selects se actualicen
                           setTimeout(() => {
                             // Confirmar que selectedAttributes se ha actualizado
@@ -419,7 +419,7 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                   </div>
 
                   {/* Mostrar atributos de la variante seleccionada */}
-                  {selectedVariant && selectedVariant.attributes && (
+                  {selectedVariant && selectedVariant.additionalAttributes && (
                     <Collapsible
                       title="Características de la variante"
                       defaultOpen={true}
@@ -427,8 +427,8 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                       headerClassName="p-4"
                       contentClassName="p-4 space-y-2"
                     >
-                      <dl className={`grid gap-2 ${Object.keys(selectedVariant.attributes).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                        {Object.entries(selectedVariant.attributes).map(([key, value]) => (
+                      <dl className={`grid gap-2 ${Object.keys(selectedVariant.additionalAttributes).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                        {Object.entries(selectedVariant.additionalAttributes).map(([key, value]) => (
                           <div key={key} className='flex flex-col'>
                             <dt className='font-medium text-white text-xs capitalize'>{key.replace(/_/g, ' ')}</dt>
                             <dd className='text-gray-400 text-sm'>{value}</dd>
@@ -469,7 +469,7 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                 image: currentImageSrc, // imagen de variante o producto
                 stock: currentStock, // stock de variante o producto
                 variantId: selectedVariant?.id, // ID de la variante seleccionada
-                variantAttributes: selectedVariant?.attributes, // atributos de la variante
+                variantAttributes: selectedVariant?.additionalAttributes, // atributos de la variante
               }}
               quantity={quantity}
               className='flex-1'

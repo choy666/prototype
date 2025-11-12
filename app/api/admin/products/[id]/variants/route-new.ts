@@ -9,7 +9,6 @@ import { z } from "zod";
 const createVariantSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
-  attributes: z.record(z.string(), z.string()).optional(),
   additionalAttributes: z.record(z.string(), z.string()).optional(),
   price: z.string(),
   stock: z.number().min(0).default(0),
@@ -21,7 +20,6 @@ const createVariantSchema = z.object({
 const updateVariantSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
-  attributes: z.record(z.string(), z.string()).optional(),
   additionalAttributes: z.record(z.string(), z.string()).optional(),
   price: z.string().optional(),
   stock: z.number().min(0).optional(),
@@ -84,22 +82,22 @@ export async function POST(
     const body = await request.json();
     const validatedData = createVariantSchema.parse(body);
 
-    // Verificar que no exista una variante con los mismos atributos (solo si attributes está presente)
-    if (validatedData.attributes) {
+    // Verificar que no exista una variante con los mismos atributos adicionales
+    if (validatedData.additionalAttributes) {
       const existingVariant = await db
         .select()
         .from(productVariants)
         .where(
           and(
             eq(productVariants.productId, productId),
-            eq(productVariants.attributes, validatedData.attributes)
+            eq(productVariants.additionalAttributes, validatedData.additionalAttributes)
           )
         )
         .limit(1);
 
       if (existingVariant.length > 0) {
         return NextResponse.json(
-          { error: "Ya existe una variante con estos atributos" },
+          { error: "Ya existe una variante con estos atributos adicionales" },
           { status: 400 }
         );
       }

@@ -17,8 +17,7 @@ export interface ProductVariant {
   id?: number;
   name?: string;
   description?: string;
-  attributes: Record<string, string>;
-  additionalAttributes?: Record<string, string>;
+  additionalAttributes: Record<string, string>;
   price?: string;
   stock: number;
   images?: string[];
@@ -111,7 +110,6 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
   const [editingVariant, setEditingVariant] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<ProductVariant>>({});
   const [newVariantForm, setNewVariantForm] = useState<Partial<ProductVariant>>({
-    attributes: {},
     additionalAttributes: {},
     stock: 0,
     images: [],
@@ -177,7 +175,7 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
         const newVariant = await response.json();
         onChange([...variants, newVariant]);
         setNewVariantForm({
-          attributes: {},
+          additionalAttributes: {},
           stock: 0,
           images: [],
           isActive: true,
@@ -213,7 +211,6 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
       name: variant.name ?? undefined,
       description: variant.description ?? undefined,
       price: variant.price ?? undefined,
-      attributes: variant.attributes ?? {},
       additionalAttributes: variant.additionalAttributes ?? undefined,
       images: variant.images ?? undefined,
     });
@@ -321,11 +318,7 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
     }
   };
 
-  const formatAttributes = (attrs: Record<string, string>) => {
-    return Object.entries(attrs)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join(", ");
-  };
+
 
   const formatAdditionalAttributes = (attrs?: Record<string, string>) => {
     if (!attrs || Object.keys(attrs).length === 0) return null;
@@ -551,7 +544,7 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h4 className="font-medium">
-                        {variant.name || formatAttributes(variant.attributes)}
+                        {variant.name || formatAdditionalAttributes(variant.additionalAttributes)}
                       </h4>
                       <Badge variant={variant.isActive ? "default" : "secondary"}>
                         {variant.isActive ? "Activa" : "Inactiva"}

@@ -20,7 +20,6 @@ interface StockManagementProps {
     id: number;
     name?: string;
     description?: string;
-    attributes: Record<string, string>;
     additionalAttributes?: Record<string, string>;
     price?: number;
     images?: string[];
@@ -184,11 +183,14 @@ export function StockManagement({ productId, productStock: initialProductStock, 
     }
   };
 
-  const formatAttributes = (attributes: Record<string, string>) => {
-    return Object.entries(attributes)
+  const formatAdditionalAttributes = (attrs?: Record<string, string>) => {
+    if (!attrs || Object.keys(attrs).length === 0) return null;
+    return Object.entries(attrs)
       .map(([key, value]) => `${key}: ${value}`)
       .join(", ");
   };
+
+
 
 
 
@@ -300,7 +302,7 @@ export function StockManagement({ productId, productStock: initialProductStock, 
                   {variants.map((variant) => (
                     <div key={variant.id} className="p-4 border rounded-lg">
                       <p className="font-medium text-sm">
-                        {variant.name || formatAttributes(variant.attributes)}
+                        {variant.name || formatAdditionalAttributes(variant.additionalAttributes)}
                       </p>
                       {variant.price && (
                         <p className="text-sm text-gray-600">Precio: ${variant.price}</p>
@@ -335,7 +337,7 @@ export function StockManagement({ productId, productStock: initialProductStock, 
                   <Card key={variant.id}>
                     <CardHeader>
                       <CardTitle className="text-lg">
-                        Variante: {variant.name || formatAttributes(variant.attributes)}
+                        Variante: {variant.name || formatAdditionalAttributes(variant.additionalAttributes)}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
