@@ -161,6 +161,7 @@ export default function CheckoutPage() {
           image: item.image,
           discount: item.discount,
           weight: item.weight,
+          variantId: item.variantId,
         })),
         shippingAddress,
         shippingMethod: {

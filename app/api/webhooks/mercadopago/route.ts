@@ -410,6 +410,7 @@ async function createOrderFromPayment(payment: any) {
     const orderItemsData = items.map((item: any) => ({
       orderId,
       productId: parseInt(item.id),
+      variantId: item.variantId || null,
       quantity: item.quantity,
       price: (item.discount && item.discount > 0
         ? parseFloat(item.price) * (1 - item.discount / 100)
