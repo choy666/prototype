@@ -143,7 +143,7 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
     selectedVariant?.image || allImages[currentImageIndex % allImages.length]?.src;
 
   // Efecto para actualizar currentImageIndex cuando se selecciona una variante con imagen
-  useMemo(() => {
+  useEffect(() => {
     if (selectedVariant?.image) {
       const variantImageIndex = allImages.findIndex((img) => img.src === selectedVariant.image);
       if (variantImageIndex !== -1) {
@@ -434,6 +434,11 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                             <dd className='text-gray-400 text-sm'>{value}</dd>
                           </div>
                         ))}
+                        {/* Mostrar stock de la variante */}
+                        <div className='flex flex-col'>
+                          <dt className='font-medium text-white text-xs capitalize'>Stock</dt>
+                          <dd className='text-gray-400 text-sm'>{selectedVariant.stock} unidades disponibles</dd>
+                        </div>
                       </dl>
                     </Collapsible>
                   )}

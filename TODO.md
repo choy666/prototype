@@ -1,15 +1,15 @@
-# Tareas para mostrar variantes activas en todos los productos
+# TODO: Corregir selección de variantes en app/products/[id]
 
-## Información del problema
-- Las variantes del producto ID 23 se muestran porque tienen atributos.
-- Para ID 27, la sección no aparece porque availableAttributes está vacío (sin atributos en variantes).
-- Solución: Cambiar condición de renderizado a hasActiveVariants (cualquier variante activa), para mostrar Select por nombre incluso sin atributos.
+## Pasos a completar:
 
-## Pasos del plan
-- [x] 1. En app/products/[id]/ProductClient.tsx: Agregar const hasActiveVariants = product.variants?.some(v => v.isActive) ?? false; después de los useState.
-- [x] 2. Cambiar la condición if (Object.keys(availableAttributes).length > 0) a if (hasActiveVariants) para la sección "Selección de producto".
-- [x] 3. Mantener availableAttributes para selects de atributos si existen, pero asegurar que el Select muestre solo activas (ya filtrado).
-- [x] 4. Verificar en navegador: Recargar /products/27 y confirmar que aparece la sección con variantes por nombre.
-- [x] 5. Si OK, marcar completado y cerrar tarea.
+1. **Corregir bug en ProductClient.tsx**: Cambiar el `useMemo` incorrecto a `useEffect` para actualizar `currentImageIndex` cuando se selecciona una variante con imagen.
+   - ✅ Completado: Cambié `useMemo` a `useEffect` en la línea 127.
 
-Dependencias: Ninguna. Solo editar ProductClient.tsx.
+2. **Mejorar visualización del stock**: Agregar visualización del stock específico de la variante seleccionada en la sección "Características de la variante".
+   - ✅ Completado: Agregué un campo adicional para mostrar el stock de la variante en la sección de características.
+
+3. **Verificar funcionalidad**: Asegurar que al seleccionar una variante, se muestre su precio (ya funciona), stock e imágenes correspondientes.
+   - ✅ Verificado: El precio ya se actualiza correctamente con `currentPrice`, el stock se muestra en la sección de características, y las imágenes se actualizan con el `useEffect`.
+
+4. **Probar la implementación**: Ejecutar la aplicación y verificar que la selección de variantes funcione correctamente.
+   - Pendiente: Necesita ser probado en el navegador.
