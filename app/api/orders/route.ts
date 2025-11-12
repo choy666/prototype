@@ -1,6 +1,6 @@
 import { auth } from '@/lib/actions/auth'; // ✅ Importar la función auth
 import { db } from '@/lib/db';
-import { orders, orderItems, products } from '@/lib/schema';
+import { orders, orderItems, products, productVariants } from '@/lib/schema';
 import { eq, desc } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger'; // ✅ Importar el logger
 
@@ -51,11 +51,16 @@ export async function GET(request: Request) {
               quantity: orderItems.quantity,
               price: orderItems.price,
               productId: orderItems.productId,
+              variantId: orderItems.variantId,
               productName: products.name,
               productImage: products.image,
+              variantName: productVariants.name,
+              variantImage: productVariants.images,
+              variantAttributes: productVariants.additionalAttributes,
             })
             .from(orderItems)
             .leftJoin(products, eq(orderItems.productId, products.id))
+            .leftJoin(productVariants, eq(orderItems.variantId, productVariants.id))
             .where(eq(orderItems.orderId, order.id));
 
           const total = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);

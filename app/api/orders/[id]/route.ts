@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/actions/auth';
 import { db } from '@/lib/db';
-import { orders, orderItems, products } from '@/lib/schema';
+import { orders, orderItems, products, productVariants } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
@@ -83,11 +83,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         quantity: orderItems.quantity,
         price: orderItems.price,
         productId: orderItems.productId,
+        variantId: orderItems.variantId,
         productName: products.name,
         productImage: products.image,
+        variantName: productVariants.name,
+        variantImage: productVariants.images,
+        variantAttributes: productVariants.additionalAttributes,
       })
       .from(orderItems)
       .leftJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(productVariants, eq(orderItems.variantId, productVariants.id))
       .where(eq(orderItems.orderId, orderIdNum));
 
     const orderWithItems = {
@@ -99,8 +104,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         quantity: item.quantity,
         price: Number(item.price),
         productId: item.productId,
+        variantId: item.variantId,
         productName: item.productName || 'Producto desconocido',
         productImage: item.productImage,
+        variantName: item.variantName,
+        variantImage: item.variantImage,
+        variantAttributes: item.variantAttributes,
       })),
     };
 

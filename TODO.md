@@ -1,25 +1,20 @@
-# TODO: Implementar carrito sin login y checkout con login obligatorio
+# Tarea: Corroborar precios en carrusel del inicio con descuentos
 
-## Tareas Completadas
+## Información Recopilada:
+- HeroSlider muestra productos sin considerar descuentos
+- DiscountBadge y getDiscountedPrice existen y se usan en ProductCard
+- Product tiene campos price y discount
 
-### 1. Modificar AddToCartButton.tsx
-- [x] Eliminar la verificación de sesión en `handleAddToCart`
-- [x] Permitir agregar productos al carrito usando solo el store local
-- [x] Mantener la funcionalidad de sincronización con servidor cuando esté logueado
+## Plan Aprobado:
+- Editar components/ui/HeroSlider.tsx para reutilizar lógica existente
+- Agregar imports: DiscountBadge, getDiscountedPrice, formatPrice
+- Calcular hasDiscount y finalPrice por producto
+- Mostrar badge si hay descuento
+- Mostrar precio tachado + precio final si hay descuento
 
-### 2. Mejorar sincronización del carrito en app/cart/page.tsx
-- [x] Mejorar la lógica de sincronización cuando el usuario inicia sesión
-- [x] Asegurar que el carrito local se fusione correctamente con el del servidor
-- [x] Evitar duplicados al sincronizar
-
-### 3. Reforzar mensaje de checkout en app/checkout/page.tsx
-- [x] Mejorar el mensaje cuando el usuario no está logueado
-- [x] Hacer el mensaje más claro y directo sobre la necesidad de iniciar sesión
-
-## Tareas Pendientes
-
-### 4. Testing y validación
-- [ ] Probar agregar productos sin login
-- [ ] Probar acceso al carrito sin login
-- [ ] Probar checkout sin login (debe requerir login)
-- [ ] Probar sincronización al loguearse
+## Pasos a Completar:
+- [ ] Agregar imports necesarios en HeroSlider.tsx
+- [ ] Calcular hasDiscount y finalPrice en el map de productos
+- [ ] Agregar DiscountBadge posicionado sobre la imagen
+- [ ] Modificar sección de precio: precio original tachado + precio final si descuento
+- [ ] Verificar cambios visualmente en la página de inicio

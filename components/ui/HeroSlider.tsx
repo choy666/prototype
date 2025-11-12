@@ -8,6 +8,9 @@ import { getAllProducts } from "@/lib/actions/products";
 import { useKeenSlider, KeenSliderInstance } from "keen-slider/react"; // ✅ importamos el tipo
 import { usePathname } from "next/navigation";
 import "keen-slider/keen-slider.min.css";
+import { DiscountBadge } from "@/components/ui/DiscountBadge";
+import { getDiscountedPrice } from "@/lib/utils/pricing";
+import { formatPrice } from "@/lib/utils";
 
 /**
  * Plugin autoplay slide-a-slide con cleanup completo y pausa por visibilidad.
@@ -201,44 +204,63 @@ export default function HeroSlider() {
           aria-label="Productos destacados"
           aria-live="polite"
         >
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="keen-slider__slide w-full sm:w-1/2 lg:w-1/3 flex-shrink-0"
-            >
-              <Link
-                href={`/products/${product.id}`}
-                className="block relative aspect-[4/3] rounded-lg overflow-hidden border"
+          {products.map((product) => {
+            const hasDiscount = product.discount && product.discount > 0;
+            const finalPrice = getDiscountedPrice(product);
+
+            return (
+              <div
+                key={product.id}
+                className="keen-slider__slide w-full sm:w-1/2 lg:w-1/3 flex-shrink-0"
               >
-                <Image
-                  src={product.image || "/placeholder-product.jpg"}
-                  alt={
-                    product.image
-                      ? `Imagen destacada del producto ${product.name}`
-                      : `Imagen no disponible para el producto ${product.name}`
-                  }
-                  width={600}
-                  height={400}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  placeholder="blur"
-                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                  className="w-full h-full object-cover"
-                  priority={true}
-                />
-                <div
-                  className="absolute bottom-0 left-0 w-full 
-                              bg-gradient-to-t from-black/80 to-transparent p-4"
+                <Link
+                  href={`/products/${product.id}`}
+                  className="block relative aspect-[4/3] rounded-lg overflow-hidden border"
                 >
-                  <h2 className="text-white text-lg md:text-xl font-bold">
-                    {product.name}
-                  </h2>
-                  <p className="text-base md:text-lg font-bold">
-                    ${product.price}
-                  </p>
-                </div>
-              </Link>
-            </div>
-          ))}
+                  <Image
+                    src={product.image || "/placeholder-product.jpg"}
+                    alt={
+                      product.image
+                        ? `Imagen destacada del producto ${product.name}`
+                        : `Imagen no disponible para el producto ${product.name}`
+                    }
+                    width={600}
+                    height={400}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    placeholder="blur"
+                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                    className="w-full h-full object-cover"
+                    priority={true}
+                  />
+                  {hasDiscount && <DiscountBadge discount={product.discount} />}
+                  <div
+                    className="absolute bottom-0 left-0 w-full
+                                bg-gradient-to-t from-black/80 to-transparent p-4"
+                  >
+                    <h2 className="text-white text-lg md:text-xl font-bold">
+                      {product.name}
+                    </h2>
+                    <div className="text-base md:text-lg font-bold">
+                      {hasDiscount ? (
+                        <div className="flex flex-col items-start">
+                          <span className="text-xs text-muted-foreground line-through text-white">
+                            {formatPrice(Number(product.price))}
+                          </span>
+                          <span className="text-primary">
+                            {formatPrice(finalPrice)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-primary">
+                          {formatPrice(Number(product.price))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
