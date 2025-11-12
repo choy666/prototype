@@ -65,7 +65,7 @@ export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: Che
                 className="w-15 h-15 object-cover rounded"
               />
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm truncate">{item.name}</h3>
+                <h3 className="font-medium text-sm truncate">{item.variantName || item.name}</h3>
                 <p className="text-xs text-gray-600">Cantidad: {item.quantity}</p>
                 <div className="flex items-center gap-2">
                   {hasDiscount ? (

@@ -12,6 +12,7 @@ export interface CartItem {
   weight?: number | null   // peso en kg para cálculo de envío
   variantId?: number       // ID de la variante seleccionada
   variantAttributes?: Record<string, string> // atributos de la variante (e.g., {color: 'Rojo', talla: 'M'})
+  variantName?: string     // nombre de la variante si existe
 }
 
 interface CartState {
