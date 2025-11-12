@@ -21,21 +21,41 @@ export default function CartPage() {
   useEffect(() => {
     if (session?.user?.id) {
       getUserCart(Number(session.user.id)).then(cart => {
-        if (cart) {
-          const mappedItems: CartItem[] = cart.items.map(item => ({
-            id: item.id,
-            name: item.product?.name || 'Producto desconocido',
-            variantName: item.variant?.name || undefined,
-            price: Number(item.variant?.price || item.product?.price || 0),
-            discount: item.product?.discount || 0,
-            image: (item.variant?.images as string[] | undefined)?.[0] || item.product?.image || undefined,
-            quantity: item.quantity,
-            stock: Number(item.variant?.stock || item.product?.stock || 0),
-            weight: item.product?.weight ? Number(item.product.weight) : undefined,
-            variantId: item.variantId || undefined,
-            variantAttributes: item.variant?.additionalAttributes ? (item.variant.additionalAttributes as Record<string, string>) : undefined,
-          }));
-          useCartStore.setState({ items: mappedItems });
+        if (cart && cart.items.length > 0) {
+          // Obtener items actuales del store local
+          const currentLocalItems = useCartStore.getState().items;
+
+          // Si hay items en el servidor pero no localmente, o si el servidor tiene más items, sincronizar
+          if (currentLocalItems.length === 0 || cart.items.length > currentLocalItems.length) {
+            const mappedItems: CartItem[] = cart.items.map(item => ({
+              id: item.id,
+              name: item.product?.name || 'Producto desconocido',
+              variantName: item.variant?.name || undefined,
+              price: Number(item.variant?.price || item.product?.price || 0),
+              discount: item.product?.discount || 0,
+              image: (item.variant?.images as string[] | undefined)?.[0] || item.product?.image || undefined,
+              quantity: item.quantity,
+              stock: Number(item.variant?.stock || item.product?.stock || 0),
+              weight: item.product?.weight ? Number(item.product.weight) : undefined,
+              variantId: item.variantId || undefined,
+              variantAttributes: item.variant?.additionalAttributes ? (item.variant.additionalAttributes as Record<string, string>) : undefined,
+            }));
+
+            // Fusionar con items locales existentes (priorizando servidor)
+            const mergedItems = [...mappedItems];
+
+            // Agregar items locales que no estén en el servidor
+            currentLocalItems.forEach(localItem => {
+              const existsInServer = mergedItems.some(serverItem =>
+                serverItem.id === localItem.id && serverItem.variantId === localItem.variantId
+              );
+              if (!existsInServer) {
+                mergedItems.push(localItem);
+              }
+            });
+
+            useCartStore.setState({ items: mergedItems });
+          }
         }
       }).catch(console.error);
     }

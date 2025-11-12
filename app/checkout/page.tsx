@@ -59,11 +59,20 @@ export default function CheckoutPage() {
   if (!session) {
     return (
       <div className="container mx-auto p-8 text-center">
-        <h1 className="text-3xl font-bold mb-4">Acceso requerido</h1>
-        <p className="mb-6">Debes iniciar sesión para continuar con el checkout.</p>
-        <Link href="/auth/signin">
-          <Button>Iniciar Sesión</Button>
-        </Link>
+        <h1 className="text-3xl font-bold mb-4 text-red-600">Inicio de Sesión Requerido</h1>
+        <p className="mb-4 text-lg">Para proceder con el checkout y completar tu compra, es obligatorio iniciar sesión.</p>
+        <p className="mb-6 text-gray-600">Puedes agregar productos al carrito sin iniciar sesión, pero para finalizar la compra necesitas una cuenta.</p>
+        <div className="space-y-4">
+          <Link href="/auth/signin">
+            <Button size="lg" className="mr-4">Iniciar Sesión</Button>
+          </Link>
+          <Link href="/auth/signup">
+            <Button variant="outline" size="lg">Crear Cuenta</Button>
+          </Link>
+        </div>
+        <p className="mt-6 text-sm text-gray-500">
+          ¿Ya tienes productos en el carrito? Se guardarán automáticamente al iniciar sesión.
+        </p>
       </div>
     );
   }

@@ -58,22 +58,10 @@ export function AddToCartButton({
       return
     }
 
-    if (!session?.user?.id) {
-      toast({
-        title: 'Error',
-        description: 'Debes iniciar sesión para agregar productos al carrito',
-        variant: 'destructive',
-      })
-      return
-    }
-
     setIsAdding(true)
 
     try {
-      // Agregar al carrito del servidor
-      await addToCart(Number(session.user.id), product.id, quantity, product.variantId)
-
-      // También actualizar el store local para UI inmediata
+      // Agregar al store local inmediatamente para UI responsiva
       addItem({
         id: product.id,
         name: product.variantName || product.name,
@@ -86,6 +74,16 @@ export function AddToCartButton({
         variantAttributes: product.variantAttributes, // 👈 guardamos atributos de variante
         variantName: product.variantName,
       })
+
+      // Si el usuario está logueado, sincronizar con el servidor
+      if (session?.user?.id) {
+        try {
+          await addToCart(Number(session.user.id), product.id, quantity, product.variantId)
+        } catch (serverError) {
+          console.error('Error sincronizando con servidor:', serverError)
+          // No mostrar error al usuario ya que el producto ya se agregó al carrito local
+        }
+      }
 
       toast({
         title: 'Producto agregado',
