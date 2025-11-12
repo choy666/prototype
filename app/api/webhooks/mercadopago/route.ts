@@ -429,6 +429,9 @@ async function createOrderFromPayment(payment: any) {
           variantId: item.variantId,
           change: -item.quantity,
           reason: `Venta - Orden ${orderId}`
+        }, {
+          bypassAuth: true,
+          userId: userId
         });
         logger.info('Stock de variante deducido', { variantId: item.variantId, quantity: item.quantity });
       } else {
@@ -438,6 +441,9 @@ async function createOrderFromPayment(payment: any) {
           productId: parseInt(item.id),
           change: -item.quantity,
           reason: `Venta - Orden ${orderId}`
+        }, {
+          bypassAuth: true,
+          userId: userId
         });
         logger.info('Stock de producto deducido', { productId: item.id, quantity: item.quantity });
       }

@@ -23,11 +23,23 @@ const adjustVariantStockSchema = z.object({
 /**
  * Ajusta el stock de un producto base
  */
-export async function adjustProductStock(data: z.infer<typeof adjustStockSchema>) {
+export async function adjustProductStock(
+  data: z.infer<typeof adjustStockSchema>,
+  options?: { bypassAuth?: boolean; userId?: number }
+) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Usuario no autenticado");
+    let userId: number;
+
+    if (options?.bypassAuth && options.userId) {
+      // Bypass de autenticación para webhooks
+      userId = options.userId;
+    } else {
+      // Autenticación normal
+      const session = await auth();
+      if (!session?.user?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+      userId = parseInt(session.user.id);
     }
 
     const validatedData = adjustStockSchema.parse(data);
@@ -59,7 +71,7 @@ export async function adjustProductStock(data: z.infer<typeof adjustStockSchema>
       newStock,
       change: validatedData.change,
       reason: validatedData.reason,
-      userId: parseInt(session.user.id),
+      userId,
     });
 
     revalidatePath(`/admin/products/${validatedData.productId}/stock`);
@@ -75,11 +87,23 @@ export async function adjustProductStock(data: z.infer<typeof adjustStockSchema>
 /**
  * Ajusta el stock de una variante de producto
  */
-export async function adjustVariantStock(data: z.infer<typeof adjustVariantStockSchema>) {
+export async function adjustVariantStock(
+  data: z.infer<typeof adjustVariantStockSchema>,
+  options?: { bypassAuth?: boolean; userId?: number }
+) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Usuario no autenticado");
+    let userId: number;
+
+    if (options?.bypassAuth && options.userId) {
+      // Bypass de autenticación para webhooks
+      userId = options.userId;
+    } else {
+      // Autenticación normal
+      const session = await auth();
+      if (!session?.user?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+      userId = parseInt(session.user.id);
     }
 
     const validatedData = adjustVariantStockSchema.parse(data);
@@ -118,7 +142,7 @@ export async function adjustVariantStock(data: z.infer<typeof adjustVariantStock
       newStock,
       change: validatedData.change,
       reason: validatedData.reason,
-      userId: parseInt(session.user.id),
+      userId,
     });
 
     revalidatePath(`/admin/products/${variant[0].productId}/stock`);
