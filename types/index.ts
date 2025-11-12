@@ -16,7 +16,7 @@ export interface ProductVariant {
   additionalAttributes?: Record<string, string>;
   price?: string | null;
   stock: number;
-  image?: string;
+  images?: string[];
   isActive: boolean;
   created_at: Date | string;
   updated_at: Date | string;

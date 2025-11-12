@@ -123,8 +123,8 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
     // Agregar imágenes de variantes activas
     if (product.variants?.length) {
       const variantImages = product.variants
-        .filter((v) => v.isActive && v.image)
-        .map((v) => ({ src: v.image!, type: 'variant' as const }))
+        .filter((v) => v.isActive && v.images && Array.isArray(v.images))
+        .flatMap((v) => v.images!.map((img) => ({ src: img, type: 'variant' as const })))
         .filter((img) => !images.some((existing) => existing.src === img.src)); // Evitar duplicados
 
       images.push(...variantImages);
@@ -140,17 +140,18 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
 
   // Imagen actual (priorizar variante seleccionada, luego galería)
   const currentImageSrc =
-    selectedVariant?.image || allImages[currentImageIndex % allImages.length]?.src;
+    (selectedVariant?.images && selectedVariant.images.length > 0 ? selectedVariant.images[0] : null) ||
+    allImages[currentImageIndex % allImages.length]?.src;
 
   // Efecto para actualizar currentImageIndex cuando se selecciona una variante con imagen
   useEffect(() => {
-    if (selectedVariant?.image) {
-      const variantImageIndex = allImages.findIndex((img) => img.src === selectedVariant.image);
+    if (selectedVariant?.images && selectedVariant.images.length > 0) {
+      const variantImageIndex = allImages.findIndex((img) => img.src === selectedVariant.images![0]);
       if (variantImageIndex !== -1) {
         setCurrentImageIndex(variantImageIndex);
       }
     }
-  }, [selectedVariant?.image, allImages]);
+  }, [selectedVariant?.images, allImages]);
 
   // Efecto para sincronizar selects cuando cambia selectedAttributes (para forzar actualización visual)
   useEffect(() => {
@@ -264,11 +265,11 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                     onClick={() => {
                       // Auto-selección de variante al clic en imagen de variante
                       if (img.type === 'variant') {
-                        const variant = product.variants?.find((v) => v.image === img.src);
+                        const variant = product.variants?.find((v) => v.images && v.images.includes(img.src));
                         if (variant && variant.additionalAttributes) {
                           // Cambiar a modo variantes y seleccionar atributos
                           setUseOriginalProduct(false);
-                          setSelectedAttributes(variant.additionalAttributes);
+                          setSelectedVariantName(variant.name);
                           // Pequeño delay para asegurar que los selects se actualicen
                           setTimeout(() => {
                             // Confirmar que selectedAttributes se ha actualizado
