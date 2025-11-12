@@ -19,6 +19,7 @@ type AddToCartButtonProps = {
     variantId?: number  // ID de la variante seleccionada
     variantAttributes?: Record<string, string> // atributos de la variante
     variantStock?: number // stock de la variante si aplica
+    variantName?: string
   }
   quantity?: number
   className?: string
@@ -75,7 +76,7 @@ export function AddToCartButton({
       // También actualizar el store local para UI inmediata
       addItem({
         id: product.id,
-        name: product.name,
+        name: product.variantName || product.name,
         price: product.price,               // precio original
         discount: product.discount ?? 0,    // 👈 guardamos descuento
         image: product.image || undefined,
@@ -83,11 +84,12 @@ export function AddToCartButton({
         stock: product.stock,
         variantId: product.variantId,       // 👈 guardamos variante
         variantAttributes: product.variantAttributes, // 👈 guardamos atributos de variante
+        variantName: product.variantName,
       })
 
       toast({
         title: 'Producto agregado',
-        description: `${product.name} se agregó al carrito`,
+        description: `${product.variantName || product.name} se agregó al carrito`,
       })
     } catch (error) {
       console.error('Error agregando al carrito:', error)

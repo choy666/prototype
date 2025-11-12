@@ -469,13 +469,14 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
             <AddToCartButton
               product={{
                 id: product.id,
-                name: product.name,
+                name: selectedVariant?.name || product.name,
                 price: currentPrice, // precio de variante o producto
                 discount: product.discount, // pasamos descuento al carrito
                 image: currentImageSrc, // imagen de variante o producto
                 stock: currentStock, // stock de variante o producto
                 variantId: selectedVariant?.id, // ID de la variante seleccionada
                 variantAttributes: selectedVariant?.additionalAttributes, // atributos de la variante
+                variantName: selectedVariant?.name,
               }}
               quantity={quantity}
               className='flex-1'

@@ -1,11 +1,14 @@
 'use client';
 
-import { useCartStore } from "@/lib/stores/useCartStore";
+import { useCartStore, CartItem } from "@/lib/stores/useCartStore";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { Minus, Plus, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { getUserCart } from "@/lib/actions/cart";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -13,6 +16,30 @@ const formatCurrency = (value: number) =>
 export default function CartPage() {
   const { items, removeItem, updateQuantity, clearCart } = useCartStore();
   const router = useRouter();
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      getUserCart(Number(session.user.id)).then(cart => {
+        if (cart) {
+          const mappedItems: CartItem[] = cart.items.map(item => ({
+            id: item.id,
+            name: item.product?.name || 'Producto desconocido',
+            variantName: item.variant?.name || undefined,
+            price: Number(item.variant?.price || item.product?.price || 0),
+            discount: item.product?.discount || 0,
+            image: (item.variant?.images as string[] | undefined)?.[0] || item.product?.image || undefined,
+            quantity: item.quantity,
+            stock: Number(item.variant?.stock || item.product?.stock || 0),
+            weight: item.product?.weight ? Number(item.product.weight) : undefined,
+            variantId: item.variantId || undefined,
+            variantAttributes: item.variant?.additionalAttributes ? (item.variant.additionalAttributes as Record<string, string>) : undefined,
+          }));
+          useCartStore.setState({ items: mappedItems });
+        }
+      }).catch(console.error);
+    }
+  }, [session]);
 
   const handleCheckout = () => {
     // Redirigir a la página de checkout en lugar de procesar directamente
@@ -72,7 +99,7 @@ export default function CartPage() {
                   className='w-16 h-16 sm:w-20 sm:h-20 object-cover rounded'
                 />
                 <div className='flex-1 min-w-0'>
-                  <h3 className='font-medium text-sm sm:text-base'>{item.name}</h3>
+                  <h3 className='font-medium text-sm sm:text-base'>{item.variantName || item.name}</h3>
                   {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
                     <p className='text-xs text-gray-500'>
                       {Object.entries(item.variantAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
