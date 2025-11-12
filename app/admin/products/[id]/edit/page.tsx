@@ -442,7 +442,7 @@ export default function EditProductPage() {
                       type="number"
                       min="0"
                       value={form.stock}
-                      onChange={(e) => handleChange('stock', e.target.value)}
+                      disabled
                       placeholder="0"
                     />
                   </div>
