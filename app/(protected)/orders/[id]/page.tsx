@@ -39,6 +39,7 @@ type Order = {
     productId: number;
     productName: string;
     productImage?: string;
+    productAttributes?: Record<string, string>;
     variantId?: number;
     variantName?: string;
     variantImage?: string[];
@@ -266,8 +267,17 @@ export default function OrderDetailPage() {
                     />
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 dark:text-white">
-                        {item.variantId ? `${item.productName} - ${item.variantName || 'Variante'}` : item.productName}
+                        {item.variantId ? `${item.variantName || 'Variante'}` : item.productName}
                       </h4>
+                      {item.productAttributes && Object.keys(item.productAttributes).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                          {Object.entries(item.productAttributes).map(([key, value]) => (
+                            <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                              {key}: {value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1 mb-2">
                           {Object.entries(item.variantAttributes).map(([key, value]) => (
