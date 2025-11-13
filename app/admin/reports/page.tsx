@@ -171,7 +171,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 md:flex-row">
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4" />
           <span className="text-sm font-medium">Período de Ventas:</span>
