@@ -83,6 +83,11 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
+  // Redirección especial para admins: si acceden a /dashboard, ir a /admin
+  if (pathname === '/dashboard' && isLoggedIn && isAdmin) {
+    return NextResponse.redirect(new URL('/admin', request.url));
+  }
+
   // Validaciones adicionales para rutas de checkout
   const isCheckoutRoute = checkoutRoutes.some(route =>
     pathname.startsWith(route)

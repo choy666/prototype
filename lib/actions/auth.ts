@@ -160,6 +160,13 @@ export const authConfig = {
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // Si la URL de redirección es /dashboard, verificar el rol del usuario
+      if (url === `${baseUrl}/dashboard`) {
+        // Nota: En el callback de redirect, no tenemos acceso directo a la sesión
+        // La lógica de redirección se maneja en el middleware
+        return url;
+      }
+
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (new URL(url).origin === baseUrl) return url;
       return baseUrl;

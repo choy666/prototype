@@ -29,6 +29,9 @@ export default function LoginPage() {
 
   const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
 
+  // Determinar la URL de redirección basada en el rol del usuario (se hará después del login)
+  // Por ahora, mantenemos la lógica existente
+
   useEffect(() => {
     const sessionExpired = searchParams?.get('session_expired');
     if (sessionExpired) {
