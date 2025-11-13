@@ -1,20 +1,15 @@
-# Tarea: Corroborar precios en carrusel del inicio con descuentos
+# TODO: Arreglar sincronización del carrito entre localStorage y base de datos
 
-## Información Recopilada:
-- HeroSlider muestra productos sin considerar descuentos
-- DiscountBadge y getDiscountedPrice existen y se usan en ProductCard
-- Product tiene campos price y discount
+## Problema identificado
+Cuando el usuario navega desde /orders a /cart, aparecen productos antiguos en el carrito porque:
+1. El carrito local (localStorage) se limpia correctamente después de un pago exitoso
+2. Pero el carrito en la base de datos (usado para checkout) NO se limpia
+3. Al ir a /cart, el código sincroniza fusionando items del servidor con los locales vacíos
 
-## Plan Aprobado:
-- Editar components/ui/HeroSlider.tsx para reutilizar lógica existente
-- Agregar imports: DiscountBadge, getDiscountedPrice, formatPrice
-- Calcular hasDiscount y finalPrice por producto
-- Mostrar badge si hay descuento
-- Mostrar precio tachado + precio final si hay descuento
+## Solución requerida
+Limpiar el carrito del usuario en la base de datos después de un checkout exitoso en el webhook de MercadoPago.
 
-## Pasos a Completar:
-- [ ] Agregar imports necesarios en HeroSlider.tsx
-- [ ] Calcular hasDiscount y finalPrice en el map de productos
-- [ ] Agregar DiscountBadge posicionado sobre la imagen
-- [ ] Modificar sección de precio: precio original tachado + precio final si descuento
-- [ ] Verificar cambios visualmente en la página de inicio
+## Pasos a implementar
+- [ ] Modificar `app/api/webhooks/mercadopago/route.ts` para llamar a `clearCart(userId)` después de crear una orden exitosa
+- [ ] Verificar que no se limpien carritos de pagos rechazados
+- [ ] Probar el flujo completo: agregar items -> checkout -> pago exitoso -> verificar que carrito esté vacío en BD y localStorage

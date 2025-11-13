@@ -1,2 +1,2 @@
-usuario: protype@gmail.com
-contraseña: Ptype666$
+usuario:protype@gmail.com
+contraseña:Ptype666$

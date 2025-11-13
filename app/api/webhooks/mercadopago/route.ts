@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { logger } from '@/lib/utils/logger';
 import { db } from '@/lib/db';
-import { orders, orderItems } from '@/lib/schema';
+import { orders, orderItems, carts, cartItems } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
@@ -451,6 +452,32 @@ async function createOrderFromPayment(payment: any) {
     }
 
     logger.info('Deducción de stock completada para orden', { orderId });
+
+    // Limpiar el carrito del usuario después de una compra exitosa
+    logger.info('Limpiando carrito del usuario después de compra exitosa', { userId });
+    try {
+      // Limpiar directamente en la base de datos sin verificar autenticación
+      const cart = await db
+        .select()
+        .from(carts)
+        .where(eq(carts.userId, userId))
+        .limit(1);
+
+      if (cart.length > 0) {
+        await db
+          .delete(cartItems)
+          .where(eq(cartItems.cartId, cart[0].id));
+        logger.info('Carrito limpiado exitosamente', { userId, cartId: cart[0].id });
+      } else {
+        logger.info('No se encontró carrito para limpiar', { userId });
+      }
+    } catch (cartError) {
+      logger.error('Error al limpiar el carrito', {
+        userId,
+        error: cartError instanceof Error ? cartError.message : String(cartError)
+      });
+      // No fallar la creación de orden por error en limpieza de carrito
+    }
 
   } catch (error) {
     logger.error('Error creando orden desde pago', {

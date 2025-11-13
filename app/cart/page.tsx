@@ -25,8 +25,9 @@ export default function CartPage() {
           // Obtener items actuales del store local
           const currentLocalItems = useCartStore.getState().items;
 
-          // Si hay items en el servidor pero no localmente, o si el servidor tiene más items, sincronizar
-          if (currentLocalItems.length === 0 || cart.items.length > currentLocalItems.length) {
+          // Solo sincronizar desde servidor si hay items locales existentes
+          // Si el carrito local está vacío, no restaurar items antiguos (evita restaurar items después de compra exitosa)
+          if (currentLocalItems.length > 0 && cart.items.length > currentLocalItems.length) {
             const mappedItems: CartItem[] = cart.items.map(item => ({
               id: item.id,
               name: item.product?.name || 'Producto desconocido',
