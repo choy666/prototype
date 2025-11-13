@@ -41,14 +41,21 @@ const Navbar = () => {
     { name: 'Productos', href: '/products' },
   ];
 
-  const authItems = session 
-    ? [
-        { name: 'Mi Cuenta', href: '/dashboard' },
-        { 
-          name: 'Cerrar Sesión', 
-          onClick: () => signOut({ callbackUrl: '/' }) 
-        }
-      ]
+  const authItems = session
+    ? isAdmin
+      ? [
+          {
+            name: 'Cerrar Sesión',
+            onClick: () => signOut({ callbackUrl: '/' })
+          }
+        ]
+      : [
+          { name: 'Mi Cuenta', href: '/dashboard' },
+          {
+            name: 'Cerrar Sesión',
+            onClick: () => signOut({ callbackUrl: '/' })
+          }
+        ]
     : [
         { name: 'Iniciar Sesión', href: '/login' },
         { name: 'Registrarse', href: '/register' }
