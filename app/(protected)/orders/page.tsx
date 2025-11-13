@@ -206,7 +206,7 @@ export default function OrdersPage() {
                 {order.items.slice(0, 3).map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
                     <Image
-                      src={item.productImage || '/placeholder-product.jpg'}
+                      src={(item.variantId && item.variantImage && item.variantImage.length > 0 ? item.variantImage[0] : item.productImage) || '/placeholder-product.jpg'}
                       alt={item.productName}
                       width={50}
                       height={50}

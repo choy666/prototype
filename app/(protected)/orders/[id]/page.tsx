@@ -255,7 +255,7 @@ export default function OrderDetailPage() {
                 {order.items.map((item) => (
                   <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                     <Image
-                      src={item.productImage || '/placeholder-product.jpg'}
+                      src={(item.variantId && item.variantImage && item.variantImage.length > 0 ? item.variantImage[0] : item.productImage) || '/placeholder-product.jpg'}
                       alt={item.productName}
                       width={60}
                       height={60}
