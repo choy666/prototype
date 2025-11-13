@@ -219,15 +219,6 @@ export default function OrdersPage() {
                       <p className="font-medium text-gray-900 dark:text-white truncate">
                         {item.variantId ? `${item.variantName || 'Variante'}` : item.productName}
                       </p>
-                      {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {Object.entries(item.variantAttributes).map(([key, value]) => (
-                            <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                              {key}: {value}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                       <p className="text-sm text-gray-600 dark:text-gray-300">
                         {item.quantity} × ${parseFloat(item.price).toFixed(2)}
                       </p>
