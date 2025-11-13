@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/Button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, Download, TrendingUp, Users, Package, DollarSign } from 'lucide-react'
+import { Calendar, TrendingUp, Users, Package, DollarSign } from 'lucide-react'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -18,8 +17,7 @@ import {
   ArcElement,
 } from 'chart.js'
 import { Bar, Line, Pie } from 'react-chartjs-2'
-import jsPDF from 'jspdf'
-import * as XLSX from 'xlsx'
+
 
 ChartJS.register(
   CategoryScale,
@@ -87,19 +85,7 @@ export default function ReportsPage() {
     fetchReportsData()
   }, [salesPeriod, userPeriod, fetchReportsData])
 
-  const exportToPDF = () => {
-    const doc = new jsPDF()
-    doc.text('Reporte de Ventas', 20, 20)
-    // Add more content as needed
-    doc.save('reporte-ventas.pdf')
-  }
 
-  const exportToExcel = () => {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(salesData)
-    XLSX.utils.book_append_sheet(wb, ws, 'Ventas')
-    XLSX.writeFile(wb, 'reporte-ventas.xlsx')
-  }
 
   const salesChartData = {
     labels: salesData.map(d => d.period),
@@ -182,16 +168,6 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Reportes</h1>
-        <div className="flex gap-2">
-          <Button onClick={exportToPDF} variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Exportar PDF
-          </Button>
-          <Button onClick={exportToExcel} variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Exportar Excel
-          </Button>
-        </div>
       </div>
 
       {/* Filtros */}

@@ -1,8 +1,7 @@
-# TODO: Implementar Filtrado Dinámico de Imágenes en ProductClient.tsx
+# Tareas para quitar exportación PDF y Excel
 
-## Pendientes
-- [x] Modificar useMemo allImages para filtrar imágenes basado en useOriginalProduct y selectedVariant
-- [x] Agregar useEffect para resetear currentImageIndex y thumbnailStartIndex cuando cambia la selección
-- [x] Ajustar botones de toggle para resetear índices apropiadamente
-- [x] Verificar funcionamiento del carrusel con imágenes filtradas
-- [x] Probar funcionalidad en navegador para asegurar visualización correcta según selección
+- [ ] Remover dependencias jspdf y xlsx de package.json
+- [ ] Remover funciones exportToPDF y exportToExcel de app/admin/reports/page.tsx
+- [ ] Remover botones de exportación PDF y Excel
+- [ ] Remover imports de jsPDF y XLSX
+- [ ] Verificar que no queden referencias huérfanas
