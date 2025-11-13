@@ -54,6 +54,7 @@ export default function ProductClient({ product }: { product: Product }) {
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [useOriginalProduct, setUseOriginalProduct] = useState(true); // Estado para alternar entre original y variantes
 const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // Estado para la variante seleccionada por nombre
+  const [isLoadingVariant, setIsLoadingVariant] = useState(false); // Loading state para cambio de variante
 
   const hasActiveVariants = product.variants?.some(v => v.isActive) ?? false;
 
@@ -90,6 +91,18 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
     return product.variants.find((variant) => variant.name === selectedVariantName) || null;
   }, [product.variants, selectedVariantName, useOriginalProduct]);
 
+  // Efecto para manejar loading al cambiar variante
+  useEffect(() => {
+    if (selectedVariantName) {
+      setIsLoadingVariant(true);
+      // Simular breve delay para mostrar loading (puede ajustarse o removerse si no es necesario)
+      const timer = setTimeout(() => {
+        setIsLoadingVariant(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedVariantName]);
+
   // Nombre de la variante seleccionada para mostrar (comentado para evitar warning)
   // const selectedVariantName = useMemo(() => {
   //   if (!selectedVariant) return null;
@@ -106,22 +119,22 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
   // Stock actual (de variante o producto)
   const currentStock = selectedVariant?.stock ?? product.stock;
 
-  // Imágenes disponibles filtradas según selección (original o variante)
+  // Imágenes disponibles: si hay variante seleccionada, usar solo las de la variante; de lo contrario, las del producto
   const allImages = useMemo<{ src: string; type: 'main' | 'secondary' | 'variant' }[]>(() => {
     const images: { src: string; type: 'main' | 'secondary' | 'variant' }[] = [];
 
-    // Siempre incluir imágenes del producto original
-    if (product?.image && typeof product.image === 'string') {
-      images.push({ src: product.image, type: 'main' });
-    }
-
-    if (product?.images && Array.isArray(product.images)) {
-      product.images.forEach((img) => images.push({ src: img, type: 'secondary' }));
-    }
-
-    // Si hay variante seleccionada, agregar sus imágenes
-    if (!useOriginalProduct && selectedVariant && selectedVariant.images && Array.isArray(selectedVariant.images)) {
+    if (!useOriginalProduct && selectedVariant && selectedVariant.images && Array.isArray(selectedVariant.images) && selectedVariant.images.length > 0) {
+      // Usar solo imágenes de la variante seleccionada
       selectedVariant.images.forEach((img) => images.push({ src: img, type: 'variant' }));
+    } else {
+      // Usar imágenes del producto original
+      if (product?.image && typeof product.image === 'string') {
+        images.push({ src: product.image, type: 'main' });
+      }
+
+      if (product?.images && Array.isArray(product.images)) {
+        product.images.forEach((img) => images.push({ src: img, type: 'secondary' }));
+      }
     }
 
     // Si no hay imágenes, usar placeholder
@@ -132,10 +145,8 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
     return images;
   }, [product?.image, product?.images, useOriginalProduct, selectedVariant]);
 
-  // Imagen actual (priorizar variante seleccionada, luego galería)
-  const currentImageSrc =
-    (selectedVariant?.images && selectedVariant.images.length > 0 ? selectedVariant.images[0] : null) ||
-    allImages[currentImageIndex % allImages.length]?.src;
+  // Imagen actual basada en el índice actual de allImages
+  const currentImageSrc = allImages[currentImageIndex % allImages.length]?.src || '/placeholder-product.jpg';
 
   // Efecto para actualizar currentImageIndex cuando se selecciona una variante con imagen
   useEffect(() => {
@@ -174,11 +185,60 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
 
   const nextThumbnail = () => {
     if (allImages.length <= 4) return;
+
+    if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 1) {
+      // Navegar por miniaturas centradas en imágenes de variante
+      const variantImageIndices = allImages
+        .map((img, index) => img.type === 'variant' ? index : -1)
+        .filter(i => i !== -1);
+
+      if (variantImageIndices.length > 4) {
+        // Si hay más de 4 imágenes de variante, navegar por ellas
+        const currentEndIndex = thumbnailStartIndex + 4;
+        const lastVariantIndex = variantImageIndices[variantImageIndices.length - 1];
+
+        if (currentEndIndex <= lastVariantIndex) {
+          // Aún hay más imágenes de variante para mostrar
+          setThumbnailStartIndex((prev) => prev + 1);
+        } else {
+          // Volver al inicio de las imágenes de variante
+          const firstVariantIndex = variantImageIndices[0];
+          setThumbnailStartIndex(firstVariantIndex);
+        }
+        return;
+      }
+    }
+
+    // Navegación normal por todas las miniaturas
     setThumbnailStartIndex((prev) => (prev + 4 >= allImages.length ? 0 : prev + 1));
   };
 
   const prevThumbnail = () => {
     if (allImages.length <= 4) return;
+
+    if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 1) {
+      // Navegar por miniaturas centradas en imágenes de variante
+      const variantImageIndices = allImages
+        .map((img, index) => img.type === 'variant' ? index : -1)
+        .filter(i => i !== -1);
+
+      if (variantImageIndices.length > 4) {
+        // Si hay más de 4 imágenes de variante, navegar por ellas
+        const firstVariantIndex = variantImageIndices[0];
+
+        if (thumbnailStartIndex > firstVariantIndex) {
+          // Aún hay imágenes de variante anteriores para mostrar
+          setThumbnailStartIndex((prev) => prev - 1);
+        } else {
+          // Ir al final de las imágenes de variante
+          const lastVariantIndex = variantImageIndices[variantImageIndices.length - 1];
+          setThumbnailStartIndex(Math.max(0, lastVariantIndex - 3));
+        }
+        return;
+      }
+    }
+
+    // Navegación normal por todas las miniaturas
     setThumbnailStartIndex((prev) => (prev === 0 ? Math.max(0, allImages.length - 4) : prev - 1));
   };
 
@@ -230,6 +290,11 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
         {/* Imágenes */}
         <div className='space-y-3 sm:space-y-4 p-5 bg-black rounded-2xl h-fit'>
           <div className='relative aspect-square overflow-hidden rounded-lg bg-gray-100'>
+            {isLoadingVariant && (
+              <div className='absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-90'>
+                <div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin'></div>
+              </div>
+            )}
             <Image
               src={currentImageSrc}
               alt={product.name}
@@ -237,14 +302,14 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
               sizes='(max-width: 768px) 100vw, 50vw'
               placeholder='blur'
               blurDataURL='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z'
-              className='object-cover'
+              className={`object-cover ${isLoadingVariant ? 'opacity-50' : ''}`}
               priority
               loading='eager'
             />
 
             {hasDiscount && <DiscountBadge discount={product.discount} />}
 
-            {allImages.length > 1 && (
+            {allImages.length > 1 && !isLoadingVariant && (
               <>
                 <button
                   onClick={prevImage}
@@ -352,7 +417,9 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
 
         {/* Información del producto */}
         <div className='space-y-4 sm:space-y-6'>
-          <h1 className='text-2xl sm:text-3xl font-bold text-white'>{product.name}</h1>
+          <h1 className='text-2xl sm:text-3xl font-bold text-white'>
+            {selectedVariant?.name || product.name}
+          </h1>
 
           <div className='text-2xl sm:text-2xl font-semibold text-primary'>
             {hasDiscount ? (
@@ -367,14 +434,18 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
             )}
           </div>
 
-          <p className='text-gray-600'>{product.description}</p>
+          <p className='text-gray-600'>
+            {selectedVariant?.description || product.description}
+          </p>
 
-          {/* Características del producto */}
+          {/* Características del producto o variante */}
           {(() => {
-            const normalizedAttrs = normalizeAttributes(product.attributes);
+            const attrsToUse = selectedVariant?.additionalAttributes || product.attributes;
+            const normalizedAttrs = normalizeAttributes(attrsToUse);
+            const title = selectedVariant ? "Características de la variante" : "Características del producto";
             return normalizedAttrs && Object.keys(normalizedAttrs).length > 0 && (
               <Collapsible
-                title="Características del producto"
+                title={title}
                 defaultOpen={false}
                 className="bg-black/20 rounded-xl border border-gray-700"
                 headerClassName="p-4"
@@ -452,31 +523,6 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Mostrar atributos de la variante seleccionada */}
-                  {selectedVariant && selectedVariant.additionalAttributes && (
-                    <Collapsible
-                      title="Características de la variante"
-                      defaultOpen={true}
-                      className="bg-black/20 rounded-xl border border-gray-700"
-                      headerClassName="p-4"
-                      contentClassName="p-4 space-y-2"
-                    >
-                      <dl className={`grid gap-2 ${Object.keys(selectedVariant.additionalAttributes).length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                        {Object.entries(selectedVariant.additionalAttributes).map(([key, value]) => (
-                          <div key={key} className='flex flex-col'>
-                            <dt className='font-medium text-white text-xs capitalize'>{key.replace(/_/g, ' ')}</dt>
-                            <dd className='text-gray-400 text-sm'>{value}</dd>
-                          </div>
-                        ))}
-                        {/* Mostrar stock de la variante */}
-                        <div className='flex flex-col'>
-                          <dt className='font-medium text-white text-xs capitalize'>Stock</dt>
-                          <dd className='text-gray-400 text-sm'>{selectedVariant.stock} unidades disponibles</dd>
-                        </div>
-                      </dl>
-                    </Collapsible>
-                  )}
                 </div>
               )}
             </div>

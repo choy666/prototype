@@ -12,6 +12,7 @@ export interface ProductVariant {
   id: number;
   productId: number;
   name: string;
+  description?: string | null;
   sku?: string | null;
   additionalAttributes?: Record<string, string>;
   price?: string | null;
