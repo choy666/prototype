@@ -27,8 +27,13 @@ interface OrderItem {
   quantity: number
   price: number
   productId: number
+  variantId?: number
   productName: string
   productImage?: string
+  productAttributes?: Record<string, string>
+  variantName?: string
+  variantImage?: string[]
+  variantAttributes?: Record<string, string>
 }
 
 interface Order {
@@ -259,39 +264,63 @@ export default function AdminOrderDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {order.items.map((item) => (
-                  <div key={item.id} className="py-4 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
-                    <div className="sm:col-span-3 flex items-center space-x-4">
-                      {item.productImage ? (
-                        <Image
-                          src={item.productImage}
-                          alt={item.productName}
-                          width={64}
-                          height={64}
-                          sizes="64px"
-                          placeholder="blur"
-                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                          className="h-16 w-16 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="h-16 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <Package className="h-8 w-8 text-gray-400" />
+                {order.items.map((item) => {
+                  // Determinar la imagen a mostrar
+                  const displayImage = item.variantId && item.variantImage && item.variantImage.length > 0
+                    ? item.variantImage[0]
+                    : item.productImage;
+
+                  // Combinar atributos para mostrar
+                  const allAttrs = {
+                    ...item.productAttributes,
+                    ...item.variantAttributes
+                  };
+
+                  return (
+                    <div key={item.id} className="py-4 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
+                      <div className="sm:col-span-3 flex items-center space-x-4">
+                        {displayImage ? (
+                          <Image
+                            src={displayImage}
+                            alt={item.productName}
+                            width={64}
+                            height={64}
+                            sizes="64px"
+                            placeholder="blur"
+                            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                            className="h-16 w-16 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                            <Package className="h-8 w-8 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base">
+                            {item.productName}{item.variantName ? ` - ${item.variantName}` : ''}
+                          </h3>
+                          {Object.keys(allAttrs).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                              {Object.entries(allAttrs).map(([key, value]) => (
+                                <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                  {key}: {String(value)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-sm text-muted-foreground">
+                            {item.quantity} x ${item.price.toFixed(2)}
+                          </p>
                         </div>
-                      )}
-                      <div>
-                        <h3 className="font-semibold text-base">{item.productName}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {item.quantity} x ${item.price.toFixed(2)}
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <p className="font-bold text-lg">
+                          ${(item.price * item.quantity).toFixed(2)}
                         </p>
                       </div>
                     </div>
-                    <div className="text-left sm:text-right">
-                      <p className="font-bold text-lg">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

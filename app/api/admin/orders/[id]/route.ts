@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { db } from '@/lib/db'
-import { orders, orderItems, products, users } from '@/lib/schema'
+import { orders, orderItems, products, users, productVariants } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { logger } from '@/lib/utils/logger'
@@ -58,11 +58,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         quantity: orderItems.quantity,
         price: orderItems.price,
         productId: orderItems.productId,
+        variantId: orderItems.variantId,
         productName: products.name,
         productImage: products.image,
+        productAttributes: products.attributes,
+        variantName: productVariants.name,
+        variantImage: productVariants.images,
+        variantAttributes: productVariants.additionalAttributes,
       })
       .from(orderItems)
       .leftJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(productVariants, eq(orderItems.variantId, productVariants.id))
       .where(eq(orderItems.orderId, orderIdNum))
 
     const order = orderData[0]
@@ -75,8 +81,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         quantity: item.quantity,
         price: Number(item.price),
         productId: item.productId,
+        variantId: item.variantId,
         productName: item.productName || 'Producto desconocido',
         productImage: item.productImage,
+        productAttributes: typeof item.productAttributes === 'object' && item.productAttributes !== null ? item.productAttributes : {},
+        variantName: item.variantName || '',
+        variantImage: Array.isArray(item.variantImage) ? item.variantImage : [],
+        variantAttributes: typeof item.variantAttributes === 'object' && item.variantAttributes !== null ? item.variantAttributes : {},
       })),
     }
 
