@@ -78,6 +78,7 @@ export default function OrderDetailPage() {
       }
 
       const orderData = await response.json();
+      console.log('Order data loaded:', orderData); // Debug log
       setOrder(orderData);
     } catch (error) {
       console.error('Error al cargar la orden:', error);
@@ -253,51 +254,69 @@ export default function OrderDetailPage() {
                 Productos
               </h3>
               <div className="space-y-4">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
-                    <Image
-                      src={(item.variantId && Array.isArray(item.variantImage) && item.variantImage.length > 0 ? item.variantImage[0] : item.productImage) || '/placeholder-product.jpg'}
-                      alt={item.productName}
-                      width={60}
-                      height={60}
-                      sizes="60px"
-                      placeholder="blur"
-                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                      className="rounded-lg object-cover"
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 dark:text-white">
-                        {item.variantId ? `${item.variantName || 'Variante'}` : item.productName}
-                      </h4>
-                      {item.productAttributes && Object.keys(item.productAttributes).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                          {Object.entries(item.productAttributes).map(([key, value]) => (
-                            <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                              {key}: {value}
-                            </span>
-                          ))}
+                {(() => {
+                  try {
+                    console.log('Rendering order items:', order.items); // Debug log
+                    return order.items.map((item) => (
+                      <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                        <Image
+                          src={
+                            item.variantId && 
+                            Array.isArray(item.variantImage) && 
+                            item.variantImage.length > 0 
+                              ? item.variantImage[0] 
+                              : (typeof item.productImage === 'string' ? item.productImage : '/placeholder-product.jpg')
+                          }
+                          alt={item.productName}
+                          width={60}
+                          height={60}
+                          sizes="60px"
+                          placeholder="blur"
+                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                          className="rounded-lg object-cover"
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {item.variantId ? `${item.variantName || 'Variante'}` : item.productName}
+                          </h4>
+                          {typeof item.productAttributes === 'object' && item.productAttributes !== null && Object.keys(item.productAttributes).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                              {Object.entries(item.productAttributes).map(([key, value]) => (
+                                <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                  {key}: {String(value)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {typeof item.variantAttributes === 'object' && item.variantAttributes !== null && Object.keys(item.variantAttributes).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                              {Object.entries(item.variantAttributes).map(([key, value]) => (
+                                <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                  {key}: {String(value)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                            Cantidad: {item.quantity} × ${item.price.toFixed(2)}
+                          </p>
                         </div>
-                      )}
-                      {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                          {Object.entries(item.variantAttributes).map(([key, value]) => (
-                            <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                              {key}: {value}
-                            </span>
-                          ))}
+                        <div className="text-right">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </p>
                         </div>
-                      )}
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Cantidad: {item.quantity} × ${item.price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                      </div>
+                    ));
+                  } catch (renderError) {
+                    console.error('Error rendering order items:', renderError);
+                    return (
+                      <div className="p-4 border border-red-200 dark:border-red-700 rounded-lg bg-red-50 dark:bg-red-900/20">
+                        <p className="text-red-600 dark:text-red-400">Error al mostrar los productos del pedido. Contacta soporte.</p>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
 
               <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
