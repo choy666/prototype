@@ -348,7 +348,7 @@ export default function EditProductPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basic" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
             <FileText className="h-4 w-4" />
-            Información Básica
+            Información
           </TabsTrigger>
           <TabsTrigger value="attributes" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
             <Tag className="h-4 w-4" />
