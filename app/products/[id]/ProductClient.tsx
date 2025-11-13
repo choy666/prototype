@@ -106,37 +106,31 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
   // Stock actual (de variante o producto)
   const currentStock = selectedVariant?.stock ?? product.stock;
 
-  // Imágenes disponibles incluyendo variantes con tipo
+  // Imágenes disponibles filtradas según selección (original o variante)
   const allImages = useMemo<{ src: string; type: 'main' | 'secondary' | 'variant' }[]>(() => {
     const images: { src: string; type: 'main' | 'secondary' | 'variant' }[] = [];
 
-    // Imagen principal del producto
+    // Siempre incluir imágenes del producto original
     if (product?.image && typeof product.image === 'string') {
       images.push({ src: product.image, type: 'main' });
     }
 
-    // Imágenes secundarias del producto
     if (product?.images && Array.isArray(product.images)) {
       product.images.forEach((img) => images.push({ src: img, type: 'secondary' }));
     }
 
-    // Agregar imágenes de variantes activas
-    if (product.variants?.length) {
-      const variantImages = product.variants
-        .filter((v) => v.isActive && v.images && Array.isArray(v.images))
-        .flatMap((v) => v.images!.map((img) => ({ src: img, type: 'variant' as const })))
-        .filter((img) => !images.some((existing) => existing.src === img.src)); // Evitar duplicados
-
-      images.push(...variantImages);
+    // Si hay variante seleccionada, agregar sus imágenes
+    if (!useOriginalProduct && selectedVariant && selectedVariant.images && Array.isArray(selectedVariant.images)) {
+      selectedVariant.images.forEach((img) => images.push({ src: img, type: 'variant' }));
     }
 
-    // Si no hay imágenes del producto, usar placeholder
+    // Si no hay imágenes, usar placeholder
     if (images.length === 0) {
       images.push({ src: '/placeholder-product.jpg', type: 'main' });
     }
 
     return images;
-  }, [product?.image, product?.images, product.variants]);
+  }, [product?.image, product?.images, useOriginalProduct, selectedVariant]);
 
   // Imagen actual (priorizar variante seleccionada, luego galería)
   const currentImageSrc =
@@ -152,6 +146,12 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
       }
     }
   }, [selectedVariant?.images, allImages]);
+
+  // Efecto para resetear índices cuando cambia la selección entre original y variantes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setThumbnailStartIndex(0);
+  }, [useOriginalProduct, selectedVariantName]);
 
   // Efecto para sincronizar selects cuando cambia selectedAttributes (para forzar actualización visual)
   useEffect(() => {
@@ -172,16 +172,6 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
   // Calcular precio final aplicando descuento al precio actual (variante o base)
   const finalPrice = hasDiscount ? getDiscountedPrice({ ...normalizedProduct, price: currentPrice }) : currentPrice;
 
-  const nextImage = () => {
-    if (!allImages.length) return;
-    setCurrentImageIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
-  };
-
-  const prevImage = () => {
-    if (!allImages.length) return;
-    setCurrentImageIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
-  };
-
   const nextThumbnail = () => {
     if (allImages.length <= 4) return;
     setThumbnailStartIndex((prev) => (prev + 4 >= allImages.length ? 0 : prev + 1));
@@ -190,6 +180,48 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
   const prevThumbnail = () => {
     if (allImages.length <= 4) return;
     setThumbnailStartIndex((prev) => (prev === 0 ? Math.max(0, allImages.length - 4) : prev - 1));
+  };
+
+  const nextImage = () => {
+    if (!allImages.length) return;
+
+    if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 1) {
+      // Navegar solo por imágenes de variante
+      const variantImageIndices = allImages
+        .map((img, index) => img.type === 'variant' ? index : -1)
+        .filter(i => i !== -1);
+
+      if (variantImageIndices.length > 1) {
+        const currentVariantIndex = variantImageIndices.indexOf(currentImageIndex);
+        const nextVariantIndex = currentVariantIndex === variantImageIndices.length - 1 ? 0 : currentVariantIndex + 1;
+        setCurrentImageIndex(variantImageIndices[nextVariantIndex]);
+        return;
+      }
+    }
+
+    // Navegación normal por todas las imágenes
+    setCurrentImageIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+  };
+
+  const prevImage = () => {
+    if (!allImages.length) return;
+
+    if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 1) {
+      // Navegar solo por imágenes de variante
+      const variantImageIndices = allImages
+        .map((img, index) => img.type === 'variant' ? index : -1)
+        .filter(i => i !== -1);
+
+      if (variantImageIndices.length > 1) {
+        const currentVariantIndex = variantImageIndices.indexOf(currentImageIndex);
+        const prevVariantIndex = currentVariantIndex === 0 ? variantImageIndices.length - 1 : currentVariantIndex - 1;
+        setCurrentImageIndex(variantImageIndices[prevVariantIndex]);
+        return;
+      }
+    }
+
+    // Navegación normal por todas las imágenes
+    setCurrentImageIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
   };
 
   return (
@@ -383,6 +415,8 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
                   onClick={() => {
                     setUseOriginalProduct(false);
                     setSelectedVariantName(''); // Resetear selección de variante
+                    setCurrentImageIndex(0);
+                    setThumbnailStartIndex(0);
                   }}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     !useOriginalProduct
