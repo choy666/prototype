@@ -108,10 +108,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         variantId: item.variantId,
         productName: item.productName || 'Producto desconocido',
         productImage: item.productImage,
-        productAttributes: item.productAttributes,
-        variantName: item.variantName,
-        variantImage: item.variantImage,
-        variantAttributes: item.variantAttributes,
+        productAttributes: typeof item.productAttributes === 'object' && item.productAttributes !== null ? item.productAttributes : {},
+        variantName: item.variantName || '',
+        variantImage: Array.isArray(item.variantImage) ? item.variantImage : [],
+        variantAttributes: typeof item.variantAttributes === 'object' && item.variantAttributes !== null ? item.variantAttributes : {},
       })),
     };
 
