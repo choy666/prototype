@@ -277,26 +277,37 @@ export default function OrderDetailPage() {
                         />
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900 dark:text-white">
-                            {item.variantId ? `${item.variantName || 'Variante'}` : item.productName}
+                            {item.productName}{item.variantName ? ` - ${item.variantName}` : ''}
                           </h4>
-                          {typeof item.productAttributes === 'object' && item.productAttributes !== null && Object.keys(item.productAttributes).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                              {Object.entries(item.productAttributes).map(([key, value]) => (
-                                <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                                  {key}: {String(value)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {typeof item.variantAttributes === 'object' && item.variantAttributes !== null && Object.keys(item.variantAttributes).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                              {Object.entries(item.variantAttributes).map(([key, value]) => (
-                                <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                                  {key}: {String(value)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            // Convertir productAttributes de array a objeto plano si es necesario
+                            let productAttrs: Record<string, string> = {};
+                            if (Array.isArray(item.productAttributes)) {
+                              item.productAttributes.forEach((attr: { name?: string; values?: string[] }) => {
+                                if (attr.name && Array.isArray(attr.values) && attr.values.length > 0) {
+                                  productAttrs[attr.name] = attr.values[0];
+                                }
+                              });
+                            } else if (typeof item.productAttributes === 'object' && item.productAttributes !== null) {
+                              productAttrs = item.productAttributes as Record<string, string>;
+                            }
+
+                            // variantAttributes ya es objeto plano
+                            const variantAttrs = typeof item.variantAttributes === 'object' && item.variantAttributes !== null ? item.variantAttributes : {};
+
+                            // Combinar atributos para mostrar
+                            const allAttrs = { ...productAttrs, ...variantAttrs };
+
+                            return Object.keys(allAttrs).length > 0 ? (
+                              <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                                {Object.entries(allAttrs).map(([key, value]) => (
+                                  <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                    {key}: {String(value)}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null;
+                          })()}
                           <p className="text-sm text-gray-600 dark:text-gray-300">
                             Cantidad: {item.quantity} × ${item.price.toFixed(2)}
                           </p>
