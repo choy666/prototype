@@ -217,7 +217,7 @@ export default function OrdersPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">
-                        {item.variantId ? `${item.productName} - ${item.variantName || 'Variante'}` : item.productName}
+                        {item.variantId ? `${item.variantName || 'Variante'}` : item.productName}
                       </p>
                       {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
