@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { loginSchema, type LoginFormValues } from '@/lib/validations/auth';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
@@ -70,7 +72,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-[calc(100vh-200px)] w-full items-center justify-center bg-black">
       <div className="grid w-full max-w-md gap-8">
-        <section className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-500">
+        <section className="rounded-3xl bg-gradient-to-r from-[#ff7b00] to-orange-600">
           <div className="m-2 rounded-xl border-8 border-transparent bg-white p-8 shadow-xl dark:bg-gray-900">
             <h1 className="mb-8 cursor-default text-center text-4xl font-bold text-gray-900 dark:text-gray-300">
               Iniciar sesión
@@ -90,12 +92,12 @@ export default function LoginPage() {
                 >
                   Correo electrónico
                 </label>
-                <input
+                <Input
                   id="email"
                   type="email"
                   placeholder="tu@email.com"
                   disabled={isLoading}
-                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
                     errors.email ? 'border-red-500' : ''
                   }`}
                   {...register('email')}
@@ -114,12 +116,12 @@ export default function LoginPage() {
                 >
                   Contraseña
                 </label>
-                <input
+                <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   disabled={isLoading}
-                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
                     errors.password ? 'border-red-500' : ''
                   }`}
                   {...register('password')}
@@ -150,7 +152,7 @@ export default function LoginPage() {
                 <div className="text-sm">
                   <Link
                     href="/forgot-password"
-                    className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="font-medium text-[#ff7b00] hover:text-orange-600 dark:text-[#ff7b00] dark:hover:text-orange-400"
                   >
                     ¿Olvidaste tu contraseña?
                   </Link>
@@ -158,10 +160,10 @@ export default function LoginPage() {
               </div>
 
               <div className="pt-2">
-                <button
+                <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-3 text-lg font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                  className="w-full bg-[#ff7b00] hover:bg-orange-600 text-white text-lg py-3 h-auto focus:ring-[#ff7b00]"
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center">
@@ -171,7 +173,7 @@ export default function LoginPage() {
                   ) : (
                     'Iniciar sesión'
                   )}
-                </button>
+                </Button>
               </div>
             </form>
 
@@ -188,10 +190,11 @@ export default function LoginPage() {
               </div>
 
               <div className="mt-6 grid grid-cols-1 gap-3">
-                <button
+                <Button
                   type="button"
                   onClick={() => signIn('google', { callbackUrl })}
-                  className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                  variant="outline"
+                  className="w-full justify-start border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 focus:ring-[#ff7b00]"
                 >
                   <svg
                     className="h-5 w-5"
@@ -202,12 +205,12 @@ export default function LoginPage() {
                     <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
                   </svg>
                   <span className="ml-2">Google</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
                   onClick={() => signIn('mercadolibre', { callbackUrl })}
-                  className="inline-flex w-full items-center justify-center rounded-lg border border-transparent bg-[#FFE600] px-4 py-3 text-sm font-medium text-[#2D3277] shadow-sm transition hover:bg-[#f0d900] focus:outline-none focus:ring-2 focus:ring-[#2D3277] focus:ring-offset-2"
+                  className="w-full justify-start bg-[#FFE600] hover:bg-[#f0d900] text-[#2D3277] border-transparent focus:ring-[#2D3277]"
                 >
                   <svg
                     className="h-5 w-5"
@@ -219,7 +222,7 @@ export default function LoginPage() {
                     <path d="M17.4545 12.7273H15.7273V11H17.4545V12.7273ZM13.4545 12.7273H11.7273V11H13.4545V12.7273ZM9.45455 12.7273H7.72727V11H9.45455V12.7273Z" />
                   </svg>
                   <span className="ml-2">MercadoLibre</span>
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -227,7 +230,7 @@ export default function LoginPage() {
               ¿No tienes una cuenta?{' '}
               <Link
                 href="/register"
-                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                className="font-medium text-[#ff7b00] hover:text-orange-600 dark:text-[#ff7b00] dark:hover:text-orange-400"
               >
                 Regístrate
               </Link>

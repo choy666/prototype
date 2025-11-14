@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import Link from 'next/link';
 import { generateCSRFToken } from '@/lib/utils/csrf';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,7 +101,7 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-[calc(100vh-200px)] w-full items-center justify-center bg-black">
       <div className="grid w-full max-w-md gap-8">
-        <section className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-500">
+        <section className="rounded-3xl bg-gradient-to-r from-[#ff7b00] to-orange-600">
           <div className="m-2 rounded-xl border-8 border-transparent bg-white p-8 shadow-xl dark:bg-gray-900">
             <h1 className="mb-8 cursor-default text-center text-4xl font-bold text-gray-900 dark:text-gray-300">
               Crear cuenta
@@ -119,12 +121,12 @@ export default function RegisterPage() {
                 >
                   Nombre completo
                 </label>
-                <input
+                <Input
                   id="name"
                   type="text"
                   placeholder="Tu nombre"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
                     errors.name ? 'border-red-500' : ''
                   }`}
                   {...register('name')}
@@ -143,12 +145,12 @@ export default function RegisterPage() {
                 >
                   Correo electrónico
                 </label>
-                <input
+                <Input
                   id="email"
                   type="email"
                   placeholder="tu@email.com"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
                     errors.email ? 'border-red-500' : ''
                   }`}
                   {...register('email')}
@@ -167,12 +169,12 @@ export default function RegisterPage() {
                 >
                   Contraseña
                 </label>
-                <input
+                <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
                     errors.password ? 'border-red-500' : ''
                   }`}
                   {...register('password')}
@@ -194,12 +196,12 @@ export default function RegisterPage() {
                 >
                   Confirmar contraseña
                 </label>
-                <input
+                <Input
                   id="confirmPassword"
                   type="password"
                   placeholder="••••••••"
                   disabled={isSubmitting}
-                  className={`w-full rounded-lg border border-gray-300 bg-white p-3 shadow-md transition duration-300 hover:scale-105 focus:ring-2 focus:ring-blue-500 dark:border-gray-300 dark:bg-white dark:text-gray-900 ${
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
                     errors.confirmPassword ? 'border-red-500' : ''
                   }`}
                   {...register('confirmPassword')}
@@ -212,13 +214,13 @@ export default function RegisterPage() {
               </div>
 
               <div className="pt-2">
-                <button
+                <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-3 text-lg font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                  className="w-full bg-[#ff7b00] hover:bg-orange-600 text-white text-lg py-3 h-auto focus:ring-[#ff7b00]"
                 >
                   {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
-                </button>
+                </Button>
               </div>
             </form>
 
@@ -226,7 +228,7 @@ export default function RegisterPage() {
               ¿Ya tienes una cuenta?{' '}
               <Link
                 href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                className="font-medium text-[#ff7b00] hover:text-orange-600 dark:text-[#ff7b00] dark:hover:text-orange-400"
               >
                 Inicia sesión
               </Link>
