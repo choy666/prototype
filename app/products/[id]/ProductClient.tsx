@@ -148,6 +148,15 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
   // Imagen actual basada en el índice actual de allImages
   const currentImageSrc = allImages[currentImageIndex % allImages.length]?.src || '/placeholder-product.jpg';
 
+  // Primera imagen del producto o variante para el carrito
+  const firstImageSrc = useMemo(() => {
+    if (!useOriginalProduct && selectedVariant && selectedVariant.images && Array.isArray(selectedVariant.images) && selectedVariant.images.length > 0) {
+      return selectedVariant.images[0];
+    } else {
+      return product?.image && typeof product.image === 'string' ? product.image : '/placeholder-product.jpg';
+    }
+  }, [product?.image, useOriginalProduct, selectedVariant]);
+
   // Efecto para actualizar currentImageIndex cuando se selecciona una variante con imagen
   useEffect(() => {
     if (selectedVariant?.images && selectedVariant.images.length > 0) {
@@ -547,16 +556,17 @@ const [selectedVariantName, setSelectedVariantName] = useState<string>(''); // E
             </div>
 
             <AddToCartButton
-              product={{
+            product={{
                 id: product.id,
                 name: selectedVariant?.name || product.name,
                 price: currentPrice, // precio de variante o producto
                 discount: product.discount, // pasamos descuento al carrito
-                image: currentImageSrc, // imagen de variante o producto
+                image: firstImageSrc, // primera imagen del producto o variante para el carrito
                 stock: currentStock, // stock de variante o producto
                 variantId: selectedVariant?.id, // ID de la variante seleccionada
                 variantAttributes: selectedVariant?.additionalAttributes, // atributos de la variante
                 variantName: selectedVariant?.name,
+                productAttributes: product.attributes, // atributos del producto base
               }}
               quantity={quantity}
               className='flex-1'

@@ -13,6 +13,7 @@ export interface CartItem {
   variantId?: number       // ID de la variante seleccionada
   variantAttributes?: Record<string, string> // atributos de la variante (e.g., {color: 'Rojo', talla: 'M'})
   variantName?: string     // nombre de la variante si existe
+  productAttributes?: Record<string, string> // atributos del producto base
 }
 
 interface CartState {

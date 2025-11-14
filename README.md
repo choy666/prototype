@@ -209,10 +209,6 @@ Desarrollado con ❤️ usando Next.js y TypeScript
 
 ---
 
-## 📊 Estado Actual del Proyecto
-
-El proyecto se encuentra en fase de mejoras críticas post-auditoría. Para más detalles sobre el progreso y tareas pendientes, consulta [TODO_AUDITORIA.md](TODO_AUDITORIA.md).
-
 ### Progreso Actual
 - **Semana Actual**: 0/8 completada
 - **Funcionalidades Críticas**: 0/3 completadas

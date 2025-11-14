@@ -33,6 +33,7 @@ export async function getUserCart(userId: number) {
         image: products.image,
         stock: products.stock,
         weight: products.weight,
+        attributes: products.attributes,
       },
       variant: {
         id: productVariants.id,

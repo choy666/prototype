@@ -20,6 +20,7 @@ type AddToCartButtonProps = {
     variantAttributes?: Record<string, string> // atributos de la variante
     variantStock?: number // stock de la variante si aplica
     variantName?: string
+    productAttributes?: Record<string, string> // atributos del producto base
   }
   quantity?: number
   className?: string
@@ -73,6 +74,7 @@ export function AddToCartButton({
         variantId: product.variantId,       // 👈 guardamos variante
         variantAttributes: product.variantAttributes, // 👈 guardamos atributos de variante
         variantName: product.variantName,
+        productAttributes: product.productAttributes, // 👈 guardamos atributos del producto
       })
 
       // Si el usuario está logueado, sincronizar con el servidor

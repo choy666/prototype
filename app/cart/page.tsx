@@ -40,6 +40,7 @@ export default function CartPage() {
               weight: item.product?.weight ? Number(item.product.weight) : undefined,
               variantId: item.variantId || undefined,
               variantAttributes: item.variant?.additionalAttributes ? (item.variant.additionalAttributes as Record<string, string>) : undefined,
+              productAttributes: item.product?.attributes ? (item.product.attributes as Record<string, string>) : undefined,
             }));
 
             // Fusionar con items locales existentes (priorizando servidor)
@@ -121,6 +122,13 @@ export default function CartPage() {
                 />
                 <div className='flex-1 min-w-0'>
                   <h3 className='font-medium text-sm sm:text-base'>{item.variantName || item.name}</h3>
+                  {/* Mostrar atributos del producto si existen */}
+                  {item.productAttributes && Object.keys(item.productAttributes).length > 0 && (
+                    <p className='text-xs text-gray-500'>
+                      {Object.entries(item.productAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                    </p>
+                  )}
+                  {/* Mostrar atributos de la variante si existen */}
                   {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
                     <p className='text-xs text-gray-500'>
                       {Object.entries(item.variantAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
