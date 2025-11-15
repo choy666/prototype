@@ -57,7 +57,7 @@ async function getStats() {
 
   const lastMonthUserCount = lastMonthUsers.count
   const currentMonthUserCount = currentMonthUsers.count
-  const userTrend = lastMonthUserCount > 0 ? ((currentMonthUserCount - lastMonthUserCount) / lastMonthUserCount) * 100 : 0
+  const userTrend = lastMonthUserCount > 0 ? ((currentMonthUserCount - lastMonthUserCount) / lastMonthUserCount) * 100 : (currentMonthUserCount > 0 ? 100 : 0)
 
   // Tendencias para productos (último mes vs mes anterior)
   const [lastMonthProducts] = await db
@@ -83,7 +83,7 @@ async function getStats() {
 
   const lastMonthProductCount = lastMonthProducts.count
   const currentMonthProductCount = currentMonthProducts.count
-  const productTrend = lastMonthProductCount > 0 ? ((currentMonthProductCount - lastMonthProductCount) / lastMonthProductCount) * 100 : 0
+  const productTrend = lastMonthProductCount > 0 ? ((currentMonthProductCount - lastMonthProductCount) / lastMonthProductCount) * 100 : (currentMonthProductCount > 0 ? 100 : 0)
 
   // Tendencias para pedidos (último mes vs mes anterior)
   const [lastMonthOrders] = await db
@@ -103,7 +103,7 @@ async function getStats() {
 
   const lastMonthOrderCount = lastMonthOrders.count
   const currentMonthOrderCount = currentMonthOrders.count
-  const orderTrend = lastMonthOrderCount > 0 ? ((currentMonthOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100 : 0
+  const orderTrend = lastMonthOrderCount > 0 ? ((currentMonthOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100 : (currentMonthOrderCount > 0 ? 100 : 0)
 
   // Tendencias para ingresos (último mes vs mes anterior)
   const [lastMonthRevenue] = await db
@@ -129,7 +129,7 @@ async function getStats() {
 
   const lastMonthRevenueTotal = Number(lastMonthRevenue?.total ?? 0)
   const currentMonthRevenueTotal = Number(currentMonthRevenue?.total ?? 0)
-  const revenueTrend = lastMonthRevenueTotal > 0 ? ((currentMonthRevenueTotal - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : 0
+  const revenueTrend = lastMonthRevenueTotal > 0 ? ((currentMonthRevenueTotal - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : (currentMonthRevenueTotal > 0 ? 100 : 0)
 
   return {
     users: userCount.count,

@@ -54,10 +54,20 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
   }
 
   // Verificar estado de pagos (podríamos verificar configuración de MercadoPago)
-  // Por ahora asumimos que está activo
-  status.payments = {
-    status: 'active',
-    message: 'Activo'
+  // Por ahora asumimos que está activo, pero podríamos agregar verificación real
+  try {
+    // Aquí podríamos verificar si las credenciales de MercadoPago están configuradas
+    // o hacer una llamada de prueba a la API de MercadoPago
+    status.payments = {
+      status: 'active',
+      message: 'Activo'
+    }
+  } catch (error) {
+    console.error('Payments check error:', error)
+    status.payments = {
+      status: 'inactive',
+      message: 'Error de configuración'
+    }
   }
 
   return status
