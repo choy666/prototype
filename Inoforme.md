@@ -1,7 +1,8 @@
 # TODO - Marketplace Neon
 
 ## ✅ Completado - Implementación de imágenes de variantes en página de producto
-
+Quiero revertir los cambios tanto en local como en el servidor.
+Quiero que se actualice al sigueinte commit "nro de comit"
 ### Fecha: 2024-01-XX
 ### Descripción:
 Se implementó la funcionalidad para mostrar las imágenes correspondientes de las variantes seleccionadas en la página de detalle del producto (`app/products/[id]`).

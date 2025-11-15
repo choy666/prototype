@@ -14,10 +14,16 @@ import {
   TrendingUp,
   TrendingDown
 } from 'lucide-react'
+import { checkSystemStatus, getStatusColor } from '@/lib/actions/system-status'
 
 async function getStats() {
+  // Total usuarios
   const [userCount] = await db.select({ count: count() }).from(users)
-  const [productCount] = await db.select({ count: count() }).from(products)
+
+  // Total productos activos (stock > 0)
+  const [productCount] = await db.select({ count: count() }).from(products).where(gte(products.stock, 1))
+
+  // Total pedidos
   const [orderCount] = await db.select({ count: count() }).from(orders)
 
   // Calcular ingresos totales de pedidos pagados
@@ -28,30 +34,120 @@ async function getStats() {
 
   const revenue = Number(revenueResult?.total ?? 0)
 
-  // Calcular ingresos del último mes para tendencias
-  const lastMonth = new Date()
-  lastMonth.setMonth(lastMonth.getMonth() - 1)
-  const currentMonth = new Date()
+  // Calcular tendencias para usuarios (último mes vs mes anterior)
+  const now = new Date()
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
+  const [lastMonthUsers] = await db
+    .select({ count: count() })
+    .from(users)
+    .where(
+      and(
+        gte(users.createdAt, lastMonthStart),
+        lte(users.createdAt, lastMonthEnd)
+      )
+    )
+
+  const [currentMonthUsers] = await db
+    .select({ count: count() })
+    .from(users)
+    .where(gte(users.createdAt, currentMonthStart))
+
+  const lastMonthUserCount = lastMonthUsers.count
+  const currentMonthUserCount = currentMonthUsers.count
+  const userTrend = lastMonthUserCount > 0 ? ((currentMonthUserCount - lastMonthUserCount) / lastMonthUserCount) * 100 : 0
+
+  // Tendencias para productos (último mes vs mes anterior)
+  const [lastMonthProducts] = await db
+    .select({ count: count() })
+    .from(products)
+    .where(
+      and(
+        gte(products.created_at, lastMonthStart),
+        lte(products.created_at, lastMonthEnd),
+        gte(products.stock, 1)
+      )
+    )
+
+  const [currentMonthProducts] = await db
+    .select({ count: count() })
+    .from(products)
+    .where(
+      and(
+        gte(products.created_at, currentMonthStart),
+        gte(products.stock, 1)
+      )
+    )
+
+  const lastMonthProductCount = lastMonthProducts.count
+  const currentMonthProductCount = currentMonthProducts.count
+  const productTrend = lastMonthProductCount > 0 ? ((currentMonthProductCount - lastMonthProductCount) / lastMonthProductCount) * 100 : 0
+
+  // Tendencias para pedidos (último mes vs mes anterior)
+  const [lastMonthOrders] = await db
+    .select({ count: count() })
+    .from(orders)
+    .where(
+      and(
+        gte(orders.createdAt, lastMonthStart),
+        lte(orders.createdAt, lastMonthEnd)
+      )
+    )
+
+  const [currentMonthOrders] = await db
+    .select({ count: count() })
+    .from(orders)
+    .where(gte(orders.createdAt, currentMonthStart))
+
+  const lastMonthOrderCount = lastMonthOrders.count
+  const currentMonthOrderCount = currentMonthOrders.count
+  const orderTrend = lastMonthOrderCount > 0 ? ((currentMonthOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100 : 0
+
+  // Tendencias para ingresos (último mes vs mes anterior)
   const [lastMonthRevenue] = await db
     .select({ total: sum(orders.total) })
     .from(orders)
     .where(
       and(
         eq(orders.status, 'paid'),
-        gte(orders.createdAt, lastMonth),
-        lte(orders.createdAt, currentMonth)
+        gte(orders.createdAt, lastMonthStart),
+        lte(orders.createdAt, lastMonthEnd)
       )
     )
 
-  const lastMonthTotal = Number(lastMonthRevenue?.total ?? 0)
-  const revenueTrend = lastMonthTotal > 0 ? ((revenue - lastMonthTotal) / lastMonthTotal) * 100 : 0
+  const [currentMonthRevenue] = await db
+    .select({ total: sum(orders.total) })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, 'paid'),
+        gte(orders.createdAt, currentMonthStart)
+      )
+    )
+
+  const lastMonthRevenueTotal = Number(lastMonthRevenue?.total ?? 0)
+  const currentMonthRevenueTotal = Number(currentMonthRevenue?.total ?? 0)
+  const revenueTrend = lastMonthRevenueTotal > 0 ? ((currentMonthRevenueTotal - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : 0
 
   return {
     users: userCount.count,
     products: productCount.count,
     orders: orderCount.count,
     revenue,
+    userTrend: {
+      value: Math.abs(userTrend),
+      isPositive: userTrend >= 0
+    },
+    productTrend: {
+      value: Math.abs(productTrend),
+      isPositive: productTrend >= 0
+    },
+    orderTrend: {
+      value: Math.abs(orderTrend),
+      isPositive: orderTrend >= 0
+    },
     revenueTrend: {
       value: Math.abs(revenueTrend),
       isPositive: revenueTrend >= 0
@@ -109,6 +205,7 @@ function StatsSkeleton() {
 
 async function DashboardContent() {
   const stats = await getStats()
+  const systemStatus = await checkSystemStatus()
 
   return (
     <div className="space-y-8">
@@ -124,19 +221,19 @@ async function DashboardContent() {
           title="Total Usuarios"
           value={stats.users}
           icon={UsersIcon}
-          trend={{ value: 12, isPositive: true }}
+          trend={stats.userTrend}
         />
         <StatCard
           title="Total Productos"
           value={stats.products}
           icon={Package}
-          trend={{ value: 8, isPositive: true }}
+          trend={stats.productTrend}
         />
         <StatCard
           title="Total Pedidos"
           value={stats.orders}
           icon={ShoppingCart}
-          trend={{ value: 15, isPositive: true }}
+          trend={stats.orderTrend}
         />
         <StatCard
           title="Ingresos Totales"
@@ -146,40 +243,33 @@ async function DashboardContent() {
         />
       </div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Aquí se mostrarán las actividades recientes del sistema.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Estado del Sistema</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm">Base de Datos</span>
-                <span className="text-sm text-green-600">Conectada</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Servidor</span>
-                <span className="text-sm text-green-600">Operativo</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Pagos</span>
-                <span className="text-sm text-green-600">Activo</span>
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Estado del Sistema</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm">Base de Datos</span>
+              <span className={`text-sm ${getStatusColor(systemStatus.database.status)}`}>
+                {systemStatus.database.message}
+              </span>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex justify-between">
+              <span className="text-sm">Servidor</span>
+              <span className={`text-sm ${getStatusColor(systemStatus.server.status)}`}>
+                {systemStatus.server.message}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm">Pagos</span>
+              <span className={`text-sm ${getStatusColor(systemStatus.payments.status)}`}>
+                {systemStatus.payments.message}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
