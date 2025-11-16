@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { debounce } from '@/lib/utils'
 import {
@@ -18,7 +19,10 @@ import {
   Search,
   Package,
   Settings,
-  X
+  X,
+  Trash2,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 
 interface Product {
@@ -63,6 +67,11 @@ export default function AdminProductsPage() {
   })
   const [showFilters] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; productId: number | null; productName: string }>({
+    isOpen: false,
+    productId: null,
+    productName: ''
+  })
   const { toast } = useToast()
   const observerRef = useRef<HTMLDivElement>(null)
 
@@ -207,6 +216,50 @@ export default function AdminProductsPage() {
         variant: 'destructive'
       })
     }
+  }
+
+  const handleDeleteClick = (productId: number) => {
+    const product = products.find(p => p.id === productId)
+    if (product) {
+      setDeleteDialog({ isOpen: true, productId, productName: product.name })
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.productId) return
+
+    try {
+      const response = await fetch(`/api/admin/products/${deleteDialog.productId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete product')
+      }
+
+      toast({
+        title: 'Éxito',
+        description: 'Producto eliminado correctamente'
+      })
+
+      // Remove the product from the local state
+      setProducts(prev => prev.filter(product => product.id !== deleteDialog.productId))
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el producto',
+        variant: 'destructive'
+      })
+    } finally {
+      setDeleteDialog({ isOpen: false, productId: null, productName: '' })
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleDeleteCancel = () => {
+    setDeleteDialog({ isOpen: false, productId: null, productName: '' })
   }
 
   return (
@@ -452,7 +505,16 @@ export default function AdminProductsPage() {
                         className="h-9 w-9"
                         aria-label={product.isActive ? `Desactivar ${product.name}` : `Reactivar ${product.name}`}
                       >
-                        {product.isActive ? 'Desactivar' : 'Reactivar'}
+                        {product.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => handleDeleteClick(product.id)}
+                        className="h-9 w-9"
+                        aria-label={`Eliminar ${product.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -493,7 +555,15 @@ export default function AdminProductsPage() {
         </CardContent>
       </Card>
 
-
+      <ConfirmationDialog
+        isOpen={deleteDialog.isOpen}
+        title="Eliminar Producto"
+        description={`¿Estás seguro de que quieres eliminar "${deleteDialog.productName}"? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   )
 }
