@@ -45,7 +45,8 @@ const productFiltersSchema = z.object({
 export async function getProducts(
   page = 1,
   limit = 10,
-  filters: Partial<ProductFilters> = {}
+  filters: Partial<ProductFilters> = {},
+  includeInactive = false
 ) {
   try {
     const validatedPage = z.coerce.number().int().min(1).default(1).parse(page);
@@ -68,6 +69,9 @@ export async function getProducts(
 
     // Construir condiciones de filtro
     const conditions = [];
+    if (!includeInactive) {
+      conditions.push(eq(products.isActive, true)); // Para tienda, solo productos activos
+    }
     if (category) {
       conditions.push(eq(products.category, category));
     }
@@ -326,7 +330,7 @@ export async function getFeaturedProducts(limit: number = 5): Promise<Product[]>
     const productsData = await db
       .select()
       .from(products)
-      .where(eq(products.destacado, true))
+      .where(and(eq(products.destacado, true), eq(products.isActive, true)))
       .limit(limit)
       .orderBy(desc(products.created_at));
 
@@ -347,6 +351,7 @@ export async function getAllProducts(): Promise<Product[]> {
     const productsData = await db
       .select()
       .from(products)
+      .where(eq(products.isActive, true))
       .orderBy(desc(products.created_at));
 
     // Normalizar imágenes para cada producto

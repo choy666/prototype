@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     const minDiscount = searchParams.get('minDiscount') ? parseInt(searchParams.get('minDiscount')!) : undefined
     const featured = searchParams.get('featured') === 'true' ? true : searchParams.get('featured') === 'false' ? false : undefined
 
+    // Para admin, mostrar todos los productos (activos e inactivos)
     const result = await getProducts(page, limit, {
       category,
       search,
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       maxStock,
       minDiscount,
       featured,
-    })
+    }, true) // includeInactive = true para admin
 
     return NextResponse.json(result)
   } catch (error) {

@@ -1,5 +1,5 @@
-import { db } from './lib/db';
-import { users, products, orders } from './lib/schema';
+import { db } from '../lib/db';
+import { users, products, orders } from '../lib/schema';
 import { count, sum, eq, gte, lte, and } from 'drizzle-orm';
 
 async function verifyStats() {

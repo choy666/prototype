@@ -8,14 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
-import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { debounce } from '@/lib/utils'
 import {
   Plus,
   Edit,
-  Trash2,
   Search,
   Package,
   Settings,
@@ -31,6 +30,7 @@ interface Product {
   stock: number
   discount: number
   destacado: boolean
+  isActive: boolean
   created_at: string
 }
 
@@ -51,10 +51,7 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null)
-  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; productId: number | null }>({
-    isOpen: false,
-    productId: null
-  })
+
   const [filters, setFilters] = useState({
     category: '',
     minPrice: '',
@@ -176,42 +173,40 @@ export default function AdminProductsPage() {
     setPage(1)
   }
 
-  const handleDeleteClick = (id: number) => {
-    setDeleteDialog({ isOpen: true, productId: id })
-  }
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteDialog.productId) return
 
+  const handleToggleActive = async (productId: number, newStatus: boolean) => {
     try {
-      const response = await fetch(`/api/admin/products/${deleteDialog.productId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/admin/products/${productId}/toggle-active`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive: newStatus }),
       })
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete product')
+        throw new Error('Failed to toggle product status')
       }
 
       toast({
         title: 'Éxito',
-        description: 'Producto eliminado correctamente'
+        description: `Producto ${newStatus ? 'activado' : 'desactivado'} correctamente`
       })
-      fetchProducts(search, page)
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'No se pudo eliminar el producto'
-      const description = errorMessage.includes('órdenes') ? 'El producto tiene órdenes activas' : 'No se pudo eliminar el producto'
+
+      // Update the product in the local state
+      setProducts(prev => prev.map(product =>
+        product.id === productId
+          ? { ...product, isActive: newStatus }
+          : product
+      ))
+    } catch {
       toast({
         title: 'Error',
-        description,
+        description: 'No se pudo cambiar el estado del producto',
         variant: 'destructive'
       })
-    } finally {
-      setDeleteDialog({ isOpen: false, productId: null })
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeleteDialog({ isOpen: false, productId: null })
   }
 
   return (
@@ -415,6 +410,15 @@ export default function AdminProductsPage() {
                             Stock bajo
                           </span>
                         )}
+                        {product.isActive ? (
+                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                            Activo
+                          </span>
+                        ) : (
+                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                            Inactivo
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -442,13 +446,13 @@ export default function AdminProductsPage() {
                         </Button>
                       </Link>
                       <Button
-                        variant="destructive"
+                        variant={product.isActive ? "outline" : "secondary"}
                         size="icon"
-                        onClick={() => handleDeleteClick(product.id)}
+                        onClick={() => handleToggleActive(product.id, !product.isActive)}
                         className="h-9 w-9"
-                        aria-label={`Eliminar ${product.name}`}
+                        aria-label={product.isActive ? `Desactivar ${product.name}` : `Reactivar ${product.name}`}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {product.isActive ? 'Desactivar' : 'Reactivar'}
                       </Button>
                     </div>
                   </div>
@@ -489,15 +493,7 @@ export default function AdminProductsPage() {
         </CardContent>
       </Card>
 
-      <ConfirmationDialog
-        isOpen={deleteDialog.isOpen}
-        title="Eliminar Producto"
-        description="¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer."
-        confirmText="Eliminar"
-        cancelText="Cancelar"
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-      />
+
     </div>
   )
 }
