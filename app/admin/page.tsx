@@ -137,19 +137,19 @@ async function getStats() {
     orders: orderCount.count,
     revenue,
     userTrend: {
-      value: Math.abs(userTrend),
+      value: parseFloat(Math.abs(userTrend).toFixed(2)),
       isPositive: userTrend >= 0
     },
     productTrend: {
-      value: Math.abs(productTrend),
+      value: parseFloat(Math.abs(productTrend).toFixed(2)),
       isPositive: productTrend >= 0
     },
     orderTrend: {
-      value: Math.abs(orderTrend),
+      value: parseFloat(Math.abs(orderTrend).toFixed(2)),
       isPositive: orderTrend >= 0
     },
     revenueTrend: {
-      value: Math.abs(revenueTrend),
+      value: parseFloat(Math.abs(revenueTrend).toFixed(2)),
       isPositive: revenueTrend >= 0
     }
   }
