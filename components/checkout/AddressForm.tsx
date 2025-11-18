@@ -73,7 +73,7 @@ export function AddressForm({
           placeholder="Juan Pérez"
           disabled={isFormLoading}
           {...register('nombre')}
-          aria-invalid={errors.nombre ? 'true' : 'false'}
+          aria-invalid={!!errors.nombre}
           aria-describedby={errors.nombre ? 'nombre-error' : undefined}
         />
         {errors.nombre && (
@@ -94,7 +94,7 @@ export function AddressForm({
           placeholder="Av. Corrientes 1234, Piso 5, Depto B"
           disabled={isFormLoading}
           {...register('direccion')}
-          aria-invalid={errors.direccion ? 'true' : 'false'}
+          aria-invalid={!!errors.direccion}
           aria-describedby={errors.direccion ? 'direccion-error' : undefined}
         />
         {errors.direccion && (
@@ -116,7 +116,7 @@ export function AddressForm({
             placeholder="Buenos Aires"
             disabled={isFormLoading}
             {...register('ciudad')}
-            aria-invalid={errors.ciudad ? 'true' : 'false'}
+            aria-invalid={!!errors.ciudad}
             aria-describedby={errors.ciudad ? 'ciudad-error' : undefined}
           />
           {errors.ciudad && (
@@ -136,7 +136,7 @@ export function AddressForm({
             placeholder="Buenos Aires"
             disabled={isFormLoading}
             {...register('provincia')}
-            aria-invalid={errors.provincia ? 'true' : 'false'}
+            aria-invalid={!!errors.provincia}
             aria-describedby={errors.provincia ? 'provincia-error' : undefined}
           />
           {errors.provincia && (
@@ -159,7 +159,7 @@ export function AddressForm({
             placeholder="1234 o C1234ABC"
             disabled={isFormLoading}
             {...register('codigoPostal')}
-            aria-invalid={errors.codigoPostal ? 'true' : 'false'}
+            aria-invalid={!!errors.codigoPostal}
             aria-describedby={errors.codigoPostal ? 'codigoPostal-error' : undefined}
           />
           {errors.codigoPostal && (
@@ -179,7 +179,7 @@ export function AddressForm({
             placeholder="1123456789"
             disabled={isFormLoading}
             {...register('telefono')}
-            aria-invalid={errors.telefono ? 'true' : 'false'}
+            aria-invalid={!!errors.telefono}
             aria-describedby={errors.telefono ? 'telefono-error' : undefined}
           />
           {errors.telefono && (

@@ -49,7 +49,7 @@ export default function ProductsPage() {
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Filtros */}
-        <aside className="w-full md:w-64 lg:w-80">
+        <aside className="w-full md:w-64 lg:w-80 md:block">
           <ProductFilters
             filters={filters}
             onFilterChange={updateFilters}

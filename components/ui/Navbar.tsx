@@ -94,7 +94,7 @@ const Navbar = () => {
                 href={item.href}
                 aria-current={pathname === item.href ? 'page' : undefined}
                 className={cn(
-                  'flex items-center text-sm font-medium transition-colors',
+                  'flex items-center text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                   pathname === item.href
                     ? 'text-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground',

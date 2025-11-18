@@ -43,7 +43,7 @@ export default async function Home() {
               priority
             />
           </div>
-          <h1 className='text-3xl font-semibold leading-none tracking-tighter md:text-4xl md:leading-none lg:text-5xl lg:leading-none'>
+          <h1 className='text-2xl font-semibold leading-none tracking-tighter sm:text-3xl md:text-4xl lg:text-5xl lg:leading-none'>
             Vercel with Neon Postgres
           </h1>
           <p className='mt-3.5 max-w-lg text-base leading-snug tracking-tight text-[#61646B] md:text-lg md:leading-snug lg:text-xl lg:leading-snug dark:text-[#94979E]'>
