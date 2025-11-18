@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { convertAttributesToObject } from '@/lib/utils'
 
 interface OrderItem {
   id: string
@@ -270,11 +271,17 @@ export default function AdminOrderDetailPage() {
                     ? item.variantImage[0]
                     : item.productImage;
 
-                  // Combinar atributos para mostrar
-                  const allAttrs = {
-                    ...item.productAttributes,
-                    ...item.variantAttributes
-                  };
+                  // Mostrar atributos relevantes: variante si existe, sino producto
+                  const attrs = item.variantId ? convertAttributesToObject(item.variantAttributes) : convertAttributesToObject(item.productAttributes);
+                  const attrsDisplay = Object.keys(attrs).length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                      {Object.entries(attrs).map(([key, value]) => (
+                        <span key={`attr-${key}`} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                          {key}: {String(value)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null;
 
                   return (
                     <div key={item.id} className="py-4 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
@@ -299,15 +306,7 @@ export default function AdminOrderDetailPage() {
                           <h3 className="font-semibold text-base">
                             {item.productName}{item.variantName ? ` - ${item.variantName}` : ''}
                           </h3>
-                          {Object.keys(allAttrs).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                              {Object.entries(allAttrs).map(([key, value]) => (
-                                <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                                  {key}: {String(value)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {attrsDisplay}
                           <p className="text-sm text-muted-foreground">
                             {item.quantity} x ${item.price.toFixed(2)}
                           </p>

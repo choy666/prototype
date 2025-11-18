@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { getUserCart } from "@/lib/actions/cart";
+import { convertAttributesToObject } from "@/lib/utils";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -122,18 +123,15 @@ export default function CartPage() {
                 />
                 <div className='flex-1 min-w-0'>
                   <h3 className='font-medium text-sm sm:text-base'>{item.variantName || item.name}</h3>
-                  {/* Mostrar atributos del producto si existen */}
-                  {item.productAttributes && Object.keys(item.productAttributes).length > 0 && (
-                    <p className='text-xs text-gray-500'>
-                      {Object.entries(item.productAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
-                    </p>
-                  )}
-                  {/* Mostrar atributos de la variante si existen */}
-                  {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
-                    <p className='text-xs text-gray-500'>
-                      {Object.entries(item.variantAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}
-                    </p>
-                  )}
+                  {/* Mostrar atributos relevantes: variante si existe, sino producto */}
+                  {(() => {
+                    const attrs = item.variantId ? convertAttributesToObject(item.variantAttributes) : convertAttributesToObject(item.productAttributes);
+                    return Object.keys(attrs).length > 0 ? (
+                      <p className='text-xs text-gray-500'>
+                        {Object.entries(attrs).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                      </p>
+                    ) : null;
+                  })()}
                   {hasDiscount ? (
                     <div className='flex flex-col'>
                       <span className='text-xs sm:text-sm text-gray-400 line-through'>

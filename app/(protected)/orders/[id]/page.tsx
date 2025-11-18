@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, CreditCard, Calendar } from 'lucide-react';
 import OrderTimeline from '@/components/orders/OrderTimeline';
+import { convertAttributesToObject } from '@/lib/utils';
 
 type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -280,33 +281,41 @@ export default function OrderDetailPage() {
                             {item.productName}{item.variantName ? ` - ${item.variantName}` : ''}
                           </h4>
                           {(() => {
-                            // Convertir productAttributes de array a objeto plano si es necesario
-                            let productAttrs: Record<string, string> = {};
-                            if (Array.isArray(item.productAttributes)) {
-                              item.productAttributes.forEach((attr: { name?: string; values?: string[] }) => {
-                                if (attr.name && Array.isArray(attr.values) && attr.values.length > 0) {
-                                  productAttrs[attr.name] = attr.values[0];
-                                }
-                              });
-                            } else if (typeof item.productAttributes === 'object' && item.productAttributes !== null) {
-                              productAttrs = item.productAttributes as Record<string, string>;
+                            // Si hay variante, mostrar solo atributos de variante
+                            if (item.variantId) {
+                              const variantAttrs = convertAttributesToObject(item.variantAttributes);
+                              return Object.keys(variantAttrs).length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                                  {Object.entries(variantAttrs).map(([key, value]) => (
+                                    <span key={`variant-${key}`} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                      {key}: {String(value)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null;
+                            } else {
+                              // Si no hay variante, mostrar atributos del producto
+                              let productAttrs: Record<string, string> = {};
+                              if (Array.isArray(item.productAttributes)) {
+                                item.productAttributes.forEach((attr: { name?: string; values?: string[] }) => {
+                                  if (attr.name && Array.isArray(attr.values) && attr.values.length > 0) {
+                                    productAttrs[attr.name] = attr.values[0];
+                                  }
+                                });
+                              } else if (typeof item.productAttributes === 'object' && item.productAttributes !== null) {
+                                productAttrs = item.productAttributes as Record<string, string>;
+                              }
+
+                              return Object.keys(productAttrs).length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                                  {Object.entries(productAttrs).map(([key, value]) => (
+                                    <span key={`product-${key}`} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                      {key}: {String(value)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null;
                             }
-
-                            // variantAttributes ya es objeto plano
-                            const variantAttrs = typeof item.variantAttributes === 'object' && item.variantAttributes !== null ? item.variantAttributes : {};
-
-                            // Combinar atributos para mostrar
-                            const allAttrs = { ...productAttrs, ...variantAttrs };
-
-                            return Object.keys(allAttrs).length > 0 ? (
-                              <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                                {Object.entries(allAttrs).map(([key, value]) => (
-                                  <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                                    {key}: {String(value)}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : null;
                           })()}
                           <p className="text-sm text-gray-600 dark:text-gray-300">
                             Cantidad: {item.quantity} × ${item.price.toFixed(2)}

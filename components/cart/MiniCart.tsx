@@ -8,6 +8,7 @@ import { Button } from '../ui/Button'
 import Link from 'next/link'
 import Image from 'next/image'
 
+
 /**
  * 🛒 MiniCart
  * - Botón de carrito con badge de cantidad
