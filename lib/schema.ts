@@ -125,6 +125,15 @@ export const orderStatusEnum = pgEnum("order_status", [
 ]);
 
 // ======================
+// Enum de estados de pago
+// ======================
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "paid",
+  "failed",
+]);
+
+// ======================
 // Direcciones de envío
 // ======================
 export const addresses = pgTable("addresses", {
@@ -165,7 +174,8 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  status: orderStatusEnum("status").default("pending").notNull(), // 👈 ahora tipado fuerte
+  status: orderStatusEnum("status").default("pending").notNull(), // Estado logístico
+  paymentStatus: paymentStatusEnum("payment_status").default("pending").notNull(), // Estado de pago
   paymentId: text("payment_id"),
   mercadoPagoId: text("mercado_pago_id"),
   shippingAddress: jsonb("shipping_address"),

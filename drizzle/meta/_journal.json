@@ -15,6 +15,13 @@
       "when": 1763309998150,
       "tag": "0001_cold_naoko",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763517258803,
+      "tag": "0002_high_loki",
+      "breakpoints": true
     }
   ]
 }

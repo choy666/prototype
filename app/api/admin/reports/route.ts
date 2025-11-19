@@ -95,7 +95,7 @@ async function getProductsReport() {
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .innerJoin(products, eq(orderItems.productId, products.id))
-    .where(eq(orders.status, 'paid'))
+    .where(eq(orders.paymentStatus, 'paid'))
     .groupBy(products.id, products.name)
     .orderBy(desc(sum(orderItems.quantity)))
     .limit(10)

@@ -24,13 +24,13 @@ async function getStats() {
   const [productCount] = await db.select({ count: count() }).from(products).where(gte(products.stock, 1))
 
   // Total pedidos
-  const [orderCount] = await db.select({ count: count() }).from(orders)
+  const [orderCount] = await db.select({ count: count() }).from(orders).where(eq(orders.paymentStatus, 'paid'))
 
   // Calcular ingresos totales de pedidos pagados
   const [revenueResult] = await db
     .select({ total: sum(orders.total) })
     .from(orders)
-    .where(eq(orders.status, 'paid'))
+    .where(eq(orders.paymentStatus, 'paid'))
 
   const revenue = Number(revenueResult?.total ?? 0)
 
@@ -91,6 +91,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
+        eq(orders.paymentStatus, 'paid'),
         gte(orders.createdAt, lastMonthStart),
         lte(orders.createdAt, lastMonthEnd)
       )
@@ -99,7 +100,12 @@ async function getStats() {
   const [currentMonthOrders] = await db
     .select({ count: count() })
     .from(orders)
-    .where(gte(orders.createdAt, currentMonthStart))
+    .where(
+      and(
+        eq(orders.paymentStatus, 'paid'),
+        gte(orders.createdAt, currentMonthStart)
+      )
+    )
 
   const lastMonthOrderCount = lastMonthOrders.count
   const currentMonthOrderCount = currentMonthOrders.count
@@ -111,7 +117,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
-        eq(orders.status, 'paid'),
+        eq(orders.paymentStatus, 'paid'),
         gte(orders.createdAt, lastMonthStart),
         lte(orders.createdAt, lastMonthEnd)
       )
@@ -122,7 +128,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
-        eq(orders.status, 'paid'),
+        eq(orders.paymentStatus, 'paid'),
         gte(orders.createdAt, currentMonthStart)
       )
     )

@@ -1,5 +1,10 @@
-CREATE TYPE "public"."order_status" AS ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled');--> statement-breakpoint
-CREATE TABLE "addresses" (
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status' AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')) THEN
+        CREATE TYPE "public"."order_status" AS ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled');
+    END IF;
+END $$;--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "addresses" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
 	"nombre" varchar(256) NOT NULL,

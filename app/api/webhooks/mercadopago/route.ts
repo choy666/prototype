@@ -395,6 +395,7 @@ async function createOrderFromPayment(payment: any) {
     const newOrder = await db.insert(orders).values({
       userId,
       total: total.toString(),
+      // Estado financiero confirmado por webhook
       status: 'paid',
       paymentId: payment.id.toString(),
       mercadoPagoId: payment.id.toString(),
@@ -581,6 +582,7 @@ async function createRejectedOrderFromPayment(payment: any) {
       userId,
       total: total.toString(),
       status: 'rejected',
+      paymentStatus: 'failed', // Estado de pago fallido
       paymentId: payment.id.toString(),
       mercadoPagoId: payment.id.toString(),
       shippingAddress: null, // No incluir dirección de envío para rechazos

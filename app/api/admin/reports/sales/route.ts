@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         dateFormat = 'YYYY-MM-DD'
     }
 
+    // Reportes basados en pago, no en logística
     // Subquery con to_char usando literal fijo
     const subquery = db
       .select({
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
       .from(orders)
       .where(
         and(
-          eq(orders.status, 'paid'),
+          eq(orders.paymentStatus, 'paid'),
           gte(orders.createdAt, startDate),
           lte(orders.createdAt, now)
         )

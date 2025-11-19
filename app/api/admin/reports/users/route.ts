@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       .groupBy(sql`period`)
       .orderBy(sql`period`)
 
+    // Reportes basados en pago, no en logística
     // Get new users
     const newUsers = await db
       .select({
