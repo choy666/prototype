@@ -55,6 +55,7 @@ interface Order {
   shippingMethodId?: number
   shippingCost: number
   trackingNumber?: string
+  cancellationReason?: string
   createdAt: string
   updatedAt: string
   userEmail: string
@@ -360,6 +361,18 @@ export default function AdminOrderDetailPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Cancellation Reason */}
+          {order.status === 'cancelled' && order.cancellationReason && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Razón de Cancelación</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{order.cancellationReason}</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Customer and Shipping Info */}

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { ArrowLeft, MapPin, CreditCard, Calendar } from 'lucide-react';
 import OrderTimeline from '@/components/orders/OrderTimeline';
 import { convertAttributesToObject } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
 
 type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -57,6 +58,10 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const { toast } = useToast();
 
   const fetchOrderDetail = useCallback(async () => {
     try {
@@ -88,6 +93,55 @@ export default function OrderDetailPage() {
       setLoading(false);
     }
   }, [orderId]);
+
+  const handleCancelOrder = useCallback(async () => {
+    if (!cancelReason.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Por favor, ingresa una justificación para la cancelación.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: cancelReason.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cancelar la orden');
+      }
+
+      await response.json();
+
+      toast({
+        title: 'Éxito',
+        description: 'La orden ha sido cancelada exitosamente.',
+      });
+
+      // Refresh order data
+      fetchOrderDetail();
+      setShowCancelDialog(false);
+      setCancelReason('');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error al cancelar la orden',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancelling(false);
+    }
+  }, [cancelReason, orderId, toast, fetchOrderDetail]);
+
+  const canCancelOrder = order && order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'shipped';
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -362,6 +416,63 @@ export default function OrderDetailPage() {
             createdAt={order.createdAt}
             trackingNumber={order.trackingNumber}
           />
+
+          {/* Cancel Order Section */}
+          {canCancelOrder && (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Cancelar Orden
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Si necesitas cancelar tu orden, puedes hacerlo aquí. Proporciona una razón para la cancelación.
+              </p>
+
+              <button
+                onClick={() => setShowCancelDialog(true)}
+                className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                disabled={cancelling}
+              >
+                {cancelling ? 'Cancelando...' : 'Cancelar Orden'}
+              </button>
+
+              {showCancelDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Cancelar Orden
+                    </h3>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Razón de cancelación
+                      </label>
+                      <textarea
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Explica por qué deseas cancelar la orden..."
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => setShowCancelDialog(false)}
+                        className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleCancelOrder}
+                        disabled={cancelling || !cancelReason.trim()}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {cancelling ? 'Cancelando...' : 'Confirmar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

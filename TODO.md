@@ -1,36 +1,56 @@
-# TODO: Fix Drizzle Migration Error for Enum Creation
+# TODO: Implementación de Cancelación de Pedidos
 
-## Problem
-Running `npx drizzle-kit migrate` fails with error: type "order_status" already exists. This occurs because the enum is being created in multiple migration files, and the database already has it from a previous run or manual creation.
+## Estado: Pendiente
 
-## Information Gathered
-- The `order_status` enum is defined in `lib/schema.ts` with values: 'pending', 'paid', 'shipped', 'delivered', 'cancelled', 'rejected'.
-- Migration files attempting to create the enum:
-  - `drizzle/0000_violet_stardust.sql`: Creates with full values including 'rejected'.
-  - `drizzle/0004_known_sleeper.sql`: Creates with values missing 'rejected'.
-  - `drizzle/0002_high_loki.sql`: Creates `payment_status` enum.
-- The database already contains the `order_status` enum, causing CREATE TYPE to fail.
+### Descripción
+Agregar funcionalidad completa de cancelación de pedidos con justificación obligatoria, actualización de estado, y notificaciones automáticas al administrador.
 
-## Plan
-- Edit migration files to conditionally create types only if they do not exist, using PostgreSQL DO blocks.
-- Update `drizzle/0000_violet_stardust.sql` to wrap CREATE TYPE for `order_status`.
-- Update `drizzle/0002_high_loki.sql` to wrap CREATE TYPE for `payment_status`.
-- Update `drizzle/0004_known_sleeper.sql` to wrap CREATE TYPE for `order_status`.
+### Requisitos
+- Opción "Cancelar Pedido" en vista app/orders/[id] para usuarios
+- Campo obligatorio de justificación en modal
+- Actualización automática del estado a "Cancelado"
+- Notificación automática al administrador con detalles completos
+- Panel de administrador con eventos destacados y enlace a detalles del pedido
 
-## Dependent Files to Edit
-- `drizzle/0000_violet_stardust.sql`
-- `drizzle/0002_high_loki.sql`
-- `drizzle/0004_known_sleeper.sql`
+### Pasos de Implementación
 
-## Followup Steps
-- Since migrations are failing due to existing database objects, use `npx drizzle-kit push` to sync the schema directly.
-- Run `npx drizzle-kit push` to push the current schema to the database.
-- Verify that the push completes successfully.
-- Test the application to ensure database schema is correct.
+#### 1. Base de Datos y Schema
+- [x] Agregar tabla `notifications` en `lib/schema.ts` para notificaciones de admin
+- [x] Ejecutar migración de base de datos para nueva tabla
 
-## Status
-- [x] Edit `drizzle/0000_violet_stardust.sql`
-- [x] Edit `drizzle/0002_high_loki.sql`
-- [x] Edit `drizzle/0004_known_sleeper.sql`
-- [ ] Run `npx drizzle-kit push`
-- [ ] Verify success
+#### 2. Funcionalidad de Cancelación (Usuario)
+- [x] Agregar botón "Cancelar Pedido" en `app/(protected)/orders/[id]/page.tsx`
+  - Solo mostrar si estado permite cancelación (pending, paid)
+  - Modal con textarea obligatorio para justificación
+- [x] Crear endpoint API `app/api/orders/[id]/cancel/route.ts` (POST)
+  - Validar autenticación y permisos
+  - Actualizar estado a 'cancelled'
+  - Guardar justificación
+  - Crear notificación para admin
+- [x] Agregar función `cancelOrder` en `lib/actions/orders.ts`
+
+#### 3. Notificaciones en Panel Admin
+- [ ] Agregar sección de notificaciones en `app/admin/page.tsx`
+  - Mostrar notificaciones recientes como eventos destacados
+  - Enlace directo a detalles del pedido
+- [x] Crear endpoint API para obtener notificaciones `app/api/admin/notifications/route.ts`
+
+#### 4. Detalles en Vista Admin
+- [ ] Mostrar justificación de cancelación en `app/admin/orders/[id]/page.tsx`
+  - Campo adicional cuando estado es 'cancelled'
+
+
+### Archivos a Modificar
+- `lib/schema.ts` - Nueva tabla notifications
+- `app/(protected)/orders/[id]/page.tsx` - Botón cancelar y modal
+- `app/api/orders/[id]/cancel/route.ts` - Nuevo endpoint
+- `lib/actions/orders.ts` - Función cancelOrder
+- `app/admin/page.tsx` - Sección notificaciones
+- `app/admin/orders/[id]/page.tsx` - Mostrar justificación
+- `app/api/admin/notifications/route.ts` - Nuevo endpoint para notificaciones
+
+### Notas Técnicas
+- Usar transacciones para asegurar atomicidad en cancelación
+- Logging apropiado para auditoría
+- Rate limiting en endpoints sensibles
+- Validación de permisos tanto en cliente como servidor

@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { checkSystemStatus, getStatusColor } from '@/lib/actions/system-status'
 
+
+
 async function getStats() {
   // Total usuarios
   const [userCount] = await db.select({ count: count() }).from(users)
@@ -242,7 +244,7 @@ function NotificationCard({ notification }: {
   }
 
   const getOrderLink = (data: Record<string, unknown>) => {
-    if (data?.orderId) {
+    if (data?.orderId && typeof data.orderId === 'number') {
       return `/admin/orders/${data.orderId}`
     }
     return null

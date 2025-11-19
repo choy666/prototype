@@ -182,6 +182,8 @@ export const orders = pgTable("orders", {
   shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0").notNull(),
   trackingNumber: text("tracking_number"), // Número de seguimiento
+  cancellationReason: text("cancellation_reason"), // Razón de cancelación
+  cancelledAt: timestamp("cancelled_at"), // Fecha de cancelación
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -200,6 +202,22 @@ export const orderItems = pgTable("order_items", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ======================
+// Notificaciones para administradores
+// ======================
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // ej: "order_cancelled", "new_order", etc.
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"), // datos adicionales (orderId, userId, etc.)
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("notifications_is_read_idx").on(table.isRead),
+  index("notifications_created_at_idx").on(table.createdAt),
+]);
 
 // ======================
 // Tipos TypeScript

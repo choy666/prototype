@@ -37,6 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         shippingMethodId: orders.shippingMethodId,
         shippingCost: orders.shippingCost,
         trackingNumber: orders.trackingNumber,
+        cancellationReason: orders.cancellationReason,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         userEmail: users.email,

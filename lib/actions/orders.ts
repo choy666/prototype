@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '../db';
-import { orders, orderItems, products, users } from '../schema';
+import { orders, orderItems, products, users, productVariants } from '../schema';
 import { eq, desc, and, gte, lte, like, sql } from 'drizzle-orm';
 import type { Order } from '../schema';
 import { revalidatePath } from 'next/cache';
@@ -138,6 +138,8 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         shippingMethodId: orders.shippingMethodId,
         shippingCost: orders.shippingCost,
         trackingNumber: orders.trackingNumber,
+        cancellationReason: orders.cancellationReason,
+        cancelledAt: orders.cancelledAt,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         userEmail: users.email,
@@ -210,6 +212,80 @@ export async function updateOrderStatus(
   } catch (error) {
     console.error('Error updating order:', error);
     throw new Error('No se pudo actualizar la orden');
+  }
+}
+
+// Cancelar una orden
+export async function cancelOrder(orderId: number, userId: number, reason: string): Promise<Order | null> {
+  try {
+    // Verificar que la orden existe y pertenece al usuario
+    const existingOrder = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
+      .limit(1);
+
+    if (existingOrder.length === 0) {
+      throw new Error('Orden no encontrada o no pertenece al usuario');
+    }
+
+    const order = existingOrder[0];
+
+    // Verificar que la orden puede ser cancelada (no entregada o ya cancelada)
+    if (order.status === 'delivered' || order.status === 'cancelled') {
+      throw new Error('La orden no puede ser cancelada en su estado actual');
+    }
+
+    // Actualizar la orden
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({
+        status: 'cancelled',
+        cancellationReason: reason,
+        cancelledAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+
+    // Restaurar stock de los productos
+    const orderItemsData = await db
+      .select({
+        productId: orderItems.productId,
+        variantId: orderItems.variantId,
+        quantity: orderItems.quantity,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
+
+    for (const item of orderItemsData) {
+      if (item.variantId) {
+        // Restaurar stock de variante
+        await db
+          .update(productVariants)
+          .set({
+            stock: sql`${productVariants.stock} + ${item.quantity}`,
+          })
+          .where(eq(productVariants.id, item.variantId));
+      } else {
+        // Restaurar stock del producto principal
+        await db
+          .update(products)
+          .set({
+            stock: sql`${products.stock} + ${item.quantity}`,
+          })
+          .where(eq(products.id, item.productId));
+      }
+    }
+
+    revalidatePath(`/orders/${orderId}`);
+    revalidatePath('/orders');
+    revalidatePath('/admin/orders');
+
+    return updatedOrder || null;
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    throw error;
   }
 }
 
