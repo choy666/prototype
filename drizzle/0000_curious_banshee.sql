@@ -1,9 +1,5 @@
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status' AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')) THEN
-        CREATE TYPE "public"."order_status" AS ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled', 'rejected');
-    END IF;
-END $$;--> statement-breakpoint
+CREATE TYPE "public"."order_status" AS ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled', 'rejected');--> statement-breakpoint
+CREATE TYPE "public"."payment_status" AS ENUM('pending', 'paid', 'failed');--> statement-breakpoint
 CREATE TABLE "addresses" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
@@ -58,6 +54,7 @@ CREATE TABLE "orders" (
 	"user_id" integer NOT NULL,
 	"total" numeric(10, 2) NOT NULL,
 	"status" "order_status" DEFAULT 'pending' NOT NULL,
+	"payment_status" "payment_status" DEFAULT 'pending' NOT NULL,
 	"payment_id" text,
 	"mercado_pago_id" text,
 	"shipping_address" jsonb,
@@ -104,6 +101,7 @@ CREATE TABLE "products" (
 	"discount" integer DEFAULT 0 NOT NULL,
 	"weight" numeric(5, 2),
 	"attributes" jsonb,
+	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );

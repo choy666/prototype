@@ -1,1 +1,0 @@
-CREATE TYPE "public"."payment_status" AS ENUM('pending', 'paid', 'failed');
