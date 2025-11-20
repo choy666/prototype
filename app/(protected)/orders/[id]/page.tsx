@@ -116,7 +116,7 @@ export default function OrderDetailPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al cancelar la orden');
+        throw new Error(errorData.details || errorData.error || 'Error al cancelar la orden');
       }
 
       await response.json();
