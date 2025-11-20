@@ -397,6 +397,7 @@ async function createOrderFromPayment(payment: any) {
       total: total.toString(),
       // Estado financiero confirmado por webhook
       status: 'paid',
+      paymentStatus: 'paid',
       paymentId: payment.id.toString(),
       mercadoPagoId: payment.id.toString(),
       shippingAddress,
