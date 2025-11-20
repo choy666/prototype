@@ -8,6 +8,13 @@
       "when": 1763549254978,
       "tag": "0000_supreme_tiger_shark",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763672941350,
+      "tag": "0001_bumpy_talon",
+      "breakpoints": true
     }
   ]
 }

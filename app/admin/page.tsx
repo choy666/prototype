@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { auth } from '@/lib/actions/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { count, sum, eq, gte, lte, and, desc } from 'drizzle-orm'
+import { count, sum, eq, gte, lte, and, desc, sql } from 'drizzle-orm'
 import { users, products, orders, notifications } from '@/lib/schema'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,40 +29,40 @@ async function getStats() {
   const [productCount] = await db.select({ count: count() }).from(products).where(gte(products.stock, 1))
 
   // Total pedidos
-  const [orderCount] = await db.select({ count: count() }).from(orders).where(eq(orders.paymentStatus, 'paid'))
+  const [orderCount] = await db.select({ count: count() }).from(orders).where(
+    and(
+      sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+      sql`${orders.status} NOT IN ('cancelled', 'rejected')`
+    )
+  )
 
-  // Calcular ingresos totales de pedidos pagados
+  // Calcular ingresos totales de pedidos con status logístico
   const [revenueResult] = await db
     .select({ total: sum(orders.total) })
     .from(orders)
-    .where(eq(orders.paymentStatus, 'paid'))
+    .where(
+      and(
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+        sql`${orders.status} NOT IN ('cancelled', 'rejected')`
+      )
+    )
 
   const revenue = Number(revenueResult?.total ?? 0)
 
-  // Calcular tendencias para usuarios (último mes vs mes anterior)
+  // Calcular tendencias para usuarios (total hasta fin del mes pasado vs total hasta ahora)
   const now = new Date()
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
   const [lastMonthUsers] = await db
     .select({ count: count() })
     .from(users)
-    .where(
-      and(
-        gte(users.createdAt, lastMonthStart),
-        lte(users.createdAt, lastMonthEnd)
-      )
-    )
-
-  const [currentMonthUsers] = await db
-    .select({ count: count() })
-    .from(users)
-    .where(gte(users.createdAt, currentMonthStart))
+    .where(lte(users.createdAt, lastMonthEnd))
 
   const lastMonthUserCount = lastMonthUsers.count
-  const currentMonthUserCount = currentMonthUsers.count
-  const userTrend = lastMonthUserCount > 0 ? ((currentMonthUserCount - lastMonthUserCount) / lastMonthUserCount) * 100 : (currentMonthUserCount > 0 ? 100 : 0)
+  const currentUserCount = userCount.count
+  const userTrend = lastMonthUserCount > 0 ? ((currentUserCount - lastMonthUserCount) / lastMonthUserCount) * 100 : (currentUserCount > 0 ? 100 : 0)
 
   // Tendencias para productos (último mes vs mes anterior)
   const [lastMonthProducts] = await db
@@ -90,57 +90,37 @@ async function getStats() {
   const currentMonthProductCount = currentMonthProducts.count
   const productTrend = lastMonthProductCount > 0 ? ((currentMonthProductCount - lastMonthProductCount) / lastMonthProductCount) * 100 : (currentMonthProductCount > 0 ? 100 : 0)
 
-  // Tendencias para pedidos (último mes vs mes anterior)
+  // Tendencias para pedidos (total hasta fin del mes pasado vs total hasta ahora)
   const [lastMonthOrders] = await db
     .select({ count: count() })
     .from(orders)
     .where(
       and(
-        eq(orders.paymentStatus, 'paid'),
-        gte(orders.createdAt, lastMonthStart),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+        sql`${orders.status} NOT IN ('cancelled', 'rejected')`,
         lte(orders.createdAt, lastMonthEnd)
       )
     )
 
-  const [currentMonthOrders] = await db
-    .select({ count: count() })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.paymentStatus, 'paid'),
-        gte(orders.createdAt, currentMonthStart)
-      )
-    )
-
   const lastMonthOrderCount = lastMonthOrders.count
-  const currentMonthOrderCount = currentMonthOrders.count
-  const orderTrend = lastMonthOrderCount > 0 ? ((currentMonthOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100 : (currentMonthOrderCount > 0 ? 100 : 0)
+  const currentOrderCount = orderCount.count
+  const orderTrend = lastMonthOrderCount > 0 ? ((currentOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100 : (currentOrderCount > 0 ? 100 : 0)
 
-  // Tendencias para ingresos (último mes vs mes anterior)
+  // Tendencias para ingresos (total hasta fin del mes pasado vs total hasta ahora)
   const [lastMonthRevenue] = await db
     .select({ total: sum(orders.total) })
     .from(orders)
     .where(
       and(
-        eq(orders.paymentStatus, 'paid'),
-        gte(orders.createdAt, lastMonthStart),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+        sql`${orders.status} NOT IN ('cancelled', 'rejected')`,
         lte(orders.createdAt, lastMonthEnd)
       )
     )
 
-  const [currentMonthRevenue] = await db
-    .select({ total: sum(orders.total) })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.paymentStatus, 'paid'),
-        gte(orders.createdAt, currentMonthStart)
-      )
-    )
-
   const lastMonthRevenueTotal = Number(lastMonthRevenue?.total ?? 0)
-  const currentMonthRevenueTotal = Number(currentMonthRevenue?.total ?? 0)
-  const revenueTrend = lastMonthRevenueTotal > 0 ? ((currentMonthRevenueTotal - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : (currentMonthRevenueTotal > 0 ? 100 : 0)
+  const currentRevenueTotal = revenue
+  const revenueTrend = lastMonthRevenueTotal > 0 ? ((currentRevenueTotal - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : (currentRevenueTotal > 0 ? 100 : 0)
 
   // Obtener notificaciones recientes (últimas 5 no leídas)
   const recentNotifications = await db
@@ -337,7 +317,7 @@ async function DashboardContent() {
         />
         <StatCard
           title="Ingresos Totales"
-          value={`$${stats.revenue.toLocaleString()}`}
+          value={`$${stats.revenue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={DollarSign}
           trend={stats.revenueTrend}
         />

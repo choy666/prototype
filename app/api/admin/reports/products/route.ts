@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { db } from '@/lib/db'
 import { orderItems, orders, products } from '@/lib/schema'
-import { eq, sum, desc } from 'drizzle-orm'
+import { eq, sum, desc, and, sql } from 'drizzle-orm'
 
 export async function GET() {
   try {
@@ -22,7 +22,12 @@ export async function GET() {
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .innerJoin(products, eq(orderItems.productId, products.id))
-      .where(eq(orders.paymentStatus, 'paid'))
+      .where(
+        and(
+          sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+          sql`${orders.status} != 'cancelled'`
+        )
+      )
       .groupBy(products.id, products.name)
       .orderBy(desc(sum(orderItems.quantity)))
       .limit(10)

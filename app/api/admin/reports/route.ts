@@ -70,7 +70,7 @@ async function getSalesReport(period: string) {
     .from(orders)
     .where(
       and(
-        eq(orders.status, 'paid'),
+        sql`${orders.status} NOT IN ('cancelled', 'rejected')`,
         gte(orders.createdAt, startDate),
         lte(orders.createdAt, now)
       )
@@ -95,7 +95,11 @@ async function getProductsReport() {
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .innerJoin(products, eq(orderItems.productId, products.id))
-    .where(eq(orders.paymentStatus, 'paid'))
+    .where(
+      and(
+        sql`${orders.status} NOT IN ('cancelled', 'rejected')`
+      )
+    )
     .groupBy(products.id, products.name)
     .orderBy(desc(sum(orderItems.quantity)))
     .limit(10)
@@ -136,6 +140,7 @@ async function getUsersReport(period: string) {
     .from(orders)
     .where(
       and(
+        sql`${orders.status} NOT IN ('cancelled', 'rejected')`,
         gte(orders.createdAt, startDate),
         lte(orders.createdAt, now)
       )

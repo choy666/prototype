@@ -1,5 +1,4 @@
-https://developers.mercadolibre.com.ar/es_ar/crea-una-aplicacion-en-mercado-libre-es
-https://developers.mercadolibre.com.ar/es_ar/gestiona-tus-aplicaciones
+ https://developers.mercadolibre.com.ar/es_ar/gestiona-tus-aplicaciones
 https://developers.mercadolibre.com.ar/es_ar/autenticacion-y-autorizacion
 --
 https://www.mercadolibre.com.ar/totp-in-app/validation?transaction_id=dzrspKr85hSyANu0SP1xamMUJ5z4oLGN&platform_id=ml&redirect_url=https%3A%2F%2Fwww.mercadolibre.com%2Fjms%2Fmla%2Flgz%2Fmsl%2Flogin%2FH4sIAAAAAAAEAzVP2wrCMAz9lzzLJgOd7NEfKbHLZjBdS5t5Qfbvpopvybkmb5A48-L0lQgGoGcS9qywgySoU8zB8WhEEIMKK_1XrBLMGEgpFxjeNWim8UxmqlGaVzINrnp1k8SHQd8qw7g4epptQXEPutyZKjuhlOqYoy1X1VSGth3pThKTVTSBsscxCl8yNT6GBnOlPS0WBdvOAoo6zehvMNR2K0_1HVSOy-_uY3fa7_uu7204HLoTbB8pIKd5AQEAAA%2Ftotp_in_app%2Fcallback%3Fdps%3Darmor.1145cf25b8cc803dc1971adc1139174352127ec86d40064ba75038e048cd287ca430f41556834434e15ed745a15b12069738147986fe5d29af9b29021fa5693604b9f73c8c43c8ef68bd62cf3711ad48abd04a53b3107d44b59d442eb038210a.72e8ce6e07b84d44b5cfd023c5c9da0f%26rbms%3D

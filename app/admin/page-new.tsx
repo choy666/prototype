@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { auth } from '@/lib/actions/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { count, sum, eq, gte, lte, and, desc } from 'drizzle-orm'
+import { count, sum, eq, gte, lte, and, desc, sql } from 'drizzle-orm'
 import { users, products, orders, notifications } from '@/lib/schema'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -30,14 +30,14 @@ async function getStats() {
   // Total productos activos (stock > 0)
   const [productCount] = await db.select({ count: count() }).from(products).where(gte(products.stock, 1))
 
-  // Total pedidos
-  const [orderCount] = await db.select({ count: count() }).from(orders).where(eq(orders.paymentStatus, 'paid'))
+  // Total pedidos (solo cuentan como ventas cuando status es paid, shipped o delivered)
+  const [orderCount] = await db.select({ count: count() }).from(orders).where(sql`${orders.status} IN ('paid', 'shipped', 'delivered')`)
 
-  // Calcular ingresos totales de pedidos pagados
+  // Calcular ingresos totales de pedidos con status logístico
   const [revenueResult] = await db
     .select({ total: sum(orders.total) })
     .from(orders)
-    .where(eq(orders.paymentStatus, 'paid'))
+    .where(sql`${orders.status} IN ('paid', 'shipped', 'delivered')`)
 
   const revenue = Number(revenueResult?.total ?? 0)
 
@@ -98,7 +98,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
-        eq(orders.paymentStatus, 'paid'),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
         gte(orders.createdAt, lastMonthStart),
         lte(orders.createdAt, lastMonthEnd)
       )
@@ -109,7 +109,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
-        eq(orders.paymentStatus, 'paid'),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
         gte(orders.createdAt, currentMonthStart)
       )
     )
@@ -124,7 +124,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
-        eq(orders.paymentStatus, 'paid'),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
         gte(orders.createdAt, lastMonthStart),
         lte(orders.createdAt, lastMonthEnd)
       )
@@ -135,7 +135,7 @@ async function getStats() {
     .from(orders)
     .where(
       and(
-        eq(orders.paymentStatus, 'paid'),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
         gte(orders.createdAt, currentMonthStart)
       )
     )

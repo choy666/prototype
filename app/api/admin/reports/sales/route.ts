@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { db } from '@/lib/db'
 import { orders } from '@/lib/schema'
-import { eq, sum, count, gte, lte, and, sql } from 'drizzle-orm'
+import { sum, count, gte, lte, and, sql } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         dateFormat = 'YYYY-MM-DD'
     }
 
-    // Reportes basados en pago, no en logística
+    // Reportes basados en status logístico
     // Subquery con to_char usando literal fijo
     const subquery = db
       .select({
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       .from(orders)
       .where(
         and(
-          eq(orders.paymentStatus, 'paid'),
+          sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
           gte(orders.createdAt, startDate),
           lte(orders.createdAt, now)
         )

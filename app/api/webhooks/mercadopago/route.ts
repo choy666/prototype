@@ -397,7 +397,6 @@ async function createOrderFromPayment(payment: any) {
       total: total.toString(),
       // Estado financiero confirmado por webhook
       status: 'paid',
-      paymentStatus: 'paid',
       paymentId: payment.id.toString(),
       mercadoPagoId: payment.id.toString(),
       shippingAddress,
@@ -583,7 +582,6 @@ async function createRejectedOrderFromPayment(payment: any) {
       userId,
       total: total.toString(),
       status: 'rejected',
-      paymentStatus: 'failed', // Estado de pago fallido
       paymentId: payment.id.toString(),
       mercadoPagoId: payment.id.toString(),
       shippingAddress: null, // No incluir dirección de envío para rechazos

@@ -48,32 +48,41 @@ interface UserData {
   newUsers: number
 }
 
+interface TotalsData {
+  totalSales: number
+  totalOrders: number
+}
+
 export default function ReportsPage() {
   const [salesPeriod, setSalesPeriod] = useState('month')
   const [userPeriod, setUserPeriod] = useState('month')
   const [salesData, setSalesData] = useState<SalesData[]>([])
   const [productData, setProductData] = useState<ProductData[]>([])
   const [userData, setUserData] = useState<UserData[]>([])
+  const [totalsData, setTotalsData] = useState<TotalsData>({ totalSales: 0, totalOrders: 0 })
   const [loading, setLoading] = useState(true)
 
   const fetchReportsData = useCallback(async () => {
     setLoading(true)
     try {
-      const [salesRes, productsRes, usersRes] = await Promise.all([
+      const [salesRes, productsRes, usersRes, totalsRes] = await Promise.all([
         fetch(`/api/admin/reports/sales?period=${salesPeriod}`),
         fetch('/api/admin/reports/products'),
-        fetch(`/api/admin/reports/users?period=${userPeriod}`)
+        fetch(`/api/admin/reports/users?period=${userPeriod}`),
+        fetch('/api/admin/reports/totals')
       ])
 
-      const [sales, products, users] = await Promise.all([
+      const [sales, products, users, totals] = await Promise.all([
         salesRes.json(),
         productsRes.json(),
-        usersRes.json()
+        usersRes.json(),
+        totalsRes.json()
       ])
 
       setSalesData(sales)
       setProductData(products)
       setUserData(users)
+      setTotalsData(totals)
     } catch (error) {
       console.error('Error fetching reports data:', error)
     } finally {
@@ -255,7 +264,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${salesData.reduce((sum, d) => sum + d.sales, 0).toLocaleString()}
+              ${totalsData.totalSales.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
@@ -266,7 +275,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {salesData.reduce((sum, d) => sum + d.orders, 0)}
+              {totalsData.totalOrders}
             </div>
           </CardContent>
         </Card>

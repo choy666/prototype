@@ -65,6 +65,8 @@ export async function GET(request: NextRequest) {
       .from(orders)
       .where(
         and(
+          sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+          sql`${orders.status} != 'cancelled'`,
           gte(orders.createdAt, startDate),
           lte(orders.createdAt, now)
         )
