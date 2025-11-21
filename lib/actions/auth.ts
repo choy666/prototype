@@ -197,3 +197,8 @@ export const authConfig = {
 
 // 🚀 Inicializar NextAuth
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+
+// Función helper para obtener la sesión
+export async function getSession() {
+  return await auth();
+}

@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "mercadolibre": {
+      "command": "node",
+      "args": ["mcp/mercadolibre-server.js"],
+      "description": "Mercado Libre API MCP Server - Productos, órdenes, usuarios y categorías",
+      "version": "1.0.0"
+    },
+    "mercadopago": {
+      "command": "node", 
+      "args": ["mcp/mercadopago-server.js"],
+      "description": "Mercado Pago API MCP Server - Pagos, preferencias, clientes y suscripciones",
+      "version": "1.0.0"
+    }
+  },
+  "requirements": {
+    "node": ">=18.0.0",
+    "mercadolibre": "OAuth2 authentication required",
+    "mercadopago": "MERCADOPAGO_ACCESS_TOKEN environment variable required"
+  },
+  "setup": {
+    "env_file": ".env",
+    "database": "PostgreSQL with Mercado Libre tokens",
+    "dependencies": [
+      "@modelcontextprotocol/sdk",
+      "mercadopago"
+    ]
+  }
+}

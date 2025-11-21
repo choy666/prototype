@@ -79,6 +79,9 @@ export const users = pgTable("users", {
   mercadoLibreId: varchar("mercado_libre_id", { length: 100 }), // Para OAuth
   mercadoLibreAccessToken: text("mercado_libre_access_token"),
   mercadoLibreRefreshToken: text("mercado_libre_refresh_token"),
+  mercadoLibreScopes: text("mercado_libre_scopes"), // Scopes autorizados separados por comas
+  mercadoLibreAccessTokenExpiresAt: timestamp("mercado_libre_access_token_expires_at"),
+  mercadoLibreRefreshTokenExpiresAt: timestamp("mercado_libre_refresh_token_expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

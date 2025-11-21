@@ -1,7 +1,7 @@
 # 🚀 TODO.md: Integración Completa Mercado Libre ↔ E-commerce
 
 ## 📋 Información del Proyecto
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 15 (App Router)
 - **Base de Datos**: Neon Serverless Postgres con Drizzle ORM
 - **App ID Mercado Libre**: 1591558006134773
 - **Redirect URI**: https://prototype-ten-dun.vercel.app/
@@ -28,7 +28,7 @@
 **Prioridad: CRÍTICA** | **Estado: Pendiente**
 
 #### Tareas Backend
-- [ ] **Implementar flujo OAuth2 PKCE**
+- [X] **Implementar flujo OAuth2 PKCE**
   - **Descripción**: Crear endpoints para iniciar autenticación y manejar callback
   - **Pasos**:
     1. Generar code_verifier y code_challenge
@@ -41,9 +41,9 @@
     - `app/api/auth/mercadolibre/route.ts` (nuevo)
     - `app/api/auth/mercadolibre/callback/route.ts` (nuevo)
     - `lib/auth/mercadolibre.ts` (nuevo - utilidades OAuth)
-  - **Comentarios Windsurf**: Crear directorio `app/api/auth/mercadolibre/`
+  - **Comentarios**: Crear directorio `app/api/auth/mercadolibre/`
 
-- [ ] **Gestión de tokens y refresh**
+- [X] **Gestión de tokens y refresh**
   - **Descripción**: Implementar renovación automática de tokens
   - **Pasos**:
     1. Almacenar tokens en BD con expiración
@@ -55,7 +55,7 @@
     - `lib/auth/mercadolibre.ts` (extender)
     - `lib/middleware/mercadolibre-auth.ts` (nuevo)
 
-- [ ] **Validación de scopes y permisos**
+- [X] **Validación de scopes y permisos**
   - **Descripción**: Verificar que la app tenga los scopes necesarios
   - **Pasos**:
     1. Endpoint para verificar permisos activos
@@ -96,7 +96,7 @@
   - **Archivos**:
     - `lib/services/mercadolibre/products.ts` (nuevo)
     - `app/api/mercadolibre/products/route.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar endpoint https://api.mercadolibre.com/items
+  - **Comentarios**: Usar endpoint https://api.mercadolibre.com/items
 
 - [ ] **Sincronización bidireccional productos**
   - **Descripción**: Sync cambios entre local y ML
@@ -148,7 +148,7 @@
   - **Archivos**:
     - `lib/services/mercadolibre/inventory.ts` (nuevo)
     - `app/api/webhooks/mercadolibre/inventory/route.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar PUT /items/{item_id}
+  - **Comentarios**: Usar PUT /items/{item_id}
 
 - [ ] **Manejo de reservas de stock**
   - **Descripción**: Reservar stock durante checkout
@@ -175,7 +175,7 @@
   - **Dependencias**: Sync productos
   - **Archivos**:
     - `lib/services/mercadolibre/pricing.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar PUT /items/{item_id} con campo price
+  - **Comentarios**: Usar PUT /items/{item_id} con campo price
 
 ### 5. 🖼️ SINCRONIZACIÓN DE IMÁGENES
 **Prioridad: MEDIA** | **Estado: Pendiente**
@@ -191,7 +191,7 @@
   - **Dependencias**: Sync productos
   - **Archivos**:
     - `lib/services/mercadolibre/images.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar POST /pictures con multipart/form-data
+  - **Comentarios**: Usar POST /pictures con multipart/form-data
 
 ### 6. 📋 SINCRONIZACIÓN DE ÓRDENES
 **Prioridad: CRÍTICA** | **Estado: Pendiente**
@@ -208,7 +208,7 @@
   - **Archivos**:
     - `app/api/webhooks/mercadolibre/orders/route.ts` (nuevo)
     - `lib/services/mercadolibre/orders.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar GET /orders/{order_id}
+  - **Comentarios**: Usar GET /orders/{order_id}
 
 - [ ] **Sync estados de órdenes**
   - **Descripción**: Mantener estados sincronizados
@@ -236,7 +236,7 @@
   - **Archivos**:
     - `lib/services/mercadolibre/messages.ts` (nuevo)
     - `app/api/webhooks/mercadolibre/messages/route.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar POST /messages con pack_id
+  - **Comentarios**: Usar POST /messages con pack_id
 
 #### Tareas Frontend
 - [ ] **UI para mensajes**
@@ -282,7 +282,7 @@
   - **Archivos**:
     - `lib/services/mercadolibre/webhooks.ts` (nuevo)
     - `app/api/mercadolibre/webhooks/route.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar PUT /applications/{app_id} para configurar topics
+  - **Comentarios**: Usar PUT /applications/{app_id} para configurar topics
 
 - [ ] **Procesamiento de webhooks**
   - **Descripción**: Manejar eventos entrantes
@@ -369,7 +369,7 @@
   - **Archivos**:
     - `lib/schema.ts` (agregar meli_shipments)
     - `drizzle/migrations/crear-meli-shipments.sql` (nuevo)
-  - **Comentarios Windsurf**: Estados: pending, ready_to_ship, shipped, delivered, not_delivered, cancelled
+  - **Comentarios**: Estados: pending, ready_to_ship, shipped, delivered, not_delivered, cancelled
 
 - [ ] **API para shipments ML**
   - **Descripción**: Interactuar con shipments API
@@ -382,7 +382,7 @@
   - **Archivos**:
     - `lib/services/mercadolibre/shipments.ts` (nuevo)
     - `app/api/mercadolibre/shipments/[id]/route.ts` (nuevo)
-  - **Comentarios Windsurf**: Usar https://developers.mercadolibre.com.ar/devsite/manage-shipments
+  - **Comentarios**: Usar https://developers.mercadolibre.com.ar/devsite/manage-shipments
 
 - [ ] **Webhooks para shipments**
   - **Descripción**: Procesar cambios en shipments

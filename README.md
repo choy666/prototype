@@ -263,6 +263,7 @@ Completar el pago y verificar redirección y estado de orden
 
 🧪 Resumen de Comandos de Drizzle Kit
 🔧 Comandos Principales
+
 🛠️ npx drizzle-kit generate Genera archivos de migración SQL basados en los cambios en lib/schema.ts. 📁 Crea un archivo en la carpeta drizzle/ con el SQL necesario.
 
 🚚 npx drizzle-kit migrate Aplica las migraciones pendientes a la base de datos conectada (DATABASE_URL). 📜 Ejecuta los archivos SQL generados en orden.

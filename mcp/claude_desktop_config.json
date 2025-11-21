@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mercadolibre": {
+      "command": "node",
+      "args": ["mcp/mercadolibre-server.js"],
+      "cwd": "c:\\developer web\\paginas\\prototype"
+    },
+    "mercadopago": {
+      "command": "node", 
+      "args": ["mcp/mercadopago-server.js"],
+      "cwd": "c:\\developer web\\paginas\\prototype"
+    }
+  }
+}
