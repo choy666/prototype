@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom';
 import 'jest-axe/extend-expect';
 
+// Polyfills para Node.js
+import { TextDecoder, TextEncoder } from 'util';
+global.TextDecoder = TextDecoder;
+global.TextEncoder = TextEncoder;
+
 // Mock de Next.js router
 jest.mock('next/navigation', () => ({
   useRouter() {
@@ -36,6 +41,11 @@ jest.mock('zustand', () => ({
 // Mock de componentes que requieren configuración especial
 jest.mock('@/lib/actions/products', () => ({
   getFeaturedProducts: jest.fn(() => Promise.resolve([])),
+}));
+
+// Mock de next/cache para evitar errores en tests
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
 }));
 
 jest.mock('@/lib/actions/auth', () => ({

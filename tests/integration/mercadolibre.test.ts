@@ -1,14 +1,58 @@
 // @ts-nocheck
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+const originalError = console.error;
+const originalLog = console.log;
 
-// Mock simple sin tipado complejo
-const mockSyncProductToMercadoLibre = jest.fn();
+beforeAll(() => {
+  console.error = jest.fn();
+  console.log = jest.fn();
+});
+
+afterAll(() => {
+  console.error = originalError;
+  console.log = originalLog;
+});
+
+// Mock de next/cache para evitar errores
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+}));
+
+// Mock de dependencias externas (base de datos y autenticación)
+jest.mock('@/lib/db', () => ({
+  db: {
+    query: {
+      products: {
+        findFirst: jest.fn(),
+      },
+    },
+    update: jest.fn(() => ({
+      set: jest.fn(() => ({
+        where: jest.fn(() => Promise.resolve([])),
+      })),
+    })),
+  },
+}));
+
+jest.mock('@/lib/auth/mercadolibre', () => ({
+  makeAuthenticatedRequest: jest.fn(),
+}));
+
+// Mock del módulo de productos pero preservando la implementación real
+jest.mock('@/lib/actions/products', () => {
+  const originalModule = jest.requireActual('@/lib/actions/products');
+  return {
+    ...originalModule,
+    syncProductToMercadoLibre: originalModule.syncProductToMercadoLibre,
+  };
+});
+
+// Importar la función real
+import { syncProductToMercadoLibre } from '@/lib/actions/products';
+
+// Mock solo para las funciones que no vamos a probar en integración
 const mockImportOrdersFromMercadoLibre = jest.fn();
 const mockProcessMercadoLibreWebhook = jest.fn();
-
-jest.mock('@/lib/actions/products', () => ({
-  syncProductToMercadoLibre: mockSyncProductToMercadoLibre,
-}));
 
 jest.mock('@/lib/actions/orders', () => ({
   importOrdersFromMercadoLibre: mockImportOrdersFromMercadoLibre,
@@ -25,36 +69,63 @@ describe('Integración Mercado Libre', () => {
 
   describe('Sincronización de Productos', () => {
     it('debe sincronizar producto a Mercado Libre exitosamente', async () => {
-      mockSyncProductToMercadoLibre.mockResolvedValue({
-        success: true,
-        mlItemId: 'MLA123456789',
+      // Mock de base de datos para producto válido
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'Producto Test',
+        stock: 10,
+        price: '100.50',
+        mlCategoryId: 'MLA3530',
+        description: 'Descripción test',
+        images: ['http://test.com/image.jpg']
       });
 
-      const result = await mockSyncProductToMercadoLibre(1, 1);
+
+      // Mock de autenticación exitosa
+      const { makeAuthenticatedRequest } = require('@/lib/auth/mercadolibre');
+      makeAuthenticatedRequest.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'MLA123456789',
+          permalink: 'http://test.com',
+          thumbnail: 'http://test.com/thumb.jpg'
+        })
+      });
+      
+      const result = await syncProductToMercadoLibre(1, 1);
 
       expect(result.success).toBe(true);
       expect(result.mlItemId).toBe('MLA123456789');
     });
 
     it('debe manejar error cuando producto no existe', async () => {
-      mockSyncProductToMercadoLibre.mockResolvedValue({
-        success: false,
-        error: 'Producto no encontrado',
-      });
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue(null);
 
-      const result = await mockSyncProductToMercadoLibre(999, 1);
+      const result = await syncProductToMercadoLibre(999, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Producto no encontrado');
     });
 
     it('debe manejar error de API de Mercado Libre', async () => {
-      mockSyncProductToMercadoLibre.mockResolvedValue({
-        success: false,
-        error: 'Error en API de Mercado Libre',
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'Producto Test',
+        stock: 10,
+        price: '100.50'
       });
 
-      const result = await mockSyncProductToMercadoLibre(1, 1);
+
+      const { makeAuthenticatedRequest } = require('@/lib/auth/mercadolibre');
+      makeAuthenticatedRequest.mockResolvedValue({
+        ok: false,
+        text: () => Promise.resolve('API Error')
+      });
+
+      const result = await syncProductToMercadoLibre(1, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -63,7 +134,8 @@ describe('Integración Mercado Libre', () => {
 
   describe('Importación de Órdenes', () => {
     it('debe importar órdenes desde Mercado Libre exitosamente', async () => {
-      mockImportOrdersFromMercadoLibre.mockResolvedValue({
+      const { importOrdersFromMercadoLibre } = require('@/lib/actions/orders');
+      importOrdersFromMercadoLibre.mockResolvedValue({
         success: true,
         imported: 5,
         total: 10,
@@ -144,24 +216,30 @@ describe('Integración Mercado Libre', () => {
 
   describe('Validaciones de Negocio', () => {
     it('debe validar que el stock sea suficiente para sincronizar', async () => {
-      mockSyncProductToMercadoLibre.mockResolvedValue({
-        success: false,
-        error: 'Stock insuficiente para publicación',
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'Producto Test',
+        stock: 0, // Stock insuficiente
+        price: '100.50'
       });
 
-      const result = await mockSyncProductToMercadoLibre(1, 1);
+      const result = await syncProductToMercadoLibre(1, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('stock insuficiente');
     });
 
     it('debe validar formato de precio antes de sincronizar', async () => {
-      mockSyncProductToMercadoLibre.mockResolvedValue({
-        success: false,
-        error: 'Precio inválido',
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'Producto Test',
+        stock: 10,
+        price: 'invalid' // Precio inválido
       });
 
-      const result = await mockSyncProductToMercadoLibre(1, 1);
+      const result = await syncProductToMercadoLibre(1, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('precio inválido');
@@ -170,31 +248,55 @@ describe('Integración Mercado Libre', () => {
 
   describe('Manejo de Errores y Retries', () => {
     it('debe implementar retry automático para errores temporales', async () => {
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'Producto Test',
+        stock: 10,
+        price: '100.50'
+      });
+
+
+      const { makeAuthenticatedRequest } = require('@/lib/auth/mercadolibre');
       // Simular retry exitoso después de un error temporal
-      mockSyncProductToMercadoLibre
+      makeAuthenticatedRequest
         .mockResolvedValueOnce({
-          success: false,
-          error: 'Service temporarily unavailable - retry 1',
+          ok: false,
+          text: () => Promise.resolve('Service temporarily unavailable - retry 1')
         })
         .mockResolvedValueOnce({
-          success: true,
-          mlItemId: 'MLA123456789',
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'MLA123456789',
+            permalink: 'http://test.com',
+            thumbnail: 'http://test.com/thumb.jpg'
+          })
         });
 
-      const result = await mockSyncProductToMercadoLibre(1, 1);
+      const result = await syncProductToMercadoLibre(1, 1);
 
-      expect(mockSyncProductToMercadoLibre).toHaveBeenCalledTimes(2);
+      expect(makeAuthenticatedRequest).toHaveBeenCalledTimes(2);
       expect(result.success).toBe(true);
     });
 
     it('debe limitar número de reintentos', async () => {
-      // Simular múltiples fallos hasta alcanzar el límite
-      mockSyncProductToMercadoLibre.mockResolvedValue({
-        success: false,
-        error: 'Máximo de reintentos alcanzado',
+      const { db } = require('@/lib/db');
+      db.query.products.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'Producto Test',
+        stock: 10,
+        price: '100.50'
       });
 
-      const result = await mockSyncProductToMercadoLibre(1, 1);
+
+      const { makeAuthenticatedRequest } = require('@/lib/auth/mercadolibre');
+      // Simular múltiples fallos con error temporal
+      makeAuthenticatedRequest.mockResolvedValue({
+        ok: false,
+        text: () => Promise.resolve('Service temporarily unavailable')
+      });
+
+      const result = await syncProductToMercadoLibre(1, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('máximo de reintentos');

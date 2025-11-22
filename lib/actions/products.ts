@@ -373,8 +373,12 @@ export async function getAllProducts(): Promise<Product[]> {
 // Sincronizar producto con Mercado Libre
 export async function syncProductToMercadoLibre(
   productId: number,
-  userId: number
+  userId: number,
+  retryCount: number = 0
 ): Promise<{ success: boolean; mlItemId?: string; error?: string }> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = process.env.NODE_ENV === 'test' ? 10 : 1000; // 1 segundo
+
   try {
     // Obtener producto local
     const product = await db.query.products.findFirst({
@@ -383,6 +387,15 @@ export async function syncProductToMercadoLibre(
 
     if (!product) {
       return { success: false, error: 'Producto no encontrado' };
+    }
+
+    // Validaciones de negocio
+    if (product.stock <= 0) {
+      return { success: false, error: 'stock insuficiente' };
+    }
+
+    if (isNaN(Number(product.price)) || Number(product.price) <= 0) {
+      return { success: false, error: 'precio inválido' };
     }
 
     // Actualizar estado de sincronización
@@ -421,8 +434,16 @@ export async function syncProductToMercadoLibre(
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Error creando producto en ML: ${error}`);
+      const errorText = await response.text();
+      
+      // Verificar si es un error temporal que debe reintentarse
+      if (errorText.includes('temporarily unavailable') && retryCount < MAX_RETRIES) {
+        console.log(`Error temporal, reintentando (${retryCount + 1}/${MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
+        return syncProductToMercadoLibre(productId, userId, retryCount + 1);
+      }
+      
+      throw new Error(`Error creando producto en ML: ${errorText}`);
     }
 
     const mlItem = await response.json();
@@ -455,6 +476,29 @@ export async function syncProductToMercadoLibre(
 
   } catch (error) {
     console.error('Error sincronizando producto a ML:', error);
+    
+    // Verificar si alcanzó el máximo de reintentos
+    if (retryCount >= MAX_RETRIES) {
+      const errorMsg = 'máximo de reintentos';
+      
+      // Actualizar estado de error
+      await db.update(mercadolibreProductsSync)
+        .set({
+          syncStatus: 'error',
+          syncError: errorMsg,
+          updatedAt: new Date()
+        })
+        .where(eq(mercadolibreProductsSync.productId, productId));
+
+      return { success: false, error: errorMsg };
+    }
+    
+    // Para errores temporales, reintentar automáticamente
+    if (error instanceof Error && error.message.includes('temporarily unavailable')) {
+      console.log(`Reintentando automáticamente (${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
+      return syncProductToMercadoLibre(productId, userId, retryCount + 1);
+    }
     
     // Actualizar estado de error
     await db.update(mercadolibreProductsSync)
