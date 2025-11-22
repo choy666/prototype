@@ -523,7 +523,7 @@ export async function updateStockInMercadoLibre(
 }
 
 // Obtener productos pendientes de sincronización
-export async function getPendingSyncProducts(_userId?: number) {
+export async function getPendingSyncProducts() {
   return await db.query.products.findMany({
     where: eq(products.mlSyncStatus, 'pending'),
     orderBy: desc(products.created_at),
