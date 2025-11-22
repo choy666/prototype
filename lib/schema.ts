@@ -47,6 +47,18 @@ export const products = pgTable("products", {
   weight: decimal("weight", { precision: 5, scale: 2 }), // peso en kg, opcional para cálculo de envío
   attributes: jsonb("attributes"), // atributos dinámicos del producto
   isActive: boolean("is_active").default(true).notNull(),
+  // Nuevos campos para Mercado Libre
+  mlItemId: text("ml_item_id").unique(),
+  mlCategoryId: text("ml_category_id"),
+  mlListingTypeId: text("ml_listing_type_id"),
+  mlCondition: text("ml_condition").default("new"),
+  mlBuyingMode: text("ml_buying_mode").default("buy_it_now"),
+  mlCurrencyId: text("ml_currency_id").default("ARS"),
+  mlSyncStatus: text("ml_sync_status").default("pending"),
+  mlLastSync: timestamp("ml_last_sync"),
+  mlPermalink: text("ml_permalink"),
+  mlThumbnail: text("ml_thumbnail"),
+  mlVideoId: text("ml_video_id"),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -82,6 +94,12 @@ export const users = pgTable("users", {
   mercadoLibreScopes: text("mercado_libre_scopes"), // Scopes autorizados separados por comas
   mercadoLibreAccessTokenExpiresAt: timestamp("mercado_libre_access_token_expires_at"),
   mercadoLibreRefreshTokenExpiresAt: timestamp("mercado_libre_refresh_token_expires_at"),
+  // Nuevos campos para Mercado Libre
+  mlNickname: text("ml_nickname"),
+  mlSiteId: text("ml_site_id").default("MLA"),
+  mlSellerId: text("ml_seller_id"),
+  mlPermalink: text("ml_permalink"),
+  mlLevelId: text("ml_level_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -178,6 +196,14 @@ export const orders = pgTable("orders", {
   trackingNumber: text("tracking_number"), // Número de seguimiento
   cancellationReason: text("cancellation_reason"), // Razón de cancelación
   cancelledAt: timestamp("cancelled_at"), // Fecha de cancelación
+  // Nuevos campos para Mercado Libre
+  mlOrderId: text("ml_order_id").unique(),
+  source: text("source").default("local"),
+  mlStatus: text("ml_status"),
+  mlBuyerInfo: jsonb("ml_buyer_info"),
+  mlShippingInfo: jsonb("ml_shipping_info"),
+  mlPaymentInfo: jsonb("ml_payment_info"),
+  mlFeedback: jsonb("ml_feedback"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -282,3 +308,210 @@ export type NewProductVariant = typeof productVariants.$inferInsert;
 // Tipos sin SKU para compatibilidad
 export type ProductVariantWithoutSKU = Omit<ProductVariant, 'sku'>;
 export type NewProductVariantWithoutSKU = Omit<NewProductVariant, 'sku'>;
+
+// ======================
+// Enums para Mercado Libre
+// ======================
+export const mlSyncStatusEnum = pgEnum("ml_sync_status", [
+  "pending",
+  "syncing", 
+  "synced",
+  "error",
+  "conflict"
+]);
+
+export const mlImportStatusEnum = pgEnum("ml_import_status", [
+  "pending",
+  "imported",
+  "error"
+]);
+
+export const mlQuestionStatusEnum = pgEnum("ml_question_status", [
+  "pending",
+  "answered",
+  "closed",
+  "deleted"
+]);
+
+export const mpPreferenceStatusEnum = pgEnum("mp_preference_status", [
+  "pending",
+  "expired",
+  "active"
+]);
+
+// ======================
+// Tabla de sincronización de productos ML
+// ======================
+export const mercadolibreProductsSync = pgTable("mercadolibre_products_sync", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  mlItemId: text("ml_item_id").unique(),
+  syncStatus: mlSyncStatusEnum("sync_status").default("pending").notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncError: text("sync_error"),
+  mlData: jsonb("ml_data"),
+  syncAttempts: integer("sync_attempts").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ml_sync_product_id_idx").on(table.productId),
+  index("ml_sync_ml_item_id_idx").on(table.mlItemId),
+  index("ml_sync_status_idx").on(table.syncStatus),
+]);
+
+// ======================
+// Tabla de importación de órdenes ML
+// ======================
+export const mercadolibreOrdersImport = pgTable("mercadolibre_orders_import", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
+  mlOrderId: text("ml_order_id").unique(),
+  importStatus: mlImportStatusEnum("import_status").default("pending").notNull(),
+  importedAt: timestamp("imported_at"),
+  importError: text("import_error"),
+  mlOrderData: jsonb("ml_order_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ml_import_order_id_idx").on(table.orderId),
+  index("ml_import_ml_order_id_idx").on(table.mlOrderId),
+  index("ml_import_status_idx").on(table.importStatus),
+]);
+
+// ======================
+// Tabla de preguntas ML
+// ======================
+export const mercadolibreQuestions = pgTable("mercadolibre_questions", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  mlQuestionId: text("ml_question_id").unique(),
+  mlItemId: text("ml_item_id"),
+  questionText: text("question_text").notNull(),
+  answerText: text("answer_text"),
+  status: mlQuestionStatusEnum("status").default("pending").notNull(),
+  mlBuyerId: text("ml_buyer_id"),
+  mlBuyerNickname: text("ml_buyer_nickname"),
+  questionDate: timestamp("question_date"),
+  answerDate: timestamp("answer_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ml_questions_product_id_idx").on(table.productId),
+  index("ml_questions_ml_item_id_idx").on(table.mlItemId),
+  index("ml_questions_status_idx").on(table.status),
+]);
+
+// ======================
+// Webhooks de Mercado Libre
+// ======================
+export const mercadolibreWebhooks = pgTable("mercadolibre_webhooks", {
+  id: serial("id").primaryKey(),
+  webhookId: text("webhook_id").unique(),
+  topic: text("topic").notNull(),
+  resource: text("resource"),
+  userId: integer("user_id").references(() => users.id),
+  resourceId: text("resource_id"),
+  applicationId: text("application_id"),
+  payload: jsonb("payload").notNull(),
+  processed: boolean("processed").default(false).notNull(),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ml_webhooks_user_id_idx").on(table.userId),
+  index("ml_webhooks_topic_idx").on(table.topic),
+  index("ml_webhooks_processed_idx").on(table.processed),
+]);
+
+// ======================
+// Preferencias de Mercado Pago (mejorado)
+// ======================
+export const mercadopagoPreferences = pgTable("mercadopago_preferences", {
+  id: serial("id").primaryKey(),
+  preferenceId: text("preference_id").unique(),
+  externalReference: text("external_reference").unique(),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  userId: integer("user_id").references(() => users.id),
+  initPoint: text("init_point"),
+  sandboxInitPoint: text("sandbox_init_point"),
+  items: jsonb("items").notNull(),
+  payer: jsonb("payer"),
+  paymentMethods: jsonb("payment_methods"),
+  expires: boolean("expires").default(false).notNull(),
+  expirationDateFrom: timestamp("expiration_date_from"),
+  expirationDateTo: timestamp("expiration_date_to"),
+  notificationUrl: text("notification_url"),
+  status: mpPreferenceStatusEnum("status").default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("mp_preferences_order_id_idx").on(table.orderId),
+  index("mp_preferences_user_id_idx").on(table.userId),
+  index("mp_preferences_status_idx").on(table.status),
+]);
+
+// ======================
+// Pagos de Mercado Pago (mejorado)
+// ======================
+export const mercadopagoPayments = pgTable("mercadopago_payments", {
+  id: serial("id").primaryKey(),
+  paymentId: text("payment_id").unique(),
+  preferenceId: text("preference_id").references(() => mercadopagoPreferences.preferenceId),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  status: text("status"),
+  paymentMethodId: text("payment_method_id"),
+  paymentMethodType: text("payment_method_type"),
+  paymentMethodName: text("payment_method_name"),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  currencyId: text("currency_id").default("ARS"),
+  installments: integer("installments"),
+  issuerId: text("issuer_id"),
+  description: text("description"),
+  externalReference: text("external_reference"),
+  statementDescriptor: text("statement_descriptor"),
+  dateCreated: timestamp("date_created"),
+  dateApproved: timestamp("date_approved"),
+  dateLastUpdated: timestamp("date_last_updated"),
+  rawData: jsonb("raw_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("mp_payments_payment_id_idx").on(table.paymentId),
+  index("mp_payments_preference_id_idx").on(table.preferenceId),
+  index("mp_payments_order_id_idx").on(table.orderId),
+  index("mp_payments_status_idx").on(table.status),
+]);
+
+// ======================
+// Métricas de integración
+// ======================
+export const integrationMetrics = pgTable("integration_metrics", {
+  id: serial("id").primaryKey(),
+  date: timestamp("date").notNull(),
+  platform: text("platform").notNull(),
+  metricName: text("metric_name").notNull(),
+  metricValue: integer("metric_value").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("integration_metrics_date_idx").on(table.date),
+  index("integration_metrics_platform_idx").on(table.platform),
+  index("integration_metrics_metric_name_idx").on(table.metricName),
+]);
+
+// ======================
+// Tipos TypeScript para nuevas tablas
+// ======================
+export type MercadoLibreProductsSync = typeof mercadolibreProductsSync.$inferSelect;
+export type NewMercadoLibreProductsSync = typeof mercadolibreProductsSync.$inferInsert;
+export type MercadoLibreOrdersImport = typeof mercadolibreOrdersImport.$inferSelect;
+export type NewMercadoLibreOrdersImport = typeof mercadolibreOrdersImport.$inferInsert;
+export type MercadoLibreQuestion = typeof mercadolibreQuestions.$inferSelect;
+export type NewMercadoLibreQuestion = typeof mercadolibreQuestions.$inferInsert;
+export type MercadoLibreWebhook = typeof mercadolibreWebhooks.$inferSelect;
+export type NewMercadoLibreWebhook = typeof mercadolibreWebhooks.$inferInsert;
+export type MercadoPagoPreference = typeof mercadopagoPreferences.$inferSelect;
+export type NewMercadoPagoPreference = typeof mercadopagoPreferences.$inferInsert;
+export type MercadoPagoPayment = typeof mercadopagoPayments.$inferSelect;
+export type NewMercadoPagoPayment = typeof mercadopagoPayments.$inferInsert;
+export type IntegrationMetric = typeof integrationMetrics.$inferSelect;
+export type NewIntegrationMetric = typeof integrationMetrics.$inferInsert;

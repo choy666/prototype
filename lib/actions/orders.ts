@@ -141,6 +141,14 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         cancelledAt: orders.cancelledAt,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
+        // Campos de Mercado Libre
+        mlOrderId: orders.mlOrderId,
+        source: orders.source,
+        mlStatus: orders.mlStatus,
+        mlBuyerInfo: orders.mlBuyerInfo,
+        mlShippingInfo: orders.mlShippingInfo,
+        mlPaymentInfo: orders.mlPaymentInfo,
+        mlFeedback: orders.mlFeedback,
         userEmail: users.email,
         userName: users.name,
       })
