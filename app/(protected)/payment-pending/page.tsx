@@ -113,7 +113,7 @@ export default function PaymentPendingPage() {
               <div className="text-sm text-yellow-800 text-left">
                 <strong>Importante:</strong><br />
                 • Recibirás un email cuando tu pago sea confirmado<br />
-                • Puedes verificar el estado en "Mis pedidos"<br />
+                • Puedes verificar el estado en &quot;Mis pedidos&quot;<br />
                 • El pago puede tardar hasta 48 horas en procesarse
               </div>
             </div>

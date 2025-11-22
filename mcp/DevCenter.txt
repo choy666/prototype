@@ -1,0 +1,24 @@
+### DevCenter de Mercado Libre
+# Configuración de la aplicación prototypeML (Mercado Libre)
+- Numero de Aplicacion: 
+- Nombre : prototypeML
+- App ID : 8458968436453153
+- Client Secret : IA9SP48WNE2w5XXogwoGde6rtcvGQskq
+- Redirect URIs : https://prototype-ten-dun.vercel.app/payment-success, https://prototype-ten-dun.vercel.app/payment-failure, https://prototype-ten-dun.vercel.app/payment-pending 
+pkce : si
+Mercado Libre : si
+Notificaciones callbacks URL : https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago
+----
+
+
+### DevCenter de Mercado Pago
+# Configuración de la aplicación prototypeMC (Mercado Pago)
+- Nombre : prototypeMC
+- User ID: 517448794
+- App ID: 6454601133735810
+- Producto integrado : Checkout Pro
+- Client Secret : XjkVjvpLGw4XrOJ7xXQ85OTJpwgaA1f3
+- Public Key: APP_USR-69258e52-a9c1-4d81-9d1e-90cf52391d49
+- Access Token : APP_USR-3512407382157264-112123-63acaed36cb3246d2b1489bf710c4cb1-2926966384
+- Url para prueba : https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago
+Clave secreta: 3268aa49b1c43eb2f43a9cc649d3081037308dd1317dc3c0ffb459b184ca4b6f
