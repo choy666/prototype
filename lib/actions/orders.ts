@@ -1,10 +1,11 @@
 'use server';
 
 import { db } from '../db';
-import { orders, orderItems, products, users, productVariants } from '../schema';
+import { orders, orderItems, products, users, productVariants, mercadolibreOrdersImport } from '../schema';
 import { eq, desc, and, gte, lte, like, sql } from 'drizzle-orm';
 import type { Order } from '../schema';
 import { revalidatePath } from 'next/cache';
+import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
 
 // Obtener órdenes con paginación y filtros para admin
 export async function getOrders(
@@ -346,4 +347,141 @@ export async function generateOrderReports(filters: {
     console.error('Error generating order reports:', error);
     throw new Error('No se pudieron generar los reportes');
   }
+}
+
+// ======================
+// Funciones para Mercado Libre
+// ======================
+
+// Importar órdenes desde Mercado Libre
+export async function importOrdersFromMercadoLibre(
+  userId: number,
+  limit: number = 50
+): Promise<{ success: boolean; imported: number; error?: string }> {
+  try {
+    // Obtener órdenes recientes de ML
+    const response = await makeAuthenticatedRequest(
+      userId,
+      `/orders/search?seller=${userId}&limit=${limit}&sort=date_desc`
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Error obteniendo órdenes de ML: ${error}`);
+    }
+
+    const mlOrdersResponse = await response.json();
+    const mlOrders = mlOrdersResponse.results || [];
+
+    let importedCount = 0;
+
+    for (const mlOrder of mlOrders) {
+      try {
+        // Verificar si ya fue importada
+        const existingImport = await db.query.mercadolibreOrdersImport.findFirst({
+          where: eq(mercadolibreOrdersImport.mlOrderId, mlOrder.id.toString()),
+        });
+
+        if (existingImport) {
+          continue; // Ya fue importada
+        }
+
+        // Crear orden local
+        const newOrder = await db.insert(orders).values({
+          userId,
+          total: mlOrder.total_amount.toString(),
+          status: mapMLStatusToLocal(mlOrder.status) as 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'rejected',
+          mlOrderId: mlOrder.id.toString(),
+          source: 'mercadolibre',
+          mlStatus: mlOrder.status,
+          mlBuyerInfo: JSON.stringify(mlOrder.buyer),
+          mlShippingInfo: JSON.stringify(mlOrder.shipping),
+          mlPaymentInfo: JSON.stringify(mlOrder.payments),
+          createdAt: new Date(mlOrder.date_created),
+          updatedAt: new Date(),
+        }).returning({ id: orders.id });
+
+        const orderId = newOrder[0].id;
+
+        // Crear items de la orden
+        if (mlOrder.order_items && mlOrder.order_items.length > 0) {
+          const orderItemsData = [];
+
+          for (const mlItem of mlOrder.order_items) {
+            // Buscar producto local por ML item ID
+            const localProduct = await db.query.products.findFirst({
+              where: eq(products.mlItemId, mlItem.item.id.toString()),
+            });
+
+            if (localProduct) {
+              orderItemsData.push({
+                orderId,
+                productId: localProduct.id,
+                quantity: mlItem.quantity,
+                price: mlItem.unit_price.toString(),
+              });
+            }
+          }
+
+          if (orderItemsData.length > 0) {
+            await db.insert(orderItems).values(orderItemsData);
+          }
+        }
+
+        // Crear registro de importación
+        await db.insert(mercadolibreOrdersImport).values({
+          orderId,
+          mlOrderId: mlOrder.id.toString(),
+          importStatus: 'imported',
+          importedAt: new Date(),
+          mlOrderData: mlOrder,
+        });
+
+        importedCount++;
+
+      } catch (itemError) {
+        console.error(`Error importando orden ${mlOrder.id}:`, itemError);
+        
+        // Omitir guardar registro de error ya que orderId es requerido y no tenemos una orden local
+        // El error ya está siendo logueado arriba
+      }
+    }
+
+    return { success: true, imported: importedCount };
+
+  } catch (error) {
+    console.error('Error importando órdenes de ML:', error);
+    return { 
+      success: false, 
+      imported: 0,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+// Mapear estados de ML a locales
+function mapMLStatusToLocal(mlStatus: string): string {
+  const statusMap: Record<string, string> = {
+    'pending': 'pending',
+    'paid': 'paid',
+    'cancelled': 'cancelled',
+    'confirmed': 'paid',
+    'payment_required': 'pending',
+    'payment_in_process': 'pending',
+    'partially_paid': 'paid',
+    'rejected': 'rejected',
+    'refunded': 'cancelled',
+    'in_mediation': 'pending',
+    'invalid': 'rejected',
+  };
+
+  return statusMap[mlStatus] || 'pending';
+}
+
+// Obtener órdenes pendientes de importación
+export async function getPendingImportOrders() {
+  return await db.query.mercadolibreOrdersImport.findMany({
+    where: eq(mercadolibreOrdersImport.importStatus, 'pending'),
+    orderBy: desc(mercadolibreOrdersImport.createdAt),
+  });
 }

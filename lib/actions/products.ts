@@ -1,12 +1,13 @@
 'use server';
 
 import { db } from '../db';
-import { products, orderItems, categories } from '../schema';
+import { products, orderItems, categories, mercadolibreProductsSync } from '../schema';
 import { and, eq, desc, sql, gte, lte, like, asc } from 'drizzle-orm';
 import type { NewProduct, Product } from '../schema';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ProductFilters } from '@/types';
+import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
 
 // ✅ Esquema de validación para los filtros de productos
 const productFiltersSchema = z.object({
@@ -362,5 +363,183 @@ export async function getAllProducts(): Promise<Product[]> {
   } catch (error) {
     console.error('Error fetching all products:', error);
     throw new Error('No se pudieron obtener todos los productos');
+  }
+}
+
+// ======================
+// Funciones para Mercado Libre
+// ======================
+
+// Sincronizar producto con Mercado Libre
+export async function syncProductToMercadoLibre(
+  productId: number,
+  userId: number
+): Promise<{ success: boolean; mlItemId?: string; error?: string }> {
+  try {
+    // Obtener producto local
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+    });
+
+    if (!product) {
+      return { success: false, error: 'Producto no encontrado' };
+    }
+
+    // Actualizar estado de sincronización
+    await db.update(mercadolibreProductsSync)
+      .set({ 
+        syncStatus: 'syncing',
+        syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(mercadolibreProductsSync.productId, productId));
+
+    // Preparar datos para ML
+    const mlProductData = {
+      title: product.name,
+      category_id: product.mlCategoryId || 'MLA3530', // Default categoría
+      price: Number(product.price),
+      currency_id: product.mlCurrencyId || 'ARS',
+      available_quantity: product.stock,
+      buying_mode: product.mlBuyingMode || 'buy_it_now',
+      listing_type_id: product.mlListingTypeId || 'bronze',
+      condition: product.mlCondition || 'new',
+      description: product.description || '',
+      pictures: product.images ? 
+        (Array.isArray(product.images) ? product.images.map(img => ({ source: img })) : [{ source: product.image }]) :
+        [{ source: product.image }].filter(img => img.source),
+    };
+
+    // Enviar a Mercado Libre
+    const response = await makeAuthenticatedRequest(
+      userId,
+      '/items',
+      {
+        method: 'POST',
+        body: JSON.stringify(mlProductData),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Error creando producto en ML: ${error}`);
+    }
+
+    const mlItem = await response.json();
+    const mlItemId = mlItem.id;
+
+    // Actualizar producto local con ID de ML
+    await db.update(products)
+      .set({
+        mlItemId,
+        mlSyncStatus: 'synced',
+        mlLastSync: new Date(),
+        mlPermalink: mlItem.permalink,
+        mlThumbnail: mlItem.thumbnail,
+        updated_at: new Date()
+      })
+      .where(eq(products.id, productId));
+
+    // Actualizar tabla de sincronización
+    await db.update(mercadolibreProductsSync)
+      .set({
+        mlItemId,
+        syncStatus: 'synced',
+        lastSyncAt: new Date(),
+        mlData: mlItem,
+        updatedAt: new Date()
+      })
+      .where(eq(mercadolibreProductsSync.productId, productId));
+
+    return { success: true, mlItemId };
+
+  } catch (error) {
+    console.error('Error sincronizando producto a ML:', error);
+    
+    // Actualizar estado de error
+    await db.update(mercadolibreProductsSync)
+      .set({
+        syncStatus: 'error',
+        syncError: error instanceof Error ? error.message : String(error),
+        updatedAt: new Date()
+      })
+      .where(eq(mercadolibreProductsSync.productId, productId));
+
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+// Actualizar stock en Mercado Libre
+export async function updateStockInMercadoLibre(
+  productId: number,
+  newStock: number,
+  userId: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+    });
+
+    if (!product?.mlItemId) {
+      return { success: false, error: 'Producto no sincronizado con ML' };
+    }
+
+    const response = await makeAuthenticatedRequest(
+      userId,
+      `/items/${product.mlItemId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          available_quantity: newStock,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Error actualizando stock en ML: ${error}`);
+    }
+
+    // Actualizar timestamp de sincronización
+    await db.update(products)
+      .set({
+        mlLastSync: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(products.id, productId));
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error actualizando stock en ML:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+// Obtener productos pendientes de sincronización
+export async function getPendingSyncProducts(_userId?: number) {
+  return await db.query.products.findMany({
+    where: eq(products.mlSyncStatus, 'pending'),
+    orderBy: desc(products.created_at),
+  });
+}
+
+// Crear registro de sincronización para producto
+export async function createProductSyncRecord(productId: number) {
+  const existing = await db.query.mercadolibreProductsSync.findFirst({
+    where: eq(mercadolibreProductsSync.productId, productId),
+  });
+
+  if (!existing) {
+    await db.insert(mercadolibreProductsSync).values({
+      productId,
+      syncStatus: 'pending',
+    });
   }
 }
