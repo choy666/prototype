@@ -154,6 +154,14 @@ export async function POST(req: NextRequest) {
     // Calcular total final
     const total = subtotal + shippingCost;
 
+    // Obtener información del usuario para el pagador
+    const payerInfo = {
+      email: userExists[0].email,
+      name: userExists[0].name || '',
+      // Nota: La identificación se puede agregar en el futuro si se añade el campo a la BD
+      // Por ahora enviamos solo los campos disponibles para mejorar tasa de aprobación
+    };
+
     // Preparar metadata incluyendo variantId en items
     const metadata = {
       userId: userId.toString(),
@@ -209,6 +217,9 @@ export async function POST(req: NextRequest) {
         },
         auto_return: "approved",
         notification_url: `${process.env.MERCADO_PAGO_NOTIFICATION_URL}?source_news=webhooks&user_id=${userId}`,
+        payer: payerInfo,
+        external_reference: `order_${userId}_${Date.now()}`,
+        statement_descriptor: "PROTOTYPE ML",
         metadata: {
           userId: userId.toString(),
           shippingAddress: JSON.stringify(shippingAddress),
