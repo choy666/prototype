@@ -4,10 +4,10 @@
 - Nombre : prototypeML
 - App ID : 8458968436453153
 - Client Secret : IA9SP48WNE2w5XXogwoGde6rtcvGQskq
-- Redirect URIs : https://prototype-ten-dun.vercel.app/payment-success, https://prototype-ten-dun.vercel.app/payment-failure, https://prototype-ten-dun.vercel.app/payment-pending 
+- Redirect URIs : https://prototype-ten-dun.vercel.app/api/auth/mercadolibre/callback
 pkce : si
 Mercado Libre : si
-Notificaciones callbacks URL : https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago
+Notificaciones callbacks URL : https://prototype-ten-dun.vercel.app/api/mercadolibre/webhooks
 ----
 
 

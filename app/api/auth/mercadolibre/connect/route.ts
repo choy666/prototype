@@ -28,8 +28,8 @@ export async function GET() {
     // Build the authorization URL
     const authUrl = new URL('https://auth.mercadolibre.com.ar/authorization');
     authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('client_id', process.env.MERCADOLIBRE_APP_ID!);
-    authUrl.searchParams.append('redirect_uri', `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/mercadolibre/callback`);
+    authUrl.searchParams.append('client_id', process.env.MERCADOLIBRE_CLIENT_ID!);
+    authUrl.searchParams.append('redirect_uri', process.env.MERCADOLIBRE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/mercadolibre/callback`);
     authUrl.searchParams.append('code_challenge', codeChallenge);
     authUrl.searchParams.append('code_challenge_method', 'S256');
     authUrl.searchParams.append('state', state);

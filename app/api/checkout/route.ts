@@ -211,12 +211,12 @@ export async function POST(req: NextRequest) {
           }] : [])
         ],
         back_urls: {
-          success: `${process.env.APP_URL}/payment-success`,
-          failure: `${process.env.APP_URL}/payment-failure`,
-          pending: `${process.env.APP_URL}/payment-pending`,
+          success: `${process.env.NEXT_PUBLIC_APP_URL}/payment-success`,
+          failure: `${process.env.NEXT_PUBLIC_APP_URL}/payment-failure`,
+          pending: `${process.env.NEXT_PUBLIC_APP_URL}/payment-pending`,
         },
         auto_return: "approved",
-        notification_url: `${process.env.MERCADO_PAGO_NOTIFICATION_URL}?source_news=webhooks&user_id=${userId}`,
+        notification_url: `${process.env.MERCADO_PAGO_WEBHOOK_URL}?source_news=webhooks&user_id=${userId}`,
         payer: payerInfo,
         external_reference: `order_${userId}_${Date.now()}`,
         statement_descriptor: "PROTOTYPE ML",

@@ -1,74 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { saveTokens } from '@/lib/auth/mercadolibre';
 import { getSession } from '@/lib/actions/auth';
-import { exchangeCodeForTokens, saveTokens } from '@/lib/auth/mercadolibre';
+
+// Interfaz para los datos del token de Mercado Libre
+interface MercadoLibreTokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user_id: string;
+}
+
+// Función para guardar tokens en base de datos
+async function saveTokensToDatabase(tokenData: MercadoLibreTokenData): Promise<void> {
+  const session = await getSession();
+  if (!session?.user?.id) {
+    throw new Error('Usuario no autenticado');
+  }
+
+  await saveTokens(parseInt(session.user.id), {
+    access_token: tokenData.access_token,
+    refresh_token: tokenData.refresh_token,
+    expires_in: tokenData.expires_in,
+    user_id: tokenData.user_id,
+  });
+}
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    const error = searchParams.get('error');
+  const searchParams = request.nextUrl.searchParams;
+  const code = searchParams.get('code');
+  const state = searchParams.get('state');
+  const storedState = request.cookies.get('oauth_state')?.value;
 
-    // Verificar si hay error en la respuesta
-    if (error) {
-      console.error('Error en callback de Mercado Libre:', error);
-      return NextResponse.redirect(
-        new URL('/admin?error=mercadolibre_auth_failed', request.url)
-      );
-    }
-
-    // Verificar parámetros requeridos
-    if (!code || !state) {
-      return NextResponse.redirect(
-        new URL('/admin?error=mercadolibre_missing_params', request.url)
-      );
-    }
-
-    // Verificar autenticación del usuario
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.redirect(
-        new URL('/admin?error=user_not_authenticated', request.url)
-      );
-    }
-
-    // Obtener cookies
-    const storedState = request.cookies.get('mercadolibre_state')?.value;
-    const codeVerifier = request.cookies.get('mercadolibre_code_verifier')?.value;
-
-    // Verificar state para prevenir CSRF
-    if (!storedState || state !== storedState) {
-      return NextResponse.redirect(
-        new URL('/admin?error=mercadolibre_invalid_state', request.url)
-      );
-    }
-
-    if (!codeVerifier) {
-      return NextResponse.redirect(
-        new URL('/admin?error=mercadolibre_missing_code_verifier', request.url)
-      );
-    }
-
-    // Intercambiar code por tokens
-    const tokens = await exchangeCodeForTokens(code, codeVerifier);
-
-    // Guardar tokens en la base de datos
-    await saveTokens(parseInt(session.user.id), tokens);
-
-    // Limpiar cookies
-    const response = NextResponse.redirect(
-      new URL('/admin?success=mercadolibre_connected', request.url)
-    );
-
-    response.cookies.delete('mercadolibre_state');
-    response.cookies.delete('mercadolibre_code_verifier');
-
-    return response;
-
-  } catch (error) {
-    console.error('Error en callback de Mercado Libre:', error);
+  // Validar state CSRF
+  if (!state || !storedState || state !== storedState) {
     return NextResponse.redirect(
-      new URL('/admin?error=mercadolibre_callback_error', request.url)
+      `${process.env.NEXT_PUBLIC_APP_URL}/login?error=invalid_state`
+    );
+  }
+
+  try {
+    // Intercambiar code por access_token
+    const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: process.env.MERCADOLIBRE_CLIENT_ID!,
+        client_secret: process.env.MERCADOLIBRE_CLIENT_SECRET,
+        code: code,
+        redirect_uri: process.env.MERCADOLIBRE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/mercadolibre/callback`,
+      }),
+    });
+
+    const tokenData: MercadoLibreTokenData = await tokenResponse.json();
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.json() as { message?: string };
+      throw new Error(`Error en token: ${errorData.message || 'Error desconocido'}`);
+    }
+
+    // Guardar tokens en base de datos
+    await saveTokensToDatabase(tokenData);
+
+    // Limpiar cookie state
+    const response = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?auth=success`
+    );
+    response.cookies.delete('oauth_state');
+    
+    return response;
+  } catch (error) {
+    console.error('Error en callback ML:', error);
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL}/login?error=token_exchange_failed`
     );
   }
 }
