@@ -2,16 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Loader2, CheckCircle2, AlertCircle, TestTube } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, CheckCircle2, AlertCircle, TestTube, RefreshCw, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { LoadingBar } from '@/components/ui/loading-bar';
 import { useMercadoLibreStatus } from '@/hooks/useMercadoLibreStatus';
 
+interface SyncStatus {
+  total: number;
+  synced: number;
+  pending: number;
+  errors: number;
+  lastSync?: string;
+}
+
 export function MercadoLibreConnection() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const router = useRouter();
 
   const {
@@ -26,6 +37,46 @@ export function MercadoLibreConnection() {
       toast.error('Error al verificar la conexión con MercadoLibre');
     }
   }, [statusError]);
+
+  useEffect(() => {
+    if (connectionStatus?.connected) {
+      fetchSyncStatus();
+    }
+  }, [connectionStatus?.connected]);
+
+  const fetchSyncStatus = async () => {
+    try {
+      const response = await fetch('/api/mercadolibre/sync/status');
+      if (response.ok) {
+        const data = await response.json();
+        setSyncStatus(data);
+      }
+    } catch (error) {
+      console.error('Error obteniendo estado de sincronización:', error);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/mercadolibre/sync/all', {
+        method: 'POST',
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(`Sincronización completada: ${result.synced} productos sincronizados`);
+        await fetchSyncStatus();
+      } else {
+        toast.error(result.error || 'Error en la sincronización');
+      }
+    } catch (error) {
+      console.error('Error en sincronización:', error);
+      toast.error('Error al sincronizar productos');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleConnect = async () => {
     try {
@@ -101,7 +152,7 @@ export function MercadoLibreConnection() {
 
   return (
     <div className="space-y-6">
-      <LoadingBar isLoading={isConnecting || isTesting} />
+      <LoadingBar isLoading={isConnecting || isTesting || isSyncing} />
       
       <div className="border-b pb-4">
         <h2 className="text-xl font-semibold">Estado de la conexión</h2>
@@ -187,6 +238,78 @@ export function MercadoLibreConnection() {
               )}
             </Button>
           </div>
+
+          {/* Estado de Sincronización */}
+          {syncStatus && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5" />
+                  Estado de Sincronización
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{syncStatus.total}</div>
+                    <div className="text-sm text-muted-foreground">Total</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{syncStatus.synced}</div>
+                    <div className="text-sm text-muted-foreground">Sincronizados</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">{syncStatus.pending}</div>
+                    <div className="text-sm text-muted-foreground">Pendientes</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{syncStatus.errors}</div>
+                    <div className="text-sm text-muted-foreground">Errores</div>
+                  </div>
+                </div>
+
+                {syncStatus.lastSync && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    Última sincronización: {new Date(syncStatus.lastSync).toLocaleString()}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSyncAll}
+                    disabled={isSyncing || syncStatus.pending === 0}
+                    className="flex-1"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Sincronizando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Sincronizar Pendientes ({syncStatus.pending})
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button variant="outline" onClick={fetchSyncStatus}>
+                    Actualizar
+                  </Button>
+                </div>
+
+                {syncStatus.errors > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 rounded-lg">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-sm text-red-800">
+                      {syncStatus.errors} productos con errores de sincronización
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         <div className="pt-4">

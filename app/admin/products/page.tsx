@@ -24,6 +24,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react'
+import { ProductSyncButton } from '@/components/admin/ProductSyncButton';
 
 interface Product {
   id: number
@@ -36,6 +37,8 @@ interface Product {
   destacado: boolean
   isActive: boolean
   created_at: string
+  mlItemId?: string | null
+  mlSyncStatus?: string
 }
 
 interface ApiResponse {
@@ -487,35 +490,46 @@ export default function AdminProductsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Link href={`/admin/products/${product.id}/edit`}>
-                        <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Editar ${product.name}`}>
-                          <Edit className="h-4 w-4" />
+                    <div className="flex flex-col items-center gap-2">
+                      {/* Mercado Libre Sync Button */}
+                      <ProductSyncButton
+                        productId={product.id}
+                        mlItemId={product.mlItemId}
+                        syncStatus={product.mlSyncStatus}
+                        onSyncComplete={() => fetchProducts(search, page)}
+                      />
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-2">
+                        <Link href={`/admin/products/${product.id}/edit`}>
+                          <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Editar ${product.name}`}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/admin/products/${product.id}/stock`}>
+                          <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Gestionar stock de ${product.name}`}>
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant={product.isActive ? "outline" : "secondary"}
+                          size="icon"
+                          onClick={() => handleToggleActive(product.id, !product.isActive)}
+                          className="h-9 w-9"
+                          aria-label={product.isActive ? `Desactivar ${product.name}` : `Reactivar ${product.name}`}
+                        >
+                          {product.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
-                      </Link>
-                      <Link href={`/admin/products/${product.id}/stock`}>
-                        <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Gestionar stock de ${product.name}`}>
-                          <Settings className="h-4 w-4" />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => handleDeleteClick(product.id)}
+                          className="h-9 w-9"
+                          aria-label={`Eliminar ${product.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </Link>
-                      <Button
-                        variant={product.isActive ? "outline" : "secondary"}
-                        size="icon"
-                        onClick={() => handleToggleActive(product.id, !product.isActive)}
-                        className="h-9 w-9"
-                        aria-label={product.isActive ? `Desactivar ${product.name}` : `Reactivar ${product.name}`}
-                      >
-                        {product.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => handleDeleteClick(product.id)}
-                        className="h-9 w-9"
-                        aria-label={`Eliminar ${product.name}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
