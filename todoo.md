@@ -68,7 +68,7 @@
     - `components/admin/MercadoLibrePermissions.tsx` (nuevo)
 
 #### Tareas Frontend
-- [ ] **UI de conexión Mercado Libre**
+- [x] **UI de conexión Mercado Libre**
   - **Descripción**: Botón y flujo para conectar cuenta ML
   - **Pasos**:
     1. Página de configuración ML en admin

@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { retryWithBackoff } from '@/lib/utils/retry';
+import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 
 // Configuración de Mercado Libre
 export const MERCADOLIBRE_CONFIG = {
@@ -57,19 +59,36 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
     code_verifier: codeVerifier,
   });
 
-  const response = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
-    },
-    body: params.toString(),
+  const response = await retryWithBackoff(async () => {
+    const res = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: params.toString(),
+    });
+    
+    if (!res.ok) {
+      const error = await res.text();
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.AUTH_FAILED,
+        `Error intercambiando código por tokens: ${error}`,
+        { status: res.status, error }
+      );
+    }
+    
+    return res;
+  }, {
+    maxRetries: 3,
+    shouldRetry: (error) => {
+      // Reintentar solo en errores de red o del servidor
+      return error instanceof MercadoLibreError && 
+             (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
+              error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
+              error.code === MercadoLibreErrorCode.API_UNAVAILABLE);
+    }
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Error exchanging code for tokens: ${error}`);
-  }
 
   return response.json();
 }
@@ -89,19 +108,35 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     refresh_token: refreshToken,
   });
 
-  const response = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
-    },
-    body: params.toString(),
+  const response = await retryWithBackoff(async () => {
+    const res = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: params.toString(),
+    });
+    
+    if (!res.ok) {
+      const error = await res.text();
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.AUTH_FAILED,
+        `Error refrescando token: ${error}`,
+        { status: res.status, error }
+      );
+    }
+    
+    return res;
+  }, {
+    maxRetries: 3,
+    shouldRetry: (error) => {
+      return error instanceof MercadoLibreError && 
+             (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
+              error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
+              error.code === MercadoLibreErrorCode.API_UNAVAILABLE);
+    }
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Error refreshing token: ${error}`);
-  }
 
   return response.json();
 }

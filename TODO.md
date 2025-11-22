@@ -1,132 +1,161 @@
-# ✅ TODO.md: Verificación de Implementación - Autenticación OAuth2 Mercado Libre
+# Plan de Implementación Actualizado: Integración en Navbar Existente
 
-## 📋 Información del Proyecto
-- **Framework**: Next.js 15 (App Router)
-- **Base de Datos**: Neon Serverless Postgres con Drizzle ORM
-- **App ID Mercado Libre**: 1591558006134773
-- **Redirect URI**: https://prototype-ten-dun.vercel.app/
-- **PKCE**: Habilitado
-- **Webhook URL**: https://prototype-ten-dun.vercel.app/checkout/webhook
+Basado en la estructura actual del Navbar, aquí está el plan actualizado:
 
-## 🔐 AUTENTICACIÓN OAUTH2 CON PKCE
-**Estado: ✅ IMPLEMENTADO**
+## 1. Actualización del Navbar para Incluir MercadoLibre
 
-### ✅ Tareas Backend Completadas
+### 1.1 Agregar Ícono de MercadoLibre
+- **Archivo**: [/components/ui/Navbar.tsx](cci:7://file:///c:/developer%20web/paginas/prototype/components/ui/Navbar.tsx:0:0-0:0)
+- **Cambios**:
+  - Importar el ícono de MercadoLibre
+  - Agregar el ítem de navegación para administradores
 
-#### ✅ **Implementar flujo OAuth2 PKCE**
-- **Estado**: ✅ Completado
-- **Verificación**:
-  - ✅ Generar code_verifier y code_challenge: Implementado en `lib/auth/mercadolibre.ts` (funciones `generateCodeVerifier()` y `generateCodeChallenge()`)
-  - ✅ Redirigir a Mercado Libre con parámetros correctos: Endpoint callback maneja redirección
-  - ✅ Manejar callback y validar state: `app/api/auth/mercadolibre/callback/route.ts` valida state y CSRF
-  - ✅ Intercambiar code por access_token y refresh_token: Función `exchangeCodeForTokens()` en `lib/auth/mercadolibre.ts`
-- **Archivos Verificados**:
-  - ❌ `app/api/auth/mercadolibre/route.ts` (no existe - flujo inicia desde frontend)
-  - ✅ `app/api/auth/mercadolibre/callback/route.ts` (implementado correctamente)
-  - ✅ `lib/auth/mercadolibre.ts` (utilidades OAuth completas)
+### 1.2 Actualizar la Lista de Navegación
+- Modificar el array `navItems` para incluir MercadoLibre
 
-#### ✅ **Gestión de tokens y refresh**
-- **Estado**: ✅ Completado
-- **Verificación**:
-  - ✅ Almacenar tokens en BD con expiración: Campos agregados en `users` table (`mercadoLibreAccessToken`, `mercadoLibreRefreshToken`, etc.)
-  - ✅ Endpoint para refresh automático: `app/api/auth/mercadolibre/refresh/route.ts` implementado
-  - ✅ Middleware para validar tokens en requests: `lib/middleware/mercadolibre-auth.ts` con refresh automático
-- **Archivos Verificados**:
-  - ✅ `lib/auth/mercadolibre.ts` (extendido con funciones de gestión de tokens)
-  - ✅ `lib/middleware/mercadolibre-auth.ts` (middleware de autenticación)
+## 2. Implementación del Indicador de Estado
 
-#### ✅ **Validación de scopes y permisos**
-- **Estado**: ✅ Completado
-- **Verificación**:
-  - ✅ Endpoint para verificar permisos activos: `app/api/auth/mercadolibre/permissions/route.ts` implementado
-  - ✅ UI para mostrar estado de permisos: `components/admin/MercadoLibrePermissions.tsx` implementado
-  - ✅ Alertas cuando falten permisos: Componente muestra alertas y estado por módulo
-- **Archivos Verificados**:
-  - ✅ `app/api/auth/mercadolibre/permissions/route.ts` (endpoint de permisos)
-  - ✅ `components/admin/MercadoLibrePermissions.tsx` (UI de permisos)
+### 2.1 Crear Componente `MercadoLibreStatus`
+- **Ubicación**: `/components/admin/MercadoLibreStatus.tsx`
+- **Funcionalidad**:
+  - Mostrar estado de conexión (conectado/desconectado)
+  - Incluir indicador visual (icono de estado)
 
-## 🗄️ BASE DE DATOS
+### 2.2 Integrar en el Dashboard
+- **Ubicación**: `/app/admin/dashboard/page.tsx`
+- **Cambios**:
+  - Agregar tarjeta con el estado de MercadoLibre
+  - Incluir enlace rápido a la configuración
 
-### ✅ Campos Mercado Libre en Users Table
-**Estado**: ✅ Implementado
-```sql
--- Campos verificados en lib/schema.ts:
-mercadoLibreId: varchar("mercado_libre_id", { length: 100 })
-mercadoLibreAccessToken: text("mercado_libre_access_token")
-mercadoLibreRefreshToken: text("mercado_libre_refresh_token")
-mercadoLibreScopes: text("mercado_libre_scopes")
-mercadoLibreAccessTokenExpiresAt: timestamp("mercado_libre_access_token_expires_at")
-mercadoLibreRefreshTokenExpiresAt: timestamp("mercado_libre_refresh_token_expires_at")
+## 3. Código de Implementación
+
+### 3.1 Actualización de [Navbar.tsx](cci:7://file:///c:/developer%20web/paginas/prototype/components/ui/Navbar.tsx:0:0-0:0)
+
+```tsx
+// En la sección de imports, agregar:
+import { ShoppingCart, Menu, X, House, User, LayoutDashboard, Package, ShoppingCart as ShoppingCartIcon, Users, BarChart3, Tag, ShoppingBag } from 'lucide-react';
+
+// En el array de navItems para admin, agregar:
+const navItems = isAdmin ? [
+  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { name: 'Productos', href: '/admin/products', icon: Package },
+  { name: 'Categorías', href: '/admin/categories', icon: Tag },
+  { name: 'MercadoLibre', href: '/admin/mercadolibre', icon: ShoppingBag },
+  { name: 'Pedidos', href: '/admin/orders', icon: ShoppingCartIcon },
+  { name: 'Usuarios', href: '/admin/users', icon: Users },
+  { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
+] : [
+  // ... resto del código existente
+];
 ```
 
-## 🔧 FUNCIONALIDADES IMPLEMENTADAS
+### 3.2 Crear Componente `MercadoLibreStatus.tsx`
 
-### ✅ Utilidades OAuth2 PKCE
-- `generateCodeVerifier()`: Genera code_verifier aleatorio
-- `generateCodeChallenge()`: Crea code_challenge con SHA-256
-- `generateState()`: Genera state para CSRF protection
-- `exchangeCodeForTokens()`: Intercambia code por tokens
-- `refreshAccessToken()`: Renueva access token
-- `saveTokens()`: Almacena tokens en BD
-- `getTokens()`: Recupera tokens de BD
-- `isConnected()`: Verifica conexión ML
-- `makeAuthenticatedRequest()`: Helper para requests autenticados
+```tsx
+'use client';
 
-### ✅ Gestión de Scopes
-- `getMercadoLibreScopes()`: Obtiene scopes desde ML API
-- `validateMercadoLibreScopes()`: Valida scopes requeridos
-- `checkCriticalScopes()`: Verifica scopes críticos
-- `REQUIRED_SCOPES`: Definición de scopes por módulo
-- `CRITICAL_SCOPES`: Scopes críticos del sistema
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, AlertCircle, Loader2, ShoppingBag } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 
-### ✅ Middleware de Autenticación
-- `withMercadoLibreAuth()`: Wrapper con refresh automático
-- `makeAuthenticatedRequestWithRefresh()`: Helper con retry en 401
+async function fetchMercadoLibreStatus() {
+  const res = await fetch('/api/auth/mercadolibre/status');
+  if (!res.ok) throw new Error('Error al obtener el estado');
+  return res.json();
+}
 
-### ✅ UI de Permisos
-- Estado general de permisos
-- Validación por módulo (auth, products, inventory, orders, messages)
-- Alertas para permisos faltantes
-- Lista de scopes disponibles
-- Botón de actualización en tiempo real
+export function MercadoLibreStatus() {
+  const { data, isLoading, error } = useQuery(
+    ['mercadolibre-status'],
+    fetchMercadoLibreStatus,
+    { retry: false }
+  );
 
-## 🧪 VERIFICACIÓN DE INTEGRACIÓN
+  const isConnected = data?.connected;
 
-### ✅ Endpoints API
-- `GET /api/auth/mercadolibre/permissions`: Verificación de permisos
-- `POST /api/auth/mercadolibre/refresh`: Refresh de tokens
-- `GET /api/auth/mercadolibre/callback`: Callback OAuth2
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium flex items-center">
+          <ShoppingBag className="mr-2 h-4 w-4" />
+          Estado de MercadoLibre
+        </CardTitle>
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : isConnected ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        ) : (
+          <AlertCircle className="h-4 w-4 text-yellow-500" />
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">
+          {isLoading
+            ? 'Cargando...'
+            : isConnected
+            ? 'Conectado'
+            : 'Desconectado'}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {isConnected
+            ? `Usuario: ${data?.userId || 'N/A'}`
+            : 'No conectado a MercadoLibre'}
+        </p>
+        <div className="mt-4">
+          <Link href="/admin/mercadolibre">
+            <Button variant="outline" size="sm" className="w-full">
+              {isConnected ? 'Administrar' : 'Conectar'}
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
 
-### ✅ Seguridad Implementada
-- ✅ PKCE (Proof Key for Code Exchange)
-- ✅ State parameter para CSRF protection
-- ✅ Validación de expiración de tokens
-- ✅ Refresh automático de tokens
-- ✅ Manejo seguro de cookies (HttpOnly, Secure)
+### 3.3 Actualizar Dashboard de Administración
 
-### ✅ Manejo de Errores
-- ✅ Validación de parámetros en callback
-- ✅ Verificación de sesión de usuario
-- ✅ Manejo de errores de API ML
-- ✅ Logging de operaciones críticas
-- ✅ Redirección con mensajes de error apropiados
+En `/app/admin/dashboard/page.tsx`:
 
-## 📊 ESTADO GENERAL
-- **Implementación**: ✅ 100% Completa
-- **Funcionalidades Críticas**: ✅ Todas implementadas
-- **Seguridad**: ✅ Medidas implementadas
-- **UI/UX**: ✅ Interfaz de permisos completa
-- **Base de Datos**: ✅ Campos necesarios agregados
+```tsx
+import { MercadoLibreStatus } from '@/components/admin/MercadoLibreStatus';
 
-## 🎯 PRÓXIMOS PASOS RECOMENDADOS
-Con la autenticación OAuth2 completamente implementada, los siguientes módulos pueden desarrollarse:
+export default function AdminDashboard() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-8">Panel de Administración</h1>
+      
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <MercadoLibreStatus />
+        {/* Otras tarjetas del dashboard */}
+      </div>
+    </div>
+  );
+}
+```
 
-1. **Sincronización de Productos** (Alta Prioridad)
-2. **Sincronización de Inventario** (Alta Prioridad)
-3. **Sincronización de Órdenes** (Crítica)
-4. **Sistema de Webhooks** (Crítica)
-5. **Eliminación del Sistema de Envíos** (Crítica)
+## 4. Pasos de Implementación
 
----
-*Verificación realizada el: $(date)*
-*Estado: ✅ TODAS LAS TAREAS DE AUTENTICACIÓN IMPLEMENTADAS CORRECTAMENTE*
+1. **Actualizar Navbar**:
+   - Agregar el ícono de MercadoLibre a los imports
+   - Añadir el ítem de navegación en el array `navItems` para administradores
+
+2. **Crear componente de estado**:
+   - Crear el archivo `MercadoLibreStatus.tsx` en [/components/admin/](cci:7://file:///c:/developer%20web/paginas/prototype/components/admin:0:0-0:0)
+
+3. **Actualizar dashboard**:
+   - Importar y agregar el componente `MercadoLibreStatus` al dashboard
+
+4. **Probar la implementación**:
+   - Verificar que el enlace de MercadoLibre aparezca en la barra de navegación para administradores
+   - Comprobar que el estado de conexión se muestre correctamente en el dashboard
+
+## 5. Beneficios de esta Implementación
+
+1. **Integración consistente**: Se mantiene el estilo y comportamiento existente del Navbar
+2. **Fácil mantenimiento**: Todo el código relacionado con MercadoLibre está en sus propios componentes
+3. **Experiencia de usuario mejorada**: Acceso rápido a la configuración de MercadoLibre desde la navegación principal
+4. **Retroalimentación visual**: Los administradores pueden ver el estado de la conexión directamente desde el dashboard

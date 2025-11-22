@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingCart, Menu, X, House, User, LayoutDashboard, Package, ShoppingCart as ShoppingCartIcon, Users, BarChart3, Tag } from 'lucide-react';
+import { ShoppingCart, Menu, X, House, User, LayoutDashboard, Package, ShoppingCart as ShoppingCartIcon, Users, BarChart3, Tag, ShoppingBag } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 import { Button } from '@/components/ui/Button';
@@ -33,6 +33,7 @@ const Navbar = () => {
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Productos', href: '/admin/products', icon: Package },
     { name: 'Categorías', href: '/admin/categories', icon: Tag },
+    { name: 'MercadoLibre', href: '/admin/mercadolibre', icon: ShoppingBag },
     { name: 'Pedidos', href: '/admin/orders', icon: ShoppingCartIcon },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },

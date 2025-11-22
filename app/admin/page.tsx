@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { MercadoLibreStatus } from '@/components/admin/MercadoLibreStatus'
 import {
   Users as UsersIcon,
   Package,
@@ -321,6 +322,7 @@ async function DashboardContent() {
           icon={DollarSign}
           trend={stats.revenueTrend}
         />
+        <MercadoLibreStatus />
       </div>
 
       {/* Notificaciones */}

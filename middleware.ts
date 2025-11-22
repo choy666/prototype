@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/actions/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Rutas protegidas (requieren sesión activa)
 const protectedRoutes = [
@@ -32,6 +33,14 @@ const userRestrictedRoutes = [
 
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Aplicar rate limiting a endpoints de MercadoLibre
+  if (pathname.startsWith('/api/auth/mercadolibre')) {
+    const rateLimitResponse = checkRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+  }
 
   // Obtener sesión completa para verificar role
   const session = await auth();
