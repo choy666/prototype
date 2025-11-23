@@ -8,6 +8,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ProductFilters } from '@/types';
 import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
+import { logger } from '@/lib/utils/logger';
+import { validateProductForMercadoLibre } from '@/lib/validations/mercadolibre';
 
 // ✅ Esquema de validación para los filtros de productos
 const productFiltersSchema = z.object({
@@ -370,7 +372,7 @@ export async function getAllProducts(): Promise<Product[]> {
 // Funciones para Mercado Libre
 // ======================
 
-// Sincronizar producto con Mercado Libre
+// Sincronizar producto con Mercado Libre (integrado con cola y validaciones)
 export async function syncProductToMercadoLibre(
   productId: number,
   userId: number,
@@ -389,7 +391,49 @@ export async function syncProductToMercadoLibre(
       return { success: false, error: 'Producto no encontrado' };
     }
 
-    // Validaciones de negocio
+    // Validar producto para Mercado Libre
+    const validation = validateProductForMercadoLibre(product);
+    
+    if (!validation.valid) {
+      const errorMessage = `Validación fallida: ${validation.errors.join(', ')}`;
+      
+      logger.error('Products: Validación de producto fallida', {
+        productId,
+        productName: product.name,
+        errors: validation.errors,
+        warnings: validation.warnings
+      });
+      
+      // Actualizar estado de error en la tabla de cola
+      await db.update(mercadolibreProductsSync)
+        .set({
+          syncStatus: 'error',
+          syncError: errorMessage,
+          updatedAt: new Date()
+        })
+        .where(eq(mercadolibreProductsSync.productId, productId));
+
+      // También actualizar el producto local
+      await db.update(products)
+        .set({
+          mlSyncStatus: 'error',
+          updated_at: new Date()
+        })
+        .where(eq(products.id, productId));
+
+      return { success: false, error: errorMessage };
+    }
+
+    // Log warnings si existen
+    if (validation.warnings.length > 0) {
+      logger.warn('Products: Advertencias de validación', {
+        productId,
+        productName: product.name,
+        warnings: validation.warnings
+      });
+    }
+
+    // Validaciones de negocio (mantener las existentes como respaldo)
     if (product.stock <= 0) {
       return { success: false, error: 'stock insuficiente' };
     }
@@ -398,7 +442,7 @@ export async function syncProductToMercadoLibre(
       return { success: false, error: 'precio inválido' };
     }
 
-    // Actualizar estado de sincronización
+    // Actualizar estado de sincronización en la tabla de cola
     await db.update(mercadolibreProductsSync)
       .set({ 
         syncStatus: 'syncing',
@@ -407,7 +451,15 @@ export async function syncProductToMercadoLibre(
       })
       .where(eq(mercadolibreProductsSync.productId, productId));
 
-    // Preparar datos para ML
+    logger.info('Products: Iniciando sincronización con ML', {
+      productId,
+      productName: product.name,
+      userId,
+      attempt: retryCount + 1,
+      validationPassed: true
+    });
+
+    // Preparar datos para ML (usando datos validados)
     const mlProductData = {
       title: product.name,
       category_id: product.mlCategoryId || 'MLA3530', // Default categoría
@@ -438,7 +490,12 @@ export async function syncProductToMercadoLibre(
       
       // Verificar si es un error temporal que debe reintentarse
       if (errorText.includes('temporarily unavailable') && retryCount < MAX_RETRIES) {
-        console.log(`Error temporal, reintentando (${retryCount + 1}/${MAX_RETRIES})`);
+        logger.warn('Products: Error temporal, reintentando', {
+          productId,
+          attempt: retryCount + 1,
+          maxRetries: MAX_RETRIES,
+          error: errorText
+        });
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
         return syncProductToMercadoLibre(productId, userId, retryCount + 1);
       }
@@ -448,6 +505,12 @@ export async function syncProductToMercadoLibre(
 
     const mlItem = await response.json();
     const mlItemId = mlItem.id;
+
+    logger.info('Products: Producto creado exitosamente en ML', {
+      productId,
+      mlItemId,
+      mlPermalink: mlItem.permalink
+    });
 
     // Actualizar producto local con ID de ML
     await db.update(products)
@@ -461,13 +524,14 @@ export async function syncProductToMercadoLibre(
       })
       .where(eq(products.id, productId));
 
-    // Actualizar tabla de sincronización
+    // Actualizar tabla de sincronización (cola)
     await db.update(mercadolibreProductsSync)
       .set({
         mlItemId,
         syncStatus: 'synced',
         lastSyncAt: new Date(),
         mlData: mlItem,
+        syncError: null,
         updatedAt: new Date()
       })
       .where(eq(mercadolibreProductsSync.productId, productId));
@@ -475,13 +539,21 @@ export async function syncProductToMercadoLibre(
     return { success: true, mlItemId };
 
   } catch (error) {
-    console.error('Error sincronizando producto a ML:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    logger.error('Products: Error sincronizando producto a ML', {
+      productId,
+      userId,
+      attempt: retryCount + 1,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     // Verificar si alcanzó el máximo de reintentos
     if (retryCount >= MAX_RETRIES) {
-      const errorMsg = 'máximo de reintentos';
+      const errorMsg = 'máximo de reintentos alcanzado';
       
-      // Actualizar estado de error
+      // Actualizar estado de error en la tabla de cola
       await db.update(mercadolibreProductsSync)
         .set({
           syncStatus: 'error',
@@ -490,28 +562,48 @@ export async function syncProductToMercadoLibre(
         })
         .where(eq(mercadolibreProductsSync.productId, productId));
 
+      // También actualizar el producto local
+      await db.update(products)
+        .set({
+          mlSyncStatus: 'error',
+          updated_at: new Date()
+        })
+        .where(eq(products.id, productId));
+
       return { success: false, error: errorMsg };
     }
     
     // Para errores temporales, reintentar automáticamente
-    if (error instanceof Error && error.message.includes('temporarily unavailable')) {
-      console.log(`Reintentando automáticamente (${retryCount + 1}/${MAX_RETRIES})`);
+    if (errorMessage.includes('temporarily unavailable')) {
+      logger.info('Products: Reintentando automáticamente', {
+        productId,
+        attempt: retryCount + 1,
+        maxRetries: MAX_RETRIES
+      });
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
       return syncProductToMercadoLibre(productId, userId, retryCount + 1);
     }
     
-    // Actualizar estado de error
+    // Actualizar estado de error en la tabla de cola
     await db.update(mercadolibreProductsSync)
       .set({
         syncStatus: 'error',
-        syncError: error instanceof Error ? error.message : String(error),
+        syncError: errorMessage,
         updatedAt: new Date()
       })
       .where(eq(mercadolibreProductsSync.productId, productId));
 
+    // También actualizar el producto local
+    await db.update(products)
+      .set({
+        mlSyncStatus: 'error',
+        updated_at: new Date()
+      })
+      .where(eq(products.id, productId));
+
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : String(error)
+      error: errorMessage
     };
   }
 }
@@ -585,5 +677,86 @@ export async function createProductSyncRecord(productId: number) {
       productId,
       syncStatus: 'pending',
     });
+    
+    logger.info('Products: Registro de sincronización creado', { productId });
+  } else {
+    logger.info('Products: Registro de sincronización ya existe', { 
+      productId, 
+      currentStatus: existing.syncStatus 
+    });
+  }
+}
+
+// Agregar producto a la cola de sincronización
+export async function addProductToSyncQueue(
+  productId: number, 
+  priority: 'low' | 'normal' | 'high' | 'critical' = 'normal',
+  delayMinutes: number = 0
+) {
+  try {
+    const { addToSyncQueue } = await import('@/lib/queue/sync-queue');
+    
+    await addToSyncQueue(productId, priority, delayMinutes);
+    
+    logger.info('Products: Producto agregado a cola de sincronización', {
+      productId,
+      priority,
+      delayMinutes
+    });
+    
+    return { success: true };
+  } catch (error) {
+    logger.error('Products: Error agregando producto a cola', {
+      productId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+// Sincronizar múltiples productos en lote
+export async function syncMultipleProducts(
+  productIds: number[],
+  userId: number
+): Promise<{ success: boolean; results: { processed: number; successful: number; failed: number; }; error?: string }> {
+  try {
+    const { processBatch } = await import('@/lib/queue/sync-queue');
+    
+    // Agregar todos los productos a la cola primero
+    for (const productId of productIds) {
+      await addProductToSyncQueue(productId, 'normal', 0);
+    }
+    
+    // Procesar el lote
+    const results = await processBatch(userId);
+    
+    logger.info('Products: Sincronización en lote completada', {
+      userId,
+      productCount: productIds.length,
+      ...results
+    });
+    
+    return { 
+      success: true, 
+      results 
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    logger.error('Products: Error en sincronización en lote', {
+      userId,
+      productIds,
+      error: errorMessage
+    });
+    
+    return { 
+      success: false, 
+      error: errorMessage,
+      results: { processed: 0, successful: 0, failed: 0 }
+    };
   }
 }

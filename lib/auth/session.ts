@@ -1,4 +1,4 @@
-// lib/auth/sesion.ts
+// lib/auth/session.ts
 import { auth } from "@/lib/actions/auth"; // ✅ importar la función auth
 
 export async function getCurrentUser() {
@@ -18,6 +18,9 @@ export async function requireAuth() {
   }
   return session;
 }
+
+// Exportar authOptions para compatibilidad con API routes
+export { auth as authOptions };
 
 export async function requireRole(role: string) {
   const session = await auth();

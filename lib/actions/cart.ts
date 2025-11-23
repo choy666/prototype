@@ -34,6 +34,7 @@ export async function getUserCart(userId: number) {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        isActive: products.isActive,
       },
       variant: {
         id: productVariants.id,
@@ -42,12 +43,17 @@ export async function getUserCart(userId: number) {
         price: productVariants.price,
         stock: productVariants.stock,
         images: productVariants.images,
+        isActive: productVariants.isActive,
       },
     })
     .from(cartItems)
-    .leftJoin(products, eq(cartItems.productId, products.id))
+    .innerJoin(products, and(eq(cartItems.productId, products.id), eq(products.isActive, true)))
     .leftJoin(productVariants, eq(cartItems.variantId, productVariants.id))
-    .where(eq(cartItems.cartId, cart[0].id))
+    .where(and(
+      eq(cartItems.cartId, cart[0].id),
+      // Si hay variante, verificar que también esté activa
+      cartItems.variantId ? eq(productVariants.isActive, true) : eq(products.isActive, true)
+    ))
 
   return {
     ...cart[0],
@@ -77,30 +83,34 @@ export async function addToCart(
     throw new Error('No autorizado')
   }
 
-  // Verificar que el producto existe
+  // Verificar que el producto existe y está activo
   const product = await db
     .select()
     .from(products)
-    .where(eq(products.id, productId))
+    .where(and(
+      eq(products.id, productId),
+      eq(products.isActive, true)
+    ))
     .limit(1)
 
   if (!product.length) {
-    throw new Error('Producto no encontrado')
+    throw new Error('Producto no encontrado o no disponible')
   }
 
-  // Si hay variantId, verificar que existe y pertenece al producto
+  // Si hay variantId, verificar que existe, pertenece al producto y está activa
   if (variantId) {
     const variant = await db
       .select()
       .from(productVariants)
       .where(and(
         eq(productVariants.id, variantId),
-        eq(productVariants.productId, productId)
+        eq(productVariants.productId, productId),
+        eq(productVariants.isActive, true)
       ))
       .limit(1)
 
     if (!variant.length) {
-      throw new Error('Variante no encontrada')
+      throw new Error('Variante no encontrada o no disponible')
     }
 
     // Verificar stock de la variante

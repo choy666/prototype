@@ -33,7 +33,13 @@ export function ShippingMethodSelector({
 
   // Calcular costos para todos los métodos cuando cambian las props
   useEffect(() => {
-    const totalWeight = calculateTotalWeight(items);
+    // Normalizar valores null a undefined para compatibilidad con CartItem
+    const normalizedItems = items.map(item => ({
+      ...item,
+      discount: item.discount ?? undefined
+    }));
+    
+    const totalWeight = calculateTotalWeight(normalizedItems);
     const costs: Record<number, number> = {};
 
     shippingMethods.forEach(method => {

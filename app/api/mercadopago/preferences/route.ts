@@ -30,6 +30,7 @@ interface PreferenceRequest {
     currency_id?: string;
     picture_url?: string;
     description?: string;
+    category_id?: string;
   }>;
   payer?: {
     name?: string;
@@ -70,6 +71,7 @@ interface PreferenceRequest {
   expirationDateFrom?: string;
   expirationDateTo?: string;
   externalReference?: string;
+  statementDescriptor?: string;
 }
 
 
@@ -136,6 +138,7 @@ export async function POST(req: Request) {
         currency_id: item.currency_id || 'ARS',
         picture_url: item.picture_url,
         description: item.description || item.title,
+        category_id: item.category_id || 'others', // Mejorar tasa de aprobación
       })),
       payer: body.payer,
       payment_methods: body.paymentMethods,
@@ -145,8 +148,9 @@ export async function POST(req: Request) {
         failure: body.backUrls?.failure || `${process.env.NEXT_PUBLIC_APP_URL}/payment/failure`,
       },
       auto_return: body.autoReturn || 'approved',
-      notification_url: body.notificationUrl || `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/payments/notify`,
+      notification_url: body.notificationUrl || `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`,
       external_reference: body.externalReference || `order_${body.orderId || 'direct'}_${Date.now()}`,
+      statement_descriptor: body.statementDescriptor || process.env.MERCADO_PAGO_STATEMENT_DESCRIPTOR || 'PROTOTYPE MARKETPLACE', // Reducir contracargos
       expires: body.expires || false,
     };
 

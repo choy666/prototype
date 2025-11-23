@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ShoppingCart, Menu, X, House, User, LayoutDashboard, Package, ShoppingCart as ShoppingCartIcon, Users, BarChart3, Tag, ShoppingBag } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useCartStore, selectTotalItems } from '@/lib/stores/useCartStore';
 

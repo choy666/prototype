@@ -8,6 +8,8 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 - **Carrito de Compras**: Gestión de productos con persistencia local y estado global
 - **Sistema de Autenticación**: Registro/login tradicional y OAuth con Mercado Libre
 - **Procesamiento de Pagos**: Integración completa con Mercado Pago
+- **Sistema de Envíos**: Integración completa con Mercado Envíos (API de Shipments ML)
+- **Tracking en Tiempo Real**: Seguimiento actualizado de envíos con webhooks ML
 - **Panel de Usuario**: Gestión de perfil, direcciones y historial de pedidos
 - **Integración Mercado Libre**: Sincronización de productos, importación de órdenes y webhooks
 - **Panel Administrativo**: Gestión completa de productos, categorías y configuración ML
@@ -197,13 +199,18 @@ El proyecto utiliza Drizzle ORM con PostgreSQL. Los esquemas principales incluye
 - **mercadopago_preferences**: Preferencias de pago mejoradas
 - **mercadopago_payments**: Registro completo de pagos
 
+### Tablas de Envíos (Mercado Libre)
+- **ml_shipping_modes**: Modos de envío disponibles (ME1, ME2, ME3)
+- **shipment_history**: Historial completo de cambios de estado
+- **shipment_webhooks**: Configuración de webhooks para notificaciones
+
 ### Tablas de Soporte
 - **integration_metrics**: Métricas de rendimiento
 - **stockLogs**: Auditoría de stock
 - **productVariants**: Variantes de productos
 - **addresses**: Direcciones de usuarios
 
-**Total**: 20+ tablas con 28 índices optimizados
+**Total**: 25+ tablas con 35+ índices optimizados
 
 ## 🔧 Scripts Disponibles
 

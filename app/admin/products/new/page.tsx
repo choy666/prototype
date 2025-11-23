@@ -12,8 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 
-import { ImageReorder } from '@/components/ui/ImageReorder'
-import { ImageSingle } from '@/components/ui/ImageSingle'
+import { ImageManager } from '@/components/ui/ImageManager'
 import type { Category } from '@/lib/schema'
 
 
@@ -123,33 +122,6 @@ export default function NewProductPage() {
     setForm(prev => ({ ...prev, images }))
   }
 
-  const handleImageRemove = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleImageAdd = (imageUrl: string) => {
-    setForm(prev => ({
-      ...prev,
-      images: [...prev.images, imageUrl]
-    }))
-  }
-
-  const handleMainImageAdd = (imageUrl: string) => {
-    setForm(prev => ({
-      ...prev,
-      image: imageUrl
-    }))
-  }
-
-  const handleMainImageRemove = () => {
-    setForm(prev => ({
-      ...prev,
-      image: ''
-    }))
-  }
 
 
 
@@ -272,20 +244,20 @@ export default function NewProductPage() {
 
               <div className="md:col-span-2">
                 <Label htmlFor="image">Imagen Principal</Label>
-                <ImageSingle
-                  image={form.image}
-                  onAdd={handleMainImageAdd}
-                  onRemove={handleMainImageRemove}
+                <ImageManager
+                  mode="single"
+                  images={form.image ? [form.image] : []}
+                  onImagesChange={(images) => setForm(prev => ({ ...prev, image: images[0] || '' }))}
+                  maxImages={1}
                 />
               </div>
 
               <div className="md:col-span-2">
                 <Label htmlFor="images">Imágenes Adicionales</Label>
-                <ImageReorder
+                <ImageManager
+                  mode="reorder"
                   images={form.images}
-                  onReorder={handleImagesReorder}
-                  onRemove={handleImageRemove}
-                  onAdd={handleImageAdd}
+                  onImagesChange={handleImagesReorder}
                   maxImages={10}
                 />
               </div>

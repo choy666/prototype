@@ -24,7 +24,10 @@
     "tunnel": "lt --port 3000 --subdomain prototypev3",
     "dev:tunnel": "concurrently \"npm run dev\" \"npm run tunnel\"",
     "mcp:mercadolibre": "node mcp/mercadolibre-server.js",
-    "mcp:mercadopago": "node mcp/mercadopago-server.js"
+    "mcp:mercadopago": "node mcp/mercadopago-server.js",
+    "ts-node": "ts-node",
+    "migrate:ml-shipping": "ts-node scripts/migrate-ml-shipping.ts",
+    "migrate:simple": "ts-node scripts/simple-migrate.ts"
   },
   "dependencies": {
     "@auth/core": "0.40.0",
@@ -62,6 +65,7 @@
     "next-themes": "0.4.6",
     "pg": "8.16.3",
     "pg-connection-string": "2.9.1",
+    "postgres": "^3.4.7",
     "react": "19.1.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.1.0",

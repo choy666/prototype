@@ -143,6 +143,77 @@ export const orderStatusEnum = pgEnum("order_status", [
   "delivered",
   "cancelled",
   "rejected",
+  "processing", // Nuevo estado para envíos ML
+  "failed", // Nuevo estado para envíos fallidos
+  "returned", // Nuevo estado para devoluciones
+]);
+
+// ======================
+// Enum de estados de envío (ML)
+// ======================
+export const shippingStatusEnum = pgEnum("shipping_status", [
+  "pending",
+  "processing",
+  "shipped",
+  "delivered",
+  "failed",
+  "cancelled",
+  "returned",
+]);
+
+// ======================
+// Modos de envío de Mercado Libre
+// ======================
+export const mlShippingModes = pgTable("ml_shipping_modes", {
+  id: serial("id").primaryKey(),
+  mlModeId: varchar("ml_mode_id", { length: 50 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("ml_shipping_modes_ml_mode_id_unique").on(table.mlModeId),
+]);
+
+// ======================
+// Historial de envíos
+// ======================
+export const shipmentHistory = pgTable("shipment_history", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  shipmentId: varchar("shipment_id", { length: 50 }),
+  status: varchar("status", { length: 50 }).notNull(),
+  substatus: varchar("substatus", { length: 50 }),
+  comment: text("comment"),
+  trackingNumber: varchar("tracking_number", { length: 100 }),
+  trackingUrl: text("tracking_url"),
+  dateCreated: timestamp("date_created").notNull(),
+  source: varchar("source", { length: 50 }).default("mercadolibre"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("shipment_history_order_id_idx").on(table.orderId),
+  index("shipment_history_shipment_id_idx").on(table.shipmentId),
+  index("shipment_history_status_idx").on(table.status),
+  index("shipment_history_date_created_idx").on(table.dateCreated),
+]);
+
+// ======================
+// Webhooks de envíos
+// ======================
+export const shipmentWebhooks = pgTable("shipment_webhooks", {
+  id: serial("id").primaryKey(),
+  applicationId: varchar("application_id", { length: 50 }).notNull(),
+  userId: varchar("user_id", { length: 50 }).notNull(),
+  topic: varchar("topic", { length: 50 }).notNull(),
+  resourceUrl: text("resource_url").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastProcessed: timestamp("last_processed"),
+  failureCount: integer("failure_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("shipment_webhooks_application_user_topic_unique").on(table.applicationId, table.userId, table.topic),
 ]);
 
 
@@ -186,17 +257,26 @@ export const shippingMethods = pgTable("shipping_methods", {
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
+  email: varchar("email", { length: 256 }), // Permitir null inicialmente
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: orderStatusEnum("status").default("pending").notNull(), // Estado logístico
+  shippingStatus: shippingStatusEnum("shipping_status").default("pending"), // Estado de envío ML
   paymentId: text("payment_id"),
   mercadoPagoId: text("mercado_pago_id"),
   shippingAddress: jsonb("shipping_address"),
+  shippingAddressId: integer("shipping_address_id").references(() => addresses.id),
   shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0").notNull(),
   trackingNumber: text("tracking_number"), // Número de seguimiento
+  trackingUrl: text("tracking_url"), // URL de seguimiento
+  shippingMode: varchar("shipping_mode", { length: 20 }).default("me2"), // Modo de envío ML
   cancellationReason: text("cancellation_reason"), // Razón de cancelación
   cancelledAt: timestamp("cancelled_at"), // Fecha de cancelación
   // Nuevos campos para Mercado Libre
+  mercadoLibreShipmentId: varchar("mercado_libre_shipment_id", { length: 50 }), // ID del shipment en ML
+  mercadoLibreAddressId: varchar("mercado_libre_address_id", { length: 50 }), // ID dirección en ML
+  mercadoLibreShipmentStatus: varchar("mercado_libre_shipment_status", { length: 50 }), // Estado shipment ML
+  mercadoLibreShipmentSubstatus: varchar("mercado_libre_shipment_substatus", { length: 50 }), // Subestado ML
   mlOrderId: text("ml_order_id").unique(),
   source: text("source").default("local"),
   mlStatus: text("ml_status"),
@@ -206,7 +286,11 @@ export const orders = pgTable("orders", {
   mlFeedback: jsonb("ml_feedback"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("orders_mercado_libre_shipment_id_idx").on(table.mercadoLibreShipmentId),
+  index("orders_shipping_status_idx").on(table.shippingStatus),
+  index("orders_shipping_mode_idx").on(table.shippingMode),
+]);
 
 // ======================
 // Ítems de la orden

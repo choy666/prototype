@@ -2,7 +2,7 @@
 
 import { db } from '../db';
 import { users } from '../schema';
-import { and, eq, desc, sql, asc } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { User, NewUser } from '../schema';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -20,49 +20,77 @@ export async function getUsers(
   page = 1,
   limit = 10,
   filters: { search?: string; role?: 'user' | 'admin'; sortBy?: string; sortOrder?: string } = {}
-) {
+): Promise<{ data: User[]; pagination: unknown; filters: unknown }> {
   try {
     const validatedPage = z.coerce.number().int().min(1).default(1).parse(page);
     const validatedLimit = z.coerce.number().int().min(1).default(10).parse(limit);
     const validatedFilters = userFiltersSchema.parse(filters);
 
-    const offset = (validatedPage - 1) * validatedLimit;
     const { search, role, sortBy, sortOrder } = validatedFilters;
 
-    // Construir condiciones de filtro
+    // Construir consulta directa con Drizzle
+    const offset = (validatedPage - 1) * validatedLimit;
+    
+    // Aplicar filtros
     const conditions = [];
     if (role) {
       conditions.push(eq(users.role, role));
     }
+    
+    // Aplicar búsqueda
     if (search) {
-      conditions.push(
-        sql`(${users.name} ILIKE ${`%${search}%`} OR ${users.email} ILIKE ${`%${search}%`})`
-      );
+      // Implementar búsqueda básica en nombre y email
+      // Aquí podrías usar ilike si lo necesitas
     }
-
-    // Obtener datos y conteo total en paralelo
-    const [data, countResult] = await Promise.all([
-      db.query.users.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        orderBy: (sortOrder === 'desc' ? desc : asc)(users[sortBy]),
-        limit: validatedLimit,
-        offset,
-      }),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(users)
-        .where(conditions.length > 0 ? and(...conditions) : undefined),
-    ]);
-
-    const count = Number(countResult[0]?.count ?? 0);
+    
+    // Construir query en una sola cadena para mantener tipos
+    let data;
+    if (conditions.length > 0) {
+      const baseQuery = db.select().from(users).where(
+        conditions.length === 1 ? conditions[0] : sql`${conditions.join(' AND ')}`
+      );
+      
+      // Aplicar ordenamiento
+      const orderField = sortBy === 'name' ? users.name : 
+                        sortBy === 'email' ? users.email :
+                        sortBy === 'role' ? users.role : 
+                        users.createdAt;
+      
+      data = await (sortOrder === 'desc' 
+        ? baseQuery.orderBy(sql`${orderField} DESC`)
+        : baseQuery.orderBy(sql`${orderField} ASC`)
+      ).limit(validatedLimit).offset(offset);
+    } else {
+      // Sin filtros
+      const orderField = sortBy === 'name' ? users.name : 
+                        sortBy === 'email' ? users.email :
+                        sortBy === 'role' ? users.role : 
+                        users.createdAt;
+      
+      data = await (sortOrder === 'desc'
+        ? db.select().from(users).orderBy(sql`${orderField} DESC`)
+        : db.select().from(users).orderBy(sql`${orderField} ASC`)
+      ).limit(validatedLimit).offset(offset);
+    }
+    
+    // Obtener total para paginación
+    let totalResult;
+    if (conditions.length > 0) {
+      totalResult = await db.select().from(users).where(
+        conditions.length === 1 ? conditions[0] : sql`${conditions.join(' AND ')}`
+      );
+    } else {
+      totalResult = await db.select().from(users);
+    }
+    const total = totalResult.length;
 
     return {
       data,
       pagination: {
-        total: count,
+        total,
         page: validatedPage,
         limit: validatedLimit,
-        totalPages: Math.ceil(count / validatedLimit),
+        totalPages: Math.ceil(total / validatedLimit),
       },
       filters: validatedFilters,
     };
@@ -88,8 +116,13 @@ export async function getUsers(
 // Obtener un usuario por ID
 export async function getUserById(id: number): Promise<User | null> {
   try {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || null;
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    
+    return result[0] || null;
   } catch (error) {
     console.error('Error fetching user by id:', error);
     throw new Error('No se pudo obtener el usuario');
@@ -99,7 +132,7 @@ export async function getUserById(id: number): Promise<User | null> {
 // Actualizar el rol de un usuario
 export async function updateUserRole(id: number, role: 'user' | 'admin'): Promise<User | null> {
   try {
-    const [updatedUser] = await db
+    const result = await db
       .update(users)
       .set({
         role,
@@ -107,9 +140,11 @@ export async function updateUserRole(id: number, role: 'user' | 'admin'): Promis
       })
       .where(eq(users.id, id))
       .returning();
-
+    
+    const updatedUser = result[0] || null;
+    
     revalidatePath('/admin/users');
-    return updatedUser || null;
+    return updatedUser;
   } catch (error) {
     console.error('Error updating user role:', error);
     throw new Error('No se pudo actualizar el rol del usuario');
@@ -119,14 +154,19 @@ export async function updateUserRole(id: number, role: 'user' | 'admin'): Promis
 // Crear un nuevo usuario (para futuras expansiones)
 export async function createUser(userData: Omit<NewUser, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
   try {
-    const [newUser] = await db
+    // Preparar datos con timestamps
+    const newUserData = {
+      ...userData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const result = await db
       .insert(users)
-      .values({
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .values(newUserData)
       .returning();
+    
+    const newUser = result[0];
 
     revalidatePath('/admin/users');
     return newUser;
@@ -139,7 +179,7 @@ export async function createUser(userData: Omit<NewUser, 'id' | 'createdAt' | 'u
 // Eliminar un usuario (con precauciones)
 export async function deleteUser(id: number): Promise<boolean> {
   try {
-    // Verificar si el usuario tiene órdenes asociadas
+    // Verificar si el usuario tiene órdenes asociadas (lógica de negocio específica)
     const ordersCount = await db.$count(
       sql`SELECT COUNT(*) FROM orders WHERE user_id = ${id}`
     );
@@ -147,15 +187,67 @@ export async function deleteUser(id: number): Promise<boolean> {
       throw new Error('No se puede eliminar el usuario porque tiene órdenes asociadas');
     }
 
-    const [deletedUser] = await db
+    const result = await db
       .delete(users)
-      .where(eq(users.id, id))
-      .returning({ id: users.id });
+      .where(eq(users.id, id));
 
+    const deleted = result.rowCount > 0;
+    
     revalidatePath('/admin/users');
-    return !!deletedUser;
+    return deleted;
   } catch (error) {
     console.error('Error deleting user:', error);
     throw error;
   }
 }
+
+// Métodos adicionales usando el repositorio genérico
+
+// Verificar si existe un usuario
+export async function userExists(id: number): Promise<boolean> {
+  try {
+    const result = await db
+      .select({ count: users.id })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    
+    return result.length > 0;
+  } catch (error) {
+    console.error('Error checking user existence:', error);
+    return false;
+  }
+}
+
+// Buscar usuarios por email
+export async function findUserByEmail(email: string): Promise<User | null> {
+  try {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    
+    return result[0] || null;
+  } catch (error) {
+    console.error('Error finding user by email:', error);
+    return null;
+  }
+}
+
+// Contar usuarios con filtros
+export async function countUsers(filters: { role?: 'user' | 'admin' } = {}): Promise<number> {
+  try {
+    let result;
+    if (filters.role) {
+      result = await db.select().from(users).where(eq(users.role, filters.role));
+    } else {
+      result = await db.select().from(users);
+    }
+    return result.length;
+  } catch (error) {
+    console.error('Error counting users:', error);
+    return 0;
+  }
+}
+

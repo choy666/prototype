@@ -5,10 +5,84 @@ import { logger } from '@/lib/utils/logger';
 import { db } from '@/lib/db';
 import { orders, orderItems, carts, cartItems } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
+
+// Función para validar la firma del webhook de Mercado Pago
+function validateWebhookSignature(
+  body: string,
+  xSignature: string | null,
+  xRequestId: string | null
+): boolean {
+  try {
+    // En desarrollo, saltar validación si no hay firma configurada
+    if (process.env.NODE_ENV === 'development' && !process.env.MERCADO_PAGO_WEBHOOK_SECRET) {
+      logger.warn('Modo desarrollo: Saltando validación de firma (webhook secret no configurado)');
+      return true;
+    }
+
+    const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      logger.error('Webhook secret no configurado');
+      return false;
+    }
+
+    if (!xSignature || !xRequestId) {
+      logger.error('Faltan headers de validación', { xSignature, xRequestId });
+      return false;
+    }
+
+    // Extraer timestamp y firma del header x-signature
+    const signatureParts = xSignature.split(',');
+    let ts = '';
+    let signature = '';
+
+    for (const part of signatureParts) {
+      if (part.startsWith('ts=')) {
+        ts = part.substring(3);
+      } else if (part.startsWith('v1=')) {
+        signature = part.substring(3);
+      }
+    }
+
+    if (!ts || !signature) {
+      logger.error('Formato de firma inválido', { xSignature, ts, signature });
+      return false;
+    }
+
+    // Crear el string a firmar: ts.id + . + request_body
+    const stringToSign = `${ts}.${xRequestId}.${body}`;
+    
+    // Generar HMAC-SHA256
+    const hmac = crypto.createHmac('sha256', webhookSecret);
+    hmac.update(stringToSign);
+    const expectedSignature = hmac.digest('hex');
+
+    // Comparar firmas
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(expectedSignature, 'hex')
+    );
+
+    logger.info('Validación de firma', {
+      isValid,
+      ts,
+      requestId: xRequestId,
+      receivedSignature: signature.substring(0, 8) + '...',
+      expectedSignature: expectedSignature.substring(0, 8) + '...'
+    });
+
+    return isValid;
+  } catch (error) {
+    logger.error('Error validando firma', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return false;
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -21,6 +95,24 @@ export async function POST(req: Request) {
     const body = await req.text();
     const payload = JSON.parse(body);
     const { action, data } = payload;
+
+    // Validar firma del webhook
+    const xSignature = req.headers.get('x-signature');
+    const xRequestId = req.headers.get('x-request-id');
+
+    if (!validateWebhookSignature(body, xSignature, xRequestId)) {
+      logger.error('Webhook MercadoPago: Firma inválida', {
+        xSignature,
+        xRequestId,
+        bodyLength: body.length
+      });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Firma inválida' 
+      }, { status: 401 });
+    }
+
+    logger.info('Webhook MercadoPago: Firma validada exitosamente');
 
     // Extraer id y type del evento
     const eventId = data?.id;
@@ -53,6 +145,21 @@ export async function POST(req: Request) {
 async function handlePaymentEvent(paymentId: string) {
   try {
     logger.info('handlePaymentEvent: Consultando pago en MercadoPago API', { paymentId });
+
+    // Verificar idempotencia - no procesar duplicados
+    const existingOrder = await db.query.orders.findFirst({
+      where: eq(orders.paymentId, paymentId),
+      columns: { id: true, status: true }
+    });
+
+    if (existingOrder) {
+      logger.info('Pago ya procesado previamente', {
+        paymentId,
+        existingOrderId: existingOrder.id,
+        existingStatus: existingOrder.status
+      });
+      return; // Salir silenciosamente, ya fue procesado
+    }
 
     // Para testing local, simular respuesta de MercadoPago
     if (process.env.NODE_ENV === 'development' && (paymentId === '123456789' || paymentId === '987654321')) {

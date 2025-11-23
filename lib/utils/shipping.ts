@@ -1,5 +1,27 @@
 import { ShippingMethod } from "@/lib/schema";
 
+export interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  weight?: number | null;
+  discount?: number;
+  variantId?: number;
+}
+
+// Interfaz para métodos de envío del formulario de checkout
+export interface CheckoutShippingMethod {
+  id: number;
+  name: string;
+  cost: number;
+  description?: string;
+  estimatedDays?: number;
+  type?: 'standard' | 'express' | 'pickup';
+  freeShippingThreshold?: number;
+  freeThreshold?: number | null; // Para compatibilidad con ShippingMethod
+}
+
 // Zonas geográficas de Argentina con multiplicadores
 const ZONE_MULTIPLIERS: Record<string, number> = {
   // Zona Centro (Buenos Aires y alrededores) - costo base
@@ -34,7 +56,7 @@ const ZONE_MULTIPLIERS: Record<string, number> = {
 
 /**
  * Calcula el costo de envío basado en:
- * - Método de envío seleccionado
+ * - Método de envío seleccionado (desde base de datos)
  * - Peso total de los productos
  * - Zona geográfica de destino
  * - Subtotal del pedido (para envío gratis)
@@ -44,40 +66,77 @@ export function calculateShippingCost(
   totalWeightKg: number,
   province: string,
   subtotal: number
+): number;
+
+/**
+ * Calcula el costo de envío basado en:
+ * - Método de envío seleccionado (desde formulario checkout)
+ * - Peso total de los productos
+ * - Zona geográfica de destino
+ * - Subtotal del pedido (para envío gratis)
+ */
+export function calculateShippingCost(
+  shippingMethod: CheckoutShippingMethod,
+  totalWeightKg: number,
+  province: string,
+  subtotal: number
+): number;
+
+export function calculateShippingCost(
+  shippingMethod: ShippingMethod | CheckoutShippingMethod,
+  totalWeightKg: number,
+  province: string,
+  subtotal: number
 ): number {
-  // Si el subtotal supera el umbral de envío gratis, costo = 0
-  if (shippingMethod.freeThreshold && subtotal >= Number(shippingMethod.freeThreshold)) {
+  // Retiro en sucursal siempre gratis
+  if ('type' in shippingMethod && shippingMethod.type === 'pickup') {
     return 0;
   }
 
-  // Obtener multiplicador de zona (default 1.0 si no está definido)
-  const zoneMultiplier = ZONE_MULTIPLIERS[province] || 1.0;
+  // Envío gratis si supera el umbral
+  const freeThreshold = 'freeThreshold' in shippingMethod 
+    ? shippingMethod.freeThreshold 
+    : shippingMethod.freeThreshold ? Number(shippingMethod.freeThreshold) : null;
+    
+  if (freeThreshold && subtotal >= Number(freeThreshold)) {
+    return 0;
+  }
 
-  // Calcular costo base
-  let cost = Number(shippingMethod.baseCost);
+  // Calcular costo base según el tipo de método
+  let cost: number;
+  
+  if ('cost' in shippingMethod) {
+    // Es CheckoutShippingMethod
+    cost = shippingMethod.cost;
+    
+    // Aplicar multiplicador de provincia
+    const provinceMultiplier = ZONE_MULTIPLIERS[province] || 1.5;
+    cost *= provinceMultiplier;
+    
+    // Recargo por peso adicional (después de 1kg)
+    if (totalWeightKg > 1) {
+      const extraWeight = totalWeightKg - 1;
+      cost += extraWeight * 50; // $50 por kg adicional
+    }
+    
+    // Recargo por envíos pesados (> 5kg)
+    if (totalWeightKg > 5) {
+      cost += 100;
+    }
+  } else {
+    // Es ShippingMethod de la base de datos
+    cost = Number(shippingMethod.baseCost);
+    
+    // Aplicar multiplicador de peso
+    cost += totalWeightKg * Number(shippingMethod.weightMultiplier);
 
-  // Agregar costo por peso
-  cost += totalWeightKg * Number(shippingMethod.weightMultiplier);
-
-  // Aplicar multiplicador de zona
-  cost *= zoneMultiplier;
+    // Aplicar multiplicador de zona
+    const zoneMultiplier = ZONE_MULTIPLIERS[province] || 1.0;
+    cost *= zoneMultiplier;
+  }
 
   // Redondear a 2 decimales
   return Math.round(cost * 100) / 100;
-}
-
-/**
- * Calcula el peso total de un carrito
- */
-export function calculateTotalWeight(items: Array<{
-  weight?: number | null;
-  quantity: number;
-}>): number {
-  return items.reduce((total, item) => {
-    // Si no tiene peso definido, asumir 0.5kg por defecto
-    const weight = item.weight ? Number(item.weight) : 0.5;
-    return total + (weight * item.quantity);
-  }, 0);
 }
 
 /**
@@ -92,4 +151,15 @@ export function getZoneMultiplier(province: string): number {
  */
 export function isFreeShipping(shippingMethod: ShippingMethod, subtotal: number): boolean {
   return Boolean(shippingMethod.freeThreshold && subtotal >= Number(shippingMethod.freeThreshold));
+}
+
+/**
+ * Calcula el peso total de los items del carrito
+ * Si no hay peso definido, usa 500g por defecto por producto
+ */
+export function calculateTotalWeight(items: CartItem[]): number {
+  return items.reduce((total, item) => {
+    const itemWeight = item.weight || 0.5; // 500g por defecto
+    return total + (itemWeight * item.quantity);
+  }, 0);
 }

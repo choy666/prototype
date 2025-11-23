@@ -171,3 +171,79 @@ export interface Order {
   updatedAt: Date;
 }
 
+// Tipos para métodos de envío
+export interface ShippingMethod {
+  id: number;
+  name: string;
+  description?: string;
+  cost: number;
+  estimatedDays?: number;
+  type?: 'standard' | 'express' | 'pickup';
+  freeShippingThreshold?: number;
+}
+
+// Tipos para Mercado Libre
+export interface MercadoLibreProduct {
+  id: string;
+  title: string;
+  category_id: string;
+  price: number;
+  currency_id: string;
+  available_quantity: number;
+  buying_mode: 'buy_it_now' | 'auction';
+  listing_type_id: string;
+  condition: 'new' | 'used';
+  description?: string;
+  pictures?: Array<{
+    id: string;
+    url: string;
+    secure_url: string;
+    size: string;
+    max_size: string;
+    quality: string;
+  }>;
+  video_id?: string;
+  attributes?: Array<{
+    id: string;
+    name: string;
+    value_id: string;
+    value_name: string;
+  }>;
+  warranty?: string;
+  tags?: string[];
+}
+
+export interface MercadoLibreSyncStatus {
+  id: number;
+  productId: number;
+  mlItemId?: string | null;
+  syncStatus: 'pending' | 'syncing' | 'synced' | 'error' | 'conflict';
+  lastSyncAt?: Date | null;
+  syncError?: string | null;
+  mlData?: any;
+  syncAttempts: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MercadoLibreConnectionStatus {
+  connected: boolean;
+  userId?: string;
+  nickname?: string;
+  scopes?: string[];
+  expiresAt?: string;
+  error?: string;
+  reason?: string;
+  refreshed?: boolean;
+  hasCriticalScopes?: boolean;
+  missingCriticalScopes?: string[];
+}
+
+// Re-exportar tipos especializados
+export * from './mercadolibre';
+export type { 
+  MLShipment, 
+  MLShipmentTracking 
+} from './mercadolibre';
+export * from './common';
+

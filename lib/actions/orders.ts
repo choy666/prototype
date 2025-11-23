@@ -128,21 +128,28 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
     // Obtener orden con información del usuario
     const orderData = await db
       .select({
+        // Todos los campos de orders
         id: orders.id,
         userId: orders.userId,
+        email: orders.email,
         total: orders.total,
         status: orders.status,
+        shippingStatus: orders.shippingStatus,
         paymentId: orders.paymentId,
         mercadoPagoId: orders.mercadoPagoId,
         shippingAddress: orders.shippingAddress,
+        shippingAddressId: orders.shippingAddressId,
         shippingMethodId: orders.shippingMethodId,
         shippingCost: orders.shippingCost,
         trackingNumber: orders.trackingNumber,
+        trackingUrl: orders.trackingUrl,
+        shippingMode: orders.shippingMode,
         cancellationReason: orders.cancellationReason,
         cancelledAt: orders.cancelledAt,
-        createdAt: orders.createdAt,
-        updatedAt: orders.updatedAt,
-        // Campos de Mercado Libre
+        mercadoLibreShipmentId: orders.mercadoLibreShipmentId,
+        mercadoLibreAddressId: orders.mercadoLibreAddressId,
+        mercadoLibreShipmentStatus: orders.mercadoLibreShipmentStatus,
+        mercadoLibreShipmentSubstatus: orders.mercadoLibreShipmentSubstatus,
         mlOrderId: orders.mlOrderId,
         source: orders.source,
         mlStatus: orders.mlStatus,
@@ -150,6 +157,9 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         mlShippingInfo: orders.mlShippingInfo,
         mlPaymentInfo: orders.mlPaymentInfo,
         mlFeedback: orders.mlFeedback,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+        // Campos del join con users
         userEmail: users.email,
         userName: users.name,
       })

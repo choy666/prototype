@@ -118,9 +118,27 @@ export const checkoutSchema = z.object({
     })
   ).min(1, 'El carrito debe tener al menos un producto'),
 
-  shippingAddress: shippingAddressSchema,
+  shippingAddress: z.object({
+    nombre: z.string().min(1, 'El nombre es requerido'),
+    direccion: z.string().min(1, 'La dirección es requerida'),
+    ciudad: z.string().min(1, 'La ciudad es requerida'),
+    provincia: z.string().min(1, 'La provincia es requerida'),
+    codigoPostal: z.string().min(1, 'El código postal es requerido'),
+    telefono: z.string().min(1, 'El teléfono es requerido'),
+    piso: z.string().optional(),
+    departamento: z.string().optional(),
+    numero: z.string().optional(),
+  }),
 
-  shippingMethod: shippingMethodSchema,
+  shippingMethod: z.object({
+    id: z.number(),
+    name: z.string(),
+    cost: z.number(),
+    description: z.string().optional(),
+    estimatedDays: z.number().optional(),
+    type: z.enum(['standard', 'express', 'pickup']).optional(),
+    freeShippingThreshold: z.number().optional(),
+  }),
 
   userId: z.string().min(1, 'El userId es requerido'),
 });

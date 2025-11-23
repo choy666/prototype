@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Edit3, Check, X, Package, Plus, Tag } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { ImageReorder } from "@/components/ui/ImageReorder";
+import { ImageManager } from "@/components/ui/ImageManager";
 
 
 export interface ProductVariant {
@@ -405,17 +405,10 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
 
             <div>
               <Label htmlFor="variant-images">Imágenes *</Label>
-              <ImageReorder
+              <ImageManager
+                mode="reorder"
                 images={newVariantForm.images || []}
-                onReorder={(images) => setNewVariantForm(prev => ({ ...prev, images }))}
-                onRemove={(index) => setNewVariantForm(prev => ({
-                  ...prev,
-                  images: prev.images?.filter((_, i) => i !== index) || []
-                }))}
-                onAdd={(imageUrl) => setNewVariantForm(prev => ({
-                  ...prev,
-                  images: [...(prev.images || []), imageUrl]
-                }))}
+                onImagesChange={(images) => setNewVariantForm(prev => ({ ...prev, images }))}
                 maxImages={10}
               />
             </div>

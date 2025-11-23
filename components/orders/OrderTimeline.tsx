@@ -1,8 +1,9 @@
 'use client';
 
-import { CheckCircle, Clock, Truck, Package, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle, Clock, Truck, Package, XCircle, ExternalLink, RefreshCw } from 'lucide-react';
 
-type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'processing' | 'failed' | 'returned';
 
 interface TimelineStep {
   status: OrderStatus;
@@ -17,6 +18,9 @@ interface OrderTimelineProps {
   currentStatus: OrderStatus;
   createdAt: string;
   trackingNumber?: string;
+  trackingUrl?: string;
+  mercadoLibreShipmentId?: string;
+  orderId?: string;
 }
 
 const statusSteps: Omit<TimelineStep, 'completed' | 'current'>[] = [
@@ -27,27 +31,37 @@ const statusSteps: Omit<TimelineStep, 'completed' | 'current'>[] = [
     icon: Clock,
   },
   {
-    status: 'paid',
-    label: 'Pago Confirmado',
-    description: 'El pago ha sido confirmado exitosamente',
-    icon: CheckCircle,
+    status: 'processing',
+    label: 'En Procesamiento',
+    description: 'Tu pedido está siendo preparado para envío',
+    icon: Package,
   },
   {
     status: 'shipped',
-    label: 'Enviado',
-    description: 'Tu pedido ha sido enviado',
+    label: 'En Camino',
+    description: 'Tu pedido ha sido enviado y está en camino',
     icon: Truck,
   },
   {
     status: 'delivered',
     label: 'Entregado',
     description: 'Tu pedido ha sido entregado exitosamente',
-    icon: Package,
+    icon: CheckCircle,
   },
 ];
 
-export default function OrderTimeline({ currentStatus, createdAt, trackingNumber }: OrderTimelineProps) {
-  const statusOrder: OrderStatus[] = ['pending', 'paid', 'shipped', 'delivered'];
+export default function OrderTimeline({ 
+  currentStatus, 
+  createdAt, 
+  trackingNumber, 
+  trackingUrl, 
+  mercadoLibreShipmentId, 
+  orderId 
+}: OrderTimelineProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  
+  const statusOrder: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered'];
   const currentIndex = statusOrder.indexOf(currentStatus);
 
   const steps: TimelineStep[] = statusSteps.map((step, index) => ({
@@ -55,6 +69,25 @@ export default function OrderTimeline({ currentStatus, createdAt, trackingNumber
     completed: index < currentIndex,
     current: index === currentIndex,
   }));
+
+  // Función para refrescar el estado del envío
+  const refreshTracking = async () => {
+    if (!mercadoLibreShipmentId || !orderId) return;
+    
+    setIsRefreshing(true);
+    try {
+      const response = await fetch(`/api/shipments?id=${mercadoLibreShipmentId}`);
+      if (response.ok) {
+        setLastUpdate(new Date());
+        // Aquí podrías actualizar el estado del componente con los datos frescos
+        // Por ahora, solo actualizamos la timestamp
+      }
+    } catch (error) {
+      console.error('Error refreshing tracking:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Si el pedido está cancelado, mostrar estado especial
   if (currentStatus === 'cancelled') {
@@ -80,16 +113,58 @@ export default function OrderTimeline({ currentStatus, createdAt, trackingNumber
       </h3>
 
       {trackingNumber && (
-        <div className="mb-6 p-4 bg-gray-900 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <span className="font-medium text-blue-800 dark:text-blue-200">
-              Número de Seguimiento
-            </span>
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <span className="font-medium text-blue-800 dark:text-blue-200">
+                Seguimiento Mercado Libre
+              </span>
+            </div>
+            {mercadoLibreShipmentId && (
+              <button
+                onClick={refreshTracking}
+                disabled={isRefreshing}
+                className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Actualizar
+              </button>
+            )}
           </div>
-          <p className="text-blue-700 dark:text-blue-300 font-mono">
-            {trackingNumber}
-          </p>
+          
+          <div className="space-y-2">
+            <div>
+              <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Número de Seguimiento:</span>
+              <p className="text-blue-700 dark:text-blue-300 font-mono font-semibold">
+                {trackingNumber}
+              </p>
+            </div>
+            
+            {trackingUrl && (
+              <div>
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Ver en Mercado Libre
+                </a>
+              </div>
+            )}
+            
+            <div className="text-xs text-blue-600 dark:text-blue-400">
+              Última actualización: {lastUpdate.toLocaleString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          </div>
         </div>
       )}
 

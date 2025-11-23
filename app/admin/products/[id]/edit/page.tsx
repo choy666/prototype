@@ -16,7 +16,7 @@ import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { ArrowLeft, Save, FileText, Tag, Package, Eye, Image as ImageIcon } from 'lucide-react'
-import { ImageReorder } from '@/components/ui/ImageReorder'
+import { ImageManager } from '@/components/ui/ImageManager'
 import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import type { Category } from '@/lib/schema'
@@ -213,20 +213,6 @@ export default function EditProductPage() {
 
   const handleImagesReorder = (images: string[]) => {
     setForm(prev => ({ ...prev, images }))
-  }
-
-  const handleImageRemove = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleImageAdd = (imageUrl: string) => {
-    setForm(prev => ({
-      ...prev,
-      images: [...prev.images, imageUrl]
-    }))
   }
 
   const handleUpdateAttributes = async () => {
@@ -506,11 +492,10 @@ export default function EditProductPage() {
 
                   <div className="md:col-span-2">
                     <Label htmlFor="images">Imágenes Adicionales</Label>
-                    <ImageReorder
+                    <ImageManager
+                      mode="reorder"
                       images={form.images}
-                      onReorder={handleImagesReorder}
-                      onRemove={handleImageRemove}
-                      onAdd={handleImageAdd}
+                      onImagesChange={handleImagesReorder}
                       maxImages={10}
                     />
                   </div>

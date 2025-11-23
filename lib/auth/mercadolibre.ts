@@ -3,6 +3,7 @@ import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { retryWithBackoff } from '@/lib/utils/retry';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
+import { logger } from '@/lib/utils/logger';
 
 // Configuración de Mercado Libre
 export const MERCADOLIBRE_CONFIG = {
@@ -229,27 +230,114 @@ export function isTokenExpired(expiresAt: Date | null): boolean {
   return expiresAt.getTime() <= Date.now();
 }
 
-// Hacer una request autenticada a la API de Mercado Libre
+// Hacer una request autenticada a la API de Mercado Libre con refresh automático
 export async function makeAuthenticatedRequest(
   userId: number,
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const tokens = await getTokens(userId);
-  if (!tokens?.access_token) {
-    throw new Error('Usuario no conectado a Mercado Libre');
+  try {
+    const tokens = await getTokens(userId);
+    if (!tokens?.access_token) {
+      throw new Error('Usuario no conectado a Mercado Libre');
+    }
+
+    // Verificar si el access token está expirado y refrescar si es necesario
+    if (isTokenExpired(tokens.accessTokenExpiresAt)) {
+      logger.info('MercadoLibre: Access token expirado, intentando refrescar', { userId });
+      
+      if (!tokens.refresh_token || isTokenExpired(tokens.refreshTokenExpiresAt)) {
+        throw new Error('Tokens expirados. Se requiere重新autenticación');
+      }
+
+      try {
+        const newTokens = await refreshAccessToken(tokens.refresh_token);
+        
+        // Actualizar tokens en la base de datos
+        const now = new Date();
+        const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
+        
+        await db.update(users)
+          .set({
+            mercadoLibreAccessToken: newTokens.access_token,
+            mercadoLibreRefreshToken: newTokens.refresh_token,
+            mercadoLibreAccessTokenExpiresAt: newAccessTokenExpiresAt,
+            mercadoLibreScopes: newTokens.scope || '',
+            updatedAt: now,
+          })
+          .where(eq(users.id, userId));
+
+        logger.info('MercadoLibre: Tokens refrescados exitosamente', { userId });
+        
+        // Usar el nuevo token
+        tokens.access_token = newTokens.access_token;
+        
+      } catch (refreshError) {
+        logger.error('MercadoLibre: Error refrescando tokens', {
+          userId,
+          error: refreshError instanceof Error ? refreshError.message : String(refreshError)
+        });
+        
+        // Limpiar tokens inválidos
+        await db.update(users)
+          .set({
+            mercadoLibreAccessToken: null,
+            mercadoLibreRefreshToken: null,
+            mercadoLibreAccessTokenExpiresAt: null,
+            mercadoLibreRefreshTokenExpiresAt: null,
+            mercadoLibreScopes: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+        
+        throw new Error('Tokens expirados. Se requiere重新autenticación');
+      }
+    }
+
+    const url = endpoint.startsWith('http') ? endpoint : `${MERCADOLIBRE_CONFIG.apiUrl}${endpoint}`;
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    // Si recibimos 401 o 403, puede ser que el token fue revocado
+    if (response.status === 401 || response.status === 403) {
+      logger.warn('MercadoLibre: Token rechazado por la API', {
+        userId,
+        status: response.status,
+        endpoint
+      });
+      
+      // Limpiar tokens inválidos
+      await db.update(users)
+        .set({
+          mercadoLibreAccessToken: null,
+          mercadoLibreRefreshToken: null,
+          mercadoLibreAccessTokenExpiresAt: null,
+          mercadoLibreRefreshTokenExpiresAt: null,
+          mercadoLibreScopes: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+      
+      throw new Error('Token invalidado por la API. Se requiere重新autenticación');
+    }
+
+    return response;
+    
+  } catch (error) {
+    logger.error('MercadoLibre: Error en request autenticada', {
+      userId,
+      endpoint,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
   }
-
-  const url = endpoint.startsWith('http') ? endpoint : `${MERCADOLIBRE_CONFIG.apiUrl}${endpoint}`;
-
-  return fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${tokens.access_token}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
 }
 
 // Scopes requeridos por módulo
@@ -376,4 +464,45 @@ export async function getCachedScopes(userId: number): Promise<string[] | null> 
   if (!user?.mercadoLibreScopes) return null;
 
   return user.mercadoLibreScopes.split(',');
+}
+
+// Clase MercadoLibreAuth para compatibilidad con shipments
+export class MercadoLibreAuth {
+  private static instance: MercadoLibreAuth;
+  
+  public static getInstance(): MercadoLibreAuth {
+    if (!MercadoLibreAuth.instance) {
+      MercadoLibreAuth.instance = new MercadoLibreAuth();
+    }
+    return MercadoLibreAuth.instance;
+  }
+  
+  public async getAccessToken(): Promise<string> {
+    // Obtener el primer usuario con tokens de ML
+    const user = await db.query.users.findFirst({
+      where: (users, { isNotNull }) => isNotNull(users.mercadoLibreAccessToken),
+      columns: {
+        mercadoLibreAccessToken: true,
+        mercadoLibreRefreshToken: true,
+        mercadoLibreAccessTokenExpiresAt: true,
+        id: true,
+      },
+    });
+    
+    if (!user?.mercadoLibreAccessToken) {
+      throw new Error('No se encontró token de acceso de Mercado Libre');
+    }
+    
+    // Verificar si el token ha expirado y refresh si es necesario
+    if (user.mercadoLibreAccessTokenExpiresAt && new Date() > user.mercadoLibreAccessTokenExpiresAt) {
+      if (user.mercadoLibreRefreshToken) {
+        const newTokens = await refreshAccessToken(user.mercadoLibreRefreshToken);
+        return newTokens.access_token;
+      } else {
+        throw new Error('Token de acceso expirado y no hay refresh token');
+      }
+    }
+    
+    return user.mercadoLibreAccessToken;
+  }
 }

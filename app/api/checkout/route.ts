@@ -1,13 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { MercadoPagoConfig, Preference } from "mercadopago";
-import { checkoutSchema } from "@/lib/validations/checkout";
-import { calculateShippingCost, calculateTotalWeight } from "@/lib/utils/shipping";
-import { db } from "@/lib/db";
-import { shippingMethods, users, products, productVariants } from "@/lib/schema";
-import { eq } from "drizzle-orm";
-import { logger } from "@/lib/utils/logger";
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { products, productVariants, users } from '@/lib/schema';
+import { eq, and } from 'drizzle-orm';
+import { checkoutSchema } from '@/lib/validations/checkout';
+import { logger } from '@/lib/utils/logger';
+import { calculateTotalWeight, calculateShippingCost } from '@/lib/utils/shipping';
+import { Preference } from 'mercadopago';
+import type { CartItem } from '@/lib/utils/shipping';
 
-const client = new MercadoPagoConfig({
+// Configuración de Mercado Pago según documentación oficial
+const mercadopago = new Preference({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
 
@@ -64,17 +66,26 @@ export async function POST(req: NextRequest) {
     logger.info('Checkout: Verificando stock de items', { itemCount: items.length });
     for (const item of items) {
       if (item.variantId) {
-        // Verificar stock de variante
+        // Verificar stock de variante y que tanto la variante como el producto estén activos
         const variant = await db
-          .select({ stock: productVariants.stock, productId: productVariants.productId })
+          .select({ 
+            stock: productVariants.stock, 
+            productId: productVariants.productId,
+            isVariantActive: productVariants.isActive
+          })
           .from(productVariants)
-          .where(eq(productVariants.id, item.variantId))
+          .innerJoin(products, eq(productVariants.productId, products.id))
+          .where(and(
+            eq(productVariants.id, item.variantId),
+            eq(productVariants.isActive, true),
+            eq(products.isActive, true)
+          ))
           .limit(1);
 
         if (!variant.length) {
-          logger.error('Checkout: Variante no encontrada', { variantId: item.variantId });
+          logger.error('Checkout: Variante no encontrada, inactiva o producto inactivo', { variantId: item.variantId });
           return NextResponse.json(
-            { error: `Variante no encontrada para producto ${item.id}` },
+            { error: `Variante no disponible para producto ${item.id}` },
             { status: 400 }
           );
         }
@@ -91,17 +102,20 @@ export async function POST(req: NextRequest) {
           );
         }
       } else {
-        // Verificar stock del producto base
+        // Verificar stock del producto base y si está activo
         const product = await db
-          .select({ stock: products.stock })
+          .select({ stock: products.stock, isActive: products.isActive })
           .from(products)
-          .where(eq(products.id, item.id))
+          .where(and(
+            eq(products.id, item.id),
+            eq(products.isActive, true)
+          ))
           .limit(1);
 
         if (!product.length) {
-          logger.error('Checkout: Producto no encontrado', { productId: item.id });
+          logger.error('Checkout: Producto no encontrado o inactivo', { productId: item.id });
           return NextResponse.json(
-            { error: `Producto no encontrado: ${item.id}` },
+            { error: `Producto no disponible: ${item.id}` },
             { status: 400 }
           );
         }
@@ -122,24 +136,8 @@ export async function POST(req: NextRequest) {
 
     logger.info('Checkout: Verificación de stock completada exitosamente');
 
-    // Obtener método de envío de la BD
-    const shippingMethodData = await db
-      .select()
-      .from(shippingMethods)
-      .where(eq(shippingMethods.id, shippingMethod.id))
-      .limit(1);
-
-    if (shippingMethodData.length === 0) {
-      return NextResponse.json(
-        { error: "Método de envío no encontrado" },
-        { status: 400 }
-      );
-    }
-
-    const method = shippingMethodData[0];
-
     // Calcular subtotal con descuentos aplicados
-    const subtotal = items.reduce((acc, item) => {
+    const subtotal = items.reduce((acc: number, item: CartItem) => {
       const basePrice = item.price;
       const finalPrice = item.discount && item.discount > 0
         ? basePrice * (1 - item.discount / 100)
@@ -149,7 +147,7 @@ export async function POST(req: NextRequest) {
 
     // Calcular costo de envío
     const totalWeight = calculateTotalWeight(items);
-    const shippingCost = calculateShippingCost(method, totalWeight, shippingAddress.provincia, subtotal);
+    const shippingCost = calculateShippingCost(shippingMethod, totalWeight, shippingAddress.provincia, subtotal);
 
     // Calcular total final
     const total = subtotal + shippingCost;
@@ -158,16 +156,14 @@ export async function POST(req: NextRequest) {
     const payerInfo = {
       email: userExists[0].email,
       name: userExists[0].name || '',
-      // Nota: La identificación se puede agregar en el futuro si se añade el campo a la BD
-      // Por ahora enviamos solo los campos disponibles para mejorar tasa de aprobación
     };
 
     // Preparar metadata incluyendo variantId en items
     const metadata = {
       userId: userId.toString(),
       shippingAddress: JSON.stringify(shippingAddress),
-      shippingMethodId: method.id.toString(),
-      items: JSON.stringify(items.map(item => ({
+      shippingMethodId: shippingMethod.id.toString(),
+      items: JSON.stringify(items.map((item: CartItem) => ({
         ...item,
         variantId: item.variantId || null
       }))),
@@ -176,23 +172,15 @@ export async function POST(req: NextRequest) {
       total: total.toString(),
     };
 
-    // Log de metadata que se enviará
-    logger.info('Checkout: Metadata preparada para MercadoPago', {
-      userId: userId.toString(),
-      itemCount: items.length,
-      shippingMethodId: shippingMethod.id,
-      hasShippingAddress: !!shippingAddress,
-      metadata
-    });
-
     // Loggear antes de enviar a MercadoPago
     console.log("Metadata enviada a MP:", metadata);
 
-    const preference = await new Preference(client).create({
+    // Crear preferencia de pago según documentación oficial de Mercado Pago
+    const preference = await mercadopago.create({
       body: {
         items: [
           // Items del carrito
-          ...items.map((item) => ({
+          ...items.map((item: CartItem) => ({
             id: item.id.toString(),
             title: item.name,
             quantity: item.quantity,
@@ -203,40 +191,79 @@ export async function POST(req: NextRequest) {
           })),
           // Item de envío (si no es gratis)
           ...(shippingCost > 0 ? [{
-            id: `shipping-${method.id}`,
-            title: `Envío - ${method.name}`,
+            id: `shipping-${shippingMethod.id}`,
+            title: `Envío - ${shippingMethod.name}`,
             quantity: 1,
             unit_price: shippingCost,
             currency_id: "ARS",
-          }] : [])
+          }] : []),
         ],
+        payer: {
+          email: payerInfo.email,
+          name: payerInfo.name,
+        },
         back_urls: {
-          success: `${process.env.NEXT_PUBLIC_APP_URL}/payment-success`,
-          failure: `${process.env.NEXT_PUBLIC_APP_URL}/payment-failure`,
-          pending: `${process.env.NEXT_PUBLIC_APP_URL}/payment-pending`,
+          success: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success`,
+          failure: `${process.env.NEXT_PUBLIC_APP_URL}/payment/failure`,
+          pending: `${process.env.NEXT_PUBLIC_APP_URL}/payment/pending`,
         },
         auto_return: "approved",
-        notification_url: `${process.env.MERCADO_PAGO_WEBHOOK_URL}?source_news=webhooks&user_id=${userId}`,
-        payer: payerInfo,
-        external_reference: `order_${userId}_${Date.now()}`,
-        statement_descriptor: "PROTOTYPE ML",
-        metadata: {
-          userId: userId.toString(),
-          shippingAddress: JSON.stringify(shippingAddress),
-          shippingMethodId: method.id.toString(),
-          items: JSON.stringify(items),
-          subtotal: subtotal.toString(),
-          shippingCost: shippingCost.toString(),
-          total: total.toString(),
+        notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
+        external_reference: metadata.userId,
+        metadata: metadata,
+        payment_methods: {
+          excluded_payment_types: [
+            { id: "ticket" }, // Excluir pago en efectivo
+          ],
+          installments: 12, // Permitir hasta 12 cuotas
+        },
+        shipments: {
+          receiver_address: {
+            zip_code: shippingAddress.codigoPostal,
+            street_name: shippingAddress.direccion,
+            street_number: shippingAddress.numero ? String(parseInt(shippingAddress.numero) || 0) : undefined,
+            floor: shippingAddress.piso,
+            apartment: shippingAddress.departamento,
+          },
+          mode: "me2", // Mercado Envíos 2
+          dimensions: `${totalWeight}x30x20,${totalWeight * 1000}`, // peso x ancho x alto, peso en gramos
         },
       },
     });
 
-    return NextResponse.json({ init_point: preference.init_point });
+    logger.info('Checkout: Preferencia de MercadoPago creada exitosamente', {
+      preferenceId: preference.id,
+      initPoint: preference.init_point,
+      total,
+      itemsCount: items.length,
+      shippingCost
+    });
+
+    return NextResponse.json({
+      preferenceId: preference.id,
+      initPoint: preference.init_point,
+      sandboxInitPoint: preference.sandbox_init_point,
+      total,
+      subtotal,
+      shippingCost,
+      items: items.map((item: CartItem) => ({
+        ...item,
+        finalPrice: item.discount && item.discount > 0
+          ? item.price * (1 - item.discount / 100)
+          : item.price,
+      })),
+    });
   } catch (error) {
-    console.error("Error creating preference:", error);
+    logger.error('Checkout: Error procesando checkout', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return NextResponse.json(
-      { error: "Failed to create preference" },
+      { 
+        error: "Error procesando el pago",
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
