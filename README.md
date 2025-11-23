@@ -13,7 +13,6 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 - **Panel de Usuario**: Gestión de perfil, direcciones y historial de pedidos
 - **Integración Mercado Libre**: Sincronización de productos, importación de órdenes y webhooks
 - **Panel Administrativo**: Gestión completa de productos, categorías y configuración ML
-- **Sistema de Testing**: Suite completo de pruebas de integración (13 tests)
 - **Diseño Responsive**: Optimizado para dispositivos móviles y desktop
 - **Tema Oscuro/Claro**: Soporte para cambio de tema
 - **Base de Datos**: PostgreSQL con Drizzle ORM y Neon
@@ -22,18 +21,18 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 ## 🛠️ Tecnologías Utilizadas
 
 ### Frontend
-- **Next.js 15** - Framework React con App Router
+- **Next.js 15.5** - Framework React con App Router
 - **TypeScript** - Tipado estático
-- **Tailwind CSS** - Framework de estilos utilitarios
-- **Framer Motion** - Animaciones
-- **React Hook Form** - Gestión de formularios
-- **Zustand** - Gestión de estado global
-- **React Query** - Gestión de estado del servidor
+- **Tailwind CSS 4.1** - Framework de estilos utilitarios
+- **Framer Motion 12.23** - Animaciones
+- **React Hook Form 7.65** - Gestión de formularios
+- **Zustand 5.0** - Gestión de estado global
+- **React Query 5.90** - Gestión de estado del servidor
 
 ### Backend
 - **Next.js API Routes** - API REST
-- **NextAuth.js** - Autenticación (v5 beta)
-- **Drizzle ORM** - ORM para PostgreSQL
+- **NextAuth.js 5.0** - Autenticación (v5 beta)
+- **Drizzle ORM 0.44** - ORM para PostgreSQL
 - **Neon** - Base de datos PostgreSQL serverless
 
 ### Integraciones
@@ -45,7 +44,7 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 - **ESLint** - Linting de código
 - **Prettier** - Formateo de código
 - **Drizzle Kit** - Migraciones de base de datos
-- **Jest** - Testing con 13 tests de integración ML
+- **Jest 30.1** - Testing configurado para integraciones
 - **LocalTunnel** - Tunelización para desarrollo
 - **Concurrently** - Ejecución paralela de scripts
 
@@ -163,9 +162,8 @@ mi-tienda/
 │   ├── mercadolibre-server.js
 │   ├── mercadopago-server.js
 │   └── config.json
-├── tests/                 # Tests
-│   └── integration/       # Tests de integración ML
-│       └── mercadolibre.test.ts
+├── tests/                 # Tests (configurado para integraciones)
+│   └── integration/       # Directorio para tests de integración
 ├── docs/                  # Documentación
 │   ├── RESUMEN_FASE_*.md  # Resúmenes de implementación
 │   └── migracionMM.md     # Plan de migración completo
@@ -233,15 +231,22 @@ npm run db:backup        # Crea backup de BD
 npm run db:restore       # Restaura backup de BD
 
 # Testing
-npm run test             # Ejecuta tests (13 tests de integración ML)
+npm run test             # Ejecuta tests (configurado para integraciones)
 
 # Utilidades
 npm run check:env        # Verifica variables de entorno
+npm run validate:env     # Valida variables de entorno al inicio
+npm run dev:safe         # Inicia desarrollo con validación de entorno
+npm run build:safe       # Construye con validación de entorno
 npm run verify:checkout  # Verifica configuración de checkout
 
 # MCP Servers
 npm run mcp:mercadolibre # Inicia server MCP de Mercado Libre
 npm run mcp:mercadopago  # Inicia server MCP de Mercado Pago
+
+# Migraciones Específicas
+npm run migrate:ml-shipping # Migra datos de envíos ML
+npm run migrate:simple      # Ejecuta migración simple
 ```
 
 ## 🌐 Despliegue
@@ -284,8 +289,7 @@ Desarrollado con ❤️ usando Next.js y TypeScript
 - **FASE 2**: ✅ Nuevos endpoints API (ML sync, import, webhooks)
 - **FASE 3**: ✅ Componentes UI administrativos (conexión ML, atributos)
 - **FASE 4**: ✅ Webhooks y procesamiento (items, órdenes, preguntas)
-- **FASE 5**: ✅ Testing y validación (configuración Jest)
-- **FASE 6**: ✅ Suite completo de tests (13 tests de integración)
+- **FASE 5**: ✅ Configuración de testing (Jest)
 
 ### 🎯 Funcionalidades Críticas Implementadas
 - **Sincronización Productos**: Publicación y actualización en Mercado Libre
@@ -293,23 +297,29 @@ Desarrollado con ❤️ usando Next.js y TypeScript
 - **Procesamiento Webhooks**: Notificaciones ML en tiempo real
 - **Autenticación OAuth**: Flujo completo con Mercado Libre
 - **Panel Administrativo**: Gestión completa de integración ML
-- **Testing Completo**: 13 tests validando todos los escenarios
+- **Testing Configurado**: Entorno de pruebas listo para implementar
 
 ### 📈 Métricas de Implementación
-- **Progreso General**: 6/7 fases completadas (85.7%)
-- **Cobertura de Testing**: 100% de funcionalidades ML
+- **Progreso General**: 5/7 fases completadas (71.4%)
+- **Configuración Testing**: 100% del entorno de pruebas listo
 - **Endpoints API**: 15+ endpoints implementados
 - **Componentes UI**: 10+ componentes administrativos
 - **Tablas BD**: 20+ tablas con integración ML/MP
 
 ### 🚀 Próximos Mejoras
+- **FASE 6**: Implementación de tests de integración ML
 - **FASE 7**: Tests E2E con Cypress/Playwright
 - **Performance**: Optimización de consultas y caché
 - **Monitoreo**: Dashboard de métricas de integración
 - **Documentación**: API docs y guías de usuario
 
 ### 🏆 Puntuación Actual
-**Calidad del Proyecto**: 9.2/10 → **Objetivo Final: 9.5/10**
+**Calidad del Proyecto**: 8.5/10 → **Objetivo Final: 9.5/10**
+
+### ⚠️ Limitaciones Conocidas
+- **Tests de Integración**: El entorno de testing está configurado pero los tests específicos de Mercado Libre no están implementados
+- **Monitoreo**: No hay dashboard de métricas de integración disponible aún
+- **Documentación API**: Falta documentación detallada de los endpoints implementados
 
 ---
 
@@ -350,4 +360,4 @@ npx drizzle-kit check
 
 ---
 
-**Estado Final**: ✅ **Proyecto listo para producción con integración completa Mercado Libre**
+**Estado Final**: ✅ **Proyecto en desarrollo activo con integración funcional Mercado Libre**

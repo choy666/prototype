@@ -4,7 +4,7 @@
 
 Antes de continuar con la implementación, es **OBLIGATORIO** configurar tokens reales de Mercado Pago.
 
-## 🔧 Paso 1: Obtener Tokens de Sandbox
+## 🔧 Paso 1: Configuración de Aplicación (Ya Completado)
 
 1. **Iniciar sesión en Mercado Pago**
    - Ve a [https://www.mercadopago.com.ar/developers](https://www.mercadopago.com.ar/developers)
@@ -23,8 +23,8 @@ Antes de continuar con la implementación, es **OBLIGATORIO** configurar tokens 
 
 4. **Configurar Webhook**
    - En la misma página de credenciales, ve a la sección "Webhooks"
-   - Configura la URL de producción: `https://tu-dominio.com/api/webhooks/mercadopago`
-   - Configura la URL de sandbox: `http://localhost:3000/api/webhooks/mercadopago`
+   - Configura la URL de producción: `https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago`
+   - Configura la URL de desarrollo: `http://localhost:3000/api/webhooks/mercadopago`
    - Copia el **Webhook Secret** que te proporciona Mercado Pago
 
 ## ⚙️ Paso 2: Actualizar Variables de Entorno
@@ -32,10 +32,16 @@ Antes de continuar con la implementación, es **OBLIGATORIO** configurar tokens 
 Edita tu archivo `.env.local` con los valores reales:
 
 ```bash
-# Reemplaza estos valores con los tokens reales de sandbox
-MERCADO_PAGO_ACCESS_TOKEN="TEST-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"  # ← Token real aquí
-NEXT_PUBLIC_MP_PUBLIC_KEY="TEST-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"  # ← Key real aquí
-MERCADO_PAGO_WEBHOOK_SECRET="TEST-WEBHOOK-SECRET-LOCAL"           # ← Secret real aquí
+# Tokens de producción (obtenidos del DevCenter)
+MERCADO_PAGO_ACCESS_TOKEN="APP_USR-3512407382157264-112123-63acaed36cb3246d2b1489bf710c4cb1-2926966384"
+NEXT_PUBLIC_MP_PUBLIC_KEY="APP_USR-69258e52-a9c1-4d81-9d1e-90cf52391d49"
+MERCADO_PAGO_WEBHOOK_SECRET="3268aa49b1c43eb2f43a9cc649d3081037308dd1317dc3c0ffb459b184ca4b6f"
+
+# URLs de producción configuradas en Mercado Pago
+MERCADO_PAGO_WEBHOOK_URL="https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago"
+MERCADO_PAGO_SUCCESS_URL="https://prototype-ten-dun.vercel.app/payment-success"
+MERCADO_PAGO_FAILURE_URL="https://prototype-ten-dun.vercel.app/payment-failure"
+MERCADO_PAGO_PENDING_URL="https://prototype-ten-dun.vercel.app/payment-pending"
 
 # Opcional: Personalizar descriptor en tarjeta
 MERCADO_PAGO_STATEMENT_DESCRIPTOR="PROTOTYPE MARKETPLACE"
@@ -62,7 +68,7 @@ curl -X POST http://localhost:3000/api/mercadopago/test-connection
     "hasAccessToken": true,
     "hasPublicKey": true,
     "hasWebhookSecret": true,
-    "isTestToken": true
+    "isTestToken": false
   },
   "apiTest": {
     "connected": true,
@@ -98,7 +104,7 @@ curl -X POST http://localhost:3000/api/mercadopago/test-connection
 - **Causa:** URL de webhook no configurada en Mercado Pago
 - **Solución:** Configura la URL en la sección Webhooks del dashboard
 
-## 🔄 Paso 5: Actualizar a Producción
+## 🔄 Paso 5: Gestión de Entornos
 
 Cuando estés listo para producción:
 
@@ -151,4 +157,4 @@ Una vez configurados los tokens reales:
 
 ---
 
-**Importante:** No continúes con las siguientes fases hasta tener los tokens reales configurados y probados.
+**Importante:** El proyecto ya está configurado con tokens de producción. Solo cambia a desarrollo si necesitas hacer pruebas locales.
