@@ -24,8 +24,12 @@ export function ProductSyncButton({
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      const response = await fetch(`/api/mercadolibre/products/${productId}/sync`, {
+      const response = await fetch(`/api/mercadolibre/products/sync`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ productId: productId.toString() }),
       });
       const result = await response.json();
       

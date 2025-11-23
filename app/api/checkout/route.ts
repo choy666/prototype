@@ -203,9 +203,9 @@ export async function POST(req: NextRequest) {
           name: payerInfo.name,
         },
         back_urls: {
-          success: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success`,
-          failure: `${process.env.NEXT_PUBLIC_APP_URL}/payment/failure`,
-          pending: `${process.env.NEXT_PUBLIC_APP_URL}/payment/pending`,
+          success: process.env.MERCADO_PAGO_SUCCESS_URL,
+          failure: process.env.MERCADO_PAGO_FAILURE_URL,
+          pending: process.env.MERCADO_PAGO_PENDING_URL,
         },
         auto_return: "approved",
         notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
