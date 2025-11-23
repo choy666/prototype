@@ -73,7 +73,8 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
-  const storedState = request.cookies.get('oauth_state')?.value;
+  const storedState = request.cookies.get('mercadolibre_state')?.value;
+  const codeVerifier = request.cookies.get('mercadolibre_code_verifier')?.value;
 
   logger.info('MercadoLibre: Callback recibido', {
     hasCode: !!code,
@@ -81,7 +82,8 @@ export async function GET(request: NextRequest) {
     error,
     errorDescription,
     hasState: !!state,
-    hasStoredState: !!storedState
+    hasStoredState: !!storedState,
+    hasCodeVerifier: !!codeVerifier
   });
 
   // Manejar errores de OAuth
@@ -91,9 +93,14 @@ export async function GET(request: NextRequest) {
       errorDescription,
       state
     });
-    return NextResponse.redirect(
+    
+    // Limpiar cookies en error
+    const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/login?error=oauth_failed&message=${encodeURIComponent(errorDescription || error)}`
     );
+    response.cookies.delete('mercadolibre_state');
+    response.cookies.delete('mercadolibre_code_verifier');
+    return response;
   }
 
   // Validar state CSRF
@@ -103,22 +110,44 @@ export async function GET(request: NextRequest) {
       storedState: storedState,
       match: state === storedState
     });
-    return NextResponse.redirect(
+    
+    // Limpiar cookies en validación fallida
+    const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/login?error=invalid_state`
     );
+    response.cookies.delete('mercadolibre_state');
+    response.cookies.delete('mercadolibre_code_verifier');
+    return response;
   }
 
   if (!code) {
     logger.error('MercadoLibre: Código de autorización faltante');
-    return NextResponse.redirect(
+    
+    // Limpiar cookies en código faltante
+    const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/login?error=no_code`
     );
+    response.cookies.delete('mercadolibre_state');
+    response.cookies.delete('mercadolibre_code_verifier');
+    return response;
+  }
+
+  if (!codeVerifier) {
+    logger.error('MercadoLibre: Code verifier faltante - PKCE incompleto');
+    
+    // Limpiar cookies en code_verifier faltante
+    const response = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL}/login?error=no_code_verifier`
+    );
+    response.cookies.delete('mercadolibre_state');
+    response.cookies.delete('mercadolibre_code_verifier');
+    return response;
   }
 
   try {
     logger.info('MercadoLibre: Iniciando intercambio de código por tokens', { codeLength: code.length });
     
-    // Intercambiar code por access_token
+    // Intercambiar code por access_token usando PKCE
     const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
       method: 'POST',
       headers: {
@@ -131,6 +160,7 @@ export async function GET(request: NextRequest) {
         client_secret: process.env.MERCADOLIBRE_CLIENT_SECRET,
         code: code,
         redirect_uri: process.env.MERCADOLIBRE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/mercadolibre/callback`,
+        code_verifier: codeVerifier,
       }),
     });
 
@@ -157,11 +187,12 @@ export async function GET(request: NextRequest) {
     // Guardar tokens en base de datos
     await saveTokensToDatabase(tokenData);
 
-    // Limpiar cookie state
+    // Limpiar cookies en éxito
     const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?auth=success&connected=mercadolibre`
     );
-    response.cookies.delete('oauth_state');
+    response.cookies.delete('mercadolibre_state');
+    response.cookies.delete('mercadolibre_code_verifier');
     
     logger.info('MercadoLibre: Proceso de autenticación completado exitosamente');
     return response;
@@ -172,8 +203,12 @@ export async function GET(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    return NextResponse.redirect(
+    // Limpiar cookies en error general
+    const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/login?error=token_exchange_failed&message=${encodeURIComponent(error instanceof Error ? error.message : 'Error desconocido')}`
     );
+    response.cookies.delete('mercadolibre_state');
+    response.cookies.delete('mercadolibre_code_verifier');
+    return response;
   }
 }

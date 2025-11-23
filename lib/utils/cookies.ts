@@ -20,7 +20,7 @@ export async function setCookieAsync(
   cookieStore.set(name, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     path: '/',
     ...options
   });

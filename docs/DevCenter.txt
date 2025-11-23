@@ -1,7 +1,5 @@
 ### DevCenter de Mercado Libre
 # Configuración de la aplicación prototypeML (Mercado Libre)
-- Numero de Aplicacion: 
-- Nombre : prototypeML
 - MERCADOLIBRE_CLIENT_ID : 8458968436453153
 - MERCADOLIBRE_CLIENT_SECRET : IA9SP48WNE2w5XXogwoGde6rtcvGQskq
 - MERCADOLIBRE_REDIRECT_URI : https://prototype-ten-dun.vercel.app/api/auth/mercadolibre/callback
