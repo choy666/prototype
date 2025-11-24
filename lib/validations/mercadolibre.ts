@@ -182,6 +182,43 @@ export const VALID_CATEGORIES = {
   'MLA1692': 'Turismo',
 };
 
+// Precios mínimos por categoría (actualizable según requerimientos de ML)
+export const CATEGORY_MIN_PRICES: Record<string, number> = {
+  'MLA3530': 1000, // Electrónica, Audio y Video
+  'MLA1648': 500,  // Computación
+  'MLA1051': 800,  // Celulares y Teléfonos
+  'MLA1430': 100,  // Ropa y Accesorios
+  'MLA1144': 150,  // Calzado
+  'MLA1384': 200,  // Belleza y Cuidado Personal
+  'MLA3025': 50,   // Libros, Revistas y Comics
+  'MLA1168': 300,  // Deportes y Fitness
+  'MLA1574': 200,  // Hogar, Muebles y Jardín
+  'MLA1558': 150,  // Juegos y Juguetes
+  'MLA1953': 500,  // Consolas y Videojuegos
+  'MLA2541': 400,  // Instrumentos Musicales
+  'MLA1492': 250,  // Animales y Mascotas
+  'MLA1071': 1000, // Antigüedades y Colecciones
+  'MLA1182': 100,  // Arte y Artesanías
+  'MLA3937': 2000, // Agro
+  'MLA1512': 5000, // Autos, Motos y Otros
+  'MLA1276': 150,  // Bebés
+  'MLA1039': 200,  // Bolsos, Carteras y Mochilas
+  'MLA1743': 300,  // Cámaras y Accesorios
+  'MLA1000': 150,  // Accesorios para Vehículos
+  'MLA1132': 10000, // Bienes Raíces
+  'MLA1459': 500,  // Industrias y Oficinas
+  'MLA1188': 100,  // Ingresos y Empleos
+  'MLA2568': 800,  // Joyas y Relojes
+  'MLA3697': 1500, // Salud y Equipamiento Médico
+  'MLA1367': 50,   // Música, Películas y Series
+  'MLA1368': 100,  // Otros
+  'MLA2521': 200,  // Servicios
+  'MLA1540': 80,   // Souvenirs, Cotillón y Fiestas
+  'MLA2820': 600,  // Tecnología
+  'MLA1112': 30,   // Tickets y Entradas
+  'MLA1692': 500,  // Turismo
+};
+
 // Tipos inferidos de los esquemas
 export type MercadoLibreApiResponse = z.infer<typeof MercadoLibreApiResponseSchema>;
 export type MercadoLibreToken = z.infer<typeof MercadoLibreTokenSchema>;
@@ -276,6 +313,122 @@ export function validateImages(images: string[]): { valid: boolean; errors: stri
   return { valid: errors.length === 0, errors };
 }
 
+// Validar accesibilidad de imágenes (modo advertencia no bloqueante)
+export async function validateImageAccessibility(images: string[]): Promise<{
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!images || images.length === 0) {
+    errors.push('Se requiere al menos una imagen');
+    return { valid: false, errors, warnings };
+  }
+
+  if (images.length > 12) {
+    errors.push('No se pueden subir más de 12 imágenes');
+  }
+
+  // Validaciones básicas de formato y URL
+  images.forEach((imageUrl, index) => {
+    if (!imageUrl || typeof imageUrl !== 'string') {
+      errors.push(`La imagen ${index + 1} no es válida`);
+      return;
+    }
+
+    try {
+      new URL(imageUrl);
+    } catch {
+      errors.push(`La imagen ${index + 1} no tiene una URL válida`);
+      return;
+    }
+
+    const validExtensions = /\.(jpg|jpeg|png|gif|webp)$/i;
+    if (!validExtensions.test(imageUrl)) {
+      errors.push(`La imagen ${index + 1} debe ser JPG, PNG, GIF o WEBP`);
+    }
+
+    if (!imageUrl.startsWith('http')) {
+      errors.push(`La imagen ${index + 1} debe ser una URL completa (http/https)`);
+    }
+  });
+
+  // Verificación de accesibilidad (paralela, no bloqueante)
+  if (errors.length === 0) {
+    const accessibilityChecks = images.map(async (imageUrl, index) => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos timeout
+
+        const response = await fetch(imageUrl, {
+          method: 'HEAD',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          return `La imagen ${index + 1} no es accesible (HTTP ${response.status})`;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.startsWith('image/')) {
+          return `La imagen ${index + 1} no parece ser un archivo de imagen válido`;
+        }
+
+        return null;
+      } catch {
+        return `La imagen ${index + 1} no se pudo verificar (timeout o error de red)`;
+      }
+    });
+
+    const results = await Promise.allSettled(accessibilityChecks);
+    
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        warnings.push(result.value);
+      } else if (result.status === 'rejected') {
+        warnings.push(`La imagen ${index + 1} no se pudo verificar (error inesperado)`);
+      }
+    });
+  }
+
+  return { 
+    valid: errors.length === 0, 
+    errors, 
+    warnings 
+  };
+}
+
+// Sanitizar HTML en títulos
+export function sanitizeTitle(title: string): string {
+  if (!title || typeof title !== 'string') {
+    return '';
+  }
+  
+  // Eliminar todos los tags HTML
+  let sanitized = title.replace(/<[^>]*>/g, '');
+  
+  // Eliminar entidades HTML comunes
+  sanitized = sanitized.replace(/&nbsp;/g, ' ')
+                       .replace(/&amp;/g, '&')
+                       .replace(/&lt;/g, '<')
+                       .replace(/&gt;/g, '>')
+                       .replace(/&quot;/g, '"')
+                       .replace(/&#39;/g, "'")
+                       .replace(/&apos;/g, "'");
+  
+  // Normalizar espacios múltiples
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+  
+  return sanitized;
+}
+
 // Validar título
 export function validateTitle(title: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -285,21 +438,24 @@ export function validateTitle(title: string): { valid: boolean; errors: string[]
     return { valid: false, errors };
   }
 
-  if (title.trim().length === 0) {
+  // Sanitizar HTML primero
+  const sanitizedTitle = sanitizeTitle(title);
+
+  if (sanitizedTitle.trim().length === 0) {
     errors.push('El título no puede estar vacío');
   }
 
-  if (title.length > 60) {
+  if (sanitizedTitle.length > 60) {
     errors.push('El título no puede exceder 60 caracteres');
   }
 
-  if (title.length < 3) {
+  if (sanitizedTitle.length < 3) {
     errors.push('El título debe tener al menos 3 caracteres');
   }
 
-  // Validar caracteres no permitidos
+  // Validar caracteres no permitidos (después de sanitización)
   const invalidChars = /[<>]/;
-  if (invalidChars.test(title)) {
+  if (invalidChars.test(sanitizedTitle)) {
     errors.push('El título contiene caracteres no permitidos');
   }
 
@@ -307,7 +463,7 @@ export function validateTitle(title: string): { valid: boolean; errors: string[]
 }
 
 // Validar precio
-export function validatePrice(price: string | number): { valid: boolean; errors: string[] } {
+export function validatePrice(price: string | number, categoryId?: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
@@ -323,6 +479,14 @@ export function validatePrice(price: string | number): { valid: boolean; errors:
 
   if (numPrice > 1000000) {
     errors.push('El precio no puede exceder $1.000.000');
+  }
+
+  // Validar precio mínimo por categoría
+  if (categoryId && CATEGORY_MIN_PRICES[categoryId]) {
+    const minPrice = CATEGORY_MIN_PRICES[categoryId];
+    if (numPrice < minPrice) {
+      errors.push(`La categoría ${categoryId} requiere un precio mínimo de $${minPrice}`);
+    }
   }
 
   // Validar decimales (máximo 2)
@@ -409,7 +573,7 @@ export function validateProductForMercadoLibre(product: Product): {
   }
 
   // Validar precio
-  const priceValidation = validatePrice(product.price || '0');
+  const priceValidation = validatePrice(product.price || '0', product.mlCategoryId || undefined);
   if (!priceValidation.valid) {
     errors.push(...priceValidation.errors);
   }

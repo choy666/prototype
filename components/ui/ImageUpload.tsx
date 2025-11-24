@@ -6,6 +6,7 @@ import { Upload, X, Image as ImageIcon } from 'lucide-react'
 import { Button } from './Button'
 import { Card } from './card'
 import Image from 'next/image'
+import { useToast } from './use-toast'
 
 interface ImageUploadProps {
   onImagesChange: (images: string[]) => void
@@ -22,6 +23,7 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [images, setImages] = useState<string[]>(initialImages)
   const [uploading, setUploading] = useState(false)
+  const { toast } = useToast()
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setUploading(true)
@@ -31,12 +33,11 @@ export function ImageUpload({
       if (images.length + newImages.length >= maxFiles) break
 
       try {
-        // Simular subida a postimages.org
-        // En producción, implementar la subida real a postimages.org
+        // Subir imagen a nuestro endpoint local
         const formData = new FormData()
         formData.append('file', file)
 
-        const response = await fetch('https://postimages.org/api/rest', {
+        const response = await fetch('/api/upload', {
           method: 'POST',
           body: formData
         })
@@ -45,17 +46,21 @@ export function ImageUpload({
           const data = await response.json()
           if (data.url) {
             newImages.push(data.url)
+          } else {
+            throw new Error('No se recibió URL del servidor')
           }
         } else {
-          // Fallback: crear URL de objeto para vista previa
-          const url = URL.createObjectURL(file)
-          newImages.push(url)
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Error al subir imagen')
         }
       } catch (error) {
         console.error('Error uploading image:', error)
-        // Fallback: crear URL de objeto para vista previa
-        const url = URL.createObjectURL(file)
-        newImages.push(url)
+        // Mostrar error al usuario en lugar de usar fallback
+        toast({
+          title: 'Error al subir imagen',
+          description: error instanceof Error ? error.message : 'No se pudo subir la imagen',
+          variant: 'destructive'
+        })
       }
     }
 
@@ -63,7 +68,7 @@ export function ImageUpload({
     setImages(updatedImages)
     onImagesChange(updatedImages)
     setUploading(false)
-  }, [images, maxFiles, onImagesChange])
+  }, [images, maxFiles, onImagesChange, toast])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

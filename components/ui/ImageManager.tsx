@@ -29,7 +29,7 @@ export function ImageManager({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
-  const handleDrop = useCallback((acceptedFiles: File[]) => {
+  const handleDrop = useCallback(async (acceptedFiles: File[]) => {
     if (mode === 'single' && acceptedFiles.length > 1) {
       toast({
         title: "Error",
@@ -48,12 +48,42 @@ export function ImageManager({
       return;
     }
 
-    const newImages = acceptedFiles.map(file => URL.createObjectURL(file));
+    // Subir imágenes al endpoint local
+    const uploadPromises = acceptedFiles.map(async (file) => {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          return data.url
+        } else {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Error al subir imagen')
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error)
+        toast({
+          title: 'Error al subir imagen',
+          description: error instanceof Error ? error.message : 'No se pudo subir la imagen',
+          variant: 'destructive'
+        })
+        return null
+      }
+    })
+
+    const uploadedUrls = await Promise.all(uploadPromises)
+    const validUrls = uploadedUrls.filter((url): url is string => url !== null)
     
     if (mode === 'single') {
-      onImagesChange(newImages);
+      onImagesChange(validUrls);
     } else {
-      onImagesChange([...images, ...newImages]);
+      onImagesChange([...images, ...validUrls]);
     }
   }, [mode, images, maxImages, onImagesChange, toast]);
 

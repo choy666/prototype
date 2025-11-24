@@ -6,6 +6,7 @@ import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { logger } from '@/lib/utils/logger';
 import { auth } from '@/lib/actions/auth';
+import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
 import type { ProductVariant } from '@/lib/schema';
 
 export async function POST(req: Request) {
@@ -95,39 +96,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
     }
 
-    // Verificar y crear registro de sincronización de forma atómica
+    // Verificar y crear registro de sincronización (sin transacciones)
     let syncRecord: typeof mercadolibreProductsSync.$inferSelect[];
     try {
-      syncRecord = await db.transaction(async (tx) => {
-        // Check atómico si ya existe sincronización en curso
-        const existingSync = await tx.query.mercadolibreProductsSync.findFirst({
-          where: and(
-            eq(mercadolibreProductsSync.productId, productIdNum!),
-            eq(mercadolibreProductsSync.syncStatus, 'syncing')
-          ),
-        });
+      // Check si ya existe sincronización en curso
+      const existingSync = await db.query.mercadolibreProductsSync.findFirst({
+        where: and(
+          eq(mercadolibreProductsSync.productId, productIdNum!),
+          eq(mercadolibreProductsSync.syncStatus, 'syncing')
+        ),
+      });
 
-        if (existingSync) {
-          throw new Error('PRODUCT_ALREADY_SYNCING');
-        }
+      if (existingSync) {
+        throw new Error('PRODUCT_ALREADY_SYNCING');
+      }
 
-        // Crear o actualizar registro de sincronización
-        const records = await tx.insert(mercadolibreProductsSync).values({
-          productId: productIdNum!,
+      // Crear o actualizar registro de sincronización
+      syncRecord = await db.insert(mercadolibreProductsSync).values({
+        productId: productIdNum!,
+        syncStatus: 'syncing',
+        lastSyncAt: new Date(),
+        syncAttempts: 1,
+      }).onConflictDoUpdate({
+        target: mercadolibreProductsSync.productId,
+        set: {
           syncStatus: 'syncing',
           lastSyncAt: new Date(),
-          syncAttempts: 1,
-        }).onConflictDoUpdate({
-          target: mercadolibreProductsSync.productId,
-          set: {
-            syncStatus: 'syncing',
-            lastSyncAt: new Date(),
-            syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
-          },
-        }).returning();
-
-        return records;
-      });
+          syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
+        },
+      }).returning();
     } catch (txError) {
       console.error('ERROR CRUDO TRANSACCIÓN SYNC:', txError);
       console.error('STACK TRANSACCIÓN:', txError instanceof Error ? txError.stack : 'No stack');
@@ -151,17 +148,17 @@ export async function POST(req: Request) {
     const hasVariants = localProduct.variants && Array.isArray(localProduct.variants) && (localProduct.variants as ProductVariant[]).length > 0;
     
     if (hasVariants) {
-      // Validar límite de 200 variantes de Mercado Libre
-      if ((localProduct.variants as ProductVariant[]).length > 200) {
+      // Validar límite de 60 variantes de Mercado Libre
+      if ((localProduct.variants as ProductVariant[]).length > 60) {
         if (timeoutId) clearTimeout(timeoutId);
         logger.error('Producto excede límite de variantes de ML', {
           productId: productIdNum,
           variantsCount: (localProduct.variants as ProductVariant[]).length
         });
         return NextResponse.json({
-          error: 'Mercado Libre permite máximo 200 variantes por publicación',
+          error: 'Mercado Libre permite máximo 60 variantes por publicación',
           variantsCount: (localProduct.variants as ProductVariant[]).length,
-          maxAllowed: 200
+          maxAllowed: 60
         }, { status: 400 });
       }
       
@@ -234,7 +231,17 @@ export async function POST(req: Request) {
         seller_custom_field: string;
       }>;
     } = {
-      title: localProduct.name,
+      title: (() => {
+        try {
+          return sanitizeTitle(localProduct.name); // Sanitizar HTML del título
+        } catch (sanitizeError) {
+          logger.warn('Error sanitizando título, usando original', {
+            productId: productIdNum,
+            error: sanitizeError instanceof Error ? sanitizeError.message : String(sanitizeError)
+          });
+          return localProduct.name; // Fallback al título original
+        }
+      })(),
       category_id: localProduct.mlCategoryId || 'MLA3530', // Categoría por defecto
       currency_id: localProduct.mlCurrencyId || 'ARS',
       buying_mode: localProduct.mlBuyingMode || 'buy_it_now',
@@ -246,6 +253,53 @@ export async function POST(req: Request) {
       }] : [],
       attributes: (localProduct.attributes as unknown[]) || [],
     };
+
+    // Validar precio con categoría dinámica antes de asignar
+    const priceValidation = validatePrice(
+      localProduct.price, 
+      localProduct.mlCategoryId || 'MLA3530'
+    );
+    if (!priceValidation.valid) {
+      if (timeoutId) clearTimeout(timeoutId);
+      logger.error('Validación de precio fallida', {
+        productId: productIdNum,
+        errors: priceValidation.errors,
+        price: localProduct.price,
+        categoryId: localProduct.mlCategoryId
+      });
+      return NextResponse.json({
+        error: 'Validación de precio fallida',
+        details: priceValidation.errors
+      }, { status: 400 });
+    }
+
+    // Validar imágenes con accesibilidad (no bloqueante)
+    const images = localProduct.images ? 
+      (Array.isArray(localProduct.images) ? localProduct.images : [localProduct.image]) : 
+      [localProduct.image].filter(Boolean);
+    
+    let imageWarnings: string[] = [];
+    try {
+      const imageValidation = await validateImageAccessibility(images);
+      if (!imageValidation.valid) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Validación de imágenes fallida', {
+          productId: productIdNum,
+          errors: imageValidation.errors
+        });
+        return NextResponse.json({
+          error: 'Validación de imágenes fallida',
+          details: imageValidation.errors
+        }, { status: 400 });
+      }
+      imageWarnings = imageValidation.warnings;
+    } catch (imageError) {
+      logger.warn('Error en validación de accesibilidad de imágenes (continuando)', {
+        productId: productIdNum,
+        error: imageError instanceof Error ? imageError.message : String(imageError)
+      });
+      // Continuar con la sincronización incluso si falla la verificación de accesibilidad
+    }
 
     if (hasVariants) {
       // Producto con variantes: usar precio base del producto padre y variaciones
@@ -351,7 +405,7 @@ export async function POST(req: Request) {
       
       if (timeoutId) clearTimeout(timeoutId);
       
-      // Manejo específico de errores de ML para variantes
+      // Manejo específico de errores de ML para precios mínimos
       let errorMessage = `Error creando producto en ML: ${errorData}`;
       if (parsedError?.cause === 'attribute_combinations_not_allowed' || 
           parsedError?.cause === 'invalid_attribute_combinations' ||
@@ -362,6 +416,26 @@ export async function POST(req: Request) {
           error: parsedError.message || errorData,
           productId: productIdNum 
         });
+      } else if (parsedError?.cause && Array.isArray(parsedError.cause)) {
+        // Buscar errores de precio mínimo
+        const priceError = parsedError.cause.find((cause: { code?: string; message?: string }) => 
+          cause.code === 'item.price.invalid' && cause.message?.includes('minimum of price')
+        );
+        
+        if (priceError) {
+          const minimumPrice = priceError.message.match(/minimum of price (\d+)/)?.[1];
+          const currentPrice = hasVariants 
+            ? (localProduct.variants as ProductVariant[])[0]?.price || localProduct.price
+            : localProduct.price;
+          
+          errorMessage = `Precio mínimo requerido: La categoría ${localProduct.mlCategoryId || 'MLA3530'} requiere un precio mínimo de $${minimumPrice || '1000'}. Precio actual: $${currentPrice}.`;
+          logger.error('Error de precio mínimo de Mercado Libre', { 
+            categoryId: localProduct.mlCategoryId,
+            minimumPrice: minimumPrice || '1000',
+            currentPrice,
+            productId: productIdNum 
+          });
+        }
       }
       
       logger.error('Error en respuesta de Mercado Libre', { 
@@ -412,44 +486,42 @@ export async function POST(req: Request) {
       );
     }
 
-    // Actualizar producto local con ID de ML (transacción atómica)
+    // Actualizar producto local con ID de ML (operaciones individuales)
     try {
-      await db.transaction(async (tx) => {
-        // Actualizar producto padre
-        await tx.update(products)
-          .set({
-            mlItemId,
-            mlSyncStatus: 'synced',
-            mlLastSync: new Date(),
-            mlPermalink: mlItem.permalink || null,
-            mlThumbnail: mlItem.thumbnail || null,
-            updated_at: new Date(),
-          })
-          .where(eq(products.id, productIdNum!));
+      // Actualizar producto padre
+      await db.update(products)
+        .set({
+          mlItemId,
+          mlSyncStatus: 'synced',
+          mlLastSync: new Date(),
+          mlPermalink: mlItem.permalink || null,
+          mlThumbnail: mlItem.thumbnail || null,
+          updated_at: new Date(),
+        })
+        .where(eq(products.id, productIdNum!));
 
-        // Actualizar IDs de variación si el producto tiene variantes
-        if (hasVariants && mlItem.variations && Array.isArray(mlItem.variations)) {
-          for (const mlVariation of mlItem.variations) {
-            // Mapear usando seller_custom_field que guardamos como referencia
-            const localVariantId = parseInt(mlVariation.seller_custom_field);
-            if (!isNaN(localVariantId)) {
-              await tx.update(productVariants)
-                .set({
-                  mlVariationId: mlVariation.id.toString(),
-                  mlSyncStatus: 'synced',
-                  updated_at: new Date(),
-                })
-                .where(eq(productVariants.id, localVariantId));
-              
-              logger.info('Variante actualizada con ID de ML', {
-                localVariantId,
-                mlVariationId: mlVariation.id,
-                productId: productIdNum
-              });
-            }
+      // Actualizar IDs de variación si el producto tiene variantes
+      if (hasVariants && mlItem.variations && Array.isArray(mlItem.variations)) {
+        for (const mlVariation of mlItem.variations) {
+          // Mapear usando seller_custom_field que guardamos como referencia
+          const localVariantId = parseInt(mlVariation.seller_custom_field);
+          if (!isNaN(localVariantId)) {
+            await db.update(productVariants)
+              .set({
+                mlVariationId: mlVariation.id.toString(),
+                mlSyncStatus: 'synced',
+                updated_at: new Date(),
+              })
+              .where(eq(productVariants.id, localVariantId));
+            
+            logger.info('Variante actualizada con ID de ML', {
+              localVariantId,
+              mlVariationId: mlVariation.id,
+              productId: productIdNum
+            });
           }
         }
-      });
+      }
     } catch (dbError) {
       if (timeoutId) clearTimeout(timeoutId);
       logger.error('Error actualizando producto local con datos de ML', { 
@@ -503,6 +575,7 @@ export async function POST(req: Request) {
       mlItemId,
       mlPermalink: mlItem.permalink,
       syncStatus: 'synced',
+      warnings: imageWarnings.length > 0 ? imageWarnings : undefined,
     });
 
   } catch (error) {
