@@ -143,71 +143,93 @@ export function MercadoLibreConnection() {
 
   if (isStatusLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <span className="ml-2">Cargando estado de conexión...</span>
+      <div className="flex items-center justify-center py-10">
+        <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+        <span className="ml-3 text-sm text-muted-foreground">Cargando estado de conexión con MercadoLibre...</span>
       </div>
     );
   }
 
+  const isConnected = Boolean(connectionStatus?.connected);
+
   return (
     <div className="space-y-6">
       <LoadingBar isLoading={isConnecting || isTesting || isSyncing} />
-      
-      <div className="border-b pb-4">
-        <h2 className="text-xl font-semibold">Estado de la conexión</h2>
-        <div className="mt-2 flex items-center">
-          {connectionStatus?.connected ? (
+
+      {/* Encabezado de estado */}
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Configuración de MercadoLibre</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Gestiona la conexión de tu cuenta de MercadoLibre, permisos y estado de sincronización.
+          </p>
+        </div>
+        <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium bg-muted/40">
+          {isConnected ? (
             <>
-              <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
-              <span>Conectado a MercadoLibre</span>
+              <CheckCircle2 className="mr-1.5 h-4 w-4 text-green-500" />
+              <span className="text-green-700">Conectado a MercadoLibre</span>
             </>
           ) : (
             <>
-              <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
-              <span>No conectado a MercadoLibre</span>
+              <AlertCircle className="mr-1.5 h-4 w-4 text-yellow-500" />
+              <span className="text-yellow-700">No conectado</span>
             </>
           )}
         </div>
       </div>
 
-      {connectionStatus?.connected ? (
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-medium">ID de usuario</h3>
-            <p className="text-sm text-muted-foreground">
-              {connectionStatus.userId || 'No disponible'}
-            </p>
+      {isConnected ? (
+        <div className="space-y-6">
+          {/* Datos de la cuenta */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                ID de usuario
+              </h3>
+              <p className="mt-2 text-sm font-mono break-all">
+                {connectionStatus?.userId || 'No disponible'}
+              </p>
+            </div>
+
+            <div className="rounded-lg border bg-card p-4 md:col-span-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Expiración del token
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {connectionStatus?.expiresAt
+                  ? new Date(connectionStatus.expiresAt as string).toLocaleString()
+                  : 'No disponible'}
+              </p>
+            </div>
           </div>
-          
-          <div>
-            <h3 className="font-medium">Permisos otorgados</h3>
-            {connectionStatus.scopes && connectionStatus.scopes.length > 0 ? (
-              <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
+
+          {/* Permisos otorgados */}
+          <div className="rounded-lg border bg-card p-4">
+            <h3 className="text-sm font-medium mb-2">Permisos otorgados</h3>
+            {connectionStatus?.scopes && connectionStatus.scopes.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
                 {connectionStatus.scopes.map((scope) => (
-                  <li key={scope}>{scope}</li>
+                  <span
+                    key={scope}
+                    className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-mono text-muted-foreground"
+                  >
+                    {scope}
+                  </span>
                 ))}
-              </ul>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">No hay permisos disponibles</p>
             )}
           </div>
-          
-          <div>
-            <h3 className="font-medium">Expiración del token</h3>
-            <p className="text-sm text-muted-foreground">
-              {connectionStatus.expiresAt 
-                ? new Date(connectionStatus.expiresAt).toLocaleString() 
-                : 'No disponible'}
-            </p>
-          </div>
 
-          <div className="pt-4 space-y-2">
-            <Button 
-              variant="outline" 
+          {/* Acciones sobre la conexión */}
+          <div className="pt-2 grid gap-3 sm:grid-cols-2">
+            <Button
+              variant="outline"
               onClick={handleTestConnection}
-              disabled={isTesting || !connectionStatus?.connected}
-              className="w-full"
+              disabled={isTesting || !isConnected}
+              className="w-full inline-flex items-center justify-center"
             >
               {isTesting ? (
                 <>
@@ -221,12 +243,12 @@ export function MercadoLibreConnection() {
                 </>
               )}
             </Button>
-            
-            <Button 
-              variant="destructive" 
+
+            <Button
+              variant="destructive"
               onClick={handleDisconnect}
               disabled={isDisconnecting}
-              className="w-full"
+              className="w-full inline-flex items-center justify-center"
             >
               {isDisconnecting ? (
                 <>

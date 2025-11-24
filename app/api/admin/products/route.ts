@@ -7,8 +7,8 @@ const createProductSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  image: z.string().url().optional(),
-  images: z.union([z.string(), z.array(z.string().url())]).optional().transform((val) => {
+  image: z.string().refine(url => !url || url.startsWith('https://') || url.startsWith('/uploads/'), 'URL de imagen inválida').optional(),
+  images: z.union([z.string(), z.array(z.string().refine(url => url.startsWith('https://') || url.startsWith('/uploads/'), 'URL de imagen inválida'))]).optional().transform((val) => {
     if (typeof val === 'string') {
       return val.split(',').map(s => s.trim()).filter(s => s.length > 0);
     }

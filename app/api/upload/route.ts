@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join, extname } from 'path'
-import { existsSync } from 'fs'
+import { put, del } from '@vercel/blob'
 import { auth } from '@/lib/actions/auth'
 
 // Extensiones permitidas
@@ -34,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar extensión
-    const fileExtension = extname(file.name).toLowerCase()
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!ALLOWED_EXTENSIONS.includes(fileExtension)) {
       return NextResponse.json({ 
         error: `Extensión no permitida. Use: ${ALLOWED_EXTENSIONS.join(', ')}` 
@@ -48,33 +46,23 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
-    // Crear directorio de uploads si no existe
-    const uploadDir = join(process.cwd(), 'public', 'uploads')
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
-
     // Generar nombre de archivo seguro y único
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 8)
     const sanitizedName = sanitizeFilename(file.name.split('.')[0])
-    const filename = `${timestamp}-${randomString}-${sanitizedName}${fileExtension}`
+    const filename = `products/${timestamp}-${randomString}-${sanitizedName}${fileExtension}`
     
-    // Guardar archivo
-    const filepath = join(uploadDir, filename)
-    await writeFile(filepath, buffer)
+    // Subir a Vercel Blob
+    const blob = await put(filename, file, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    })
 
-    // Retornar URL pública
-    const publicUrl = `/uploads/${filename}`
-    
-    console.log(`Imagen subida: ${filename} por usuario: ${session.user?.email || 'desconocido'}`)
+    console.log(`Imagen subida a Blob: ${blob.url} por usuario: ${session.user?.email || 'desconocido'}`)
     
     return NextResponse.json({ 
       success: true, 
-      url: publicUrl,
+      url: blob.url,
       filename: filename
     })
 
@@ -82,6 +70,37 @@ export async function POST(request: NextRequest) {
     console.error('Error al subir imagen:', error)
     return NextResponse.json({ 
       error: 'Error al procesar la imagen' 
+    }, { status: 500 })
+  }
+}
+
+// Endpoint para eliminar imágenes
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const url = searchParams.get('url')
+
+    if (!url) {
+      return NextResponse.json({ error: 'URL no proporcionada' }, { status: 400 })
+    }
+
+    // Solo eliminar URLs de Blob (no locales)
+    if (url.startsWith('https://')) {
+      await del(url)
+      console.log(`Imagen eliminada de Blob: ${url}`)
+    }
+
+    return NextResponse.json({ success: true })
+
+  } catch (error) {
+    console.error('Error al eliminar imagen:', error)
+    return NextResponse.json({ 
+      error: 'Error al eliminar la imagen' 
     }, { status: 500 })
   }
 }
