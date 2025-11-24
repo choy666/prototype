@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, checkDatabaseConnection } from '@/lib/db';
 import { products, mercadolibreProductsSync, productVariants } from '@/lib/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
@@ -15,9 +15,33 @@ export async function POST(req: Request) {
   let timeoutId: NodeJS.Timeout | null = null;
   
   try {
+    // Verificar conexión a base de datos primero
+    try {
+      const dbCheck = await checkDatabaseConnection();
+      if (!dbCheck.success) {
+        console.error('ERROR CRUDO CONEXIÓN DB:', dbCheck);
+        return NextResponse.json({ 
+          error: 'Error de conexión a base de datos' 
+        }, { status: 500 });
+      }
+    } catch (dbConnError) {
+      console.error('ERROR CRUDO VERIFICACIÓN DB:', dbConnError);
+      console.error('STACK VERIFICACIÓN DB:', dbConnError instanceof Error ? dbConnError.stack : 'No stack');
+      throw dbConnError;
+    }
+    
     // Validaciones tempranas antes de crear timeout
-    const session = await auth();
+    let session;
+    try {
+      session = await auth();
+    } catch (authError) {
+      console.error('ERROR CRUDO AUTH:', authError);
+      console.error('STACK AUTH:', authError instanceof Error ? authError.stack : 'No stack');
+      throw authError;
+    }
+    
     if (!session?.user?.id) {
+      console.error('ERROR CRUDO: Sesión inválida', { session });
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -35,23 +59,36 @@ export async function POST(req: Request) {
     timeoutId = setTimeout(() => abortController!.abort(), 30000); // 30 segundos timeout
 
     // Verificar conexión con Mercado Libre
-    const connected = await isConnected(parseInt(session.user.id));
-    if (!connected) {
-      if (timeoutId) clearTimeout(timeoutId);
-      return NextResponse.json({ 
-        error: 'Usuario no conectado a Mercado Libre' 
-      }, { status: 400 });
+    try {
+      const connected = await isConnected(parseInt(session.user.id));
+      if (!connected) {
+        if (timeoutId) clearTimeout(timeoutId);
+        return NextResponse.json({ 
+          error: 'Usuario no conectado a Mercado Libre' 
+        }, { status: 400 });
+      }
+    } catch (connectionError) {
+      console.error('ERROR CRUDO CONEXIÓN ML:', connectionError);
+      console.error('STACK CONEXIÓN:', connectionError instanceof Error ? connectionError.stack : 'No stack');
+      throw connectionError;
     }
 
     // Obtener producto local con variantes
-    const localProduct = await db.query.products.findFirst({
-      where: eq(products.id, productIdNum!),
-      with: {
-        variants: {
-          where: eq(productVariants.isActive, true),
+    let localProduct;
+    try {
+      localProduct = await db.query.products.findFirst({
+        where: eq(products.id, productIdNum!),
+        with: {
+          variants: {
+            where: eq(productVariants.isActive, true),
+          },
         },
-      },
-    });
+      });
+    } catch (dbError) {
+      console.error('ERROR CRUDO DB QUERY PRODUCTO:', dbError);
+      console.error('STACK DB QUERY:', dbError instanceof Error ? dbError.stack : 'No stack');
+      throw dbError;
+    }
 
     if (!localProduct) {
       if (timeoutId) clearTimeout(timeoutId);
@@ -92,6 +129,9 @@ export async function POST(req: Request) {
         return records;
       });
     } catch (txError) {
+      console.error('ERROR CRUDO TRANSACCIÓN SYNC:', txError);
+      console.error('STACK TRANSACCIÓN:', txError instanceof Error ? txError.stack : 'No stack');
+      
       if (txError instanceof Error && txError.message === 'PRODUCT_ALREADY_SYNCING') {
         if (timeoutId) clearTimeout(timeoutId);
         return NextResponse.json({ 
@@ -467,6 +507,15 @@ export async function POST(req: Request) {
 
   } catch (error) {
     if (timeoutId) clearTimeout(timeoutId);
+    
+    // LOGGING CRUDO ANTES DEL LOGGER - CAPTURA EL ERROR REAL
+    console.error('=== ERROR CRUDO SINCRONIZACIÓN PRODUCTO ===');
+    console.error('ERROR:', error);
+    console.error('TIPO:', error?.constructor?.name);
+    console.error('MENSAJE:', error instanceof Error ? error.message : String(error));
+    console.error('STACK:', error instanceof Error ? error.stack : 'No stack disponible');
+    console.error('PRODUCT ID:', productIdNum);
+    console.error('=== FIN ERROR CRUDO ===');
     
     const errorContext = {
       productId: productIdNum,
