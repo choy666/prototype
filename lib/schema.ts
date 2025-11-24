@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 // ======================
 // User roles type
@@ -350,38 +351,46 @@ export type StockLog = typeof stockLogs.$inferSelect;
 export type NewStockLog = typeof stockLogs.$inferInsert;
 
 // ======================
-// Atributos de productos (tallas, colores, etc.)
+// Atributos de productos (mapeados a catálogo ML)
 // ======================
 export const productAttributes = pgTable("product_attributes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(), // ej: "Talla", "Color", "Material"
-  values: jsonb("values").notNull(), // array de valores posibles ["S", "M", "L"] o ["Rojo", "Azul"]
+  mlAttributeId: text("ml_attribute_id"), // ID del atributo en catálogo ML
+  values: jsonb("values").notNull(), // [{name: "Rojo", mlValueId: "52049"}, {name: "Azul", mlValueId: "52051"}]
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("product_attributes_name_unique").on(table.name),
   index("product_attributes_name_idx").on(table.name),
+  index("product_attributes_ml_attribute_id_idx").on(table.mlAttributeId),
 ]);
 
 // ======================
-// Variantes de productos
+// Variantes de productos (compatible con Mercado Libre)
 // ======================
 export const productVariants = pgTable("product_variants", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
   name: text("name"), // Nombre personalizado de variante
   description: text("description"), // Descripción específica de variante
-  additionalAttributes: jsonb("additional_attributes"), // Atributos adicionales específicos (unificado)
-  price: decimal("price", { precision: 10, scale: 2 }), // precio específico de variante, opcional
+  // Atributos para ML (mapeados a IDs de catálogo ML)
+  mlAttributeCombinations: jsonb("ml_attribute_combinations"), // [{id: "83000", name: "Color", value_id: "52049", value_name: "Negro"}]
+  additionalAttributes: jsonb("additional_attributes"), // Atributos adicionales específicos
+  price: decimal("price", { precision: 10, scale: 2 }), // precio específico de variante
   stock: integer("stock").default(0).notNull(),
   images: jsonb("images"), // array de urls de imágenes
   isActive: boolean("is_active").default(true).notNull(),
+  // Campos de sincronización con ML
+  mlVariationId: text("ml_variation_id"), // ID de la variación en ML
+  mlSyncStatus: text("ml_sync_status").default("pending"),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("product_variants_product_id_idx").on(table.productId),
   index("product_variants_is_active_idx").on(table.isActive),
   index("product_variants_product_active_idx").on(table.productId, table.isActive),
+  index("product_variants_ml_variation_id_idx").on(table.mlVariationId),
 ]);
 
 // ======================
@@ -431,7 +440,7 @@ export const mpPreferenceStatusEnum = pgEnum("mp_preference_status", [
 // ======================
 export const mercadolibreProductsSync = pgTable("mercadolibre_products_sync", {
   id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull().unique(),
   mlItemId: text("ml_item_id").unique(),
   syncStatus: mlSyncStatusEnum("sync_status").default("pending").notNull(),
   lastSyncAt: timestamp("last_sync_at"),
@@ -584,6 +593,20 @@ export const integrationMetrics = pgTable("integration_metrics", {
   index("integration_metrics_platform_idx").on(table.platform),
   index("integration_metrics_metric_name_idx").on(table.metricName),
 ]);
+
+// ======================
+// Relaciones de la base de datos
+// ======================
+export const productsRelations = relations(products, ({ many }) => ({
+  variants: many(productVariants),
+}));
+
+export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+  product: one(products, {
+    fields: [productVariants.productId],
+    references: [products.id],
+  }),
+}));
 
 // ======================
 // Tipos TypeScript para nuevas tablas

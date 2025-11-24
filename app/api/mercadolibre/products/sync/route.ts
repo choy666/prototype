@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { products, mercadolibreProductsSync } from '@/lib/schema';
+import { products, mercadolibreProductsSync, productVariants } from '@/lib/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { logger } from '@/lib/utils/logger';
 import { auth } from '@/lib/actions/auth';
+import type { ProductVariant } from '@/lib/schema';
 
 export async function POST(req: Request) {
   let productId: number | null = null;
   let productIdNum: number | null = null;
+  let abortController: AbortController | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
   
   try {
+    // Validaciones tempranas antes de crear timeout
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -26,59 +30,173 @@ export async function POST(req: Request) {
 
     productIdNum = typeof productId === 'string' ? parseInt(productId) : productId;
 
+    // Crear timeout después de validaciones básicas
+    abortController = new AbortController();
+    timeoutId = setTimeout(() => abortController!.abort(), 30000); // 30 segundos timeout
+
     // Verificar conexión con Mercado Libre
     const connected = await isConnected(parseInt(session.user.id));
     if (!connected) {
+      if (timeoutId) clearTimeout(timeoutId);
       return NextResponse.json({ 
         error: 'Usuario no conectado a Mercado Libre' 
       }, { status: 400 });
     }
 
-    // Obtener producto local
+    // Obtener producto local con variantes
     const localProduct = await db.query.products.findFirst({
       where: eq(products.id, productIdNum!),
+      with: {
+        variants: {
+          where: eq(productVariants.isActive, true),
+        },
+      },
     });
 
     if (!localProduct) {
+      if (timeoutId) clearTimeout(timeoutId);
       return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
     }
 
-    // Verificar si ya existe una sincronización en curso
-    const existingSync = await db.query.mercadolibreProductsSync.findFirst({
-      where: and(
-        eq(mercadolibreProductsSync.productId, productIdNum!),
-        eq(mercadolibreProductsSync.syncStatus, 'syncing')
-      ),
-    });
+    // Verificar y crear registro de sincronización de forma atómica
+    let syncRecord: typeof mercadolibreProductsSync.$inferSelect[];
+    try {
+      syncRecord = await db.transaction(async (tx) => {
+        // Check atómico si ya existe sincronización en curso
+        const existingSync = await tx.query.mercadolibreProductsSync.findFirst({
+          where: and(
+            eq(mercadolibreProductsSync.productId, productIdNum!),
+            eq(mercadolibreProductsSync.syncStatus, 'syncing')
+          ),
+        });
 
-    if (existingSync) {
-      return NextResponse.json({ 
-        error: 'El producto ya está siendo sincronizado' 
-      }, { status: 409 });
+        if (existingSync) {
+          throw new Error('PRODUCT_ALREADY_SYNCING');
+        }
+
+        // Crear o actualizar registro de sincronización
+        const records = await tx.insert(mercadolibreProductsSync).values({
+          productId: productIdNum!,
+          syncStatus: 'syncing',
+          lastSyncAt: new Date(),
+          syncAttempts: 1,
+        }).onConflictDoUpdate({
+          target: mercadolibreProductsSync.productId,
+          set: {
+            syncStatus: 'syncing',
+            lastSyncAt: new Date(),
+            syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
+          },
+        }).returning();
+
+        return records;
+      });
+    } catch (txError) {
+      if (txError instanceof Error && txError.message === 'PRODUCT_ALREADY_SYNCING') {
+        if (timeoutId) clearTimeout(timeoutId);
+        return NextResponse.json({ 
+          error: 'El producto ya está siendo sincronizado' 
+        }, { status: 409 });
+      }
+      throw txError; // Re-lanzar otros errores
     }
 
-    // Crear o actualizar registro de sincronización
-    const syncRecord = await db.insert(mercadolibreProductsSync).values({
-      productId: productIdNum!,
-      syncStatus: 'syncing',
-      lastSyncAt: new Date(),
-      syncAttempts: 1,
-    }).onConflictDoUpdate({
-      target: mercadolibreProductsSync.productId,
-      set: {
-        syncStatus: 'syncing',
-        lastSyncAt: new Date(),
-        syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
-      },
-    }).returning();
+    if (!syncRecord || syncRecord.length === 0) {
+      if (timeoutId) clearTimeout(timeoutId);
+      logger.error('No se pudo crear/actualizar registro de sincronización', { productId: productIdNum });
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    }
+
+    // Validar datos antes de sincronizar
+    const hasVariants = localProduct.variants && Array.isArray(localProduct.variants) && (localProduct.variants as ProductVariant[]).length > 0;
+    
+    if (hasVariants) {
+      // Validar límite de 200 variantes de Mercado Libre
+      if ((localProduct.variants as ProductVariant[]).length > 200) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Producto excede límite de variantes de ML', {
+          productId: productIdNum,
+          variantsCount: (localProduct.variants as ProductVariant[]).length
+        });
+        return NextResponse.json({
+          error: 'Mercado Libre permite máximo 200 variantes por publicación',
+          variantsCount: (localProduct.variants as ProductVariant[]).length,
+          maxAllowed: 200
+        }, { status: 400 });
+      }
+      
+      // Validar unicidad de attribute_combinations entre variantes
+      const attributeCombinations = (localProduct.variants as ProductVariant[]).map((variant: ProductVariant) => {
+        if (!variant.mlAttributeCombinations || !Array.isArray(variant.mlAttributeCombinations)) {
+          return null;
+        }
+        // Crear clave única basada en los atributos combinados
+        return variant.mlAttributeCombinations
+          .map((attr: { id: string; value_id: string }) => `${attr.id}:${attr.value_id}`)
+          .sort() // Ordenar para asegurar consistencia
+          .join('|');
+      });
+      
+      const duplicateCombinations = attributeCombinations.filter((combo: string | null, index: number) => 
+        combo && attributeCombinations.indexOf(combo) !== index
+      );
+      
+      if (duplicateCombinations.length > 0) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Variantes con combinaciones de atributos duplicadas', {
+          productId: productIdNum,
+          duplicateCombinations: [...new Set(duplicateCombinations)]
+        });
+        return NextResponse.json({
+          error: 'Las variantes no pueden tener combinaciones de atributos duplicadas',
+          duplicateCombinations: [...new Set(duplicateCombinations)]
+        }, { status: 400 });
+      }
+      
+      const invalidVariants = (localProduct.variants as ProductVariant[]).filter((variant: ProductVariant) => 
+        !variant.mlAttributeCombinations || 
+        (Array.isArray(variant.mlAttributeCombinations) && variant.mlAttributeCombinations.length === 0)
+      );
+      
+      if (invalidVariants.length > 0) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Variantes sin atributos ML válidos', {
+          productId: productIdNum,
+          invalidVariantsCount: invalidVariants.length,
+          invalidVariantIds: invalidVariants.map((v: ProductVariant) => v.id)
+        });
+        return NextResponse.json({
+          error: 'Las variantes deben tener atributos de Mercado Libre configurados',
+          invalidVariants: invalidVariants.map((v: ProductVariant) => ({ id: v.id, name: v.name }))
+        }, { status: 400 });
+      }
+    }
 
     // Preparar datos para Mercado Libre
-    const mlProductData = {
+    
+    const mlProductData: {
+      title: string;
+      category_id: string;
+      currency_id: string;
+      buying_mode: string;
+      condition: string;
+      listing_type_id: string;
+      description: string;
+      pictures: Array<{ source: string }>;
+      attributes: unknown[];
+      price?: number;
+      available_quantity?: number;
+      variations?: Array<{
+        price: number;
+        available_quantity: number;
+        attribute_combinations: unknown[];
+        picture_ids: unknown[];
+        seller_custom_field: string;
+      }>;
+    } = {
       title: localProduct.name,
       category_id: localProduct.mlCategoryId || 'MLA3530', // Categoría por defecto
-      price: parseFloat(localProduct.price),
       currency_id: localProduct.mlCurrencyId || 'ARS',
-      available_quantity: localProduct.stock,
       buying_mode: localProduct.mlBuyingMode || 'buy_it_now',
       condition: localProduct.mlCondition || 'new',
       listing_type_id: localProduct.mlListingTypeId || 'bronze',
@@ -86,58 +204,257 @@ export async function POST(req: Request) {
       pictures: localProduct.image ? [{
         source: localProduct.image,
       }] : [],
-      attributes: localProduct.attributes || [],
+      attributes: (localProduct.attributes as unknown[]) || [],
     };
 
-    // Enviar a Mercado Libre
-    const response = await makeAuthenticatedRequest(
-      parseInt(session.user.id),
-      '/items',
-      {
-        method: 'POST',
-        body: JSON.stringify(mlProductData),
-      }
-    );
+    if (hasVariants) {
+      // Producto con variantes: usar precio base del producto padre y variaciones
+      mlProductData.price = parseFloat(localProduct.price);
+      mlProductData.available_quantity = localProduct.stock;
+      
+      // Agregar variaciones
+      mlProductData.variations = (localProduct.variants as ProductVariant[]).map((variant: ProductVariant) => ({
+        price: variant.price ? parseFloat(variant.price) : parseFloat(localProduct.price),
+        available_quantity: variant.stock,
+        attribute_combinations: (variant.mlAttributeCombinations as unknown[]) || [],
+        picture_ids: (variant.images as unknown[]) || [],
+        seller_custom_field: variant.id.toString(), // Referencia local
+      }));
+      
+      logger.info('Producto con variantes preparado para ML', {
+        productId: productIdNum,
+        variantsCount: (localProduct.variants as ProductVariant[]).length,
+        hasVariations: true
+      });
+    } else {
+      // Producto simple sin variantes
+      mlProductData.price = parseFloat(localProduct.price);
+      mlProductData.available_quantity = localProduct.stock;
+      
+      logger.info('Producto simple preparado para ML', {
+        productId: productIdNum,
+        hasVariations: false
+      });
+    }
 
-    if (!response.ok) {
-      const errorData = await response.text();
+    // Determinar si es CREATE o UPDATE
+    const isUpdate = !!localProduct.mlItemId;
+    const mlEndpoint = isUpdate ? `/items/${localProduct.mlItemId}` : '/items';
+    const mlMethod = isUpdate ? 'PUT' : 'POST';
+    
+    logger.info(isUpdate ? 'Actualizando producto existente en ML' : 'Creando nuevo producto en ML', {
+      productId: productIdNum,
+      mlItemId: localProduct.mlItemId,
+      method: mlMethod,
+      endpoint: mlEndpoint
+    });
+
+    // Enviar a Mercado Libre con timeout y retry logic
+    let response: Response;
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    if (!abortController) {
+      throw new Error('AbortController no inicializado');
+    }
+    
+    while (retryCount <= maxRetries) {
+      try {
+        response = await makeAuthenticatedRequest(
+          parseInt(session.user.id),
+          mlEndpoint,
+          {
+            method: mlMethod,
+            body: JSON.stringify(mlProductData),
+            signal: abortController.signal,
+          }
+        );
+        break; // Si tiene éxito, salir del loop
+      } catch (fetchError) {
+        retryCount++;
+        if (retryCount > maxRetries || abortController.signal.aborted) {
+          if (timeoutId) clearTimeout(timeoutId);
+          logger.error('Error de red con Mercado Libre después de reintentos', { 
+            error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+            retryCount,
+            productId: productIdNum
+          });
+          throw new MercadoLibreError(
+            MercadoLibreErrorCode.CONNECTION_ERROR,
+            'Error de conexión con Mercado Libre',
+            { originalError: fetchError }
+          );
+        }
+        // Esperar exponential backoff antes de reintentar
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+      }
+    }
+
+    if (!response!.ok) {
+      let errorData: string;
+      let parsedError: {
+        cause?: string;
+        message?: string;
+        [key: string]: unknown;
+      } | null = null;
+      try {
+        errorData = await response!.text();
+        // Intentar parsear error específico de ML
+        try {
+          parsedError = JSON.parse(errorData);
+        } catch {
+          // No es JSON, usar texto plano
+        }
+      } catch {
+        errorData = 'Error desconocido al leer respuesta de ML';
+      }
+      
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      // Manejo específico de errores de ML para variantes
+      let errorMessage = `Error creando producto en ML: ${errorData}`;
+      if (parsedError?.cause === 'attribute_combinations_not_allowed' || 
+          parsedError?.cause === 'invalid_attribute_combinations' ||
+          parsedError?.cause === 'duplicate_attribute_combinations') {
+        errorMessage = `Error en atributos de variantes: ${parsedError.message || errorData}`;
+        logger.error('Error específico de ML en atributos de variantes', { 
+          cause: parsedError.cause,
+          error: parsedError.message || errorData,
+          productId: productIdNum 
+        });
+      }
+      
+      logger.error('Error en respuesta de Mercado Libre', { 
+        status: response!.status, 
+        errorData, 
+        parsedError,
+        productId: productIdNum 
+      });
+      
       throw new MercadoLibreError(
         MercadoLibreErrorCode.INVALID_REQUEST,
-        `Error creando producto en ML: ${errorData}`,
-        { status: response.status, error: errorData }
+        errorMessage,
+        { status: response!.status, error: errorData, parsedError }
       );
     }
 
-    const mlItem = await response.json();
-    const mlItemId = mlItem.id;
+    interface MercadoLibreItemResponse {
+      id: string;
+      permalink?: string;
+      thumbnail?: string;
+      [key: string]: unknown;
+    }
+    
+    let mlItem: MercadoLibreItemResponse;
+    try {
+      mlItem = await response!.json();
+    } catch (parseError) {
+      if (timeoutId) clearTimeout(timeoutId);
+      logger.error('Error parseando respuesta JSON de Mercado Libre', { 
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        productId: productIdNum 
+      });
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.INVALID_REQUEST,
+        'Respuesta inválida de Mercado Libre',
+        { originalError: parseError }
+      );
+    }
+    
+    const mlItemId = mlItem?.id;
+    if (!mlItemId) {
+      if (timeoutId) clearTimeout(timeoutId);
+      logger.error('Respuesta de ML no contiene ID válido', { mlItem, productId: productIdNum });
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.INVALID_REQUEST,
+        'La respuesta de Mercado Libre no contiene un ID válido',
+        { mlItem }
+      );
+    }
 
-    // Actualizar producto local con ID de ML
-    await db.update(products)
-      .set({
-        mlItemId,
-        mlSyncStatus: 'synced',
-        mlLastSync: new Date(),
-        mlPermalink: mlItem.permalink,
-        mlThumbnail: mlItem.thumbnail,
-        updated_at: new Date(),
-      })
-      .where(eq(products.id, productIdNum!));
+    // Actualizar producto local con ID de ML (transacción atómica)
+    try {
+      await db.transaction(async (tx) => {
+        // Actualizar producto padre
+        await tx.update(products)
+          .set({
+            mlItemId,
+            mlSyncStatus: 'synced',
+            mlLastSync: new Date(),
+            mlPermalink: mlItem.permalink || null,
+            mlThumbnail: mlItem.thumbnail || null,
+            updated_at: new Date(),
+          })
+          .where(eq(products.id, productIdNum!));
+
+        // Actualizar IDs de variación si el producto tiene variantes
+        if (hasVariants && mlItem.variations && Array.isArray(mlItem.variations)) {
+          for (const mlVariation of mlItem.variations) {
+            // Mapear usando seller_custom_field que guardamos como referencia
+            const localVariantId = parseInt(mlVariation.seller_custom_field);
+            if (!isNaN(localVariantId)) {
+              await tx.update(productVariants)
+                .set({
+                  mlVariationId: mlVariation.id.toString(),
+                  mlSyncStatus: 'synced',
+                  updated_at: new Date(),
+                })
+                .where(eq(productVariants.id, localVariantId));
+              
+              logger.info('Variante actualizada con ID de ML', {
+                localVariantId,
+                mlVariationId: mlVariation.id,
+                productId: productIdNum
+              });
+            }
+          }
+        }
+      });
+    } catch (dbError) {
+      if (timeoutId) clearTimeout(timeoutId);
+      logger.error('Error actualizando producto local con datos de ML', { 
+        error: dbError instanceof Error ? dbError.message : String(dbError),
+        productId: productIdNum,
+        mlItemId 
+      });
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
+        'Error actualizando base de datos local',
+        { originalError: dbError }
+      );
+    }
 
     // Actualizar registro de sincronización
-    await db.update(mercadolibreProductsSync)
-      .set({
-        mlItemId,
-        syncStatus: 'synced',
-        lastSyncAt: new Date(),
-        mlData: mlItem,
-        updatedAt: new Date(),
-      })
-      .where(eq(mercadolibreProductsSync.id, syncRecord[0].id));
+    try {
+      await db.update(mercadolibreProductsSync)
+        .set({
+          mlItemId,
+          syncStatus: 'synced',
+          lastSyncAt: new Date(),
+          mlData: mlItem,
+          updatedAt: new Date(),
+        })
+        .where(eq(mercadolibreProductsSync.id, syncRecord[0].id));
+    } catch (dbError) {
+      if (timeoutId) clearTimeout(timeoutId);
+      logger.error('Error actualizando registro de sincronización', { 
+        error: dbError instanceof Error ? dbError.message : String(dbError),
+        productId: productIdNum,
+        syncRecordId: syncRecord[0]?.id 
+      });
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
+        'Error actualizando registro de sincronización',
+        { originalError: dbError }
+      );
+    }
 
+    if (timeoutId) clearTimeout(timeoutId);
     logger.info('Producto sincronizado exitosamente', {
       productId: productIdNum!,
       mlItemId,
       userId: session.user.id,
+      mlPermalink: mlItem.permalink,
     });
 
     return NextResponse.json({
@@ -149,14 +466,23 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    logger.error('Error sincronizando producto', {
+    if (timeoutId) clearTimeout(timeoutId);
+    
+    const errorContext = {
+      productId: productIdNum,
+      userId: 'unknown', // No podemos depender de session aquí
+      timestamp: new Date().toISOString(),
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-    });
+      errorType: error?.constructor?.name || 'Unknown',
+    };
+    
+    logger.error('Error sincronizando producto - Contexto completo', errorContext);
 
-    // Actualizar estado de sincronización a error
+    // Actualizar estado de sincronización a error (sin afectar el error original)
     if (productId && productIdNum) {
       try {
+        // Primero actualizar el registro de sincronización
         await db.update(mercadolibreProductsSync)
           .set({
             syncStatus: 'error',
@@ -165,28 +491,51 @@ export async function POST(req: Request) {
           })
           .where(eq(mercadolibreProductsSync.productId, productIdNum!));
 
+        // Luego actualizar el producto
         await db.update(products)
           .set({
             mlSyncStatus: 'error',
             updated_at: new Date(),
           })
           .where(eq(products.id, productIdNum!));
+          
+        logger.info('Estado de sincronización actualizado a error', { productId: productIdNum });
       } catch (updateError) {
-        logger.error('Error actualizando estado de sincronización', { updateError });
+        logger.error('Error actualizando estado de sincronización (no crítico)', { 
+          updateError: updateError instanceof Error ? updateError.message : String(updateError),
+          productId: productIdNum 
+        });
+        // No relanzar este error para no ocultar el error original
       }
     }
 
     if (error instanceof MercadoLibreError) {
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { 
+          error: error.message, 
+          code: error.code,
+          productId: productIdNum,
+          timestamp: new Date().toISOString()
+        },
         { status: 400 }
       );
     }
 
+    // Error genérico con más contexto para debugging
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { 
+        error: 'Error interno del servidor',
+        productId: productIdNum,
+        timestamp: new Date().toISOString(),
+        requestId: crypto.randomUUID()
+      },
       { status: 500 }
     );
+  } finally {
+    // Garantizar que el timeout siempre se limpie
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
