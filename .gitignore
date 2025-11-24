@@ -45,3 +45,6 @@ next-env.d.ts
 
 # uploads (user uploaded images)
 /public/uploads/*
+
+# documentation
+docs/DevCenter.txt
