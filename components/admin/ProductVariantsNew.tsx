@@ -135,6 +135,30 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
     }
   }, [productId, onChange]);
 
+  const activeCount = variants.filter(v => v.isActive).length;
+  const totalVariants = variants.length;
+  const exceedsMlLimit = totalVariants > 60;
+  const nearMlLimit = totalVariants >= 50 && totalVariants <= 60;
+  const variantsWithoutAttrs = variants.filter(
+    v => !v.additionalAttributes || Object.keys(v.additionalAttributes).length === 0
+  ).length;
+
+  const serializeAttrs = (attrs?: Record<string, string>) => {
+    if (!attrs || Object.keys(attrs).length === 0) return "";
+    return Object.entries(attrs)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}:${value}`)
+      .join("|");
+  };
+
+  const combinationCounts: Record<string, number> = {};
+  variants.forEach((variant) => {
+    const key = serializeAttrs(variant.additionalAttributes);
+    if (key) {
+      combinationCounts[key] = (combinationCounts[key] || 0) + 1;
+    }
+  });
+
   const handleCreateVariant = async () => {
     // Validación de campos obligatorios
     if (!newVariantForm.name?.trim()) {
@@ -162,6 +186,23 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
         variant: "destructive",
       });
       return;
+    }
+
+    // Validación UI extra: evitar combinaciones duplicadas de atributos adicionales
+    const newAttrsKey = serializeAttrs(newVariantForm.additionalAttributes || {});
+    if (newAttrsKey) {
+      const existsDuplicate = variants.some(
+        (v) => serializeAttrs(v.additionalAttributes) === newAttrsKey
+      );
+      if (existsDuplicate) {
+        toast({
+          title: "Atributos duplicados",
+          description:
+            "Ya existe una variante con estos atributos adicionales. Mercado Libre requiere combinaciones únicas por variante.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     try {
@@ -338,7 +379,10 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">
-            {variants.filter(v => v.isActive).length} activas
+            {activeCount} activas
+          </Badge>
+          <Badge variant={exceedsMlLimit ? "destructive" : "secondary"}>
+            ML: {totalVariants}/60 variantes
           </Badge>
           <Button onClick={() => setShowCreateForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -346,6 +390,25 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
           </Button>
         </div>
       </div>
+
+      {/* Recomendaciones de Mercado Libre para variantes */}
+      {exceedsMlLimit && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          Mercado Libre permite máximo 60 variantes por publicación. Actualmente tienes {totalVariants}.
+          Reduce la cantidad de variantes o combina atributos para cumplir con el límite.
+        </div>
+      )}
+      {!exceedsMlLimit && nearMlLimit && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Estás cerca del límite de 60 variantes de Mercado Libre ({totalVariants}/60). Revisa si todas son necesarias.
+        </div>
+      )}
+      {!exceedsMlLimit && variantsWithoutAttrs > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Hay {variantsWithoutAttrs} variantes sin atributos adicionales. Para Mercado Libre se recomienda que cada
+          variante tenga atributos únicos (por ejemplo, Color, Talla) para poder diferenciarlas.
+        </div>
+      )}
 
       {/* Formulario de creación */}
       {showCreateForm && (
@@ -542,6 +605,33 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
                       <Badge variant={variant.isActive ? "default" : "secondary"}>
                         {variant.isActive ? "Activa" : "Inactiva"}
                       </Badge>
+                      {(() => {
+                        const key = serializeAttrs(variant.additionalAttributes);
+                        const hasAttrs = !!key;
+                        const isDuplicate = key && combinationCounts[key] > 1;
+
+                        if (!hasAttrs) {
+                          return (
+                            <Badge variant="destructive" className="text-[10px]">
+                              Sin atributos
+                            </Badge>
+                          );
+                        }
+
+                        if (isDuplicate) {
+                          return (
+                            <Badge variant="destructive" className="text-[10px]">
+                              Combinación duplicada
+                            </Badge>
+                          );
+                        }
+
+                        return (
+                          <Badge variant="outline" className="text-[10px]">
+                            Atributos OK
+                          </Badge>
+                        );
+                      })()}
                     </div>
                     <div className="text-sm text-gray-600 space-y-1">
                       <p>Stock: {variant.stock} unidades</p>

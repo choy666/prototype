@@ -37,6 +37,15 @@ interface Product {
   discount: number
   weight?: string
   destacado: boolean
+  mlCondition?: string
+  mlBuyingMode?: string
+  mlListingTypeId?: string
+  mlCurrencyId?: string
+  mlCategoryId?: string
+  mlVideoId?: string
+  height?: string
+  width?: string
+  length?: string
 }
 
 interface ProductForm {
@@ -51,6 +60,16 @@ interface ProductForm {
   stock: string
   destacado: boolean
   dynamicAttributes: DynamicAttribute[]
+  mlCondition: string
+  mlBuyingMode: string
+  mlListingTypeId: string
+  mlCurrencyId: string
+  mlCategoryId: string
+  warranty: string
+  videoId: string
+  height: string
+  width: string
+  length: string
 }
 
 
@@ -62,7 +81,6 @@ export default function EditProductPage() {
   const params = useParams()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [loadingAttributes, setLoadingAttributes] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
@@ -77,7 +95,17 @@ export default function EditProductPage() {
     weight: '',
     stock: '0',
     destacado: false,
-    dynamicAttributes: []
+    dynamicAttributes: [],
+    mlCondition: 'new',
+    mlBuyingMode: 'buy_it_now',
+    mlListingTypeId: 'free',
+    mlCurrencyId: 'ARS',
+    mlCategoryId: '',
+    warranty: '',
+    videoId: '',
+    height: '',
+    width: '',
+    length: ''
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
   const [variants, setVariants] = useState<ProductVariant[]>([])
@@ -127,6 +155,16 @@ export default function EditProductPage() {
           stock: product.stock.toString(),
           destacado: product.destacado,
           dynamicAttributes: (product as unknown as { attributes?: DynamicAttribute[] }).attributes || [],
+          mlCondition: product.mlCondition || 'new',
+          mlBuyingMode: product.mlBuyingMode || 'buy_it_now',
+          mlListingTypeId: product.mlListingTypeId || 'free',
+          mlCurrencyId: product.mlCurrencyId || 'ARS',
+          mlCategoryId: product.mlCategoryId || '',
+          warranty: '',
+          videoId: product.mlVideoId || '',
+          height: (product.height as string | undefined) || '',
+          width: (product.width as string | undefined) || '',
+          length: (product.length as string | undefined) || '',
           variants: [] // Se cargarán desde ProductVariants
         }
 
@@ -170,7 +208,16 @@ export default function EditProductPage() {
         weight: form.weight || undefined,
         stock: parseInt(form.stock) || 0,
         destacado: form.destacado,
-        attributes: attributes.length > 0 ? attributes : undefined
+        attributes: attributes.length > 0 ? attributes : undefined,
+        mlCondition: form.mlCondition,
+        mlBuyingMode: form.mlBuyingMode,
+        mlListingTypeId: form.mlListingTypeId,
+        mlCurrencyId: form.mlCurrencyId,
+        mlCategoryId: form.mlCategoryId || undefined,
+        mlVideoId: form.videoId || undefined,
+        height: form.height || undefined,
+        width: form.width || undefined,
+        length: form.length || undefined
       }
 
       const response = await fetch(`/api/admin/products/${id}`, {
@@ -213,38 +260,6 @@ export default function EditProductPage() {
 
   const handleImagesReorder = (images: string[]) => {
     setForm(prev => ({ ...prev, images }))
-  }
-
-  const handleUpdateAttributes = async () => {
-    setLoadingAttributes(true)
-
-    try {
-      const response = await fetch(`/api/admin/products/${id}/attributes`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ attributes })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to update attributes')
-      }
-
-      toast({
-        title: 'Éxito',
-        description: 'Atributos dinámicos actualizados correctamente'
-      })
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudieron actualizar los atributos',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoadingAttributes(false)
-    }
   }
 
 
@@ -433,6 +448,45 @@ export default function EditProductPage() {
                     />
                   </div>
 
+                  <div>
+                    <Label htmlFor="height">Alto (cm)</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.height}
+                      onChange={(e) => handleChange('height', e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="width">Ancho (cm)</Label>
+                    <Input
+                      id="width"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.width}
+                      onChange={(e) => handleChange('width', e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="length">Largo (cm)</Label>
+                    <Input
+                      id="length"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.length}
+                      onChange={(e) => handleChange('length', e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+
                   <div className="md:col-span-2">
                     <Label htmlFor="description">Descripción</Label>
                     <Textarea
@@ -443,6 +497,113 @@ export default function EditProductPage() {
                       rows={4}
                       className="resize-y"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label htmlFor="warranty">Garantía</Label>
+                    <Input
+                      id="warranty"
+                      value={form.warranty}
+                      onChange={(e) => handleChange('warranty', e.target.value)}
+                      placeholder="Ej: 90 días, 1 año, sin garantía"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label htmlFor="videoId">ID de Video (YouTube, Vimeo)</Label>
+                    <Input
+                      id="videoId"
+                      value={form.videoId}
+                      onChange={(e) => handleChange('videoId', e.target.value)}
+                      placeholder="ID del video para mostrar en la publicación"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="mlCondition">Condición *</Label>
+                    <Select value={form.mlCondition} onValueChange={(value) => handleChange('mlCondition', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar condición" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">Nuevo</SelectItem>
+                        <SelectItem value="used">Usado</SelectItem>
+                        <SelectItem value="not_specified">No especificado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="mlBuyingMode">Modalidad de compra *</Label>
+                    <Select value={form.mlBuyingMode} onValueChange={(value) => handleChange('mlBuyingMode', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar modalidad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="buy_it_now">Comprar ahora</SelectItem>
+                        <SelectItem value="auction">Subasta</SelectItem>
+                        <SelectItem value="classified">Clasificado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="mlListingTypeId">Tipo de publicación *</Label>
+                    <Select value={form.mlListingTypeId} onValueChange={(value) => handleChange('mlListingTypeId', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Gratuita</SelectItem>
+                        <SelectItem value="bronze">Bronce</SelectItem>
+                        <SelectItem value="silver">Plata</SelectItem>
+                        <SelectItem value="gold">Oro</SelectItem>
+                        <SelectItem value="gold_premium">Oro Premium</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="mlCurrencyId">Moneda *</Label>
+                    <Select value={form.mlCurrencyId} onValueChange={(value) => handleChange('mlCurrencyId', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar moneda" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ARS">ARS - Pesos Argentinos</SelectItem>
+                        <SelectItem value="USD">USD - Dólares Estadounidenses</SelectItem>
+                        <SelectItem value="UYU">UYU - Pesos Uruguayos</SelectItem>
+                        <SelectItem value="CLP">CLP - Pesos Chilenos</SelectItem>
+                        <SelectItem value="COP">COP - Pesos Colombianos</SelectItem>
+                        <SelectItem value="MXN">MXN - Pesos Mexicanos</SelectItem>
+                        <SelectItem value="PEN">PEN - Soles Peruanos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="mlCategoryId">Categoría Mercado Libre (ID)</Label>
+                    <Select
+                      value={form.mlCategoryId}
+                      onValueChange={(value) => handleChange('mlCategoryId', value)}
+                      disabled={categoriesLoading}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar categoría ML (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories
+                          .filter((category) => category.mlCategoryId)
+                          .map((category) => (
+                            <SelectItem
+                              key={category.id}
+                              value={category.mlCategoryId as string}
+                            >
+                              {category.name} ({category.mlCategoryId})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="md:col-span-2">
@@ -533,25 +694,31 @@ export default function EditProductPage() {
           <TabsContent value="attributes" className="animate-in fade-in slide-in-from-right-2 duration-300">
             <Card className="transition-all duration-300 hover:shadow-lg">
               <CardHeader>
-                <CardTitle>Atributos Dinámicos</CardTitle>
+                <CardTitle>Atributos del Producto</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Define los atributos que tendrán las variantes de este producto
+                  Define atributos adicionales como talla, color, material, etc. Estos atributos pueden ser usados
+                  para mapear variaciones en Mercado Libre.
                 </p>
               </CardHeader>
               <CardContent>
                 <AttributeBuilder
                   attributes={attributes}
                   onChange={setAttributes}
+                  recommendedAttributes={[
+                    {
+                      key: 'brand',
+                      label: 'Marca (BRAND)',
+                      aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
+                      required: form.mlCategoryId === 'MLA3530',
+                    },
+                    {
+                      key: 'model',
+                      label: 'Modelo (MODEL)',
+                      aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
+                      required: form.mlCategoryId === 'MLA3530',
+                    },
+                  ]}
                 />
-                <div className="flex justify-end mt-6">
-                  <Button
-                    onClick={handleUpdateAttributes}
-                    disabled={loadingAttributes}
-                    className="min-h-[44px]"
-                  >
-                    {loadingAttributes ? 'Actualizando...' : 'Actualizar Atributos Dinámicos'}
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -24,6 +24,7 @@ const createProductSchema = z.object({
   mlBuyingMode: z.string().min(1),
   mlListingTypeId: z.string().min(1),
   mlCurrencyId: z.string().min(1),
+  mlCategoryId: z.string().regex(/^MLA\d+$/).optional(),
   warranty: z.string().optional(),
   mlVideoId: z.string().optional(),
   // Dimensiones para envío

@@ -10,18 +10,32 @@ export interface DynamicAttribute {
   values: string[]
 }
 
+interface RecommendedAttribute {
+  key: string
+  label: string
+  aliases: string[]
+  required?: boolean
+}
+
 interface AttributeBuilderProps {
   attributes: DynamicAttribute[]
   onChange: (attributes: DynamicAttribute[]) => void
+  recommendedAttributes?: RecommendedAttribute[]
 }
 
-export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps) {
+export function AttributeBuilder({ attributes, onChange, recommendedAttributes = [] }: AttributeBuilderProps) {
   const [newAttributeName, setNewAttributeName] = useState('')
   const [newAttributeValue, setNewAttributeValue] = useState('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [animatingItems, setAnimatingItems] = useState<Set<number>>(new Set())
+
+  const normalizeName = (value: string) => value.trim().toLowerCase()
+  const isRecommendedPresent = (aliases: string[]) =>
+    attributes.some((attr) =>
+      aliases.some((alias) => normalizeName(attr.name) === normalizeName(alias))
+    )
 
   const addAttribute = () => {
     if (!newAttributeName.trim() || !newAttributeValue.trim()) return
@@ -133,6 +147,41 @@ export function AttributeBuilder({ attributes, onChange }: AttributeBuilderProps
         <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Atributos Dinámicos</h3>
         <span className="text-sm text-gray-500">({attributes.length} atributos)</span>
       </div>
+
+      {recommendedAttributes.length > 0 && (
+        <div className="rounded-lg border bg-blue-50 dark:bg-blue-900/20 p-4 space-y-2">
+          <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
+            Atributos recomendados por Mercado Libre para esta categoría
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {recommendedAttributes.map((attr) => {
+              const present = isRecommendedPresent(attr.aliases)
+              return (
+                <span
+                  key={attr.key}
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
+                    present
+                      ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+                      : 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                  }`}
+                >
+                  {attr.label}
+                  {attr.required && (
+                    <span className="ml-1 text-[10px] font-semibold">
+                      (obligatorio)
+                    </span>
+                  )}
+                  <span
+                    className={`ml-2 h-2 w-2 rounded-full ${
+                      present ? 'bg-green-500' : 'bg-amber-400'
+                    }`}
+                  />
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Lista de atributos existentes */}
       {attributes.length > 0 && (

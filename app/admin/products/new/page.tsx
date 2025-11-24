@@ -32,6 +32,7 @@ interface ProductForm {
   mlBuyingMode: string
   mlListingTypeId: string
   mlCurrencyId: string
+  mlCategoryId: string
   warranty: string
   videoId: string
   // Dimensiones para envío
@@ -62,6 +63,7 @@ export default function NewProductPage() {
     mlBuyingMode: 'buy_it_now',
     mlListingTypeId: 'free',
     mlCurrencyId: 'ARS',
+    mlCategoryId: '',
     warranty: '',
     videoId: '',
     // Dimensiones
@@ -109,6 +111,7 @@ export default function NewProductPage() {
         mlBuyingMode: form.mlBuyingMode,
         mlListingTypeId: form.mlListingTypeId,
         mlCurrencyId: form.mlCurrencyId,
+        mlCategoryId: form.mlCategoryId || undefined,
         warranty: form.warranty || undefined,
         mlVideoId: form.videoId || undefined,
         // Dimensiones para envío
@@ -207,6 +210,30 @@ export default function NewProductPage() {
                         {category.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="mlCategoryId">Categoría Mercado Libre (ID)</Label>
+                <Select
+                  value={form.mlCategoryId}
+                  onValueChange={(value) => handleChange('mlCategoryId', value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar categoría ML (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories
+                      .filter((category) => category.mlCategoryId)
+                      .map((category) => (
+                        <SelectItem
+                          key={category.id}
+                          value={category.mlCategoryId as string}
+                        >
+                          {category.name} ({category.mlCategoryId})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

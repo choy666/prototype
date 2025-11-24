@@ -27,6 +27,53 @@ const updateVariantSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+type MlAttributeCombination = {
+  id: string;
+  name?: string;
+  value_id?: string;
+  value_name: string;
+};
+
+function buildMlAttributeCombinations(
+  additionalAttributes?: Record<string, string> | null
+): MlAttributeCombination[] | null {
+  if (!additionalAttributes) return null;
+
+  const combinations: MlAttributeCombination[] = [];
+
+  for (const [key, value] of Object.entries(additionalAttributes)) {
+    const lowerKey = key.toLowerCase();
+
+    let attrId: string | null = null;
+    let attrName: string | undefined = key;
+
+    if (lowerKey.includes("color")) {
+      // Atributo estándar de ML para color
+      attrId = "COLOR";
+      attrName = "Color";
+    } else if (
+      lowerKey.includes("talle") ||
+      lowerKey.includes("talla") ||
+      lowerKey.includes("size")
+    ) {
+      // Atributo estándar de ML para talla/tamaño
+      attrId = "SIZE";
+      attrName = "Talle";
+    }
+
+    // Si no es un atributo conocido, no generamos combinación ML automática
+    if (!attrId) continue;
+
+    combinations.push({
+      id: attrId,
+      name: attrName,
+      value_name: value,
+    });
+  }
+
+  return combinations.length > 0 ? combinations : null;
+}
+
 // GET /api/admin/products/[id]/variants - Listar variantes de un producto
 export async function GET(
   request: NextRequest,
@@ -105,16 +152,24 @@ export async function POST(
 
     // Preparar datos para insertar, tratando additionalAttributes vacío como null
     const dataToInsert = { ...validatedData };
-    if (validatedData.additionalAttributes && Object.keys(validatedData.additionalAttributes).length === 0) {
+    if (
+      validatedData.additionalAttributes &&
+      Object.keys(validatedData.additionalAttributes).length === 0
+    ) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (dataToInsert as any).additionalAttributes = null;
     }
+
+    const mlAttributeCombinations = buildMlAttributeCombinations(
+      validatedData.additionalAttributes || null
+    );
 
     const newVariant = await db
       .insert(productVariants)
       .values({
         productId,
         ...dataToInsert,
+        mlAttributeCombinations,
       })
       .returning();
 
@@ -163,15 +218,24 @@ export async function PUT(
     const validatedData = updateVariantSchema.parse(body);
 
     // Si se está actualizando el stock, determinar automáticamente el estado activo/inactivo
-    const finalData = { ...validatedData };
+    const finalData: Record<string, unknown> = { ...validatedData };
     if (validatedData.stock !== undefined) {
       finalData.isActive = validatedData.stock > 0;
     }
 
     // Preparar datos para actualizar, tratando additionalAttributes vacío como null
-    if (validatedData.additionalAttributes && Object.keys(validatedData.additionalAttributes).length === 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      finalData.additionalAttributes = null as any;
+    if (
+      validatedData.additionalAttributes &&
+      Object.keys(validatedData.additionalAttributes).length === 0
+    ) {
+      finalData.additionalAttributes = null as unknown;
+    }
+
+    // Recalcular combinaciones ML si se actualizan los atributos adicionales
+    if (validatedData.additionalAttributes !== undefined) {
+      finalData.mlAttributeCombinations = buildMlAttributeCombinations(
+        validatedData.additionalAttributes
+      );
     }
 
     const updatedVariant = await db

@@ -254,6 +254,52 @@ export async function POST(req: Request) {
       attributes: (localProduct.attributes as unknown[]) || [],
     };
 
+    const categoryId = mlProductData.category_id;
+    const condition = mlProductData.condition;
+    const listingTypeId = mlProductData.listing_type_id;
+
+    // Validar atributos obligatorios (ej: BRAND y MODEL) para ciertas categorías
+    if (categoryId === 'MLA3530') {
+      const mlAttributes = (mlProductData.attributes as Array<{ id?: string; name?: string; value_name?: string }>) || [];
+
+      const hasBrand = mlAttributes.some((attr) =>
+        (attr.id === 'BRAND' || attr.name?.toUpperCase() === 'BRAND' || attr.name?.toUpperCase() === 'MARCA') &&
+        !!attr.value_name
+      );
+
+      const hasModel = mlAttributes.some((attr) =>
+        (attr.id === 'MODEL' || attr.name?.toUpperCase() === 'MODEL' || attr.name?.toUpperCase() === 'MODELO') &&
+        !!attr.value_name
+      );
+
+      if (!hasBrand || !hasModel) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Faltan atributos obligatorios BRAND/MODEL para categoría MLA3530', {
+          productId: productIdNum,
+          categoryId,
+          hasBrand,
+          hasModel,
+        });
+
+        return NextResponse.json(
+          {
+            error: 'Faltan atributos obligatorios para Mercado Libre',
+            details: [
+              !hasBrand ? 'Debes indicar la marca (atributo BRAND) para esta categoría.' : null,
+              !hasModel ? 'Debes indicar el modelo (atributo MODEL) para esta categoría.' : null,
+            ].filter(Boolean),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Regla especial conocida de ML: para ciertas combinaciones solo permiten cantidad 1
+    const isMaxQuantityOneRule =
+      categoryId === 'MLA3530' &&
+      condition === 'used' &&
+      listingTypeId === 'free';
+
     // Validar precio con categoría dinámica antes de asignar
     const priceValidation = validatePrice(
       localProduct.price, 
@@ -304,12 +350,12 @@ export async function POST(req: Request) {
     if (hasVariants) {
       // Producto con variantes: usar precio base del producto padre y variaciones
       mlProductData.price = parseFloat(localProduct.price);
-      mlProductData.available_quantity = localProduct.stock;
+      mlProductData.available_quantity = isMaxQuantityOneRule ? 1 : localProduct.stock;
       
       // Agregar variaciones
       mlProductData.variations = (localProduct.variants as ProductVariant[]).map((variant: ProductVariant) => ({
         price: variant.price ? parseFloat(variant.price) : parseFloat(localProduct.price),
-        available_quantity: variant.stock,
+        available_quantity: isMaxQuantityOneRule ? 1 : variant.stock,
         attribute_combinations: (variant.mlAttributeCombinations as unknown[]) || [],
         picture_ids: (variant.images as unknown[]) || [],
         seller_custom_field: variant.id.toString(), // Referencia local
@@ -323,7 +369,7 @@ export async function POST(req: Request) {
     } else {
       // Producto simple sin variantes
       mlProductData.price = parseFloat(localProduct.price);
-      mlProductData.available_quantity = localProduct.stock;
+      mlProductData.available_quantity = isMaxQuantityOneRule ? 1 : localProduct.stock;
       
       logger.info('Producto simple preparado para ML', {
         productId: productIdNum,
@@ -405,7 +451,7 @@ export async function POST(req: Request) {
       
       if (timeoutId) clearTimeout(timeoutId);
       
-      // Manejo específico de errores de ML para precios mínimos
+      // Manejo específico de errores de ML para validaciones conocidas
       let errorMessage = `Error creando producto en ML: ${errorData}`;
       if (parsedError?.cause === 'attribute_combinations_not_allowed' || 
           parsedError?.cause === 'invalid_attribute_combinations' ||
@@ -417,13 +463,51 @@ export async function POST(req: Request) {
           productId: productIdNum 
         });
       } else if (parsedError?.cause && Array.isArray(parsedError.cause)) {
+        const causes = parsedError.cause as Array<{ code?: string; message?: string; [key: string]: unknown }>;
+
+        // Buscar errores de cantidad máxima (available_quantity)
+        const quantityError = causes.find((cause) =>
+          cause.code === 'item.available_quantity.invalid' &&
+          typeof cause.message === 'string' &&
+          cause.message.includes('max. value is 1')
+        );
+
+        if (quantityError) {
+          errorMessage =
+            'Mercado Libre solo permite publicar cantidad 1 para esta combinación de categoría, condición y tipo de publicación. ' +
+            'Ajusta el stock de la publicación a 1 o modifica la condición o el tipo de publicación del producto.';
+          logger.error('Error de cantidad máxima de Mercado Libre', {
+            categoryId: mlProductData.category_id,
+            condition: mlProductData.condition,
+            listingTypeId: mlProductData.listing_type_id,
+            message: quantityError.message,
+            productId: productIdNum,
+          });
+        }
+
+        // Buscar errores de atributos requeridos (por ejemplo BRAND/MODEL)
+        const missingAttrsError = causes.find((cause) =>
+          cause.code === 'item.attributes.missing_required'
+        );
+
+        if (missingAttrsError) {
+          errorMessage =
+            'Faltan atributos obligatorios para Mercado Libre (por ejemplo, Marca y Modelo). ' +
+            'Completa los atributos requeridos en la ficha del producto antes de sincronizar.';
+          logger.error('Error de atributos requeridos de Mercado Libre', {
+            categoryId: mlProductData.category_id,
+            message: missingAttrsError.message,
+            productId: productIdNum,
+          });
+        }
+
         // Buscar errores de precio mínimo
-        const priceError = parsedError.cause.find((cause: { code?: string; message?: string }) => 
+        const priceError = causes.find((cause: { code?: string; message?: string }) => 
           cause.code === 'item.price.invalid' && cause.message?.includes('minimum of price')
         );
         
         if (priceError) {
-          const minimumPrice = priceError.message.match(/minimum of price (\d+)/)?.[1];
+          const minimumPrice = priceError.message?.match(/minimum of price (\d+)/)?.[1];
           const currentPrice = hasVariants 
             ? (localProduct.variants as ProductVariant[])[0]?.price || localProduct.price
             : localProduct.price;
