@@ -19,7 +19,8 @@ import { logger } from '@/lib/utils/logger';
 export async function calculateMLShippingCost(
   zipcode: string,
   items: Array<{ id: string; quantity: number; price: number }>,
-  sellerAddressId?: string
+  sellerAddressId?: string,
+  logisticType: string = 'drop_off'
 ): Promise<MLShippingCalculateResponse> {
   try {
     const auth = await MercadoLibreAuth.getInstance();
@@ -46,10 +47,24 @@ export async function calculateMLShippingCost(
       throw new Error(`Producto no encontrado: ${firstItem.id}`);
     }
 
+    // Verificar dimensiones y loggear advertencias si faltan
+    const hasInvalidDimensions = !product[0].height || !product[0].width || !product[0].length || 
+                                Number(product[0].height) === 0 || Number(product[0].width) === 0 || Number(product[0].length) === 0;
+    
+    if (hasInvalidDimensions) {
+      logger.warn('Product has invalid dimensions, using defaults', {
+        productId: firstItem.id,
+        height: product[0].height,
+        width: product[0].width,
+        length: product[0].length,
+        weight: product[0].weight
+      });
+    }
+
     const dimensions = {
-      height: Number(product[0].weight) || 10, // Usar weight como height temporalmente
-      width: Number(product[0].weight) || 10,  // Usar weight como width temporalmente
-      length: Number(product[0].weight) || 10, // Usar weight como length temporalmente
+      height: Number(product[0].height) || 10,
+      width: Number(product[0].width) || 10,
+      length: Number(product[0].length) || 10,
       weight: Number(product[0].weight) || 0.5
     };
 
@@ -60,7 +75,7 @@ export async function calculateMLShippingCost(
       dimensions,
       seller_address: sellerAddressId,
       local_pickup: false,
-      logistic_type: 'drop_off'
+      logistic_type: logisticType
     };
 
     const response = await fetch(
@@ -140,9 +155,9 @@ export async function createMLShipment(orderId: string): Promise<MLShipment> {
             description: row.product.name,
             quantity: 0,
             dimensions: {
-              height: Number(row.product.weight) || 10,
-              width: Number(row.product.weight) || 10,
-              length: Number(row.product.weight) || 10,
+              height: Number(row.product.height) || 10,
+              width: Number(row.product.width) || 10,
+              length: Number(row.product.length) || 10,
               weight: Number(row.product.weight) || 0.5
             }
           });

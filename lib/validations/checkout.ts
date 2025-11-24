@@ -131,7 +131,7 @@ export const checkoutSchema = z.object({
   }),
 
   shippingMethod: z.object({
-    id: z.number(),
+    id: z.string(),
     name: z.string(),
     cost: z.number(),
     description: z.string().optional(),

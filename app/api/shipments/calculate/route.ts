@@ -12,6 +12,7 @@ const calculateShippingSchema = z.object({
     price: z.number().min(0, 'Precio debe ser mayor o igual a 0')
   })).min(1, 'Se requiere al menos un item'),
   sellerAddressId: z.string().optional(),
+  logisticType: z.enum(['drop_off', 'me2', 'me1']).default('drop_off'),
 });
 
 export async function POST(request: NextRequest) {
@@ -26,15 +27,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { zipcode, items, sellerAddressId } = calculateShippingSchema.parse(body);
+    const { zipcode, items, sellerAddressId, logisticType } = calculateShippingSchema.parse(body);
     
     logger.info('Calculating ML shipping cost', { 
       zipcode, 
       itemsCount: items.length,
+      logisticType,
       userEmail: session.user.email 
     });
     
-    const shippingData = await calculateMLShippingCost(zipcode, items, sellerAddressId);
+    const shippingData = await calculateMLShippingCost(zipcode, items, sellerAddressId, logisticType);
     
     // Formatear respuesta para el frontend
     const formattedMethods = shippingData.methods.map(method => ({

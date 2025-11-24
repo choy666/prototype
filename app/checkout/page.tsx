@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/lib/stores/useCartStore';
 import { ShippingForm } from '@/components/checkout/ShippingForm';
@@ -11,8 +11,9 @@ import { CheckoutSummary } from '@/components/checkout/CheckoutSummary';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { ShippingFormData, Address as ValidationAddress } from '@/lib/validations/checkout';
-import { Address, ShippingMethod } from '@/lib/schema';
+import { Address } from '@/lib/schema';
 import { toast } from 'react-hot-toast';
+import { MLShippingMethod } from '@/lib/types/shipping';
 
 type CheckoutStep = 'address-selection' | 'shipping-form' | 'shipping-method' | 'new-address-form';
 
@@ -22,29 +23,8 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('address-selection');
   const [selectedAddress, setSelectedAddress] = useState<Address & { id: number } | null>(null);
-  const [shippingMethodsList, setShippingMethodsList] = useState<ShippingMethod[]>([]);
-  const [selectedShippingMethod, setSelectedShippingMethod] = useState<ShippingMethod | null>(null);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<MLShippingMethod | null>(null);
   const [shippingAddress, setShippingAddress] = useState<ShippingFormData | null>(null);
-
-  // Cargar métodos de envío al montar el componente
-  useEffect(() => {
-    const loadShippingMethods = async () => {
-      try {
-        const response = await fetch('/api/shipping-methods');
-        if (response.ok) {
-          const methods = await response.json();
-          setShippingMethodsList(methods);
-        } else {
-          throw new Error('Error al cargar métodos de envío');
-        }
-      } catch (error) {
-        console.error('Error loading shipping methods:', error);
-        toast.error('Error al cargar métodos de envío');
-      }
-    };
-
-    loadShippingMethods();
-  }, []);
 
   // Verificar autenticación
   if (status === 'loading') {
@@ -147,7 +127,7 @@ export default function CheckoutPage() {
     setCurrentStep('shipping-method');
   };
 
-  const handleShippingMethodSelect = (method: ShippingMethod) => {
+  const handleShippingMethodSelect = (method: MLShippingMethod) => {
     setSelectedShippingMethod(method);
   };
 
@@ -174,7 +154,7 @@ export default function CheckoutPage() {
         })),
         shippingAddress,
         shippingMethod: {
-          id: selectedShippingMethod.id,
+          id: selectedShippingMethod.shipping_method_id.toString(),
           name: selectedShippingMethod.name,
         },
         userId: session.user.id,
@@ -253,11 +233,10 @@ export default function CheckoutPage() {
           {currentStep === 'shipping-method' && (
             <div className="space-y-6">
               <ShippingMethodSelector
-                shippingMethods={shippingMethodsList}
                 selectedMethod={selectedShippingMethod}
                 onMethodSelect={handleShippingMethodSelect}
                 items={items}
-                province={shippingAddress?.provincia || ''}
+                zipcode={shippingAddress?.codigoPostal || ''}
                 subtotal={items.reduce((acc, item) => {
                   const basePrice = item.price;
                   const finalPrice = item.discount && item.discount > 0
@@ -289,7 +268,11 @@ export default function CheckoutPage() {
         {/* Resumen del pedido */}
         <div className="order-1 lg:order-2">
           <CheckoutSummary
-            selectedShippingMethod={selectedShippingMethod}
+            selectedShippingMethod={selectedShippingMethod ? {
+              id: selectedShippingMethod.shipping_method_id.toString(),
+              name: selectedShippingMethod.name,
+              cost: selectedShippingMethod.cost
+            } : null}
             shippingAddress={shippingAddress}
           />
         </div>

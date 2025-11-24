@@ -45,6 +45,9 @@ export const products = pgTable("products", {
   stock: integer("stock").default(0).notNull(),
   discount: integer("discount").default(0).notNull(), // porcentaje de descuento
   weight: decimal("weight", { precision: 5, scale: 2 }), // peso en kg, opcional para cálculo de envío
+  height: decimal("height", { precision: 5, scale: 2 }), // altura en cm, para cálculo de envío ME2
+  width: decimal("width", { precision: 5, scale: 2 }), // ancho en cm, para cálculo de envío ME2
+  length: decimal("length", { precision: 5, scale: 2 }), // largo en cm, para cálculo de envío ME2
   attributes: jsonb("attributes"), // atributos dinámicos del producto
   isActive: boolean("is_active").default(true).notNull(),
   // Nuevos campos para Mercado Libre

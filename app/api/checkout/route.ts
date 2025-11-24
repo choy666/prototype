@@ -1,12 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { products, productVariants, users } from '@/lib/schema';
+import { products, users, productVariants } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
+import { MLShippingResponse, ShippingResponse, ShippingMethod } from '@/lib/types/shipping';
+
+// Mapper function to transform ML API response to internal model
+function mapMLShippingToInternal(mlResponse: MLShippingResponse): ShippingResponse {
+  return {
+    methods: mlResponse.methods.map(mlMethod => ({
+      order_priority: mlMethod.shipping_method_id,
+      name: mlMethod.name,
+      cost: mlMethod.cost,
+      estimated_delivery: mlMethod.estimated_delivery,
+      shipping_mode: mlMethod.shipping_mode
+    })),
+    coverage: {
+      all: mlResponse.coverage.all_country,
+      partially_covered: mlResponse.coverage.excluded_places.length > 0
+    }
+  };
+}
+
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
-import { calculateTotalWeight, calculateShippingCost } from '@/lib/utils/shipping';
+import { calculateMLShippingCost } from '@/lib/actions/shipments';
 import { Preference } from 'mercadopago';
-import type { CartItem } from '@/lib/utils/shipping';
+
+// Tipo para items del checkout (sin stock requerido)
+type CheckoutItem = {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+  discount?: number;
+  weight?: number | null;
+  variantId?: number | null;
+};
 
 // Configuración de Mercado Pago según documentación oficial
 const mercadopago = new Preference({
@@ -137,7 +167,7 @@ export async function POST(req: NextRequest) {
     logger.info('Checkout: Verificación de stock completada exitosamente');
 
     // Calcular subtotal con descuentos aplicados
-    const subtotal = items.reduce((acc: number, item: CartItem) => {
+    const subtotal = items.reduce((acc: number, item: CheckoutItem) => {
       const basePrice = item.price;
       const finalPrice = item.discount && item.discount > 0
         ? basePrice * (1 - item.discount / 100)
@@ -145,9 +175,78 @@ export async function POST(req: NextRequest) {
       return acc + finalPrice * item.quantity;
     }, 0);
 
-    // Calcular costo de envío
-    const totalWeight = calculateTotalWeight(items);
-    const shippingCost = calculateShippingCost(shippingMethod, totalWeight, shippingAddress.provincia, subtotal);
+    // Calcular costo de envío usando API de Mercado Libre con fallback
+    let shippingCost: number;
+    try {
+      const mlShippingResponse: MLShippingResponse = await calculateMLShippingCost(
+        shippingAddress.codigoPostal,
+        items.map((item: CheckoutItem) => ({
+          id: item.id.toString(),
+          quantity: item.quantity,
+          price: item.discount && item.discount > 0
+            ? item.price * (1 - item.discount / 100)
+            : item.price
+        }))
+      );
+      
+      // Transform ML API response to internal model
+      const shippingResponse = mapMLShippingToInternal(mlShippingResponse);
+      
+      // Usar método estándar (order_priority: 1) o el más barato si no hay estándar
+      if (shippingResponse.methods.length === 0) {
+        throw new Error('No shipping methods available for this zipcode');
+      }
+      
+      const standardMethod = shippingResponse.methods.find((m: ShippingMethod) => m.order_priority === 1);
+      const cheapestMethod = shippingResponse.methods.reduce((min: ShippingMethod, curr: ShippingMethod) => 
+        curr.cost < min.cost ? curr : min
+      );
+      
+      shippingCost = standardMethod?.cost || cheapestMethod?.cost || 0;
+      
+      logger.info('Shipping cost calculated via ML API', { 
+        zipcode: shippingAddress.codigoPostal,
+        cost: shippingCost,
+        method: standardMethod?.name || cheapestMethod?.name 
+      });
+      
+    } catch (error) {
+      logger.error('ML API failed in checkout, using API fallback', { error: error instanceof Error ? error.message : String(error) });
+      
+      // Usar el fallback de la API de shipments que ya tiene métodos hardcoded
+      try {
+        const fallbackResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/shipments/calculate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            zipcode: shippingAddress.codigoPostal,
+            items: items.map((item: CheckoutItem) => ({
+              id: item.id.toString(),
+              quantity: item.quantity,
+              price: item.discount && item.discount > 0
+                ? item.price * (1 - item.discount / 100)
+                : item.price
+            })),
+            logisticType: 'drop_off'
+          })
+        });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          const fallbackMethod = fallbackData.methods?.[0];
+          shippingCost = fallbackMethod?.cost || 500; // Default 500 si todo falla
+          
+          logger.info('Using fallback shipping cost', { cost: shippingCost, method: fallbackMethod?.name });
+        } else {
+          shippingCost = 500; // Default absoluto
+        }
+      } catch (fallbackError) {
+        logger.error('Even fallback failed, using default cost', { error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) });
+        shippingCost = 500;
+      }
+    }
 
     // Calcular total final
     const total = subtotal + shippingCost;
@@ -163,7 +262,7 @@ export async function POST(req: NextRequest) {
       userId: userId.toString(),
       shippingAddress: JSON.stringify(shippingAddress),
       shippingMethodId: shippingMethod.id.toString(),
-      items: JSON.stringify(items.map((item: CartItem) => ({
+      items: JSON.stringify(items.map((item: CheckoutItem) => ({
         ...item,
         variantId: item.variantId || null
       }))),
@@ -180,7 +279,7 @@ export async function POST(req: NextRequest) {
       body: {
         items: [
           // Items del carrito
-          ...items.map((item: CartItem) => ({
+          ...items.map((item: CheckoutItem) => ({
             id: item.id.toString(),
             title: item.name,
             quantity: item.quantity,
@@ -226,7 +325,7 @@ export async function POST(req: NextRequest) {
             apartment: shippingAddress.departamento,
           },
           mode: "me2", // Mercado Envíos 2
-          dimensions: `${totalWeight}x30x20,${totalWeight * 1000}`, // peso x ancho x alto, peso en gramos
+          dimensions: "10x10x10,500", // defaults seguros para ME2
         },
       },
     });
@@ -246,7 +345,7 @@ export async function POST(req: NextRequest) {
       total,
       subtotal,
       shippingCost,
-      items: items.map((item: CartItem) => ({
+      items: items.map((item: CheckoutItem) => ({
         ...item,
         finalPrice: item.discount && item.discount > 0
           ? item.price * (1 - item.discount / 100)

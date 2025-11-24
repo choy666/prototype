@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ShippingMethod } from '@/lib/schema';
-import { calculateShippingCost, calculateTotalWeight, isFreeShipping } from '@/lib/utils/shipping';
-import { Label } from '@/components/ui/label';
+import { toast } from 'react-hot-toast';
+import { MLShippingMethod } from '@/lib/types/shipping';
 
 interface ShippingMethodSelectorProps {
-  shippingMethods: ShippingMethod[];
-  selectedMethod?: ShippingMethod | null;
-  onMethodSelect: (method: ShippingMethod) => void;
+  selectedMethod?: MLShippingMethod | null;
+  onMethodSelect: (method: MLShippingMethod) => void;
   items: Array<{
     id: number;
     name: string;
@@ -17,45 +15,86 @@ interface ShippingMethodSelectorProps {
     weight?: number | null;
     discount?: number | null;
   }>;
-  province: string;
+  zipcode: string;
   subtotal: number;
 }
 
 export function ShippingMethodSelector({
-  shippingMethods,
   selectedMethod,
   onMethodSelect,
   items,
-  province,
+  zipcode,
   subtotal,
 }: ShippingMethodSelectorProps) {
-  const [calculatedCosts, setCalculatedCosts] = useState<Record<number, number>>({});
+  const [shippingMethods, setShippingMethods] = useState<MLShippingMethod[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Calcular costos para todos los métodos cuando cambian las props
+  // Obtener métodos de envío de la API ML cuando cambia el zipcode o items
   useEffect(() => {
-    // Normalizar valores null a undefined para compatibilidad con CartItem
-    const normalizedItems = items.map(item => ({
-      ...item,
-      discount: item.discount ?? undefined
-    }));
-    
-    const totalWeight = calculateTotalWeight(normalizedItems);
-    const costs: Record<number, number> = {};
+    if (!zipcode || items.length === 0) {
+      setShippingMethods([]);
+      return;
+    }
 
-    shippingMethods.forEach(method => {
-      costs[method.id] = calculateShippingCost(method, totalWeight, province, subtotal);
-    });
+    const fetchShippingMethods = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/shipments/calculate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            zipcode,
+            items: items.map(item => ({
+              id: item.id.toString(),
+              quantity: item.quantity,
+              price: item.discount && item.discount > 0
+                ? item.price * (1 - item.discount / 100)
+                : item.price
+            })),
+            logisticType: 'drop_off'
+          })
+        });
 
-    setCalculatedCosts(costs);
-  }, [shippingMethods, items, province, subtotal]);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.methods) {
+            setShippingMethods(data.methods);
+          } else {
+            throw new Error(data.error || 'Error al obtener métodos de envío');
+          }
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error en la API de envíos');
+        }
+      } catch (error) {
+        console.error('Error fetching shipping methods:', error);
+        toast.error('No se pudieron cargar los métodos de envío');
+        setShippingMethods([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchShippingMethods();
+  }, [zipcode, items, subtotal]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 
+  if (isLoading) {
+    return (
+      <div className="p-4 border rounded-lg bg-gray-50">
+        <p className="text-sm text-gray-600">Cargando métodos de envío...</p>
+      </div>
+    );
+  }
+
   if (shippingMethods.length === 0) {
     return (
       <div className="p-4 border rounded-lg bg-gray-50">
-        <p className="text-sm text-gray-600">No hay métodos de envío disponibles</p>
+        <p className="text-sm text-gray-600">No hay métodos de envío disponibles para este código postal</p>
       </div>
     );
   }
@@ -71,14 +110,12 @@ export function ShippingMethodSelector({
 
       <div className="space-y-3">
         {shippingMethods.map((method) => {
-          const cost = calculatedCosts[method.id] || 0;
-          const isFree = isFreeShipping(method, subtotal);
-          const isSelected = selectedMethod?.id === method.id;
+          const isSelected = selectedMethod?.shipping_method_id === method.shipping_method_id;
 
           return (
             <div
-              key={method.id}
-            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+              key={method.shipping_method_id}
+              className={`border rounded-lg p-4 cursor-pointer transition-colors ${
                 isSelected
                   ? 'border-blue-500 bg-gray-900'
                   : 'border-gray-200 hover:border-gray-300'
@@ -89,25 +126,25 @@ export function ShippingMethodSelector({
                 <div className="flex items-center space-x-3">
                   <input
                     type="radio"
-                    id={`shipping-${method.id}`}
+                    id={`shipping-${method.shipping_method_id}`}
                     name="shipping-method"
                     checked={isSelected}
                     onChange={() => onMethodSelect(method)}
                     className="w-4 h-4 text-blue-600 focus:ring-blue-500"
                   />
-                  <Label
-                    htmlFor={`shipping-${method.id}`}
+                  <label
+                    htmlFor={`shipping-${method.shipping_method_id}`}
                     className="font-medium cursor-pointer"
                   >
                     {method.name}
-                  </Label>
+                  </label>
                 </div>
 
                 <div className="text-right">
-                  {isFree ? (
+                  {method.cost === 0 ? (
                     <span className="text-green-600 font-semibold">Gratis</span>
                   ) : (
-                    <span className="font-semibold">{formatCurrency(cost)}</span>
+                    <span className="font-semibold">{formatCurrency(method.cost)}</span>
                   )}
                 </div>
               </div>
@@ -115,12 +152,13 @@ export function ShippingMethodSelector({
               {/* Información adicional del método */}
               <div className="mt-2 ml-7">
                 <div className="text-xs text-gray-500 space-y-1">
-                  {method.freeThreshold && (
+                  <p>{method.description}</p>
+                  {method.estimated_delivery && (
                     <p>
-                      Envío gratis en compras superiores a {formatCurrency(Number(method.freeThreshold))}
+                      Entrega estimada: {new Date(method.estimated_delivery.date).toLocaleDateString('es-AR')}
                     </p>
                   )}
-                  <p>Tiempo de entrega: 7-10 días hábiles</p>
+                  <p>Modo: {method.shipping_mode}</p>
                 </div>
               </div>
             </div>
@@ -133,7 +171,7 @@ export function ShippingMethodSelector({
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Costo de envío:</span>
             <span className="text-sm font-semibold">
-              {calculatedCosts[selectedMethod.id] === 0 ? 'Gratis' : formatCurrency(calculatedCosts[selectedMethod.id] || 0)}
+              {selectedMethod.cost === 0 ? 'Gratis' : formatCurrency(selectedMethod.cost)}
             </span>
           </div>
         </div>

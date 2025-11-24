@@ -3,7 +3,7 @@ import {
   getMLShipmentDetails
 } from '@/lib/actions/shipments';
 import { db } from '@/lib/db';
-import { orders } from '@/lib/schema';
+import { orders, shipmentHistory } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
 import { 
@@ -80,12 +80,26 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(orders.id, order.id));
 
+    // Insertar registro en historial de envíos
+    await db.insert(shipmentHistory).values({
+      orderId: order.id,
+      shipmentId: shipmentId,
+      status: shipment.status,
+      substatus: shipment.substatus || null,
+      trackingNumber: shipment.tracking_number || null,
+      trackingUrl: shipment.tracking_url || null,
+      dateCreated: new Date(shipment.date_created),
+      source: 'mercadolibre',
+      createdAt: new Date()
+    });
+
     logger.info('Order updated with shipment status', {
       orderId: order.id,
       shipmentId,
       oldStatus: order.currentStatus,
       newStatus,
-      trackingNumber: shipment.tracking_number
+      trackingNumber: shipment.tracking_number,
+      historyRecordCreated: true
     });
 
     // Si el estado cambió, enviar notificación (aquí podrías integrar email, push, etc.)

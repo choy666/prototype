@@ -3,20 +3,23 @@
 import { useCartStore } from "@/lib/stores/useCartStore";
 import Link from "next/link";
 import Image from "next/image";
-import { ShippingMethod } from "@/lib/schema";
-import { calculateShippingCost, calculateTotalWeight } from "@/lib/utils/shipping";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 
 interface CheckoutSummaryProps {
-  selectedShippingMethod?: ShippingMethod | null;
+  selectedShippingMethod?: {
+    id: string;
+    name: string;
+    cost: number;
+  } | null;
   shippingAddress?: {
+    codigoPostal: string;
     provincia: string;
   } | null;
 }
 
-export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: CheckoutSummaryProps) {
+export function CheckoutSummary({ selectedShippingMethod }: CheckoutSummaryProps) {
   const { items } = useCartStore();
 
   // Calcular total con descuentos
@@ -27,17 +30,8 @@ export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: Che
     return acc + finalPrice * item.quantity;
   }, 0);
 
-  // Calcular costo de envío
-  let shippingCost = 0;
-  if (selectedShippingMethod && shippingAddress) {
-    const totalWeight = calculateTotalWeight(items);
-    shippingCost = calculateShippingCost(
-      selectedShippingMethod,
-      totalWeight,
-      shippingAddress.provincia,
-      subtotal
-    );
-  }
+  // Usar el costo del método de envío seleccionado (ya calculado por API ML)
+  const shippingCost = selectedShippingMethod?.cost || 0;
 
   const total = subtotal + shippingCost;
 

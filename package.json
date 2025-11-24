@@ -27,7 +27,10 @@
     "mcp:mercadopago": "node mcp/mercadopago-server.js",
     "ts-node": "ts-node",
     "migrate:ml-shipping": "ts-node scripts/migrate-ml-shipping.ts",
-    "migrate:simple": "ts-node scripts/simple-migrate.ts"
+    "migrate:simple": "ts-node scripts/simple-migrate.ts",
+    "audit:products": "ts-node scripts/migration-me2/audit/run-audit.ts",
+    "migrate:products-dimensions": "ts-node scripts/migration-me2/migrate-products-dimensions.ts",
+    "migrate:products-rollback": "ts-node scripts/migration-me2/migrate-products-dimensions.ts rollback"
   },
   "dependencies": {
     "@auth/core": "0.40.0",
