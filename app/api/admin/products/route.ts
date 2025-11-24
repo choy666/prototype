@@ -19,6 +19,17 @@ const createProductSchema = z.object({
   stock: z.number().int().min(0).default(0),
   discount: z.number().int().min(0).max(100).default(0),
   weight: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+  // Campos de Mercado Libre
+  mlCondition: z.string().min(1),
+  mlBuyingMode: z.string().min(1),
+  mlListingTypeId: z.string().min(1),
+  mlCurrencyId: z.string().min(1),
+  warranty: z.string().optional(),
+  mlVideoId: z.string().optional(),
+  // Dimensiones para envío
+  height: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
+  width: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
+  length: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
 })
 
 export async function GET(request: NextRequest) {
