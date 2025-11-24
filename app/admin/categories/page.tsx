@@ -150,7 +150,7 @@ export default function AdminCategoriesPage() {
             variant="outline"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Sincronizando...' : 'Sincronizar ML'}
+            {syncing ? 'Actualizando desde ML...' : 'Actualizar desde Mercado Libre'}
           </Button>
           <Link href="/admin/categories/new">
             <Button className="w-full sm:w-auto min-h-[44px] border">

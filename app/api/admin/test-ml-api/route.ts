@@ -12,13 +12,15 @@ export async function GET() {
     console.log('🔄 Testing public ML API...')
     const publicResponse = await fetch('https://api.mercadolibre.com/sites/MLA/categories')
     
-    const result: any = {
+    const result = {
       publicApi: {
         url: 'https://api.mercadolibre.com/sites/MLA/categories',
         status: publicResponse.status,
         statusText: publicResponse.statusText,
         ok: publicResponse.ok,
-        headers: Object.fromEntries(publicResponse.headers.entries())
+        headers: Object.fromEntries(publicResponse.headers.entries()),
+        error: undefined as string | undefined,
+        categoriesCount: undefined as number | undefined
       }
     }
 
