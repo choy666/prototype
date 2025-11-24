@@ -8,17 +8,23 @@ import { logger } from '@/lib/utils/logger';
 import { auth } from '@/lib/actions/auth';
 
 export async function POST(req: Request) {
+  let productId: number | null = null;
+  let productIdNum: number | null = null;
+  
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { productId } = await req.json();
+    const requestData = await req.json();
+    productId = requestData.productId;
     
     if (!productId) {
       return NextResponse.json({ error: 'productId es requerido' }, { status: 400 });
     }
+
+    productIdNum = typeof productId === 'string' ? parseInt(productId) : productId;
 
     // Verificar conexión con Mercado Libre
     const connected = await isConnected(parseInt(session.user.id));
@@ -30,7 +36,7 @@ export async function POST(req: Request) {
 
     // Obtener producto local
     const localProduct = await db.query.products.findFirst({
-      where: eq(products.id, parseInt(productId)),
+      where: eq(products.id, productIdNum!),
     });
 
     if (!localProduct) {
@@ -40,7 +46,7 @@ export async function POST(req: Request) {
     // Verificar si ya existe una sincronización en curso
     const existingSync = await db.query.mercadolibreProductsSync.findFirst({
       where: and(
-        eq(mercadolibreProductsSync.productId, parseInt(productId)),
+        eq(mercadolibreProductsSync.productId, productIdNum!),
         eq(mercadolibreProductsSync.syncStatus, 'syncing')
       ),
     });
@@ -53,7 +59,7 @@ export async function POST(req: Request) {
 
     // Crear o actualizar registro de sincronización
     const syncRecord = await db.insert(mercadolibreProductsSync).values({
-      productId: parseInt(productId),
+      productId: productIdNum!,
       syncStatus: 'syncing',
       lastSyncAt: new Date(),
       syncAttempts: 1,
@@ -115,7 +121,7 @@ export async function POST(req: Request) {
         mlThumbnail: mlItem.thumbnail,
         updated_at: new Date(),
       })
-      .where(eq(products.id, parseInt(productId)));
+      .where(eq(products.id, productIdNum!));
 
     // Actualizar registro de sincronización
     await db.update(mercadolibreProductsSync)
@@ -129,14 +135,14 @@ export async function POST(req: Request) {
       .where(eq(mercadolibreProductsSync.id, syncRecord[0].id));
 
     logger.info('Producto sincronizado exitosamente', {
-      productId: parseInt(productId),
+      productId: productIdNum!,
       mlItemId,
       userId: session.user.id,
     });
 
     return NextResponse.json({
       success: true,
-      productId: parseInt(productId),
+      productId: productIdNum!,
       mlItemId,
       mlPermalink: mlItem.permalink,
       syncStatus: 'synced',
@@ -149,25 +155,22 @@ export async function POST(req: Request) {
     });
 
     // Actualizar estado de sincronización a error
-    if (req.body) {
+    if (productId && productIdNum) {
       try {
-        const { productId } = await req.json();
-        if (productId) {
-          await db.update(mercadolibreProductsSync)
-            .set({
-              syncStatus: 'error',
-              syncError: error instanceof Error ? error.message : String(error),
-              updatedAt: new Date(),
-            })
-            .where(eq(mercadolibreProductsSync.productId, parseInt(productId)));
+        await db.update(mercadolibreProductsSync)
+          .set({
+            syncStatus: 'error',
+            syncError: error instanceof Error ? error.message : String(error),
+            updatedAt: new Date(),
+          })
+          .where(eq(mercadolibreProductsSync.productId, productIdNum!));
 
-          await db.update(products)
-            .set({
-              mlSyncStatus: 'error',
-              updated_at: new Date(),
-            })
-            .where(eq(products.id, parseInt(productId)));
-        }
+        await db.update(products)
+          .set({
+            mlSyncStatus: 'error',
+            updated_at: new Date(),
+          })
+          .where(eq(products.id, productIdNum!));
       } catch (updateError) {
         logger.error('Error actualizando estado de sincronización', { updateError });
       }
