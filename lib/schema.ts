@@ -26,6 +26,8 @@ export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  mlCategoryId: text("ml_category_id").unique(), // ID de categoría de Mercado Libre
+  isMlOfficial: boolean("is_ml_official").default(false).notNull(), // Indica si es categoría oficial de ML
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -49,6 +49,73 @@ export async function createCategory(
   }
 }
 
+// Sincronizar categorías de Mercado Libre
+export async function syncMLCategories(): Promise<{
+  created: number;
+  updated: number;
+  errors: number;
+  totalCategories: number;
+}> {
+  try {
+    // Obtener categorías de Mercado Libre para Argentina (MLA)
+    const mlResponse = await fetch('https://api.mercadolibre.com/sites/MLA/categories')
+    if (!mlResponse.ok) {
+      throw new Error('Failed to fetch ML categories')
+    }
+
+    const mlCategories = await mlResponse.json() as Array<{ id: string; name: string }>
+
+    // Sincronizar categorías con la base de datos
+    const syncResults = {
+      created: 0,
+      updated: 0,
+      errors: 0
+    }
+
+    for (const mlCategory of mlCategories) {
+      try {
+        // Verificar si la categoría ya existe
+        const existingCategory = await db.select()
+          .from(categories)
+          .where(eq(categories.mlCategoryId, mlCategory.id))
+          .limit(1)
+
+        if (existingCategory.length === 0) {
+          // Crear nueva categoría
+          await db.insert(categories).values({
+            name: mlCategory.name,
+            mlCategoryId: mlCategory.id,
+            isMlOfficial: true
+          })
+          syncResults.created++
+        } else {
+          // Actualizar categoría existente
+          await db.update(categories)
+            .set({ 
+              name: mlCategory.name,
+              isMlOfficial: true,
+              updated_at: new Date()
+            })
+            .where(eq(categories.mlCategoryId, mlCategory.id))
+          syncResults.updated++
+        }
+      } catch (error) {
+        console.error(`Error syncing category ${mlCategory.id}:`, error)
+        syncResults.errors++
+      }
+    }
+
+    revalidatePath('/admin/categories');
+    return {
+      ...syncResults,
+      totalCategories: mlCategories.length
+    }
+  } catch (error) {
+    console.error('Error syncing ML categories:', error)
+    throw new Error('Error al sincronizar categorías de Mercado Libre')
+  }
+}
+
 // Actualizar categoría
 export async function updateCategory(
   id: number,
