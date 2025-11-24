@@ -5,6 +5,7 @@ import { categories } from '../schema';
 import { eq, desc, like } from 'drizzle-orm';
 import type { NewCategory, Category } from '../schema';
 import { revalidatePath } from 'next/cache';
+import { MercadoLibreAuth } from '../auth/mercadolibre';
 
 // Obtener todas las categorías
 export async function getCategories(search?: string): Promise<Category[]> {
@@ -58,9 +59,33 @@ export async function syncMLCategories(): Promise<{
 }> {
   try {
     // Obtener categorías de Mercado Libre para Argentina (MLA)
-    const mlResponse = await fetch('https://api.mercadolibre.com/sites/MLA/categories')
+    const apiUrl = 'https://api.mercadolibre.com/sites/MLA/categories'
+    console.log('🔄 Fetching ML categories from:', apiUrl)
+    
+    // Obtener token de acceso de Mercado Libre
+    const mlAuth = new MercadoLibreAuth()
+    const accessToken = await mlAuth.getAccessToken()
+    
+    if (!accessToken) {
+      throw new Error('No se pudo obtener el token de acceso de Mercado Libre')
+    }
+    
+    const mlResponse = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+        'Referer': 'https://www.mercadolibre.com.ar/',
+        'Origin': 'https://www.mercadolibre.com.ar'
+      }
+    })
+    console.log('📊 ML API Response Status:', mlResponse.status, mlResponse.statusText)
+    
     if (!mlResponse.ok) {
-      throw new Error('Failed to fetch ML categories')
+      const errorText = await mlResponse.text()
+      console.error('❌ ML API Error Response:', errorText)
+      throw new Error(`Failed to fetch ML categories: ${mlResponse.status} ${mlResponse.statusText}`)
     }
 
     const mlCategories = await mlResponse.json() as Array<{ id: string; name: string }>
