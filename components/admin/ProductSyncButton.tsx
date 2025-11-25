@@ -13,6 +13,12 @@ interface ProductSyncButtonProps {
   onSyncComplete?: () => void;
 }
 
+interface ProductSyncResult {
+  success?: boolean;
+  error?: string;
+  details?: unknown;
+}
+
 export function ProductSyncButton({
   productId,
   mlItemId,
@@ -31,13 +37,31 @@ export function ProductSyncButton({
         },
         body: JSON.stringify({ productId: productId.toString() }),
       });
-      const result = await response.json();
-      
-      if (result.success) {
+      let result: ProductSyncResult | null = null;
+      try {
+        result = await response.json();
+      } catch {
+        // Ignorar errores de parseo JSON y caer a mensajes genéricos
+      }
+
+      // Si la respuesta no es OK, mostrar el mensaje detallado de error que viene del backend
+      if (!response.ok) {
+        const baseMessage = result?.error || 'Error al sincronizar producto con Mercado Libre';
+        const details = Array.isArray(result?.details)
+          ? result.details.filter((d: unknown) => typeof d === 'string' && d.trim().length > 0)
+          : [];
+
+        const detailsMessage = details.length > 0 ? `\n${details.join('\n')}` : '';
+
+        toast.error(`${baseMessage}${detailsMessage}`);
+        return;
+      }
+
+      if (result?.success) {
         toast.success('Producto sincronizado exitosamente');
         onSyncComplete?.();
       } else {
-        toast.error(result.error || 'Error al sincronizar producto');
+        toast.error(result?.error || 'Error al sincronizar producto');
       }
     } catch (error) {
       console.error('Error sincronizando producto:', error);

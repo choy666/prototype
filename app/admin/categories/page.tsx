@@ -212,7 +212,9 @@ export default function AdminCategoriesPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {categories.map((category) => (
+              {categories
+                .filter((category) => !category.mlCategoryId || category.isLeaf)
+                .map((category) => (
                 <div key={category.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg space-y-4 sm:space-y-0 gap-4">
                   <div className="flex items-center space-x-4 min-w-0 flex-1">
                     <div className={`h-12 w-12 rounded flex items-center justify-center flex-shrink-0 ${
