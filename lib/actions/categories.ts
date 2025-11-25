@@ -2,7 +2,7 @@
 
 import { db } from '../db';
 import { categories } from '../schema';
-import { eq, desc, like, and } from 'drizzle-orm';
+import { eq, desc, like, and, notInArray } from 'drizzle-orm';
 import type { NewCategory, Category } from '../schema';
 import { revalidatePath } from 'next/cache';
 import { MercadoLibreAuth } from '../auth/mercadolibre';
@@ -95,16 +95,6 @@ export async function syncMLCategories(): Promise<{
       'MLA1087', 'MLA8830', 'MLA409415', 'MLA8618', 'MLA3697',
     ]
     
-    // Respetar límite de 30 categorías oficiales
-    const existingOfficialCategories = await db
-      .select()
-      .from(categories)
-      .where(eq(categories.isMlOfficial, true))
-    if (existingOfficialCategories.length >= 30) {
-      console.warn('⚠️ Ya existen 30 o más categorías oficiales. No se agregarán más.')
-      return { created: 0, updated: 0, errors: 0, totalCategories: existingOfficialCategories.length }
-    }
-    
     const syncResults = { created: 0, updated: 0, errors: 0 }
     
     for (const categoryId of ML_CATEGORY_IDS) {
@@ -148,7 +138,8 @@ export async function syncMLCategories(): Promise<{
           })
           syncResults.created++
           console.log(`✅ Created category ${categoryId} (${details.name}) - leaf: ${isLeaf}`)
-        } else {
+        } else if (existing.length > 0) {
+          // Siempre actualizar categorías existentes para corregir flags isLeaf
           await db.update(categories)
             .set({
               name: details.name,
@@ -168,6 +159,20 @@ export async function syncMLCategories(): Promise<{
         syncResults.errors++
       }
     }
+    
+    // Asegurar que solo las categorías de la lista fija queden marcadas como hoja y oficiales de ML
+    await db.update(categories)
+      .set({
+        isLeaf: false,
+        isMlOfficial: false,
+        updated_at: new Date(),
+      })
+      .where(
+        and(
+          eq(categories.isMlOfficial, true),
+          notInArray(categories.mlCategoryId, ML_CATEGORY_IDS)
+        )
+      )
     
     revalidatePath('/admin/categories')
     return {

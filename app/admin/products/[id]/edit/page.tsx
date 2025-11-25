@@ -8,14 +8,13 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CategorySuggestButton } from '@/components/admin/CategorySuggestButton';
+import { MLCategorySelectSimple } from '@/components/admin/MLCategorySelectSimple'
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye } from 'lucide-react'
 import { ImageManager } from '@/components/ui/ImageManager'
 import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -112,6 +111,10 @@ export default function EditProductPage() {
   const [showPreview, setShowPreview] = useState(false)
 
   const id = params.id as string
+
+  const mlCategories = categories.filter(
+    (category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf
+  )
 
 
 
@@ -437,84 +440,58 @@ export default function EditProductPage() {
 
                   <div>
                     <Label htmlFor="mlCategoryId">Categoría Mercado Libre *</Label>
-                    <Select
+                    <MLCategorySelectSimple
                       value={form.mlCategoryId}
                       onValueChange={handleMlCategoryChange}
-                      disabled={categoriesLoading}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar categoría ML" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories
-                          .filter((category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf)
-                          .map((category) => (
-                            <SelectItem
-                              key={category.id}
-                              value={category.mlCategoryId as string}
-                            >
-                              {category.name} ({category.mlCategoryId})
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <CategorySuggestButton
-                      title={form.name}
-                      description={form.description}
-                      price={form.price ? parseFloat(form.price) : undefined}
-                      onCategorySelected={(categoryId) => {
-                        const category = categories.find(c => c.id === parseInt(categoryId));
-                        if (category?.mlCategoryId) {
-                          handleMlCategoryChange(category.mlCategoryId);
-                        }
-                      }}
-                      currentCategoryId={categories.find(c => c.mlCategoryId === form.mlCategoryId)?.id?.toString()}
+                      categories={categories}
+                      placeholder="Seleccionar categoría ML"
+                      disabled={categoriesLoading || mlCategories.length === 0}
                     />
+                    {mlCategories.length === 0 && (
+                      <p className="mt-2 text-sm text-orange-600">
+                        No hay categorías oficiales de Mercado Libre configuradas. Ve a la sección Categorías y usa el botón Actualizar desde Mercado Libre antes de editar productos.
+                      </p>
+                    )}
                   </div>
 
-                  <div className="md:col-span-2">
-                    <Label htmlFor="image" className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Imagen Principal (URL)
-                    </Label>
-                    <div className="space-y-3">
-                      <Input
-                        id="image"
-                        type="url"
-                        value={form.image}
-                        onChange={(e) => handleChange('image', e.target.value)}
-                        placeholder="https://ejemplo.com/imagen.jpg"
-                      />
-                      {form.image && (
-                        <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                          <div className="relative w-16 h-16 rounded-lg overflow-hidden border">
-                            <Image
-                              src={form.image}
-                              alt="Vista previa de imagen principal"
-                              fill
-                              sizes="64px"
-                              className="object-cover"
-                              placeholder="blur"
-                              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Imagen Principal</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-xs">{form.image}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(form.image, '_blank')}
-                            className="min-h-[32px]"
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Ver
-                          </Button>
+                  <div>
+                    <Label htmlFor="image">Imagen Principal</Label>
+                    <Input
+                      id="image"
+                      type="url"
+                      value={form.image || ''}
+                      onChange={(e) => handleChange('image', e.target.value)}
+                      placeholder="https://ejemplo.com/imagen.jpg"
+                    />
+                    {form.image && (
+                      <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border">
+                          <Image
+                            src={form.image}
+                            alt="Vista previa de imagen principal"
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                            placeholder="blur"
+                            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                          />
                         </div>
-                      )}
-                    </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Imagen Principal</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-xs">{form.image}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(form.image, '_blank')}
+                          className="min-h-[32px]"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Ver
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="md:col-span-2">

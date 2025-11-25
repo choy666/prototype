@@ -11,8 +11,9 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
+    const onlyLeaf = searchParams.get('onlyLeaf') !== 'false' // Por defecto true
 
-    const categories = await getCategories(search || undefined)
+    const categories = await getCategories(search || undefined, onlyLeaf)
     return NextResponse.json(categories)
   } catch (error) {
     console.error('Error fetching categories:', error)

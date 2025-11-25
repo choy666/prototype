@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { getProducts, createProduct } from '@/lib/actions/products'
+import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category'
 import { z } from 'zod'
 
 const createProductSchema = z.object({
@@ -83,6 +84,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = createProductSchema.parse(body)
+
+    // Validar que la categoría ML sea una categoría hoja válida
+    if (validatedData.mlCategoryId) {
+      const isValidCategory = await validateMLCategory(validatedData.mlCategoryId);
+      
+      if (!isValidCategory) {
+        return NextResponse.json({
+          ...createMLCategoryErrorResponse(validatedData.mlCategoryId),
+          error: createMLCategoryErrorResponse(validatedData.mlCategoryId).error,
+        }, { status: 400 });
+      }
+    }
 
     const product = await createProduct({
       ...validatedData,

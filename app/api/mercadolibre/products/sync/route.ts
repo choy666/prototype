@@ -7,6 +7,7 @@ import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadoli
 import { logger } from '@/lib/utils/logger';
 import { auth } from '@/lib/actions/auth';
 import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
+import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category';
 import type { ProductVariant } from '@/lib/schema';
 
 type DynamicAttributeForML = {
@@ -197,6 +198,29 @@ export async function POST(req: Request) {
 
     // Validar datos antes de sincronizar
     const hasVariants = localProduct.variants && Array.isArray(localProduct.variants) && (localProduct.variants as ProductVariant[]).length > 0;
+    
+    // Validar que la categoría ML sea una categoría hoja válida
+    if (localProduct.mlCategoryId) {
+      try {
+        const isValidCategory = await validateMLCategory(localProduct.mlCategoryId);
+        
+        if (!isValidCategory) {
+          if (timeoutId) clearTimeout(timeoutId);
+          logger.error('Producto intenta sincronizar con categoría ML no válida', {
+            productId: productIdNum,
+            mlCategoryId: localProduct.mlCategoryId,
+          });
+          return NextResponse.json({
+            ...createMLCategoryErrorResponse(localProduct.mlCategoryId),
+            error: createMLCategoryErrorResponse(localProduct.mlCategoryId).error + ' Por favor, seleccione una categoría oficial y vuelva a intentar.',
+          }, { status: 400 });
+        }
+      } catch (categoryError) {
+        console.error('ERROR CRUDO VALIDACIÓN CATEGORÍA:', categoryError);
+        if (timeoutId) clearTimeout(timeoutId);
+        throw categoryError;
+      }
+    }
     
     if (hasVariants) {
       // Validar límite de 60 variantes de Mercado Libre

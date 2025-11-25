@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/actions/auth'
 import { getProductById, deleteProduct } from '@/lib/actions/products'
+import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category'
 
 export async function GET(
   request: NextRequest,
@@ -48,6 +49,19 @@ export async function PUT(
     }
 
     const body = await request.json()
+    
+    // Validar que la categoría ML sea una categoría hoja válida si se está actualizando
+    if (body.mlCategoryId) {
+      const isValidCategory = await validateMLCategory(body.mlCategoryId);
+      
+      if (!isValidCategory) {
+        return NextResponse.json({
+          ...createMLCategoryErrorResponse(body.mlCategoryId),
+          error: createMLCategoryErrorResponse(body.mlCategoryId).error,
+        }, { status: 400 });
+      }
+    }
+
     const { updateProduct } = await import('@/lib/actions/products')
 
     const updatedProduct = await updateProduct(productId, body)

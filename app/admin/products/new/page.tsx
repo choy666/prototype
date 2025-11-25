@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CategorySuggestButton } from '@/components/admin/CategorySuggestButton';
+import { MLCategorySelectSimple } from '@/components/admin/MLCategorySelectSimple'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 
@@ -71,6 +71,10 @@ export default function NewProductPage() {
     length: ''
   })
 
+  const mlCategories = categories.filter(
+    (category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf
+  )
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -94,6 +98,10 @@ export default function NewProductPage() {
     setLoading(true)
 
     try {
+      if (mlCategories.length === 0) {
+        throw new Error('No hay categorías oficiales de Mercado Libre. Ve a "Categorías" y usa "Actualizar desde Mercado Libre".')
+      }
+
       if (!form.mlCategoryId) {
         throw new Error('Debes seleccionar una categoría de Mercado Libre')
       }
@@ -209,38 +217,18 @@ export default function NewProductPage() {
 
               <div>
                 <Label htmlFor="mlCategoryId">Categoría Mercado Libre *</Label>
-                <Select
+                <MLCategorySelectSimple
                   value={form.mlCategoryId}
                   onValueChange={handleMlCategoryChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar categoría ML" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories
-                      .filter((category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf)
-                      .map((category) => (
-                        <SelectItem
-                          key={category.id}
-                          value={category.mlCategoryId as string}
-                        >
-                          {category.name} ({category.mlCategoryId})
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <CategorySuggestButton
-                  title={form.name}
-                  description={form.description}
-                  price={form.price ? parseFloat(form.price) : undefined}
-                  onCategorySelected={(categoryId) => {
-                    const category = categories.find(c => c.id === parseInt(categoryId));
-                    if (category?.mlCategoryId) {
-                      handleMlCategoryChange(category.mlCategoryId);
-                    }
-                  }}
-                  currentCategoryId={categories.find(c => c.mlCategoryId === form.mlCategoryId)?.id?.toString()}
+                  categories={categories}
+                  placeholder="Seleccionar categoría ML"
+                  disabled={mlCategories.length === 0}
                 />
+                {mlCategories.length === 0 && (
+                  <p className="mt-2 text-sm text-orange-600">
+                    No hay categorías oficiales de Mercado Libre configuradas. Ve a la sección Categorías y usa el botón Actualizar desde Mercado Libre antes de crear productos.
+                  </p>
+                )}
               </div>
 
               <div>

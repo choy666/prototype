@@ -24,6 +24,7 @@ interface Category {
   description?: string
   mlCategoryId?: string
   isMlOfficial?: boolean
+  isLeaf?: boolean
   created_at: string
   updated_at: string
 }
@@ -43,7 +44,8 @@ export default function AdminCategoriesPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams({
-        ...(searchTerm && { search: searchTerm })
+        ...(searchTerm && { search: searchTerm }),
+        onlyLeaf: 'false' // Mostrar TODAS las categorías en admin
       })
       const response = await fetch(`/api/admin/categories?${params}`)
       if (!response.ok) throw new Error('Failed to fetch categories')
@@ -226,11 +228,33 @@ export default function AdminCategoriesPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-sm sm:text-base truncate">{category.name}</h3>
+                        <h3 className="font-medium text-sm sm:text-base truncate">
+                          {category.name}
+                          {category.mlCategoryId && (
+                            <span className="text-muted-foreground">
+                              {' : '}{category.mlCategoryId}
+                            </span>
+                          )}
+                        </h3>
                         {category.isMlOfficial && (
                           <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/50 rounded-full">
                             <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
                             <span className="text-xs text-green-600 dark:text-green-400 font-medium">ML</span>
+                          </div>
+                        )}
+                        {category.isLeaf !== undefined && (
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${
+                            category.isLeaf 
+                              ? 'bg-blue-100 dark:bg-blue-900/50' 
+                              : 'bg-orange-100 dark:bg-orange-900/50'
+                          }`}>
+                            <span className={`text-xs font-medium ${
+                              category.isLeaf 
+                                ? 'text-blue-600 dark:text-blue-400' 
+                                : 'text-orange-600 dark:text-orange-400'
+                            }`}>
+                              {category.isLeaf ? 'HOJA' : 'PADRE'}
+                            </span>
                           </div>
                         )}
                       </div>
