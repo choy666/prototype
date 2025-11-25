@@ -187,24 +187,39 @@ export async function updateProductWithAttributes(
   productData: Partial<Omit<NewProduct, 'id' | 'created_at'>>
 ): Promise<Product | null> {
   try {
-    // Si se está actualizando categoryId, obtener el nombre de la categoría
-    let categoryName: string | undefined;
-    if (productData.categoryId != null) {
+    // Resolver categoría a partir de mlCategoryId (fuente principal) o categoryId como respaldo
+    let categoryId: number | undefined
+    let categoryName: string | undefined
+
+    if (productData.mlCategoryId) {
       const category = await db.query.categories.findFirst({
-        where: eq(categories.id, productData.categoryId),
-      });
+        where: eq(categories.mlCategoryId, productData.mlCategoryId),
+      })
 
       if (!category) {
-        throw new Error('Categoría no encontrada');
+        throw new Error('Categoría de Mercado Libre no encontrada')
       }
 
-      categoryName = category.name;
+      categoryId = category.id
+      categoryName = category.name
+    } else if (productData.categoryId != null) {
+      const category = await db.query.categories.findFirst({
+        where: eq(categories.id, productData.categoryId),
+      })
+
+      if (!category) {
+        throw new Error('Categoría no encontrada')
+      }
+
+      categoryId = category.id
+      categoryName = category.name
     }
 
     const [updatedProduct] = await db
       .update(products)
       .set({
         ...productData,
+        ...(categoryId != null && { categoryId }),
         ...(categoryName && { category: categoryName }),
         updated_at: new Date(),
       })
@@ -239,19 +254,20 @@ export async function createProduct(
   productData: Omit<NewProduct, 'id' | 'created_at' | 'updated_at' | 'category'>
 ): Promise<Product> {
   try {
-    // Obtener el nombre de la categoría para poblar el campo category
+    // Resolver categoría usando mlCategoryId como fuente principal
     const category = await db.query.categories.findFirst({
-      where: eq(categories.id, productData.categoryId!),
-    });
+      where: eq(categories.mlCategoryId, productData.mlCategoryId!),
+    })
 
     if (!category) {
-      throw new Error('Categoría no encontrada');
+      throw new Error('Categoría de Mercado Libre no encontrada')
     }
 
     const [newProduct] = await db
       .insert(products)
       .values({
         ...productData,
+        categoryId: category.id,
         category: category.name,
         created_at: new Date(),
         updated_at: new Date(),
@@ -272,24 +288,39 @@ export async function updateProduct(
   productData: Partial<Omit<NewProduct, 'id' | 'created_at'>>
 ): Promise<Product | null> {
   try {
-    // Si se está actualizando categoryId, obtener el nombre de la categoría
-    let categoryName: string | undefined;
-    if (productData.categoryId != null) {
+    // Resolver categoría a partir de mlCategoryId (fuente principal) o categoryId como respaldo
+    let categoryId: number | undefined
+    let categoryName: string | undefined
+
+    if (productData.mlCategoryId) {
       const category = await db.query.categories.findFirst({
-        where: eq(categories.id, productData.categoryId),
-      });
+        where: eq(categories.mlCategoryId, productData.mlCategoryId),
+      })
 
       if (!category) {
-        throw new Error('Categoría no encontrada');
+        throw new Error('Categoría de Mercado Libre no encontrada')
       }
 
-      categoryName = category.name;
+      categoryId = category.id
+      categoryName = category.name
+    } else if (productData.categoryId != null) {
+      const category = await db.query.categories.findFirst({
+        where: eq(categories.id, productData.categoryId),
+      })
+
+      if (!category) {
+        throw new Error('Categoría no encontrada')
+      }
+
+      categoryId = category.id
+      categoryName = category.name
     }
 
     const [updatedProduct] = await db
       .update(products)
       .set({
         ...productData,
+        ...(categoryId != null && { categoryId }),
         ...(categoryName && { category: categoryName }),
         updated_at: new Date(),
       })

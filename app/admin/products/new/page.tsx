@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { CategorySuggestButton } from '@/components/admin/CategorySuggestButton';
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Save } from 'lucide-react'
 
@@ -22,7 +23,6 @@ interface ProductForm {
   price: string
   image: string
   images: string[]
-  categoryId: string
   discount: string
   weight: string
   stock: string
@@ -53,7 +53,6 @@ export default function NewProductPage() {
     price: '',
     image: '',
     images: [],
-    categoryId: '',
     discount: '0',
     weight: '',
     stock: '0',
@@ -95,13 +94,16 @@ export default function NewProductPage() {
     setLoading(true)
 
     try {
+      if (!form.mlCategoryId) {
+        throw new Error('Debes seleccionar una categoría de Mercado Libre')
+      }
+
       const productData = {
         name: form.name,
         description: form.description || undefined,
         price: form.price,
         image: form.image || undefined,
         images: form.images,
-        categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
         stock: parseInt(form.stock) || 0,
@@ -111,7 +113,7 @@ export default function NewProductPage() {
         mlBuyingMode: form.mlBuyingMode,
         mlListingTypeId: form.mlListingTypeId,
         mlCurrencyId: form.mlCurrencyId,
-        mlCategoryId: form.mlCategoryId || undefined,
+        mlCategoryId: form.mlCategoryId,
         warranty: form.warranty || undefined,
         mlVideoId: form.videoId || undefined,
         // Dimensiones para envío
@@ -158,6 +160,13 @@ export default function NewProductPage() {
     setForm(prev => ({ ...prev, images }))
   }
 
+  const handleMlCategoryChange = (mlCategoryId: string) => {
+    setForm(prev => ({
+      ...prev,
+      mlCategoryId,
+    }))
+  }
+
 
 
 
@@ -199,33 +208,17 @@ export default function NewProductPage() {
               </div>
 
               <div>
-                <Label htmlFor="categoryId">Categoría *</Label>
-                <Select value={form.categoryId} onValueChange={(value) => handleChange('categoryId', value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="mlCategoryId">Categoría Mercado Libre (ID)</Label>
+                <Label htmlFor="mlCategoryId">Categoría Mercado Libre *</Label>
                 <Select
                   value={form.mlCategoryId}
-                  onValueChange={(value) => handleChange('mlCategoryId', value)}
+                  onValueChange={handleMlCategoryChange}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar categoría ML (opcional)" />
+                    <SelectValue placeholder="Seleccionar categoría ML" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories
-                      .filter((category) => category.mlCategoryId)
+                      .filter((category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf)
                       .map((category) => (
                         <SelectItem
                           key={category.id}
@@ -236,6 +229,18 @@ export default function NewProductPage() {
                       ))}
                   </SelectContent>
                 </Select>
+                <CategorySuggestButton
+                  title={form.name}
+                  description={form.description}
+                  price={form.price ? parseFloat(form.price) : undefined}
+                  onCategorySelected={(categoryId) => {
+                    const category = categories.find(c => c.id === parseInt(categoryId));
+                    if (category?.mlCategoryId) {
+                      handleMlCategoryChange(category.mlCategoryId);
+                    }
+                  }}
+                  currentCategoryId={categories.find(c => c.mlCategoryId === form.mlCategoryId)?.id?.toString()}
+                />
               </div>
 
               <div>

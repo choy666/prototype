@@ -14,7 +14,6 @@ const createProductSchema = z.object({
     }
     return val || [];
   }),
-  categoryId: z.number().int().min(1),
   destacado: z.boolean().default(false),
   stock: z.number().int().min(0).default(0),
   discount: z.number().int().min(0).max(100).default(0),
@@ -24,7 +23,7 @@ const createProductSchema = z.object({
   mlBuyingMode: z.string().min(1),
   mlListingTypeId: z.string().min(1),
   mlCurrencyId: z.string().min(1),
-  mlCategoryId: z.string().regex(/^MLA\d+$/).optional(),
+  mlCategoryId: z.string().regex(/^MLA\d+$/, 'El ID de categoría de Mercado Libre debe tener formato MLA123'),
   warranty: z.string().optional(),
   mlVideoId: z.string().optional(),
   // Dimensiones para envío

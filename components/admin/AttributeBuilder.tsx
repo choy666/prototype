@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, X, Tag, GripVertical, Edit3, Check, AlertCircle } from 'lucide-react'
+import { Plus, X, Tag, GripVertical, AlertCircle } from 'lucide-react'
 
 export interface DynamicAttribute {
   name: string
@@ -26,10 +26,7 @@ interface AttributeBuilderProps {
 export function AttributeBuilder({ attributes, onChange, recommendedAttributes = [] }: AttributeBuilderProps) {
   const [newAttributeName, setNewAttributeName] = useState('')
   const [newAttributeValue, setNewAttributeValue] = useState('')
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editingValue, setEditingValue] = useState('')
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [animatingItems, setAnimatingItems] = useState<Set<number>>(new Set())
 
   const normalizeName = (value: string) => value.trim().toLowerCase()
   const isRecommendedPresent = (aliases: string[]) =>
@@ -45,20 +42,9 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
       values: [newAttributeValue.trim()]
     }
 
-    const newIndex = attributes.length
-    setAnimatingItems(prev => new Set(prev).add(newIndex))
     onChange([...attributes, newAttribute])
     setNewAttributeName('')
     setNewAttributeValue('')
-
-    // Remove animation class after animation completes
-    setTimeout(() => {
-      setAnimatingItems(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(newIndex)
-        return newSet
-      })
-    }, 300)
   }
 
   const removeAttribute = (index: number) => {
@@ -71,39 +57,6 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
       i === index ? { ...attr, [field]: value } : attr
     )
     onChange(newAttributes)
-  }
-
-  const addValueToAttribute = (index: number, value: string) => {
-    if (!value.trim()) return
-    const newValues = [...attributes[index].values, value.trim()]
-    updateAttribute(index, 'values', newValues)
-  }
-
-  const removeValueFromAttribute = (attrIndex: number, valueIndex: number) => {
-    const newValues = attributes[attrIndex].values.filter((_, i) => i !== valueIndex)
-    updateAttribute(attrIndex, 'values', newValues)
-  }
-
-  const startEditingValue = (index: number) => {
-    setEditingIndex(index)
-    setEditingValue('')
-  }
-
-  const saveEditingValue = () => {
-    if (editingIndex !== null && editingValue.trim()) {
-      addValueToAttribute(editingIndex, editingValue.trim())
-      setEditingIndex(null)
-      setEditingValue('')
-    }
-  }
-
-  const cancelEditingValue = () => {
-    setEditingIndex(null)
-    setEditingValue('')
-  }
-
-  const updateEditingValue = (value: string) => {
-    setEditingValue(value)
   }
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -136,21 +89,22 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
   const validateAttribute = (name: string, values: string[]) => {
     const errors = []
     if (!name.trim()) errors.push('Nombre requerido')
-    if (values.length === 0) errors.push('Al menos un valor requerido')
+    const firstValue = values[0]?.trim() || ''
+    if (!firstValue) errors.push('Valor requerido')
     return errors
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <Tag className="h-5 w-5 text-blue-600" />
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Atributos Dinámicos</h3>
-        <span className="text-sm text-gray-500">({attributes.length} atributos)</span>
+        <Tag className="h-4 w-4 text-gray-500" />
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Atributos dinámicos</h3>
+        <span className="text-xs text-gray-500">({attributes.length} atributos)</span>
       </div>
 
       {recommendedAttributes.length > 0 && (
-        <div className="rounded-lg border bg-blue-50 dark:bg-blue-900/20 p-4 space-y-2">
-          <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
+        <div className="rounded-md border border-dashed p-3 space-y-2">
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
             Atributos recomendados por Mercado Libre para esta categoría
           </p>
           <div className="flex flex-wrap gap-2">
@@ -159,10 +113,8 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
               return (
                 <span
                   key={attr.key}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
-                    present
-                      ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:text-green-200'
-                      : 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border text-gray-600 dark:text-gray-300 ${
+                    present ? 'border-emerald-400' : 'border-amber-400'
                   }`}
                 >
                   {attr.label}
@@ -172,8 +124,8 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
                     </span>
                   )}
                   <span
-                    className={`ml-2 h-2 w-2 rounded-full ${
-                      present ? 'bg-green-500' : 'bg-amber-400'
+                    className={`ml-2 h-1.5 w-1.5 rounded-full ${
+                      present ? 'bg-emerald-500' : 'bg-amber-400'
                     }`}
                   />
                 </span>
@@ -185,7 +137,7 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
 
       {/* Lista de atributos existentes */}
       {attributes.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {attributes.map((attribute, index) => {
             const errors = validateAttribute(attribute.name, attribute.values)
             return (
@@ -196,22 +148,22 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`p-6 border-2 rounded-xl transition-all duration-300 cursor-move group animate-in fade-in slide-in-from-bottom-2 ${
+                className={`rounded-lg border bg-white dark:bg-gray-900 p-4 cursor-move group ${
                   draggedIndex === index
-                    ? 'border-blue-500 bg-gray-900 dark:bg-blue-900/20 shadow-lg scale-105'
-                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 hover:shadow-md hover:scale-[1.02] focus-within:ring-2 focus-within:ring-blue-500/20'
-                } ${errors.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : ''} ${animatingItems.has(index) ? 'animate-pulse' : ''}`}
+                    ? 'border-gray-400'
+                    : 'border-gray-200 dark:border-gray-700'
+                } ${errors.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : ''}`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <GripVertical className="h-5 w-5 text-gray-400 group-hover:text-gray-600" />
-                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-gray-800 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:scale-[1.02]">
-                      <Tag className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <GripVertical className="h-4 w-4 text-gray-300" />
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       <Input
                         value={attribute.name}
                         onChange={(e) => updateAttribute(index, 'name', e.target.value)}
                         placeholder="Ej: Color, Talla, Material..."
-                        className="font-semibold text-lg border-none bg-transparent p-0 focus:ring-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
+                        className="h-8 border-0 bg-transparent p-0 text-sm font-medium placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                   </div>
@@ -237,73 +189,16 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
                   </div>
                 )}
 
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Valor del Atributo
-                    </label>
-                    {editingIndex !== index && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startEditingValue(index)}
-                        className="min-h-[32px]"
-                      >
-                        <Edit3 className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                    )}
-                  </div>
-
-                  {editingIndex === index ? (
-                    <div className="space-y-3">
-                      <Input
-                        value={editingValue}
-                        onChange={(e) => updateEditingValue(e.target.value)}
-                        placeholder="Valor del atributo"
-                        className="flex-1"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="default"
-                          size="sm"
-                          onClick={saveEditingValue}
-                          className="min-h-[36px]"
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Guardar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={cancelEditingValue}
-                          className="min-h-[36px]"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {attribute.values.map((value, valueIndex) => (
-                        <span key={valueIndex} className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800">
-                          {value}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeValueFromAttribute(index, valueIndex)}
-                            className="ml-1 h-4 w-4 p-0 text-blue-600 hover:text-blue-800"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Valor del atributo
+                  </label>
+                  <Input
+                    value={attribute.values[0] ?? ''}
+                    onChange={(e) => updateAttribute(index, 'values', [e.target.value])}
+                    placeholder="Valor del atributo"
+                    className="h-8 text-sm"
+                  />
                 </div>
               </div>
             )
@@ -312,20 +207,20 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
       )}
 
       {/* Formulario para agregar nuevo atributo */}
-      <div className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-        <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Agregar Nuevo Atributo</h4>
+      <div className="rounded-lg border border-dashed border-gray-200 dark:border-gray-700 p-4">
+        <h4 className="mb-3 text-sm font-medium text-gray-900 dark:text-gray-100">Agregar nuevo atributo</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
               Nombre del Atributo *
             </label>
-            <div className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-gray-800 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:scale-[1.02]">
-              <Tag className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-gray-500 flex-shrink-0" />
               <Input
                 value={newAttributeName}
                 onChange={(e) => setNewAttributeName(e.target.value)}
                 placeholder="Ej: Color, Talla, Material..."
-                className="font-semibold text-lg border-none bg-transparent p-0 focus:ring-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
+                className="h-8 border-0 bg-transparent p-0 text-sm font-medium placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </div>
           </div>
@@ -337,7 +232,6 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
               value={newAttributeValue}
               onChange={(e) => setNewAttributeValue(e.target.value)}
               placeholder="ej: Rojo"
-              className="transition-colors focus:border-blue-500"
             />
           </div>
         </div>
@@ -345,7 +239,7 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
           type="button"
           onClick={addAttribute}
           disabled={!newAttributeName.trim() || !newAttributeValue.trim()}
-          className="min-h-[44px] bg-blue-600 hover:bg-blue-700 transition-colors"
+          className="min-h-[40px] px-4"
         >
           <Plus className="h-4 w-4 mr-2" />
           Agregar Atributo

@@ -9,6 +9,57 @@ import { auth } from '@/lib/actions/auth';
 import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
 import type { ProductVariant } from '@/lib/schema';
 
+type DynamicAttributeForML = {
+  id?: string;
+  name?: string;
+  value_name?: string;
+  value?: string;
+  values?: unknown;
+};
+
+function mapProductAttributesToMercadoLibreAttributes(rawAttributes: unknown): Array<{ id?: string; name: string; value_name: string }> {
+  if (!Array.isArray(rawAttributes)) return [];
+
+  const mapped = (rawAttributes as DynamicAttributeForML[])
+    .map((attr) => {
+      if (!attr) return null;
+
+      const name = typeof attr.name === 'string' ? attr.name.trim() : undefined;
+      let valueName: string | undefined;
+
+      if (typeof attr.value_name === 'string') {
+        valueName = attr.value_name.trim();
+      } else if (typeof attr.value === 'string') {
+        valueName = attr.value.trim();
+      } else if (Array.isArray(attr.values) && typeof (attr.values as unknown[])[0] === 'string') {
+        valueName = ((attr.values as unknown[])[0] as string).trim();
+      }
+
+      if (!name || !valueName) {
+        return null;
+      }
+
+      let id = attr.id;
+      const normalizedName = name.toLowerCase();
+      if (!id) {
+        if (normalizedName === 'marca' || normalizedName === 'brand') {
+          id = 'BRAND';
+        } else if (normalizedName === 'modelo' || normalizedName === 'model') {
+          id = 'MODEL';
+        }
+      }
+
+      return {
+        id,
+        name,
+        value_name: valueName,
+      };
+    })
+    .filter(Boolean) as Array<{ id?: string; name: string; value_name: string }>;
+
+  return mapped;
+}
+
 export async function POST(req: Request) {
   let productId: number | null = null;
   let productIdNum: number | null = null;
@@ -251,7 +302,7 @@ export async function POST(req: Request) {
       pictures: localProduct.image ? [{
         source: localProduct.image,
       }] : [],
-      attributes: (localProduct.attributes as unknown[]) || [],
+      attributes: mapProductAttributesToMercadoLibreAttributes(localProduct.attributes as unknown),
     };
 
     const categoryId = mlProductData.category_id;
@@ -481,6 +532,23 @@ export async function POST(req: Request) {
             condition: mlProductData.condition,
             listingTypeId: mlProductData.listing_type_id,
             message: quantityError.message,
+            productId: productIdNum,
+          });
+        }
+
+        // Buscar errores de categoría inválida (no hoja o no permitida)
+        const categoryError = causes.find((cause) =>
+          cause.code === 'item.category_id.invalid'
+        );
+
+        if (categoryError) {
+          errorMessage =
+            'La categoría de Mercado Libre seleccionada no permite publicar directamente. ' +
+            'Debes seleccionar una categoría más específica (categoría hoja) en el campo "Categoría Mercado Libre" del producto.';
+
+          logger.error('Error de categoría inválida de Mercado Libre', {
+            categoryId: mlProductData.category_id,
+            message: categoryError.message,
             productId: productIdNum,
           });
         }

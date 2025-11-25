@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CategorySuggestButton } from '@/components/admin/CategorySuggestButton';
 import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
@@ -54,7 +54,6 @@ interface ProductForm {
   price: string
   image: string
   images: string[]
-  categoryId: string
   discount: string
   weight: string
   stock: string
@@ -90,7 +89,6 @@ export default function EditProductPage() {
     price: '',
     image: '',
     images: [],
-    categoryId: '',
     discount: '0',
     weight: '',
     stock: '0',
@@ -108,6 +106,7 @@ export default function EditProductPage() {
     length: ''
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
+  const [attributesSaving, setAttributesSaving] = useState(false)
   const [variants, setVariants] = useState<ProductVariant[]>([])
 
   const [showPreview, setShowPreview] = useState(false)
@@ -149,7 +148,6 @@ export default function EditProductPage() {
           price: product.price,
           image: product.image || '',
           images: product.images || [],
-          categoryId: product.categoryId?.toString() || '',
           discount: product.discount.toString(),
           weight: product.weight || '',
           stock: product.stock.toString(),
@@ -197,13 +195,16 @@ export default function EditProductPage() {
     setLoading(true)
 
     try {
+      if (!form.mlCategoryId) {
+        throw new Error('Debes seleccionar una categoría de Mercado Libre')
+      }
+
       const productData = {
         name: form.name,
         description: form.description || undefined,
         price: form.price,
         image: form.image || undefined,
         images: form.images,
-        categoryId: parseInt(form.categoryId),
         discount: parseInt(form.discount),
         weight: form.weight || undefined,
         stock: parseInt(form.stock) || 0,
@@ -213,7 +214,7 @@ export default function EditProductPage() {
         mlBuyingMode: form.mlBuyingMode,
         mlListingTypeId: form.mlListingTypeId,
         mlCurrencyId: form.mlCurrencyId,
-        mlCategoryId: form.mlCategoryId || undefined,
+        mlCategoryId: form.mlCategoryId,
         mlVideoId: form.videoId || undefined,
         height: form.height || undefined,
         width: form.width || undefined,
@@ -254,12 +255,52 @@ export default function EditProductPage() {
 
 
 
+  const handleUpdateAttributes = async () => {
+    setAttributesSaving(true)
+
+    try {
+      const response = await fetch(`/api/admin/products/${id}/attributes`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ attributes })
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || 'No se pudieron actualizar los atributos')
+      }
+
+      toast({
+        title: 'Éxito',
+        description: 'Atributos actualizados correctamente'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudieron actualizar los atributos',
+        variant: 'destructive'
+      })
+    } finally {
+      setAttributesSaving(false)
+    }
+  }
+
+
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
   const handleImagesReorder = (images: string[]) => {
     setForm(prev => ({ ...prev, images }))
+  }
+
+  const handleMlCategoryChange = (mlCategoryId: string) => {
+    setForm(prev => ({
+      ...prev,
+      mlCategoryId,
+    }))
   }
 
 
@@ -381,22 +422,6 @@ export default function EditProductPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="categoryId">Categoría *</Label>
-                    <Select value={form.categoryId} onValueChange={(value) => handleChange('categoryId', value)} disabled={categoriesLoading}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
                     <Label htmlFor="price">Precio *</Label>
                     <Input
                       id="price"
@@ -411,189 +436,18 @@ export default function EditProductPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="discount">Descuento (%)</Label>
-                    <Input
-                      id="discount"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={form.discount}
-                      onChange={(e) => handleChange('discount', e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weight">Peso (kg)</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.weight}
-                      onChange={(e) => handleChange('weight', e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="stock">Stock</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      min="0"
-                      value={form.stock}
-                      disabled
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="height">Alto (cm)</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.height}
-                      onChange={(e) => handleChange('height', e.target.value)}
-                      placeholder="0.0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="width">Ancho (cm)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.width}
-                      onChange={(e) => handleChange('width', e.target.value)}
-                      placeholder="0.0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="length">Largo (cm)</Label>
-                    <Input
-                      id="length"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.length}
-                      onChange={(e) => handleChange('length', e.target.value)}
-                      placeholder="0.0"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Label htmlFor="description">Descripción</Label>
-                    <Textarea
-                      id="description"
-                      value={form.description}
-                      onChange={(e) => handleChange('description', e.target.value)}
-                      placeholder="Descripción del producto"
-                      rows={4}
-                      className="resize-y"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Label htmlFor="warranty">Garantía</Label>
-                    <Input
-                      id="warranty"
-                      value={form.warranty}
-                      onChange={(e) => handleChange('warranty', e.target.value)}
-                      placeholder="Ej: 90 días, 1 año, sin garantía"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Label htmlFor="videoId">ID de Video (YouTube, Vimeo)</Label>
-                    <Input
-                      id="videoId"
-                      value={form.videoId}
-                      onChange={(e) => handleChange('videoId', e.target.value)}
-                      placeholder="ID del video para mostrar en la publicación"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mlCondition">Condición *</Label>
-                    <Select value={form.mlCondition} onValueChange={(value) => handleChange('mlCondition', value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar condición" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">Nuevo</SelectItem>
-                        <SelectItem value="used">Usado</SelectItem>
-                        <SelectItem value="not_specified">No especificado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mlBuyingMode">Modalidad de compra *</Label>
-                    <Select value={form.mlBuyingMode} onValueChange={(value) => handleChange('mlBuyingMode', value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar modalidad" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="buy_it_now">Comprar ahora</SelectItem>
-                        <SelectItem value="auction">Subasta</SelectItem>
-                        <SelectItem value="classified">Clasificado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mlListingTypeId">Tipo de publicación *</Label>
-                    <Select value={form.mlListingTypeId} onValueChange={(value) => handleChange('mlListingTypeId', value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="free">Gratuita</SelectItem>
-                        <SelectItem value="bronze">Bronce</SelectItem>
-                        <SelectItem value="silver">Plata</SelectItem>
-                        <SelectItem value="gold">Oro</SelectItem>
-                        <SelectItem value="gold_premium">Oro Premium</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mlCurrencyId">Moneda *</Label>
-                    <Select value={form.mlCurrencyId} onValueChange={(value) => handleChange('mlCurrencyId', value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar moneda" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ARS">ARS - Pesos Argentinos</SelectItem>
-                        <SelectItem value="USD">USD - Dólares Estadounidenses</SelectItem>
-                        <SelectItem value="UYU">UYU - Pesos Uruguayos</SelectItem>
-                        <SelectItem value="CLP">CLP - Pesos Chilenos</SelectItem>
-                        <SelectItem value="COP">COP - Pesos Colombianos</SelectItem>
-                        <SelectItem value="MXN">MXN - Pesos Mexicanos</SelectItem>
-                        <SelectItem value="PEN">PEN - Soles Peruanos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mlCategoryId">Categoría Mercado Libre (ID)</Label>
+                    <Label htmlFor="mlCategoryId">Categoría Mercado Libre *</Label>
                     <Select
                       value={form.mlCategoryId}
-                      onValueChange={(value) => handleChange('mlCategoryId', value)}
+                      onValueChange={handleMlCategoryChange}
                       disabled={categoriesLoading}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar categoría ML (opcional)" />
+                        <SelectValue placeholder="Seleccionar categoría ML" />
                       </SelectTrigger>
                       <SelectContent>
                         {categories
-                          .filter((category) => category.mlCategoryId)
+                          .filter((category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf)
                           .map((category) => (
                             <SelectItem
                               key={category.id}
@@ -604,6 +458,18 @@ export default function EditProductPage() {
                           ))}
                       </SelectContent>
                     </Select>
+                    <CategorySuggestButton
+                      title={form.name}
+                      description={form.description}
+                      price={form.price ? parseFloat(form.price) : undefined}
+                      onCategorySelected={(categoryId) => {
+                        const category = categories.find(c => c.id === parseInt(categoryId));
+                        if (category?.mlCategoryId) {
+                          handleMlCategoryChange(category.mlCategoryId);
+                        }
+                      }}
+                      currentCategoryId={categories.find(c => c.mlCategoryId === form.mlCategoryId)?.id?.toString()}
+                    />
                   </div>
 
                   <div className="md:col-span-2">
@@ -701,24 +567,38 @@ export default function EditProductPage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <AttributeBuilder
-                  attributes={attributes}
-                  onChange={setAttributes}
-                  recommendedAttributes={[
-                    {
-                      key: 'brand',
-                      label: 'Marca (BRAND)',
-                      aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
-                      required: form.mlCategoryId === 'MLA3530',
-                    },
-                    {
-                      key: 'model',
-                      label: 'Modelo (MODEL)',
-                      aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
-                      required: form.mlCategoryId === 'MLA3530',
-                    },
-                  ]}
-                />
+                <div className="space-y-6">
+                  <AttributeBuilder
+                    attributes={attributes}
+                    onChange={setAttributes}
+                    recommendedAttributes={[
+                      {
+                        key: 'brand',
+                        label: 'Marca (BRAND)',
+                        aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
+                        required: form.mlCategoryId === 'MLA3530',
+                      },
+                      {
+                        key: 'model',
+                        label: 'Modelo (MODEL)',
+                        aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
+                        required: form.mlCategoryId === 'MLA3530',
+                      },
+                    ]}
+                  />
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleUpdateAttributes}
+                      disabled={attributesSaving || fetchLoading}
+                      className="min-h-[40px]"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {attributesSaving ? 'Guardando atributos...' : 'Actualizar Atributos'}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
