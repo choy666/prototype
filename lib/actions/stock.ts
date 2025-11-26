@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { stockLogs, products, productVariants } from "@/lib/schema";
-import { eq, and, desc, lte } from "drizzle-orm";
+import { eq, and, desc, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/actions/auth";
 import { z } from "zod";
@@ -56,19 +56,30 @@ export async function adjustProductStock(
     }
 
     const currentStock = product[0].stock;
-    const newStock = Math.max(0, currentStock + validatedData.change); // No permitir stock negativo
+    // newStock ya no se usa directamente, se obtiene después del UPDATE
 
-    // Actualizar stock del producto
+    // Actualizar stock del producto de forma atómica y sin permitir negativos
     await db
       .update(products)
-      .set({ stock: newStock, updated_at: new Date() })
+      .set({ 
+        stock: sql`GREATEST(0, ${products.stock} + ${validatedData.change})`,
+        updated_at: new Date() 
+      })
       .where(eq(products.id, validatedData.productId));
 
-    // Registrar en logs
+    // Obtener el nuevo stock real para el log
+    const updatedProduct = await db
+      .select({ stock: products.stock })
+      .from(products)
+      .where(eq(products.id, validatedData.productId))
+      .limit(1);
+    const actualNewStock = updatedProduct[0].stock;
+
+    // Registrar en logs con el valor real
     await db.insert(stockLogs).values({
       productId: validatedData.productId,
       oldStock: currentStock,
-      newStock,
+      newStock: actualNewStock,
       change: validatedData.change,
       reason: validatedData.reason,
       userId,
@@ -77,7 +88,7 @@ export async function adjustProductStock(
     revalidatePath(`/admin/products/${validatedData.productId}/stock`);
     revalidatePath(`/admin/products/${validatedData.productId}/edit`);
 
-    return { success: true, newStock };
+    return { success: true, newStock: actualNewStock };
   } catch (error) {
     console.error("Error ajustando stock del producto:", error);
     throw new Error("Error al ajustar el stock del producto");
@@ -120,26 +131,33 @@ export async function adjustVariantStock(
     }
 
     const currentStock = variant[0].stock;
-    const newStock = Math.max(0, currentStock + validatedData.change); // No permitir stock negativo
+    // shouldBeActive ya no se usa directamente, se calcula en el UPDATE
 
-    // Determinar si la variante debe estar activa o inactiva basado en el nuevo stock
-    const shouldBeActive = newStock > 0;
-
-    // Actualizar stock de la variante y estado activo/inactivo
+    // Actualizar stock de la variante y estado activo/inactivo de forma atómica y sin permitir negativos
     await db
       .update(productVariants)
       .set({
-        stock: newStock,
-        isActive: shouldBeActive,
+        stock: sql`GREATEST(0, ${productVariants.stock} + ${validatedData.change})`,
+        isActive: sql`CASE WHEN GREATEST(0, ${productVariants.stock} + ${validatedData.change}) > 0 THEN true ELSE false END`,
         updated_at: new Date()
       })
       .where(eq(productVariants.id, validatedData.variantId));
 
-    // Registrar en logs (usando productId de la variante)
+    // Obtener el nuevo stock real para el log
+    const updatedVariant = await db
+      .select({ stock: productVariants.stock, isActive: productVariants.isActive })
+      .from(productVariants)
+      .where(eq(productVariants.id, validatedData.variantId))
+      .limit(1);
+    const actualNewStock = updatedVariant[0].stock;
+    const actualIsActive = updatedVariant[0].isActive;
+
+    // Registrar en logs con el valor real y referencia a variante
     await db.insert(stockLogs).values({
       productId: variant[0].productId,
+      variantId: validatedData.variantId,
       oldStock: currentStock,
-      newStock,
+      newStock: actualNewStock,
       change: validatedData.change,
       reason: validatedData.reason,
       userId,
@@ -148,7 +166,7 @@ export async function adjustVariantStock(
     revalidatePath(`/admin/products/${variant[0].productId}/stock`);
     revalidatePath(`/admin/products/${variant[0].productId}/edit`);
 
-    return { success: true, newStock, isActive: shouldBeActive };
+    return { success: true, newStock: actualNewStock, isActive: actualIsActive };
   } catch (error) {
     console.error("Error ajustando stock de variante:", error);
     throw new Error("Error al ajustar el stock de la variante");

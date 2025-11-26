@@ -76,6 +76,7 @@ export const products = pgTable("products", {
 export const stockLogs = pgTable("stock_logs", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  variantId: integer("variant_id").references(() => productVariants.id, { onDelete: "cascade" }),
   oldStock: integer("old_stock").notNull(),
   newStock: integer("new_stock").notNull(),
   change: integer("change").notNull(), // cantidad cambiada (positiva o negativa)

@@ -9,6 +9,7 @@ import { auth } from '@/lib/actions/auth';
 import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
 import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category';
 import type { ProductVariant } from '@/lib/schema';
+import { resolveStockPolicy, calculateAvailableQuantityForML } from '@/lib/domain/ml-stock';
 
 type DynamicAttributeForML = {
   id?: string;
@@ -369,11 +370,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // Regla especial conocida de ML: para ciertas combinaciones solo permiten cantidad 1
-    const isMaxQuantityOneRule =
-      categoryId === 'MLA3530' &&
-      condition === 'used' &&
-      listingTypeId === 'free';
+    // Determinar política de stock según categoría/condición/listing type
+    const stockPolicy = resolveStockPolicy({
+      categoryId,
+      condition,
+      listingTypeId,
+    });
 
     // Validar precio con categoría dinámica antes de asignar
     const priceValidation = validatePrice(
@@ -425,12 +427,12 @@ export async function POST(req: Request) {
     if (hasVariants) {
       // Producto con variantes: usar precio base del producto padre y variaciones
       mlProductData.price = parseFloat(localProduct.price);
-      mlProductData.available_quantity = isMaxQuantityOneRule ? 1 : localProduct.stock;
+      mlProductData.available_quantity = calculateAvailableQuantityForML(localProduct.stock, stockPolicy);
       
       // Agregar variaciones
       mlProductData.variations = (localProduct.variants as ProductVariant[]).map((variant: ProductVariant) => ({
         price: variant.price ? parseFloat(variant.price) : parseFloat(localProduct.price),
-        available_quantity: isMaxQuantityOneRule ? 1 : variant.stock,
+        available_quantity: calculateAvailableQuantityForML(variant.stock, stockPolicy),
         attribute_combinations: (variant.mlAttributeCombinations as unknown[]) || [],
         picture_ids: (variant.images as unknown[]) || [],
         seller_custom_field: variant.id.toString(), // Referencia local
@@ -439,16 +441,18 @@ export async function POST(req: Request) {
       logger.info('Producto con variantes preparado para ML', {
         productId: productIdNum,
         variantsCount: (localProduct.variants as ProductVariant[]).length,
-        hasVariations: true
+        hasVariations: true,
+        stockPolicy,
       });
     } else {
       // Producto simple sin variantes
       mlProductData.price = parseFloat(localProduct.price);
-      mlProductData.available_quantity = isMaxQuantityOneRule ? 1 : localProduct.stock;
+      mlProductData.available_quantity = calculateAvailableQuantityForML(localProduct.stock, stockPolicy);
       
       logger.info('Producto simple preparado para ML', {
         productId: productIdNum,
-        hasVariations: false
+        hasVariations: false,
+        stockPolicy,
       });
     }
 

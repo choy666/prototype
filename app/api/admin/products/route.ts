@@ -31,6 +31,15 @@ const createProductSchema = z.object({
   height: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
   width: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
   length: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
+  // Atributos dinámicos del producto
+  attributes: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        values: z.array(z.string().min(1)).min(1),
+      })
+    )
+    .optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -102,6 +111,7 @@ export async function POST(request: NextRequest) {
       price: validatedData.price,
       weight: validatedData.weight ? validatedData.weight : null,
       images: validatedData.images || [],
+      attributes: validatedData.attributes || undefined,
     })
 
     return NextResponse.json(product, { status: 201 })

@@ -70,9 +70,75 @@ interface ProductForm {
   length: string
 }
 
+type RecommendedAttributeConfig = {
+  key: string
+  label: string
+  aliases: string[]
+  required?: boolean
+}
 
+const getRecommendedAttributesForCategory = (
+  mlCategoryId: string
+): RecommendedAttributeConfig[] => {
+  if (!mlCategoryId) {
+    return []
+  }
 
+  const common: RecommendedAttributeConfig[] = [
+    {
+      key: 'brand',
+      label: 'Marca (BRAND)',
+      aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
+      required: true,
+    },
+    {
+      key: 'model',
+      label: 'Modelo (MODEL)',
+      aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
+      required: true,
+    },
+  ]
 
+  switch (mlCategoryId) {
+    case 'MLA1055':
+      return [
+        ...common,
+        {
+          key: 'line',
+          label: 'Línea / Familia',
+          aliases: ['linea', 'línea', 'LINEA', 'LÍNEA', 'line', 'familia'],
+        },
+        {
+          key: 'color',
+          label: 'Color (COLOR)',
+          aliases: ['color', 'COLOR'],
+        },
+        {
+          key: 'internal_storage',
+          label: 'Capacidad de almacenamiento interno',
+          aliases: [
+            'capacidad de almacenamiento',
+            'almacenamiento interno',
+            'memoria interna',
+            'capacidad interna',
+          ],
+        },
+        {
+          key: 'ram',
+          label: 'Memoria RAM',
+          aliases: ['ram', 'memoria ram', 'RAM', 'Memoria RAM'],
+        },
+        {
+          key: 'operator',
+          label: 'Operadora / Conectividad',
+          aliases: ['operadora', 'compañía', 'compania', 'carrier', 'conectividad'],
+        },
+      ]
+
+    default:
+      return common
+  }
+}
 
 export default function EditProductPage() {
   const router = useRouter()
@@ -115,10 +181,6 @@ export default function EditProductPage() {
   const mlCategories = categories.filter(
     (category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf
   )
-
-
-
-
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -187,12 +249,6 @@ export default function EditProductPage() {
     if (id) fetchProduct()
   }, [id, router, toast])
 
-
-
-
-
-
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -254,10 +310,6 @@ export default function EditProductPage() {
     }
   }
 
-
-
-
-
   const handleUpdateAttributes = async () => {
     setAttributesSaving(true)
 
@@ -290,7 +342,6 @@ export default function EditProductPage() {
     }
   }
 
-
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
@@ -305,14 +356,6 @@ export default function EditProductPage() {
       mlCategoryId,
     }))
   }
-
-
-
-
-
-
-
-
 
   if (fetchLoading) {
     return (
@@ -339,12 +382,9 @@ export default function EditProductPage() {
             </div>
           </CardContent>
         </Card>
-
-
-
-    </div>
-  )
-}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -353,7 +393,6 @@ export default function EditProductPage() {
         { label: 'Editar Producto' }
       ]} />
 
-      {/* Header with progress and actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link href="/admin/products">
@@ -370,9 +409,7 @@ export default function EditProductPage() {
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex items-center gap-2">
-          {/* Preview toggle */}
           <Tooltip content="Vista previa">
             <Button
               variant={showPreview ? "default" : "outline"}
@@ -386,9 +423,6 @@ export default function EditProductPage() {
         </div>
       </div>
 
-
-
-      {/* Main content with tabs */}
       <Tabs defaultValue="basic" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basic" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
@@ -412,7 +446,7 @@ export default function EditProductPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   <div className="md:col-span-2">
                     <Label htmlFor="name">Nombre *</Label>
                     <Input
@@ -530,55 +564,42 @@ export default function EditProductPage() {
                   </Button>
                 </div>
               </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="attributes" className="animate-in fade-in slide-in-from-right-2 duration-300">
-            <Card className="transition-all duration-300 hover:shadow-lg">
-              <CardHeader>
-                <CardTitle>Atributos del Producto</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Define atributos adicionales como talla, color, material, etc. Estos atributos pueden ser usados
-                  para mapear variaciones en Mercado Libre.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <AttributeBuilder
-                    attributes={attributes}
-                    onChange={setAttributes}
-                    recommendedAttributes={[
-                      {
-                        key: 'brand',
-                        label: 'Marca (BRAND)',
-                        aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
-                        required: form.mlCategoryId === 'MLA3530',
-                      },
-                      {
-                        key: 'model',
-                        label: 'Modelo (MODEL)',
-                        aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
-                        required: form.mlCategoryId === 'MLA3530',
-                      },
-                    ]}
-                  />
+        <TabsContent value="attributes" className="animate-in fade-in slide-in-from-right-2 duration-300">
+          <Card className="transition-all duration-300 hover:shadow-lg">
+            <CardHeader>
+              <CardTitle>Atributos del Producto</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Define atributos adicionales como talla, color, material, etc. Estos atributos pueden ser usados
+                para mapear variaciones en Mercado Libre.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <AttributeBuilder
+                  attributes={attributes}
+                  onChange={setAttributes}
+                  recommendedAttributes={getRecommendedAttributesForCategory(form.mlCategoryId)}
+                />
 
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={handleUpdateAttributes}
-                      disabled={attributesSaving || fetchLoading}
-                      className="min-h-[40px]"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      {attributesSaving ? 'Guardando atributos...' : 'Actualizar Atributos'}
-                    </Button>
-                  </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleUpdateAttributes}
+                    disabled={attributesSaving || fetchLoading}
+                    className="min-h-[40px]"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    {attributesSaving ? 'Guardando atributos...' : 'Actualizar Atributos'}
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
           <TabsContent value="variants" className="animate-in fade-in slide-in-from-right-2 duration-300">
             <Card className="transition-all duration-300 hover:shadow-lg">

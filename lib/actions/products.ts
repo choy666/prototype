@@ -2,7 +2,7 @@
 
 import { db } from '../db';
 import { products, orderItems, categories, mercadolibreProductsSync } from '../schema';
-import { and, eq, desc, sql, gte, lte, like, asc } from 'drizzle-orm';
+import { and, eq, desc, sql, gte, lte, like, asc, or } from 'drizzle-orm';
 import type { NewProduct, Product } from '../schema';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import type { ProductFilters } from '@/types';
 import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
 import { validateProductForMercadoLibre } from '@/lib/validations/mercadolibre';
+import { calculateAvailableQuantityFromProduct } from '@/lib/domain/ml-stock';
 
 // ✅ Esquema de validación para los filtros de productos
 const productFiltersSchema = z.object({
@@ -76,7 +77,12 @@ export async function getProducts(
       conditions.push(eq(products.isActive, true)); // Para tienda, solo productos activos
     }
     if (category) {
-      conditions.push(eq(products.category, category));
+      conditions.push(
+        or(
+          eq(products.mlCategoryId, category),
+          eq(products.category, category),
+        ),
+      );
     }
     if (typeof minPrice === 'number') {
       conditions.push(gte(products.price, String(minPrice)));
@@ -496,7 +502,7 @@ export async function syncProductToMercadoLibre(
       category_id: product.mlCategoryId || 'MLA3530', // Default categoría
       price: Number(product.price),
       currency_id: product.mlCurrencyId || 'ARS',
-      available_quantity: product.stock,
+      available_quantity: calculateAvailableQuantityFromProduct(product),
       buying_mode: product.mlBuyingMode || 'buy_it_now',
       listing_type_id: product.mlListingTypeId || 'bronze',
       condition: product.mlCondition || 'new',

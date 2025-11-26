@@ -15,6 +15,8 @@ import { ArrowLeft, Save } from 'lucide-react'
 
 import { ImageManager } from '@/components/ui/ImageManager'
 import type { Category } from '@/lib/schema'
+import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
+import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 
 
 interface ProductForm {
@@ -41,11 +43,82 @@ interface ProductForm {
   length: string
 }
 
+type RecommendedAttributeConfig = {
+  key: string
+  label: string
+  aliases: string[]
+  required?: boolean
+}
+
+const getRecommendedAttributesForCategory = (
+  mlCategoryId: string
+): RecommendedAttributeConfig[] => {
+  if (!mlCategoryId) {
+    return []
+  }
+
+  const common: RecommendedAttributeConfig[] = [
+    {
+      key: 'brand',
+      label: 'Marca (BRAND)',
+      aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
+      required: true,
+    },
+    {
+      key: 'model',
+      label: 'Modelo (MODEL)',
+      aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
+      required: true,
+    },
+  ]
+
+  switch (mlCategoryId) {
+    case 'MLA1055':
+      return [
+        ...common,
+        {
+          key: 'line',
+          label: 'Línea / Familia',
+          aliases: ['linea', 'línea', 'LINEA', 'LÍNEA', 'line', 'familia'],
+        },
+        {
+          key: 'color',
+          label: 'Color (COLOR)',
+          aliases: ['color', 'COLOR'],
+        },
+        {
+          key: 'internal_storage',
+          label: 'Capacidad de almacenamiento interno',
+          aliases: [
+            'capacidad de almacenamiento',
+            'almacenamiento interno',
+            'memoria interna',
+            'capacidad interna',
+          ],
+        },
+        {
+          key: 'ram',
+          label: 'Memoria RAM',
+          aliases: ['ram', 'memoria ram', 'RAM', 'Memoria RAM'],
+        },
+        {
+          key: 'operator',
+          label: 'Operadora / Conectividad',
+          aliases: ['operadora', 'compañía', 'compania', 'carrier', 'conectividad'],
+        },
+      ]
+
+    default:
+      return common
+  }
+}
+
 export default function NewProductPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
 
   const [form, setForm] = useState<ProductForm>({
     name: '',
@@ -91,8 +164,6 @@ export default function NewProductPage() {
     fetchData()
   }, [])
 
-
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -127,7 +198,8 @@ export default function NewProductPage() {
         // Dimensiones para envío
         height: form.height || undefined,
         width: form.width || undefined,
-        length: form.length || undefined
+        length: form.length || undefined,
+        attributes: attributes.length > 0 ? attributes : undefined,
       }
 
       const response = await fetch('/api/admin/products', {
@@ -174,11 +246,6 @@ export default function NewProductPage() {
       mlCategoryId,
     }))
   }
-
-
-
-
-
 
   return (
     <div className="space-y-6">
@@ -450,8 +517,6 @@ export default function NewProductPage() {
               </div>
             </div>
 
-
-
             <div className="flex flex-col sm:flex-row justify-end gap-4">
               <Link href="/admin/products">
                 <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
@@ -464,6 +529,19 @@ export default function NewProductPage() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Atributos del Producto</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AttributeBuilder
+            attributes={attributes}
+            onChange={setAttributes}
+            recommendedAttributes={getRecommendedAttributesForCategory(form.mlCategoryId)}
+          />
         </CardContent>
       </Card>
     </div>

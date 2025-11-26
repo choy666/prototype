@@ -1,8 +1,9 @@
-import { db } from '@/lib/db';
-import { products, stockLogs } from '@/lib/schema';
+import { db, checkDatabaseConnection } from '@/lib/db';
+import { products, type Product } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
+import { calculateAvailableQuantityFromProduct } from '@/lib/domain/ml-stock';
 
 export async function syncInventoryToMercadoLibre(
   userId: number,
@@ -36,17 +37,18 @@ export async function syncInventoryToMercadoLibre(
           continue;
         }
 
-        // Obtener stock actual
+        // Obtener stock real local y cantidad calculada para ML
         const currentStock = product.stock || 0;
+        const availableQuantity = calculateAvailableQuantityFromProduct(product as Product);
 
-        // Actualizar en Mercado Libre
+        // Actualizar en Mercado Libre usando available_quantity calculado
         const response = await makeAuthenticatedRequest(
           userId,
           `/items/${product.mlItemId}`,
           {
             method: 'PUT',
             body: JSON.stringify({
-              available_quantity: currentStock,
+              available_quantity: availableQuantity,
             }),
           }
         );
@@ -69,7 +71,8 @@ export async function syncInventoryToMercadoLibre(
         logger.info('Stock sincronizado', {
           productId: product.id,
           mlItemId: product.mlItemId,
-          stock: currentStock
+          stock: currentStock,
+          availableQuantity,
         });
 
       } catch (error) {
@@ -92,95 +95,79 @@ export async function syncInventoryToMercadoLibre(
   }
 }
 
-export async function bidirectionalInventorySync(
-  userId: number,
-  productId: number
-): Promise<{ success: boolean; source: 'local' | 'ml'; error?: string }> {
+/**
+ * Sincronización bidireccional de inventario (SOLO LECTURA Y MONITOREO)
+ * Ya no sobreescribe el stock local con datos de ML para evitar inconsistencias.
+ * Solo registra discrepancias y actualiza ML si el stock local es menor.
+ */
+export async function bidirectionalInventorySync(userId: number, productId: number): Promise<{
+  localStock: number;
+  mlStock: number;
+  discrepancy: number;
+  mlUpdated: boolean;
+}> {
   try {
-    // Obtener producto local
-    const product = await db.query.products.findFirst({
+    await checkDatabaseConnection();
+
+    // Obtener stock local
+    const localProduct = await db.query.products.findFirst({
       where: eq(products.id, productId),
     });
 
-    if (!product?.mlItemId) {
-      return { success: false, source: 'local' as const, error: 'Producto no sincronizado con ML' };
+    if (!localProduct || !localProduct.mlItemId) {
+      throw new Error('Producto no encontrado o no sincronizado con ML');
     }
 
-    // Obtener stock desde Mercado Libre
-    const response = await makeAuthenticatedRequest(
+    const localStock = localProduct.stock;
+
+    // Obtener stock de ML
+    const mlResponse = await makeAuthenticatedRequest(
       userId,
-      `/items/${product.mlItemId}`
+      `/items/${localProduct.mlItemId}`,
+      { method: 'GET' }
     );
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Error obteniendo stock de ML: ${error}`);
-    }
+    const mlData = await mlResponse.json();
+    const mlStock = mlData.available_quantity || 0;
 
-    const mlItem = await response.json();
-    const mlStock = mlItem.available_quantity || 0;
-    const localStock = product.stock || 0;
+    // Calcular discrepancia
+    const discrepancy = localStock - mlStock;
 
-    // Comparar stocks
-    if (localStock !== mlStock) {
-      logger.warn('Diferencia de stock detectada', {
+    // Registrar discrepancia si existe
+    if (discrepancy !== 0) {
+      logger.warn('Discrepancia detectada entre stock local y ML', {
         productId,
         localStock,
         mlStock,
-        mlItemId: product.mlItemId
+        discrepancy,
+        mlItemId: localProduct.mlItemId,
       });
 
-      // Estrategia: usar el stock más bajo para evitar sobreventa
-      const newStock = Math.min(localStock, mlStock);
-
-      // Actualizar local
-      await db.update(products)
-        .set({
-          stock: newStock,
-          updated_at: new Date()
-        })
-        .where(eq(products.id, productId));
-
-      // Crear log de ajuste
-      await db.insert(stockLogs).values({
-        productId,
-        oldStock: localStock,
-        newStock,
-        change: newStock - localStock,
-        reason: 'Sincronización bidireccional ML',
-        userId,
-      });
-
-      // Actualizar en ML si el stock local es menor
+      // Si el stock local es menor, actualizar ML para evitar sobreventa
       if (localStock < mlStock) {
+        const availableQuantity = calculateAvailableQuantityFromProduct(localProduct as Product);
         await makeAuthenticatedRequest(
           userId,
-          `/items/${product.mlItemId}`,
-          {
-            method: 'PUT',
-            body: JSON.stringify({
-              available_quantity: localStock,
-            }),
+          `/items/${localProduct.mlItemId}`,
+          { 
+            method: 'PUT', 
+            body: JSON.stringify({ available_quantity: availableQuantity }) 
           }
         );
-
-        return { success: true, source: 'local' };
-      } else {
-        return { success: true, source: 'ml' };
+        logger.info('Stock actualizado en ML para evitar sobreventa', {
+          productId,
+          newAvailableQuantity: availableQuantity,
+        });
+        return { localStock, mlStock, discrepancy, mlUpdated: true };
       }
     }
 
-    return { success: true, source: 'local' };
-
+    return { localStock, mlStock, discrepancy, mlUpdated: false };
   } catch (error) {
-    logger.error('Error en sincronización bidireccional', {
+    logger.error('Error en monitoreo de inventario bidireccional', {
       productId,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
-    return { 
-      success: false, 
-      source: 'local' as const,
-      error: error instanceof Error ? error.message : String(error)
-    };
+    throw error;
   }
 }

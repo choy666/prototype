@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
+import { eq, sql, count } from 'drizzle-orm';
+import { orders, products, mercadolibreOrdersImport, orderItems, stockLogs, productVariants } from '@/lib/schema';
 import { db } from '@/lib/db';
-import { orders, orderItems, products, mercadolibreOrdersImport } from '@/lib/schema';
-import { eq, count } from 'drizzle-orm';
-import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
-import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
-import { logger } from '@/lib/utils/logger';
 import { auth } from '@/lib/actions/auth';
+import { logger } from '@/lib/utils/logger';
+import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
+import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
 
 interface MercadoLibreOrder {
   id: string;
@@ -227,9 +227,14 @@ export async function POST(req: Request) {
         }).returning();
 
         // Procesar items de la orden
-        if (mlOrder.order_items && mlOrder.order_items.length > 0) {
-          const orderItemsData = [];
+        const orderItemsData: Array<{
+          orderId: number;
+          productId: number;
+          quantity: number;
+          price: string;
+        }> = [];
 
+        if (mlOrder.order_items && mlOrder.order_items.length > 0) {
           for (const mlItem of mlOrder.order_items) {
             // Buscar producto local por ML item ID
             const localProduct = await db.query.products.findFirst({
@@ -265,6 +270,89 @@ export async function POST(req: Request) {
             importedAt: new Date(),
           })
           .where(eq(mercadolibreOrdersImport.id, importRecord[0].id));
+
+        // Deducción de stock por venta ML (transaccional para evitar race conditions)
+        if (orderItemsData && orderItemsData.length > 0) {
+          logger.info('Deduciendo stock por venta ML', { localOrderId, itemsCount: orderItemsData.length });
+          await db.transaction(async (tx) => {
+            for (const item of orderItemsData) {
+              // Buscar si corresponde a variante por productId y quantity
+              const localProduct = await tx.query.products.findFirst({
+                where: eq(products.id, item.productId),
+                with: {
+                  variants: {
+                    where: eq(productVariants.isActive, true),
+                  },
+                },
+              });
+              if (!localProduct) continue;
+
+              // Intentar deducir de variante si hay stock coincidente
+              let deducted = false;
+              if (localProduct.variants && Array.isArray(localProduct.variants)) {
+                for (const variant of localProduct.variants) {
+                  if (variant.stock >= item.quantity) {
+                    // Actualizar stock de variante directamente en la transacción
+                    await tx.update(productVariants)
+                      .set({
+                        stock: sql`${productVariants.stock} - ${item.quantity}`,
+                        updated_at: new Date(),
+                      })
+                      .where(eq(productVariants.id, variant.id));
+                    
+                    // Registrar log de stock
+                    await tx.insert(stockLogs).values({
+                      productId: item.productId,
+                      variantId: variant.id,
+                      oldStock: variant.stock,
+                      newStock: Math.max(0, variant.stock - item.quantity),
+                      change: -item.quantity,
+                      reason: `Venta ML - Orden ${mlOrder.id}`,
+                      userId: parseInt(session.user.id),
+                      created_at: new Date(),
+                    });
+                    
+                    logger.info('Stock de variante deducido por venta ML', {
+                      variantId: variant.id,
+                      quantity: item.quantity,
+                      mlOrderId: mlOrder.id
+                    });
+                    deducted = true;
+                    break;
+                  }
+                }
+              }
+
+              // Si no se dedujo de variante, deducir del producto base
+              if (!deducted) {
+                await tx.update(products)
+                  .set({
+                    stock: sql`${products.stock} - ${item.quantity}`,
+                    updated_at: new Date(),
+                  })
+                  .where(eq(products.id, item.productId));
+                
+                // Registrar log de stock
+                await tx.insert(stockLogs).values({
+                  productId: item.productId,
+                  oldStock: localProduct.stock,
+                  newStock: Math.max(0, localProduct.stock - item.quantity),
+                  change: -item.quantity,
+                  reason: `Venta ML - Orden ${mlOrder.id}`,
+                  userId: parseInt(session.user.id),
+                  created_at: new Date(),
+                });
+                
+                logger.info('Stock de producto deducido por venta ML', {
+                  productId: item.productId,
+                  quantity: item.quantity,
+                  mlOrderId: mlOrder.id
+                });
+              }
+            }
+          });
+          logger.info('Deducción de stock completada para orden ML', { localOrderId });
+        }
 
         result.status = 'success';
         result.localOrderId = localOrderId;
