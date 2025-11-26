@@ -50,75 +50,13 @@ type RecommendedAttributeConfig = {
   required?: boolean
 }
 
-const getRecommendedAttributesForCategory = (
-  mlCategoryId: string
-): RecommendedAttributeConfig[] => {
-  if (!mlCategoryId) {
-    return []
-  }
-
-  const common: RecommendedAttributeConfig[] = [
-    {
-      key: 'brand',
-      label: 'Marca (BRAND)',
-      aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
-      required: true,
-    },
-    {
-      key: 'model',
-      label: 'Modelo (MODEL)',
-      aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
-      required: true,
-    },
-  ]
-
-  switch (mlCategoryId) {
-    case 'MLA1055':
-      return [
-        ...common,
-        {
-          key: 'line',
-          label: 'Línea / Familia',
-          aliases: ['linea', 'línea', 'LINEA', 'LÍNEA', 'line', 'familia'],
-        },
-        {
-          key: 'color',
-          label: 'Color (COLOR)',
-          aliases: ['color', 'COLOR'],
-        },
-        {
-          key: 'internal_storage',
-          label: 'Capacidad de almacenamiento interno',
-          aliases: [
-            'capacidad de almacenamiento',
-            'almacenamiento interno',
-            'memoria interna',
-            'capacidad interna',
-          ],
-        },
-        {
-          key: 'ram',
-          label: 'Memoria RAM',
-          aliases: ['ram', 'memoria ram', 'RAM', 'Memoria RAM'],
-        },
-        {
-          key: 'operator',
-          label: 'Operadora / Conectividad',
-          aliases: ['operadora', 'compañía', 'compania', 'carrier', 'conectividad'],
-        },
-      ]
-
-    default:
-      return common
-  }
-}
-
 export default function NewProductPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
+  const [recommendedAttributes, setRecommendedAttributes] = useState<RecommendedAttributeConfig[]>([])
 
   const [form, setForm] = useState<ProductForm>({
     name: '',
@@ -163,6 +101,29 @@ export default function NewProductPage() {
     }
     fetchData()
   }, [])
+
+  useEffect(() => {
+    const fetchRecommendedAttributes = async () => {
+      if (!form.mlCategoryId) {
+        setRecommendedAttributes([])
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/mercadolibre/categories/${form.mlCategoryId}/attributes`)
+        if (!res.ok) {
+          setRecommendedAttributes([])
+          return
+        }
+        const data = await res.json()
+        setRecommendedAttributes(data.attributes || [])
+      } catch {
+        setRecommendedAttributes([])
+      }
+    }
+
+    fetchRecommendedAttributes()
+  }, [form.mlCategoryId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -540,7 +501,7 @@ export default function NewProductPage() {
           <AttributeBuilder
             attributes={attributes}
             onChange={setAttributes}
-            recommendedAttributes={getRecommendedAttributesForCategory(form.mlCategoryId)}
+            recommendedAttributes={recommendedAttributes}
           />
         </CardContent>
       </Card>

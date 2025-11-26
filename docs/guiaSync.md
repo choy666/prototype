@@ -29,21 +29,8 @@ Mercado Libre publica los atributos por categoría en el endpoint `categories/{i
    - Ejemplo real de tu proyecto: `MLA1055` (Celulares y Smartphones) en `docs/products.json`.
 2. Consultar la API de atributos:
 
-   ```bash
-   curl -X GET -H "Authorization: Bearer $ACCESS_TOKEN" \
-     https://api.mercadolibre.com/categories/MLA1055/attributes
-   ```
-
-3. En la respuesta, revisar por cada atributo:
-   - Campo `id` y `name` (ej.: `"id": "BRAND", "name": "Marca"`).
-   - Campo `tags`:
-     - `tags.required == true`: **atributo obligatorio para publicar**.
-     - `tags.catalog_required == true`: requerido si quieres asociar a un catálogo oficial.
-     - `tags.allow_variations == true`: se puede usar como **atributo de variación** (ej.: `COLOR`).
-
-> Recomendación: para cada `ml_category_id` que uses, guarda en una nota interna o config el listado de:
-> - Atributos con `tags.required == true` (mínimo obligatorio).
-> - Atributos con `tags.allow_variations == true` (posibles variantes).
+> Si necesitás depurar o entender un caso particular, sigue siendo útil llamar manualmente a
+> `GET /categories/{ml_category_id}/attributes` para ver la respuesta cruda de Mercado Libre.
 
 ---
 
@@ -121,6 +108,30 @@ Aunque cambian según categoría, hay atributos **casi universales** que convien
 > Si faltan atributos obligatorios (ej.: Marca y Modelo), la sincronización puede fallar con errores similares a:
 > "Faltan atributos obligatorios para Mercado Libre (por ejemplo, Marca y Modelo)".
 
+### 4.5 Cómo se ve esto en el backoffice (AttributeBuilder)
+
+Cuando en el panel de administración:
+
+- Creas un producto nuevo, o
+- Editas un producto existente,
+
+y seleccionas la **Categoría Mercado Libre**:
+
+1. El front llama automáticamente a:
+   - `GET /api/mercadolibre/categories/{mlCategoryId}/attributes`.
+2. Ese endpoint interno obtiene los atributos desde la API oficial de Mercado Libre y los traduce al formato que usa `AttributeBuilder`.
+3. En la pestaña de **Atributos del Producto**, `AttributeBuilder` muestra arriba un bloque:
+   - *"Atributos recomendados por Mercado Libre para esta categoría"*.
+   - Cada atributo recomendado/obligatorio aparece como un **chip** con:
+     - El nombre + ID de ML (ej.: `Marca (BRAND)`).
+     - El texto `(obligatorio)` si `required == true`.
+     - Un color de estado según si ya lo cargaste o no:
+       - **Verde** (borde y punto): el atributo ya está presente en la lista de atributos dinámicos del producto (coincide con algún alias).
+       - **Amarillo** (borde y punto): el atributo está recomendado por ML, pero todavía **no fue cargado**.
+
+> Nota: actualmente los atributos obligatorios que faltan se ven como recomendados pendientes (amarillos) pero con la etiqueta `(obligatorio)`. 
+> La validación estricta sigue ocurriendo al sincronizar con Mercado Libre; si falta un obligatorio, la API puede rechazar la publicación.
+
 ---
 
 ## 5. Checklist específico: Celulares y Smartphones (MLA1055)
@@ -174,22 +185,26 @@ Checklist de variantes:
 ## 6. Flujo sugerido al crear/editar un producto en tu backoffice
 
 1. **Elegir categoría interna** → se obtiene el `ml_category_id` desde `categories.json`.
-2. **Consultar atributos de la categoría** en la API de Mercado Libre (al menos una vez por categoría) y documentar:
-   - Atributos `required`.
-   - Atributos `allow_variations`.
-3. **Completar ficha de producto** en tu sistema con:
+2. **(Automático en este proyecto)**: al seleccionar la *Categoría Mercado Libre* en el formulario, el backoffice llama a
+   `GET /api/mercadolibre/categories/{mlCategoryId}/attributes` y muestra en `AttributeBuilder`:
+   - Atributos marcados como obligatorios (`required` / `catalog_required`).
+   - Atributos marcados como `allow_variations` (candidatos a variación).
+   Esto reemplaza la necesidad de que el usuario consulte manualmente la API para el uso cotidiano.
+3. **(Opcional / para debugging)**: si necesitás ver la respuesta cruda de la API de ML, puedes llamar a
+   `GET https://api.mercadolibre.com/categories/{mlCategoryId}/attributes` y contrastarla con lo que muestra el backoffice.
+4. **Completar ficha de producto** en tu sistema con:
    - Datos básicos (título, descripción, precio, stock, imágenes).
    - Medidas físicas y peso.
    - Atributos mínimos (Marca, Modelo, etc.).
-4. **Definir variantes** (si aplica):
+5. **Definir variantes** (si aplica):
    - Elegir atributos de variación permitidos por la categoría.
    - Crear las combinaciones (Color x Capacidad, etc.).
-5. **Validar antes de sincronizar**:
+6. **Validar antes de sincronizar**:
    - [ ] ¿Todos los atributos `required` de la categoría tienen valor?
    - [ ] ¿Las variantes usan solo atributos con `allow_variations`?
    - [ ] ¿Los valores son coherentes (ej.: Marca y Modelo reales)?
-6. **Ejecutar la sincronización** desde tu app.
-7. Si hay error en `mercadolibre_products_sync`:
+7. **Ejecutar la sincronización** desde tu app.
+8. Si hay error en `mercadolibre_products_sync`:
    - Leer el `sync_error` guardado (ej.: faltan atributos).
    - Corregir la ficha del producto siguiendo esta guía y reintentar.
 

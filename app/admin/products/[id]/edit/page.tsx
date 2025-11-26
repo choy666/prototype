@@ -77,69 +77,6 @@ type RecommendedAttributeConfig = {
   required?: boolean
 }
 
-const getRecommendedAttributesForCategory = (
-  mlCategoryId: string
-): RecommendedAttributeConfig[] => {
-  if (!mlCategoryId) {
-    return []
-  }
-
-  const common: RecommendedAttributeConfig[] = [
-    {
-      key: 'brand',
-      label: 'Marca (BRAND)',
-      aliases: ['brand', 'marca', 'BRAND', 'MARCA'],
-      required: true,
-    },
-    {
-      key: 'model',
-      label: 'Modelo (MODEL)',
-      aliases: ['model', 'modelo', 'MODEL', 'MODELO'],
-      required: true,
-    },
-  ]
-
-  switch (mlCategoryId) {
-    case 'MLA1055':
-      return [
-        ...common,
-        {
-          key: 'line',
-          label: 'Línea / Familia',
-          aliases: ['linea', 'línea', 'LINEA', 'LÍNEA', 'line', 'familia'],
-        },
-        {
-          key: 'color',
-          label: 'Color (COLOR)',
-          aliases: ['color', 'COLOR'],
-        },
-        {
-          key: 'internal_storage',
-          label: 'Capacidad de almacenamiento interno',
-          aliases: [
-            'capacidad de almacenamiento',
-            'almacenamiento interno',
-            'memoria interna',
-            'capacidad interna',
-          ],
-        },
-        {
-          key: 'ram',
-          label: 'Memoria RAM',
-          aliases: ['ram', 'memoria ram', 'RAM', 'Memoria RAM'],
-        },
-        {
-          key: 'operator',
-          label: 'Operadora / Conectividad',
-          aliases: ['operadora', 'compañía', 'compania', 'carrier', 'conectividad'],
-        },
-      ]
-
-    default:
-      return common
-  }
-}
-
 export default function EditProductPage() {
   const router = useRouter()
   const params = useParams()
@@ -173,6 +110,7 @@ export default function EditProductPage() {
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
   const [attributesSaving, setAttributesSaving] = useState(false)
   const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [recommendedAttributes, setRecommendedAttributes] = useState<RecommendedAttributeConfig[]>([])
 
   const [showPreview, setShowPreview] = useState(false)
 
@@ -248,6 +186,29 @@ export default function EditProductPage() {
     fetchCategories()
     if (id) fetchProduct()
   }, [id, router, toast])
+
+  useEffect(() => {
+    const fetchRecommendedAttributes = async () => {
+      if (!form.mlCategoryId) {
+        setRecommendedAttributes([])
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/mercadolibre/categories/${form.mlCategoryId}/attributes`)
+        if (!res.ok) {
+          setRecommendedAttributes([])
+          return
+        }
+        const data = await res.json()
+        setRecommendedAttributes(data.attributes || [])
+      } catch {
+        setRecommendedAttributes([])
+      }
+    }
+
+    fetchRecommendedAttributes()
+  }, [form.mlCategoryId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -582,7 +543,7 @@ export default function EditProductPage() {
                 <AttributeBuilder
                   attributes={attributes}
                   onChange={setAttributes}
-                  recommendedAttributes={getRecommendedAttributesForCategory(form.mlCategoryId)}
+                  recommendedAttributes={recommendedAttributes}
                 />
 
                 <div className="flex justify-end">
