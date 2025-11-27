@@ -141,7 +141,7 @@ Todo este proceso ocurre **dentro de una única transacción** por orden importa
 
 ## 4. Sincronización de stock hacia Mercado Libre
 
-Archivo principal: `lib/services/mercadolibre/inventory.ts`.
+Archivo principal de inventario dedicado: `lib/services/mercadolibre/inventory.ts`.
 
 ### 4.1. `syncInventoryToMercadoLibre`
 
@@ -152,7 +152,7 @@ Esta función toma el **stock real local** y lo proyecta a `available_quantity` 
    - Un `productId` específico si se pasa como parámetro.
 2. Para cada producto:
    - Lee `product.stock` de la BD.
-   - Calcula `availableQuantity` usando `calculateAvailableQuantityFromProduct(product)`.
+   - Calcula `availableQuantity` usando `calculateAvailableQuantityFromProduct(product)` (en `lib/domain/ml-stock.ts`).
    - Hace un `PUT` a la API de ML:
      - `PUT /items/:mlItemId` con `{ available_quantity: availableQuantity }`.
    - Actualiza `mlLastSync` y `updated_at` en la tabla `products`.
@@ -162,6 +162,7 @@ Esta función toma el **stock real local** y lo proyecta a `available_quantity` 
 
 - En ningún momento se pisa el stock local con datos de ML.
 - El flujo es siempre **local → ML**, usando el dominio de stock para respetar las políticas de categoría.
+- La misma función `calculateAvailableQuantityFromProduct` también se utiliza al **crear/actualizar ítems** en `app/api/mercadolibre/products/sync/route.ts`, de modo que tanto la publicación inicial como las sincronizaciones de inventario respetan exactamente las mismas reglas de cantidad por categoría/listing.
 
 ---
 

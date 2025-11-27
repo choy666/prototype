@@ -224,3 +224,84 @@ Para cada nueva categoría que empieces a usar:
    - "Variantes típicas".
 
 De esta forma, tu equipo tendrá siempre una **guía concreta por categoría** para crear/editar productos y lograr una sincronización exitosa con Mercado Libre.
+
+---
+
+## 8. Mapeo a catálogo de atributos (product_attributes)
+
+Además de los atributos cargados dinámicamente en cada producto, el proyecto ahora tiene una capa de **mapeo a catálogo de Mercado Libre** basada en una tabla y una UI interna.
+
+### 8.1. Tabla `product_attributes`
+
+En `lib/schema.ts` existe la tabla `product_attributes`:
+
+- `name`: nombre interno del atributo (ej.: `Color`, `Talla`, `Material`).
+- `mlAttributeId`: ID del atributo en el catálogo de ML (ej.: `COLOR`, `SIZE`, `BRAND`).
+- `values`: arreglo JSON de valores posibles, por ejemplo:
+  - `[{ name: "Negro", mlValueId: "52049" }, { name: "Blanco", mlValueId: "52050" }]`.
+
+Esta tabla es la **fuente de verdad del mapeo a catálogo** que luego se utiliza al sincronizar productos con Mercado Libre.
+
+### 8.2. UI interna de atributos de producto
+
+Para gestionar esta tabla sin tocar la base de datos directamente, existe una UI de administración:
+
+- `/admin/product-attributes` → listado de atributos de catálogo:
+  - Muestra `name`, `mlAttributeId` y cuántos `values` tiene cada uno.
+  - Permite editar o eliminar cada atributo.
+- `/admin/product-attributes/new` → creación de un nuevo atributo de catálogo:
+  - Campos: `name`, `mlAttributeId` y una lista de valores `{ name, mlValueId }`.
+- `/admin/product-attributes/[id]/edit` → edición de un atributo existente.
+
+Con esta UI se puede mantener el catálogo de valores oficiales (por ejemplo, todos los colores válidos para ML) sin cambios de código.
+
+### 8.3. Uso en el sincronizador de productos
+
+En `app/api/mercadolibre/products/sync/route.ts`, antes de enviar los `attributes` del ítem a ML se hace lo siguiente:
+
+1. Se cargan todos los registros de `product_attributes` desde la base de datos.
+2. Se mapean los atributos dinámicos del producto (`attributes` del producto) a la estructura que espera ML, usando la función `mapProductAttributesToMercadoLibreAttributes`.
+3. Esta función:
+   - Intenta identificar el atributo por nombre (ej.: `Color`, `Marca`, `Modelo`).
+   - Si existe un registro en `product_attributes` para ese nombre:
+     - Usa `mlAttributeId` como `id` del atributo en ML cuando aplique.
+     - Busca en `values` un valor cuyo `name` coincida (normalizado) con el valor del producto.
+     - Si encuentra match, envía también `value_id = mlValueId`.
+
+**Ejemplo simplificado:**
+
+- En `product_attributes` tienes:
+  - `name = "Color"`, `mlAttributeId = "COLOR"`, `values = [{ name: "Negro", mlValueId: "52049" }]`.
+- En el producto, en el backoffice, cargas un atributo dinámico:
+  - `name = "Color"`, `values = ["Negro"]`.
+- El mapper construye para ML:
+  - `{ id: "COLOR", name: "Color", value_name: "Negro", value_id: "52049" }`.
+
+Esto reduce warnings del tipo `item.attribute.missing_catalog_required` y mejora el alineamiento con el catálogo oficial de Mercado Libre.
+
+### 8.4. Sugerencias de valores en AttributeBuilder
+
+El componente `AttributeBuilder` ahora puede mostrar **sugerencias de valores de catálogo** para facilitar la carga correcta de atributos:
+
+- Para cada atributo cargado (por ejemplo, `Color`), debajo del campo "Valor del atributo" aparece un botón:
+  - **"Ver sugerencias ML"**.
+- Al hacer click:
+  - Llama internamente a `GET /api/admin/ml-attributes/{attributeName}/values?q=...`.
+  - Este endpoint consulta `product_attributes` y devuelve los valores configurados para ese atributo (filtrando opcionalmente por el texto actual).
+  - Se muestran chips clicables con valores sugeridos (ej.: `Negro`, `Blanco`, `Rojo`).
+  - Al seleccionar un chip, se rellena automáticamente el valor del atributo del producto con ese texto.
+
+El mismo patrón se aplica en el formulario de **nuevo atributo** dentro de `AttributeBuilder`:
+
+- Si escribes el nombre del atributo (por ejemplo, `Color`) y pulsas "Ver sugerencias ML", se muestran valores de catálogo para elegir.
+
+### 8.5. Resumen práctico para el equipo
+
+Para aprovechar al máximo el mapeo a catálogo:
+
+1. Mantener actualizado `/admin/product-attributes` con los atributos clave (Color, Talla, Material, etc.) y sus valores oficiales de ML.
+2. Al cargar atributos en un producto, usar el botón **"Ver sugerencias ML"** para elegir siempre valores que existan en el catálogo.
+3. Revisar que, para atributos importantes (como Color, Marca, Modelo y otros `catalog_required`), los valores se correspondan con los configurados en `product_attributes`.
+4. Si en la respuesta de ML aparecen warnings de catálogo, ajustar primero `product_attributes` y luego volver a sincronizar el producto.
+
+De esta forma, el proyecto no solo cumple con los mínimos de atributos obligatorios, sino que también se alinea cada vez más con el catálogo oficial de Mercado Libre, mejorando la calidad y visibilidad de las publicaciones.

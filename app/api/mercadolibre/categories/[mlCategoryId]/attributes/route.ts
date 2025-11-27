@@ -24,12 +24,6 @@ interface MercadoLibreCategoryAttribute {
   }
 }
 
-interface MercadoLibreCategoryResponse {
-  id: string
-  name: string
-  attributes?: MercadoLibreCategoryAttribute[]
-}
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ mlCategoryId: string }> }
@@ -45,7 +39,7 @@ export async function GET(
 
   try {
     const response = await fetch(
-      `${MERCADOLIBRE_CONFIG.apiUrl}/categories/${mlCategoryId}`
+      `${MERCADOLIBRE_CONFIG.apiUrl}/categories/${mlCategoryId}/attributes`
     )
 
     if (!response.ok) {
@@ -60,9 +54,9 @@ export async function GET(
       )
     }
 
-    const data = (await response.json()) as MercadoLibreCategoryResponse
+    const data = (await response.json()) as MercadoLibreCategoryAttribute[]
 
-    const rawAttributes = data.attributes || []
+    const rawAttributes = Array.isArray(data) ? data : []
 
     // Seleccionar atributos marcados como requeridos o relevantes
     const mapped: RecommendedAttributeConfig[] = rawAttributes

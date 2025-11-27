@@ -131,7 +131,7 @@ export async function POST(req: Request) {
           available_quantity: product.stock,
           buying_mode: product.mlBuyingMode || 'buy_it_now',
           condition: product.mlCondition || 'new',
-          listing_type_id: product.mlListingTypeId || 'bronze',
+          listing_type_id: product.mlListingTypeId || 'free',
           description: product.description || '',
           pictures: product.image ? [{
             source: product.image,

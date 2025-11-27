@@ -27,6 +27,9 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
   const [newAttributeName, setNewAttributeName] = useState('')
   const [newAttributeValue, setNewAttributeValue] = useState('')
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [valueSuggestions, setValueSuggestions] = useState<Record<number, string[]>>({})
+  const [newValueSuggestions, setNewValueSuggestions] = useState<string[]>([])
+  const [loadingSuggestionsFor, setLoadingSuggestionsFor] = useState<number | 'new' | null>(null)
 
   const normalizeName = (value: string) => value.trim().toLowerCase()
   const isRecommendedPresent = (aliases: string[]) =>
@@ -92,6 +95,45 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
     const firstValue = values[0]?.trim() || ''
     if (!firstValue) errors.push('Valor requerido')
     return errors
+  }
+
+  const fetchSuggestions = async (attributeName: string, query: string): Promise<string[]> => {
+    const trimmedName = attributeName.trim()
+    if (!trimmedName) return []
+
+    const params = new URLSearchParams()
+    if (query.trim()) {
+      params.set('q', query.trim())
+    }
+
+    try {
+      const response = await fetch(
+        `/api/admin/ml-attributes/${encodeURIComponent(trimmedName)}/values?${params.toString()}`,
+      )
+      if (!response.ok) return []
+      const data = (await response.json()) as Array<{ name: string; mlValueId?: string | null }>
+      return data.map((v) => v.name).filter(Boolean)
+    } catch {
+      return []
+    }
+  }
+
+  const handleLoadSuggestionsForAttribute = async (index: number) => {
+    const attribute = attributes[index]
+    if (!attribute) return
+
+    setLoadingSuggestionsFor(index)
+    const suggestions = await fetchSuggestions(attribute.name, attribute.values[0] ?? '')
+    setValueSuggestions((prev) => ({ ...prev, [index]: suggestions }))
+    setLoadingSuggestionsFor((current) => (current === index ? null : current))
+  }
+
+  const handleLoadSuggestionsForNew = async () => {
+    if (!newAttributeName.trim()) return
+    setLoadingSuggestionsFor('new')
+    const suggestions = await fetchSuggestions(newAttributeName, newAttributeValue)
+    setNewValueSuggestions(suggestions)
+    setLoadingSuggestionsFor((current) => (current === 'new' ? null : current))
   }
 
   return (
@@ -199,6 +241,35 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
                     placeholder="Valor del atributo"
                     className="h-8 text-sm"
                   />
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => handleLoadSuggestionsForAttribute(index)}
+                      disabled={!attribute.name.trim() || loadingSuggestionsFor === index}
+                    >
+                      {loadingSuggestionsFor === index ? 'Cargando...' : 'Ver sugerencias ML'}
+                    </Button>
+                    <span className="text-[11px] text-gray-500">
+                      Usa valores de catálogo configurados en Atributos de producto.
+                    </span>
+                  </div>
+                  {valueSuggestions[index]?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {valueSuggestions[index].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => updateAttribute(index, 'values', [suggestion])}
+                          className="px-2 py-0.5 text-[11px] rounded-full border border-emerald-400 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )
@@ -233,6 +304,35 @@ export function AttributeBuilder({ attributes, onChange, recommendedAttributes =
               onChange={(e) => setNewAttributeValue(e.target.value)}
               placeholder="ej: Rojo"
             />
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={handleLoadSuggestionsForNew}
+                disabled={!newAttributeName.trim() || loadingSuggestionsFor === 'new'}
+              >
+                {loadingSuggestionsFor === 'new' ? 'Cargando...' : 'Ver sugerencias ML'}
+              </Button>
+              <span className="text-[11px] text-gray-500">
+                Sugerencias desde catálogo ML si existe configuración.
+              </span>
+            </div>
+            {newValueSuggestions.length ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {newValueSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => setNewAttributeValue(suggestion)}
+                    className="px-2 py-0.5 text-[11px] rounded-full border border-emerald-400 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
         <Button

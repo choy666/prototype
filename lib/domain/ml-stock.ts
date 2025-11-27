@@ -7,11 +7,9 @@ export function resolveStockPolicy(params: {
   condition?: string | null;
   listingTypeId?: string | null;
 }): MLStockPolicy {
-  const categoryId = params.categoryId ?? null;
-  const condition = params.condition ?? null;
   const listingTypeId = params.listingTypeId ?? null;
 
-  if (categoryId === 'MLA3530' && condition === 'used' && listingTypeId === 'free') {
+  if (listingTypeId === 'free') {
     return 'UNIQUE';
   }
 

@@ -50,6 +50,13 @@ type RecommendedAttributeConfig = {
   required?: boolean
 }
 
+interface ListingTypeConfig {
+  id: string
+  name: string
+  saleFeePercent: number
+  currency: string
+}
+
 export default function NewProductPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -57,6 +64,7 @@ export default function NewProductPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
   const [recommendedAttributes, setRecommendedAttributes] = useState<RecommendedAttributeConfig[]>([])
+  const [listingTypes, setListingTypes] = useState<ListingTypeConfig[]>([])
 
   const [form, setForm] = useState<ProductForm>({
     name: '',
@@ -100,6 +108,23 @@ export default function NewProductPage() {
       }
     }
     fetchData()
+  }, [])
+
+  useEffect(() => {
+    const fetchListingTypes = async () => {
+      try {
+        const res = await fetch('/api/mercadolibre/listing-types')
+        if (!res.ok) return
+
+        const data = await res.json()
+        const types = Array.isArray(data.listingTypes) ? data.listingTypes : []
+        setListingTypes(types)
+      } catch (error) {
+        console.error('Error fetching listing types:', error)
+      }
+    }
+
+    fetchListingTypes()
   }, [])
 
   useEffect(() => {
@@ -417,11 +442,32 @@ export default function NewProductPage() {
                     <SelectValue placeholder="Seleccionar tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="free">Gratuita</SelectItem>
-                    <SelectItem value="bronze">Bronce</SelectItem>
-                    <SelectItem value="silver">Plata</SelectItem>
-                    <SelectItem value="gold">Oro</SelectItem>
-                    <SelectItem value="gold_premium">Oro Premium</SelectItem>
+                    {listingTypes.length > 0 ? (
+                      listingTypes.map((lt) => {
+                        const baseLabel =
+                          lt.id === 'free'
+                            ? 'Gratuita (Free)'
+                            : lt.id === 'gold_special'
+                            ? 'Gold Special (Premium)'
+                            : lt.name
+
+                        const feeLabel =
+                          typeof lt.saleFeePercent === 'number'
+                            ? `${lt.saleFeePercent}%`
+                            : 'N/D'
+
+                        return (
+                          <SelectItem key={lt.id} value={lt.id}>
+                            {`${baseLabel} – Comisión ${feeLabel}`}
+                          </SelectItem>
+                        )
+                      })
+                    ) : (
+                      <>
+                        <SelectItem value="free">Gratuita (Free)</SelectItem>
+                        <SelectItem value="gold_special">Gold Special (Premium)</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

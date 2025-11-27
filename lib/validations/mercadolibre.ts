@@ -102,8 +102,8 @@ export const MercadoLibreProductSchema = z.object({
     .enum(['buy_it_now', 'auction'])
     .default('buy_it_now'),
   listing_type_id: z
-    .enum(['bronze', 'silver', 'gold', 'gold_premium', 'gold_special'])
-    .default('bronze'),
+    .enum(['free', 'gold_special'])
+    .default('free'),
   condition: z
     .enum(['new', 'used'])
     .default('new'),
@@ -628,7 +628,7 @@ export function validateProductForMercadoLibre(product: Product): {
   }
 
   // Validar tipo de publicación
-  if (product.mlListingTypeId && !['bronze', 'silver', 'gold', 'gold_premium', 'gold_special'].includes(product.mlListingTypeId)) {
+  if (product.mlListingTypeId && !['free', 'gold_special'].includes(product.mlListingTypeId)) {
     errors.push(`El tipo de publicación "${product.mlListingTypeId}" no es válido`);
   }
 

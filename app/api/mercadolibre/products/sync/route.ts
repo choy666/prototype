@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db, checkDatabaseConnection } from '@/lib/db';
-import { products, mercadolibreProductsSync, productVariants } from '@/lib/schema';
+import { products, mercadolibreProductsSync, productVariants, productAttributes } from '@/lib/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
@@ -8,7 +8,7 @@ import { logger } from '@/lib/utils/logger';
 import { auth } from '@/lib/actions/auth';
 import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
 import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category';
-import type { ProductVariant } from '@/lib/schema';
+import type { ProductVariant, ProductAttribute } from '@/lib/schema';
 import { resolveStockPolicy, calculateAvailableQuantityForML } from '@/lib/domain/ml-stock';
 
 type DynamicAttributeForML = {
@@ -19,8 +19,28 @@ type DynamicAttributeForML = {
   values?: unknown;
 };
 
-function mapProductAttributesToMercadoLibreAttributes(rawAttributes: unknown): Array<{ id?: string; name: string; value_name: string }> {
+type MLAttributeForRequest = {
+  id?: string;
+  name: string;
+  value_name: string;
+  value_id?: string;
+};
+
+function mapProductAttributesToMercadoLibreAttributes(
+  rawAttributes: unknown,
+  catalogAttributes: ProductAttribute[],
+): MLAttributeForRequest[] {
   if (!Array.isArray(rawAttributes)) return [];
+
+  const normalize = (value: string) => value.trim().toLowerCase();
+
+  // Índice rápido por nombre de atributo de catálogo (ej: "Color", "Talla")
+  const catalogByName = new Map<string, ProductAttribute>();
+  for (const catAttr of catalogAttributes) {
+    if (typeof catAttr.name === 'string') {
+      catalogByName.set(normalize(catAttr.name), catAttr);
+    }
+  }
 
   const mapped = (rawAttributes as DynamicAttributeForML[])
     .map((attr) => {
@@ -42,22 +62,61 @@ function mapProductAttributesToMercadoLibreAttributes(rawAttributes: unknown): A
       }
 
       let id = attr.id;
-      const normalizedName = name.toLowerCase();
+      const normalizedName = normalize(name);
+
+      // Mapeo básico por nombre (compatibilidad con implementación previa)
       if (!id) {
         if (normalizedName === 'marca' || normalizedName === 'brand') {
           id = 'BRAND';
         } else if (normalizedName === 'modelo' || normalizedName === 'model') {
           id = 'MODEL';
+        } else if (
+          normalizedName === 'color' ||
+          normalizedName === 'colour' ||
+          normalizedName === 'color principal'
+        ) {
+          id = 'COLOR';
         }
       }
 
-      return {
+      let valueId: string | undefined;
+
+      // Enriquecer con datos de catálogo si existen en product_attributes
+      const catalogAttr = catalogByName.get(normalizedName);
+      if (catalogAttr) {
+        // Si no hay id aún, usar el mlAttributeId guardado en catálogo
+        if (!id && typeof catalogAttr.mlAttributeId === 'string') {
+          id = catalogAttr.mlAttributeId;
+        }
+
+        const rawValues = (catalogAttr as unknown as { values?: unknown }).values;
+        if (Array.isArray(rawValues)) {
+          const catalogValues = rawValues as Array<{ name?: string; mlValueId?: string }>;
+          const normalizedValue = normalize(valueName);
+
+          const matchedValue = catalogValues.find(
+            (v) => typeof v.name === 'string' && normalize(v.name) === normalizedValue,
+          );
+
+          if (matchedValue?.mlValueId && typeof matchedValue.mlValueId === 'string') {
+            valueId = matchedValue.mlValueId;
+          }
+        }
+      }
+
+      const result: MLAttributeForRequest = {
         id,
         name,
         value_name: valueName,
       };
+
+      if (valueId) {
+        result.value_id = valueId;
+      }
+
+      return result;
     })
-    .filter(Boolean) as Array<{ id?: string; name: string; value_name: string }>;
+    .filter(Boolean) as MLAttributeForRequest[];
 
   return mapped;
 }
@@ -287,6 +346,9 @@ export async function POST(req: Request) {
 
     // Preparar datos para Mercado Libre
     
+    // Cargar atributos de catálogo locales (product_attributes) para enriquecer el mapeo a ML
+    const catalogAttributes = await db.select().from(productAttributes);
+
     const mlProductData: {
       title: string;
       category_id: string;
@@ -306,6 +368,16 @@ export async function POST(req: Request) {
         picture_ids: unknown[];
         seller_custom_field: string;
       }>;
+      shipping?: {
+        mode: 'me1' | 'me2' | 'custom';
+        local_pick_up: boolean;
+        free_shipping: boolean;
+        logistic_type?: string;
+        store_pick_up: boolean;
+        dimensions?: string;
+        methods?: unknown[];
+        tags?: string[];
+      };
     } = {
       title: (() => {
         try {
@@ -322,12 +394,15 @@ export async function POST(req: Request) {
       currency_id: localProduct.mlCurrencyId || 'ARS',
       buying_mode: localProduct.mlBuyingMode || 'buy_it_now',
       condition: localProduct.mlCondition || 'new',
-      listing_type_id: localProduct.mlListingTypeId || 'bronze',
+      listing_type_id: localProduct.mlListingTypeId || 'free',
       description: localProduct.description || '',
       pictures: localProduct.image ? [{
         source: localProduct.image,
       }] : [],
-      attributes: mapProductAttributesToMercadoLibreAttributes(localProduct.attributes as unknown),
+      attributes: mapProductAttributesToMercadoLibreAttributes(
+        localProduct.attributes as unknown,
+        catalogAttributes,
+      ),
     };
 
     const categoryId = mlProductData.category_id;
@@ -455,6 +530,23 @@ export async function POST(req: Request) {
         stockPolicy,
       });
     }
+
+    // Configurar envío (Mercado Envíos 2 por defecto)
+    const height = Number(localProduct.height) || 10;
+    const width = Number(localProduct.width) || 10;
+    const length = Number(localProduct.length) || 10;
+    const weight = Number(localProduct.weight) || 0.5;
+
+    mlProductData.shipping = {
+      mode: 'me2',
+      local_pick_up: false,
+      free_shipping: false,
+      logistic_type: 'drop_off',
+      store_pick_up: false,
+      dimensions: `${height}x${width}x${length},${weight}`,
+      tags: ['local_pick_up_not_allowed'],
+      methods: [],
+    };
 
     // Determinar si es CREATE o UPDATE
     const isUpdate = !!localProduct.mlItemId;
