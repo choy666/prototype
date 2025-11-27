@@ -3,6 +3,10 @@ import { retryWithBackoff } from '@/lib/utils/retry';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { MercadoLibreAuth } from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
+import { shippingMethods } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
+import type { MLShippingMethod } from '@/lib/types/shipping';
+import type { MLShippingCalculateResponse } from '@/types/mercadolibre';
 
 // Configuración de Mercado Libre
 const MERCADOLIBRE_API_URL = 'https://api.mercadolibre.com';
@@ -26,21 +30,18 @@ interface ME2ShippingOptions {
   dimensions?: ShippingDimensions;
 }
 
-interface ME2ShippingOption {
-  id: string;
-  name: string;
-  cost: number;
-  estimatedDelivery: number;
-  shippingMode: string;
-  type: string;
-}
-
 interface ME2ShippingResult {
-  shippingOptions: ME2ShippingOption[];
-  cheapestOption?: ME2ShippingOption;
+  shippingOptions: MLShippingMethod[];
+  cheapestOption?: MLShippingMethod | null;
   estimatedDelivery: number;
   totalCost: number;
   currency: string;
+  coverage?: MLShippingCalculateResponse['coverage'];
+  destination?: MLShippingCalculateResponse['destination'];
+  source?: MLShippingCalculateResponse['source'];
+  input?: MLShippingCalculateResponse['input'];
+  fallback?: boolean;
+  message?: string;
 }
 
 // Obtener dimensiones reales de los productos desde la base de datos
@@ -110,6 +111,80 @@ async function getProductsDimensions(items: ShippingItem[]): Promise<ShippingDim
       length: 10,
       weight: 0.5
     };
+  }
+}
+
+async function calculateLocalShippingFallback(zipcode: string, items: ShippingItem[]): Promise<ME2ShippingResult> {
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  try {
+    const methods = await db
+      .select()
+      .from(shippingMethods)
+      .where(eq(shippingMethods.isActive, true));
+
+    if (!methods.length) {
+      throw new Error('No hay métodos de envío locales activos configurados');
+    }
+
+    const now = new Date();
+    const estimatedDate = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+    const estimatedDateString = estimatedDate.toISOString().split('T')[0];
+
+    const shippingOptions: MLShippingMethod[] = methods.map((method): MLShippingMethod => {
+      const baseCost = Number(method.baseCost) || 0;
+      const freeThreshold = method.freeThreshold != null ? Number(method.freeThreshold) : null;
+      const cost = freeThreshold !== null && subtotal >= freeThreshold ? 0 : baseCost;
+
+      return {
+        shipping_method_id: method.id,
+        name: method.name,
+        description: 'Envío configurado localmente en la tienda',
+        list_cost: cost,
+        cost,
+        currency_id: 'ARS',
+        estimated_delivery: {
+          date: estimatedDateString,
+          time_from: '09:00',
+          time_to: '18:00',
+        },
+        estimated_delivery_time: {
+          type: 'known_frame',
+          unit: 'days',
+          value: 5,
+        },
+        shipping_mode: 'custom',
+        logistic_type: 'custom',
+        treatment: 'custom',
+        guaranteed: false,
+        order_priority: method.id,
+        tags: ['local'],
+        speed: {
+          handling: 1,
+          shipping: 4,
+        },
+      };
+    });
+
+    const cheapestOption = shippingOptions.reduce((min, option) =>
+      (option.cost || 0) < (min.cost || 0) ? option : min
+    );
+
+    return {
+      shippingOptions,
+      cheapestOption,
+      estimatedDelivery: 5,
+      totalCost: cheapestOption?.cost || 0,
+      currency: 'ARS',
+      fallback: true,
+      message: 'Usando métodos de envío locales configurados en la tienda',
+    };
+  } catch (error) {
+    logger.error('Error calculando envío local de fallback', {
+      zipcode,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 }
 
@@ -190,12 +265,12 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       }
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as MLShippingCalculateResponse;
     
     // Procesar resultados según la estructura real de la API de ML
-    const shippingOptions = data.methods || [];
+    const shippingOptions: MLShippingMethod[] = (data.methods ?? []) as MLShippingMethod[];
     const cheapestOption = shippingOptions.length > 0 
-      ? shippingOptions.reduce((min: ME2ShippingOption, option: ME2ShippingOption) => 
+      ? shippingOptions.reduce((min, option) => 
           (option.cost || 0) < (min.cost || 0) ? option : min
         )
       : null;
@@ -203,9 +278,14 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     const result: ME2ShippingResult = {
       shippingOptions,
       cheapestOption,
-      estimatedDelivery: cheapestOption?.estimated_delivery_time || cheapestOption?.estimated_delivery || 5,
+      estimatedDelivery: cheapestOption?.estimated_delivery_time?.value ?? 5,
       totalCost: cheapestOption?.cost || 0,
-      currency: cheapestOption?.currency_id || 'ARS'
+      currency: cheapestOption?.currency_id || 'ARS',
+      coverage: data.coverage,
+      destination: data.destination,
+      source: data.source,
+      input: data.input,
+      fallback: false,
     };
 
     logger.info('Cálculo de envío ME2 completado', {
@@ -222,75 +302,11 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       zipcode: options.zipcode,
       error: error instanceof Error ? error.message : String(error)
     });
-    
-    // En caso de error, retornar fallback con costo estándar
-    const fallbackCost = calculateFallbackShipping(options.zipcode, options.items);
-    
-    return {
-      shippingOptions: [{
-        id: 'fallback',
-        name: 'Envío estándar (fallback)',
-        cost: fallbackCost,
-        estimatedDelivery: 5,
-        shippingMode: 'standard',
-        type: 'standard'
-      }],
-      cheapestOption: {
-        id: 'fallback',
-        name: 'Envío estándar (fallback)',
-        cost: fallbackCost,
-        estimatedDelivery: 5,
-        shippingMode: 'standard',
-        type: 'standard'
-      },
-      estimatedDelivery: 5,
-      totalCost: fallbackCost,
-      currency: 'ARS'
-    };
+
+    // En caso de error, usar métodos locales configurados en BD como fallback
+    const fallbackResult = await calculateLocalShippingFallback(options.zipcode, options.items);
+    return fallbackResult;
   }
-}
-
-// Fallback simple basado en código postal (similar al sistema actual pero mejorado)
-function calculateFallbackShipping(zipcode: string, items: ShippingItem[]): number {
-  // Lógica básica de fallback según provincia
-  const provincePrefix = zipcode.substring(0, 1);
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  // Umbrales de envío gratis por provincia
-  const freeShippingThresholds: { [key: string]: number } = {
-    '1': 15000, // Buenos Aires
-    '2': 20000, // Capital Federal
-    '3': 25000, // Catamarca
-    '4': 25000, // Córdoba
-    '5': 25000, // Corrientes
-    '6': 30000, // Chaco
-    '7': 30000, // Chubut
-    '8': 25000, // Entre Ríos
-    '9': 30000, // Formosa
-    '0': 30000, // Jujuy
-  };
-
-  const threshold = freeShippingThresholds[provincePrefix] || 25000;
-  
-  if (subtotal >= threshold) {
-    return 0;
-  }
-
-  // Costo base según provincia
-  const baseCosts: { [key: string]: number } = {
-    '1': 800,  // Buenos Aires
-    '2': 600,  // Capital Federal
-    '3': 1200, // Catamarca
-    '4': 1000, // Córdoba
-    '5': 1100, // Corrientes
-    '6': 1300, // Chaco
-    '7': 1400, // Chubut
-    '8': 1000, // Entre Ríos
-    '9': 1350, // Formosa
-    '0': 1400, // Jujuy
-  };
-
-  return baseCosts[provincePrefix] || 1200;
 }
 
 // Validar cobertura ME2 para un código postal

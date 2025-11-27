@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth/session';
-import { calculateMLShippingCost } from '@/lib/actions/shipments';
+import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 import { logger } from '@/lib/utils/logger';
 import { z } from 'zod';
+import type { MLShippingMethod } from '@/lib/types/shipping';
 
 const calculateShippingSchema = z.object({
   zipcode: z.string().min(4, 'Código postal requerido'),
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { zipcode, items, sellerAddressId, logisticType } = calculateShippingSchema.parse(body);
+    const { zipcode, items, logisticType } = calculateShippingSchema.parse(body);
     
     logger.info('Calculating ML shipping cost', { 
       zipcode, 
@@ -36,10 +37,13 @@ export async function POST(request: NextRequest) {
       userEmail: session.user.email 
     });
     
-    const shippingData = await calculateMLShippingCost(zipcode, items, sellerAddressId, logisticType);
+    const shippingData = await calculateME2ShippingCost({
+      zipcode,
+      items,
+    });
     
     // Formatear respuesta para el frontend
-    const formattedMethods = shippingData.methods.map(method => ({
+    const formattedMethods = shippingData.shippingOptions.map((method: MLShippingMethod) => ({
       id: method.shipping_method_id,
       name: method.name,
       description: method.description,
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
       destination: shippingData.destination,
       methods: formattedMethods,
       source: shippingData.source,
-      input: {
+      input: shippingData.input && {
         zipcodeTarget: shippingData.input.zipcode_target,
         dimensions: shippingData.input.dimensions,
         itemPrice: shippingData.input.item_price,
@@ -78,86 +82,21 @@ export async function POST(request: NextRequest) {
         listCost: shippingData.input.list_cost,
         cost: shippingData.input.cost,
         sellerId: shippingData.input.seller_id,
-      }
+      },
+      fallback: shippingData.fallback ?? false,
+      message: shippingData.message,
     });
     
   } catch (error) {
     logger.error('Error calculating shipping cost', error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.issues },
         { status: 400 }
       );
     }
-    
-    // Si hay error con la API de ML, devolver métodos de envío locales como fallback
-    if (error instanceof Error && (error.message?.includes('Mercado Libre') || error.message?.includes('token'))) {
-      logger.warn('ML API unavailable, using fallback shipping methods');
-      
-      return NextResponse.json({
-        success: true,
-        fallback: true,
-        message: 'Usando métodos de envío locales (API de ML no disponible)',
-        methods: [
-          {
-            id: 'standard',
-            name: 'Envío Estándar',
-            description: 'Entrega en 3-5 días hábiles',
-            cost: 500,
-            currencyId: 'ARS',
-            estimatedDelivery: {
-              date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              timeFrom: '09:00',
-              timeTo: '18:00',
-            },
-            estimatedTime: {
-              type: 'known_frame',
-              unit: 'days',
-              value: 5,
-            },
-            shippingMode: 'standard',
-            logisticType: 'drop_off',
-            treatment: 'default',
-            guaranteed: false,
-            orderPriority: 1,
-            tags: [],
-            speed: {
-              handling: 1,
-              shipping: 4,
-            },
-          },
-          {
-            id: 'express',
-            name: 'Envío Express',
-            description: 'Entrega en 1-2 días hábiles',
-            cost: 800,
-            currencyId: 'ARS',
-            estimatedDelivery: {
-              date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              timeFrom: '09:00',
-              timeTo: '18:00',
-            },
-            estimatedTime: {
-              type: 'known_frame',
-              unit: 'days',
-              value: 2,
-            },
-            shippingMode: 'express',
-            logisticType: 'drop_off',
-            treatment: 'default',
-            guaranteed: true,
-            orderPriority: 2,
-            tags: ['express'],
-            speed: {
-              handling: 0.5,
-              shipping: 1.5,
-            },
-          }
-        ]
-      });
-    }
-    
+
     return NextResponse.json(
       { error: 'Error al calcular costo de envío' },
       { status: 500 }
@@ -201,11 +140,14 @@ export async function GET(request: NextRequest) {
       userEmail: session.user.email 
     });
     
-    const shippingData = await calculateMLShippingCost(zipcode, items);
+    const shippingData = await calculateME2ShippingCost({
+      zipcode,
+      items,
+    });
     
     return NextResponse.json({
       success: true,
-      methods: shippingData.methods.map(method => ({
+      methods: shippingData.shippingOptions.map((method: MLShippingMethod) => ({
         id: method.shipping_method_id,
         name: method.name,
         description: method.description,

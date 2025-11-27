@@ -23,7 +23,7 @@ function mapMLShippingToInternal(mlResponse: MLShippingResponse): ShippingRespon
 
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
-import { calculateMLShippingCost } from '@/lib/actions/shipments';
+import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 import { Preference } from 'mercadopago';
 
 // Tipo para items del checkout (sin stock requerido)
@@ -175,78 +175,47 @@ export async function POST(req: NextRequest) {
       return acc + finalPrice * item.quantity;
     }, 0);
 
-    // Calcular costo de envío usando API de Mercado Libre con fallback
-    let shippingCost: number;
-    try {
-      const mlShippingResponse: MLShippingResponse = await calculateMLShippingCost(
-        shippingAddress.codigoPostal,
-        items.map((item: CheckoutItem) => ({
-          id: item.id.toString(),
-          quantity: item.quantity,
-          price: item.discount && item.discount > 0
-            ? item.price * (1 - item.discount / 100)
-            : item.price
-        }))
-      );
-      
-      // Transform ML API response to internal model
-      const shippingResponse = mapMLShippingToInternal(mlShippingResponse);
-      
-      // Usar método estándar (order_priority: 1) o el más barato si no hay estándar
-      if (shippingResponse.methods.length === 0) {
-        throw new Error('No shipping methods available for this zipcode');
-      }
-      
-      const standardMethod = shippingResponse.methods.find((m: ShippingMethod) => m.order_priority === 1);
-      const cheapestMethod = shippingResponse.methods.reduce((min: ShippingMethod, curr: ShippingMethod) => 
-        curr.cost < min.cost ? curr : min
-      );
-      
-      shippingCost = standardMethod?.cost || cheapestMethod?.cost || 0;
-      
-      logger.info('Shipping cost calculated via ML API', { 
-        zipcode: shippingAddress.codigoPostal,
-        cost: shippingCost,
-        method: standardMethod?.name || cheapestMethod?.name 
-      });
-      
-    } catch (error) {
-      logger.error('ML API failed in checkout, using API fallback', { error: error instanceof Error ? error.message : String(error) });
-      
-      // Usar el fallback de la API de shipments que ya tiene métodos hardcoded
-      try {
-        const fallbackResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/shipments/calculate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            zipcode: shippingAddress.codigoPostal,
-            items: items.map((item: CheckoutItem) => ({
-              id: item.id.toString(),
-              quantity: item.quantity,
-              price: item.discount && item.discount > 0
-                ? item.price * (1 - item.discount / 100)
-                : item.price
-            })),
-            logisticType: 'drop_off'
-          })
-        });
-        
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          const fallbackMethod = fallbackData.methods?.[0];
-          shippingCost = fallbackMethod?.cost || 500; // Default 500 si todo falla
-          
-          logger.info('Using fallback shipping cost', { cost: shippingCost, method: fallbackMethod?.name });
-        } else {
-          shippingCost = 500; // Default absoluto
-        }
-      } catch (fallbackError) {
-        logger.error('Even fallback failed, using default cost', { error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) });
-        shippingCost = 500;
-      }
+    // Calcular costo de envío usando API de Mercado Libre ME2 con fallback interno basado en BD
+    const me2Response = await calculateME2ShippingCost({
+      zipcode: shippingAddress.codigoPostal,
+      items: items.map((item: CheckoutItem) => ({
+        id: item.id.toString(),
+        quantity: item.quantity,
+        price: item.discount && item.discount > 0
+          ? item.price * (1 - item.discount / 100)
+          : item.price
+      })),
+    });
+
+      // Adaptar resultado ME2 a MLShippingResponse esperado por mapMLShippingToInternal
+    const mlShippingResponse: MLShippingResponse = {
+      methods: me2Response.shippingOptions,
+      coverage: me2Response.coverage || {
+        all_country: true,
+        excluded_places: [],
+      },
+    };
+
+    const shippingResponse = mapMLShippingToInternal(mlShippingResponse);
+
+    // Usar método estándar (order_priority: 1) o el más barato si no hay estándar
+    if (shippingResponse.methods.length === 0) {
+      throw new Error('No shipping methods available for this zipcode');
     }
+
+    const standardMethod = shippingResponse.methods.find((m: ShippingMethod) => m.order_priority === 1);
+    const cheapestMethod = shippingResponse.methods.reduce((min: ShippingMethod, curr: ShippingMethod) => 
+      curr.cost < min.cost ? curr : min
+    );
+
+    const shippingCost = standardMethod?.cost ?? cheapestMethod?.cost ?? 0;
+
+    logger.info('Shipping cost calculated via ME2/core', { 
+      zipcode: shippingAddress.codigoPostal,
+      cost: shippingCost,
+      method: standardMethod?.name || cheapestMethod?.name,
+      fallback: me2Response.fallback ?? false,
+    });
 
     // Calcular total final
     const total = subtotal + shippingCost;

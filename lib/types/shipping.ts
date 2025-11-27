@@ -17,6 +17,21 @@ export interface MLShippingMethod {
     handling: number;
     shipping: number;
   };
+  estimated_delivery_time?: {
+    type: string;
+    unit: string;
+    value: number;
+  };
+  estimated_delivery_final?: {
+    date: string;
+    time_from: string;
+    time_to: string;
+  };
+  logistic_type?: string;
+  treatment?: string;
+  guaranteed?: boolean;
+  order_priority?: number;
+  tags?: string[];
 }
 
 export interface MLShippingResponse {

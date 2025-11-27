@@ -28,6 +28,7 @@ export function ShippingMethodSelector({
 }: ShippingMethodSelectorProps) {
   const [shippingMethods, setShippingMethods] = useState<MLShippingMethod[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
 
   // Obtener métodos de envío de la API ML cuando cambia el zipcode o items
   useEffect(() => {
@@ -38,6 +39,7 @@ export function ShippingMethodSelector({
 
     const fetchShippingMethods = async () => {
       setIsLoading(true);
+      setIsFallback(false);
       try {
         const response = await fetch('/api/shipments/calculate', {
           method: 'POST',
@@ -53,7 +55,7 @@ export function ShippingMethodSelector({
                 ? item.price * (1 - item.discount / 100)
                 : item.price
             })),
-            logisticType: 'drop_off'
+            logisticType: 'me2'
           })
         });
 
@@ -61,6 +63,7 @@ export function ShippingMethodSelector({
           const data = await response.json();
           if (data.success && data.methods) {
             setShippingMethods(data.methods);
+            setIsFallback(Boolean(data.fallback));
           } else {
             throw new Error(data.error || 'Error al obtener métodos de envío');
           }
@@ -72,6 +75,7 @@ export function ShippingMethodSelector({
         console.error('Error fetching shipping methods:', error);
         toast.error('No se pudieron cargar los métodos de envío');
         setShippingMethods([]);
+        setIsFallback(false);
       } finally {
         setIsLoading(false);
       }
@@ -105,6 +109,11 @@ export function ShippingMethodSelector({
         <h3 className="text-lg font-semibold mb-2">Método de Envío</h3>
         <p className="text-sm text-gray-600 mb-4">
           Selecciona cómo quieres recibir tu pedido
+        </p>
+        <p className="text-xs text-gray-500">
+          {isFallback
+            ? 'Mostrando métodos de envío locales (fallback) porque la API de Mercado Libre no está disponible. Los costos son estimados.'
+            : 'Mostrando métodos de Mercado Envíos 2 provistos por Mercado Libre.'}
         </p>
       </div>
 

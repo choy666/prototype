@@ -31,9 +31,9 @@ export function CheckoutSummary({ selectedShippingMethod }: CheckoutSummaryProps
   }, 0);
 
   // Usar el costo del método de envío seleccionado (ya calculado por API ML)
-  const shippingCost = selectedShippingMethod?.cost || 0;
+  const shippingCost = selectedShippingMethod ? selectedShippingMethod.cost : null;
 
-  const total = subtotal + shippingCost;
+  const total = subtotal + (shippingCost ?? 0);
 
   return (
     <div className="bg-gray-50 p-4 sm:p-6 rounded-lg h-fit">
@@ -94,7 +94,11 @@ export function CheckoutSummary({ selectedShippingMethod }: CheckoutSummaryProps
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Envío</span>
           <span className="text-gray-600">
-            {shippingCost === 0 ? 'Gratis' : formatCurrency(shippingCost)}
+            {shippingCost === null
+              ? 'A seleccionar'
+              : shippingCost === 0
+                ? 'Gratis'
+                : formatCurrency(shippingCost)}
           </span>
         </div>
 
