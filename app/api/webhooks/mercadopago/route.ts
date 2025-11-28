@@ -57,7 +57,28 @@ function validateWebhookSignature(
     // Formato exacto: signature = HMAC_SHA256(secret, `${ts}.${id}`)
     // donde id = data.id del payload
     const parsedPayload = JSON.parse(body);
-    const dataId = parsedPayload.data?.id || '';
+    
+    // Debug detallado para identificar el problema
+    logger.info('DEBUG: Análisis completo del payload', {
+      rawBody: body,
+      parsedPayload: parsedPayload,
+      dataField: parsedPayload.data,
+      dataIdValue: parsedPayload.data?.id,
+      dataIdType: typeof parsedPayload.data?.id,
+      dataIdAsString: String(parsedPayload.data?.id),
+      dataIdLength: String(parsedPayload.data?.id).length
+    });
+    
+    // Asegurar que dataId sea string
+    const dataId = String(parsedPayload.data?.id || '');
+    
+    logger.info('DEBUG: Valores finales usados', {
+      ts,
+      dataId,
+      dataIdType: typeof dataId,
+      stringToSignPreview: `${ts}.${dataId}`
+    });
+    
     const stringToSign = `${ts}.${dataId}`;
     
     logger.info('Validación HMAC - Formato oficial Mercado Pago', {
