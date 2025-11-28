@@ -53,8 +53,11 @@ function validateWebhookSignature(
       return false;
     }
 
-    // Crear el string a firmar: ts.id + . + request_body
-    const stringToSign = `${ts}.${xRequestId}.${body}`;
+    // Crear el string a firmar según documentación de Mercado Pago: data.id + . + timestamp
+    // El cuerpo del webhook no se usa en la firma, solo el data.id
+    const parsedPayload = JSON.parse(body);
+    const dataId = parsedPayload.data?.id || '';
+    const stringToSign = `${dataId}.${ts}`;
     
     // Generar HMAC-SHA256
     const hmac = crypto.createHmac('sha256', webhookSecret);
@@ -71,6 +74,8 @@ function validateWebhookSignature(
       isValid,
       ts,
       requestId: xRequestId,
+      dataId,
+      stringToSign,
       receivedSignature: signature.substring(0, 8) + '...',
       expectedSignature: expectedSignature.substring(0, 8) + '...'
     });
