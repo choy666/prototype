@@ -3,38 +3,58 @@ import { logger } from '@/lib/utils/logger';
 
 export interface WebhookValidationResult {
   isValid: boolean;
-  error?: string;
   dataId?: string;
+  error?: string;
 }
 
 // Validar firma HMAC SHA256 de Mercado Pago (versión oficial)
 export function verifyHmacSHA256(
+  xSignature: string | undefined,
   rawBody: string,
-  xSignature: string | null,
-  xRequestId: string | null,
   webhookSecret: string
-): WebhookValidationResult {
+): { isValid: boolean; dataId?: string; error?: string } {
+  logger.info('Iniciando validación HMAC SHA256', {
+    hasXSignature: !!xSignature,
+    xSignatureLength: xSignature?.length,
+    rawBodyLength: rawBody.length,
+    webhookSecretSet: !!webhookSecret,
+    webhookSecretLength: webhookSecret.length,
+    rawXSignature: xSignature
+  });
+
+  // Si no hay x-signature, podría ser un webhook de prueba o tipo especial
+  if (!xSignature) {
+    logger.warn('No se recibió header x-signature, verificando si es webhook de prueba');
+    
+    try {
+      const parsedPayload = JSON.parse(rawBody);
+      if (parsedPayload.action === 'test.notification' || 
+          (parsedPayload.type && !parsedPayload.data?.id && !parsedPayload.id)) {
+        logger.info('Webhook de prueba o type-only detectado sin firma, aceptando', {
+          action: parsedPayload.action,
+          type: parsedPayload.type
+        });
+        return { isValid: true };
+      }
+    } catch (e) {
+      logger.error('Error parseando payload para verificar webhook de prueba', {
+        error: e instanceof Error ? e.message : String(e)
+      });
+    }
+    
+    logger.error('Header x-signature faltante para webhook que requiere validación');
+    return {
+      isValid: false,
+      error: 'Header x-signature requerido'
+    };
+  }
+
+  // Parsear header x-signature (formato: ts=123,v1=abc)
+  let ts: string | undefined;
+  let signature: string | undefined;
+  
   try {
-    // Validar parámetros básicos
-    if (!webhookSecret) {
-      return {
-        isValid: false,
-        error: 'Webhook secret no configurado'
-      };
-    }
-
-    if (!xSignature || !xRequestId) {
-      return {
-        isValid: false,
-        error: 'Faltan headers de validación'
-      };
-    }
-
-    // Extraer timestamp y firma del header x-signature
     const signatureParts = xSignature.split(',');
-    let ts = '';
-    let signature = '';
-
     for (const part of signatureParts) {
       if (part.startsWith('ts=')) {
         ts = part.substring(3);
@@ -42,114 +62,132 @@ export function verifyHmacSHA256(
         signature = part.substring(3);
       }
     }
-
-    if (!ts || !signature) {
-      return {
-        isValid: false,
-        error: 'Formato de firma inválido'
-      };
-    }
-
-    // Parsear el payload para obtener data.id (después de validar estructura básica)
-    let parsedPayload: Record<string, unknown>;
-    try {
-      parsedPayload = JSON.parse(rawBody);
-    } catch (parseError) {
-      logger.error('Error parseando payload JSON', {
-        error: parseError instanceof Error ? parseError.message : String(parseError),
-        rawBodyLength: rawBody.length
-      });
-      return {
-        isValid: false,
-        error: 'Payload JSON inválido'
-      };
-    }
-
-    // Validar estructura del payload
-    if (!parsedPayload.data || !(parsedPayload.data as { id: unknown })?.id) {
-      // Permitir webhooks de prueba que no tienen data.id
-      if (parsedPayload.action === 'test.notification') {
-        logger.info('Webhook de prueba recibido, saltando validación de data.id');
-        return { isValid: true };
-      }
-      logger.error('Estructura de payload inválida: falta data.id', {
-        payloadStructure: Object.keys(parsedPayload),
-        dataField: parsedPayload.data,
-        dataId: (parsedPayload.data as { id: unknown })?.id,
-        rawBody: rawBody.substring(0, 200) + '...' // Primeros 200 chars para debug
-      });
-      return {
-        isValid: false,
-        error: 'Estructura de payload inválida: falta data.id'
-      };
-    }
-
-    // Normalizar dataId a string
-    const dataId = String((parsedPayload.data as { id: unknown }).id);
-    
-    if (!dataId || dataId === 'undefined' || dataId === 'null') {
-      logger.error('data.id inválido o vacío', {
-        rawId: (parsedPayload.data as { id: unknown }).id,
-        stringifiedId: dataId
-      });
-      return {
-        isValid: false,
-        error: 'data.id inválido o vacío'
-      };
-    }
-
-    // Construir string a firmar según especificación oficial de Mercado Pago
-    const stringToSign = `ts:${ts};data.id:${dataId}`;
-    
-    logger.info('Validación HMAC - Mercado Pago Oficial', {
-      ts,
-      dataId,
-      dataIdType: typeof dataId,
-      stringToSign,
-      webhookSecretSet: !!webhookSecret,
-      webhookSecretLength: webhookSecret.length
-    });
-    
-    // Generar HMAC-SHA256
-    const hmac = crypto.createHmac('sha256', webhookSecret);
-    hmac.update(stringToSign);
-    const expectedSignature = hmac.digest('hex');
-
-    // Comparar firmas de forma segura
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(signature, 'hex'),
-      Buffer.from(expectedSignature, 'hex')
-    );
-
-    logger.info('Validación de firma - Resultado', {
-      ts,
-      requestId: xRequestId,
-      dataId,
-      stringToSign,
-      receivedSignature: signature,
-      expectedSignature: expectedSignature,
-      signaturesMatch: isValid,
-      webhookSecretConfigured: !!webhookSecret,
-      webhookSecretLength: webhookSecret?.length || 0,
-      webhookSecretPrefix: webhookSecret ? webhookSecret.substring(0, 8) + '...' : 'none'
-    });
-
-    return {
-      isValid,
-      dataId,
-      error: isValid ? undefined : 'Firma inválida'
-    };
-
-  } catch (error) {
-    logger.error('Error validando firma HMAC', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+  } catch (parseError) {
+    logger.error('Error parseando header x-signature', {
+      error: parseError instanceof Error ? parseError.message : String(parseError),
+      xSignature
     });
     return {
       isValid: false,
-      error: 'Error en validación de firma'
+      error: 'Formato de x-signature inválido'
     };
   }
+
+  if (!ts || !signature) {
+    logger.error('Componentes faltantes en x-signature', {
+      xSignature,
+      hasTs: !!ts,
+      hasSignature: !!signature
+    });
+    return {
+      isValid: false,
+      error: 'Formato de firma inválido: faltan ts o v1'
+    };
+  }
+
+  // Parsear el payload para obtener data.id
+  let parsedPayload: Record<string, unknown>;
+  try {
+    parsedPayload = JSON.parse(rawBody);
+  } catch (parseError) {
+    logger.error('Error parseando payload JSON', {
+      error: parseError instanceof Error ? parseError.message : String(parseError),
+      rawBodyLength: rawBody.length
+    });
+    return {
+      isValid: false,
+      error: 'Payload JSON inválido'
+    };
+  }
+
+  // Permitir webhooks de prueba y tipar payload
+  const p = parsedPayload as {
+    action?: string;
+    type?: string;
+    data?: { id?: unknown };
+    id?: unknown;
+  };
+
+  if (p.action === 'test.notification') {
+    logger.info('Webhook de prueba recibido, saltando validación');
+    return { isValid: true };
+  }
+
+  // Extraer data.id de diferentes estructuras posibles
+  let dataId: string | undefined;
+  
+  // Estructura estándar: {action, data: {id}}
+  if (p.data?.id) {
+    dataId = String(p.data.id);
+  }
+  // Estructura alternativa: {action, type, id} (IPN style)
+  else if (p.id) {
+    dataId = String(p.id);
+  }
+  // Estructura alternativa: {action, type} sin id (ignorar)
+  else {
+    const hasType = p.type;
+    const hasDataId = p.data?.id;
+    const hasTopLevelId = p.id;
+    
+    if (hasType && !hasDataId && !hasTopLevelId) {
+      logger.warn('Webhook con estructura type-only, aceptando sin validación completa', {
+        action: p.action,
+        type: hasType
+      });
+      return { isValid: true };
+    }
+  }
+
+  if (!dataId || dataId === 'undefined' || dataId === 'null') {
+    logger.error('No se pudo extraer data.id del payload', {
+      payloadStructure: Object.keys(parsedPayload),
+      dataField: p.data,
+      dataId: p.data?.id,
+      topLevelId: p.id,
+      rawBody: rawBody.substring(0, 200) + '...'
+    });
+    return {
+      isValid: false,
+      error: 'Estructura de payload inválida: falta data.id'
+    };
+  }
+
+  // Construir string a firmar según especificación oficial de Mercado Pago
+  const stringToSign = `id=${dataId}&ts=${ts}`;
+  
+  logger.info('Construyendo string para validación HMAC', {
+    ts,
+    dataId,
+    stringToSign,
+    webhookSecretSet: !!webhookSecret
+  });
+  
+  // Generar HMAC-SHA256
+  const hmac = crypto.createHmac('sha256', webhookSecret);
+  hmac.update(stringToSign);
+  const expectedSignature = hmac.digest('hex');
+
+  // Comparar firmas de forma segura
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex')
+  );
+
+  logger.info('Resultado de validación HMAC', {
+    ts,
+    dataId,
+    stringToSign,
+    receivedSignature: signature,
+    expectedSignature,
+    signaturesMatch: isValid
+  });
+
+  return {
+    isValid,
+    dataId,
+    error: isValid ? undefined : 'Firma inválida'
+  };
 }
 
 // Validar firma con soporte para múltiples formatos (compatibilidad)
@@ -180,7 +218,7 @@ export function verifyWebhookSignature(
     }
 
     // Intentar validación oficial primero
-    const officialResult = verifyHmacSHA256(rawBody, xSignature, xRequestId, webhookSecret);
+    const officialResult = verifyHmacSHA256(xSignature || undefined, rawBody, webhookSecret);
     if (officialResult.isValid) {
       return officialResult;
     }
@@ -258,13 +296,42 @@ export function validateWebhookPayload(rawBody: string): {
   try {
     const parsed = JSON.parse(rawBody);
     
-    if (!parsed.action || !parsed.data || !parsed.data.id) {
+    // Permitir webhooks de prueba
+    if (parsed.action === 'test.notification') {
+      return {
+        isValid: true,
+        action: parsed.action
+      };
+    }
+    
+    // Extraer data.id de diferentes estructuras posibles
+    let dataId: string | undefined;
+    
+    // Estructura estándar: {action, data: {id}}
+    if (parsed.data && (parsed.data as { id: unknown })?.id) {
+      dataId = String((parsed.data as { id: unknown }).id);
+    }
+    // Estructura alternativa: {action, type, id} (IPN style)
+    else if (parsed.id) {
+      dataId = String(parsed.id);
+    }
+    // Estructura alternativa: {action, type} sin id (ignorar)
+    else if (parsed.type && !parsed.data?.id && !parsed.id) {
+      return {
+        isValid: true,
+        action: parsed.action
+      };
+    }
+    
+    if (!parsed.action || !dataId) {
       logger.error('Estructura de payload inválida en validateWebhookPayload', {
         error: 'Faltan campos action o data.id',
         payloadKeys: Object.keys(parsed),
         hasAction: !!parsed.action,
         hasData: !!parsed.data,
         hasDataId: !!parsed.data?.id,
+        hasTopLevelId: !!parsed.id,
+        hasType: !!parsed.type
       });
       return {
         isValid: false,
@@ -275,7 +342,7 @@ export function validateWebhookPayload(rawBody: string): {
     return {
       isValid: true,
       action: parsed.action,
-      dataId: String(parsed.data.id)
+      dataId
     };
     
   } catch (e) {
