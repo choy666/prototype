@@ -250,19 +250,23 @@ export async function POST(req: NextRequest) {
           ...items.map((item: CheckoutItem) => ({
             id: item.id.toString(),
             title: item.name,
+            description: `Producto: ${item.name} - Cantidad: ${item.quantity}${item.variantId ? ` - Variante ID: ${item.variantId}` : ''}`,
             quantity: item.quantity,
-            unit_price: item.discount && item.discount > 0
+            unit_price: Math.round((item.discount && item.discount > 0
               ? item.price * (1 - item.discount / 100)
-              : item.price,
+              : item.price) * 100) / 100, // Redondear a 2 decimales
             currency_id: "ARS",
+            category_id: "others", // Categoría genérica pero requerida
           })),
           // Item de envío (si no es gratis)
           ...(shippingCost > 0 ? [{
             id: `shipping-${shippingMethod.id}`,
             title: `Envío - ${shippingMethod.name}`,
+            description: `Costo de envío a ${shippingAddress.ciudad}, ${shippingAddress.provincia} (CP: ${shippingAddress.codigoPostal})`,
             quantity: 1,
-            unit_price: shippingCost,
+            unit_price: Math.round(shippingCost * 100) / 100, // Redondear a 2 decimales
             currency_id: "ARS",
+            category_id: "others",
           }] : []),
         ],
         payer: {
@@ -288,11 +292,14 @@ export async function POST(req: NextRequest) {
           receiver_address: {
             zip_code: shippingAddress.codigoPostal,
             street_name: shippingAddress.direccion,
-            street_number: shippingAddress.numero ? String(parseInt(shippingAddress.numero) || 0) : undefined,
-            floor: shippingAddress.piso,
-            apartment: shippingAddress.departamento,
+            street_number: shippingAddress.numero ? String(parseInt(shippingAddress.numero) || 0) : "0", // Evitar undefined
+            floor: shippingAddress.piso || "", // Evitar undefined
+            apartment: shippingAddress.departamento || "", // Evitar undefined
+            city_name: shippingAddress.ciudad,
+            state_name: shippingAddress.provincia,
+            country_name: "Argentina",
           },
-          mode: process.env.MERCADO_PAGO_SHIPMENTS_MODE || "custom", // Configurable via env var
+          mode: "me2", // Cambiar a me2 que es más compatible con receiver_address
           dimensions: "10x10x10,500", // defaults seguros
         },
       },
@@ -309,7 +316,6 @@ export async function POST(req: NextRequest) {
       itemsCount: items.length,
       shippingCost
     });
-
     return NextResponse.json({
       preferenceId: preference.id,
       init_point: preference.init_point, // Campo que espera el frontend
