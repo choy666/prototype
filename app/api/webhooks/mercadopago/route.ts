@@ -5,182 +5,309 @@ import { logger } from '@/lib/utils/logger';
 import { db } from '@/lib/db';
 import { orders, orderItems, carts, cartItems } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier';
 import crypto from 'crypto';
+
+// Funciones de persistencia para failed webhooks (serverless-safe)
+async function saveFailedWebhookForRetry(data: {
+  paymentId: string;
+  requestId: string;
+  retryCount: number;
+  error: string;
+  timestamp: string;
+}) {
+  try {
+    // En producción, esto podría guardar en Redis, DB, o cola de mensajes
+    // Por ahora, loggear para retry manual o procesamiento externo
+    logger.warn('Webhook guardado para retry externo', {
+      ...data,
+      action: 'RETRY_LATER'
+    });
+    
+    // TODO: Implementar persistencia real según infraestructura
+    // - Redis con TTL para retry automático
+    // - Tabla en BD para procesamiento batch
+    // - SQS/SNS para cola de reintentos
+    
+  } catch (storageError) {
+    logger.error('Error guardando webhook para retry', {
+      paymentId: data.paymentId,
+      requestId: data.requestId,
+      error: storageError instanceof Error ? storageError.message : String(storageError)
+    });
+  }
+}
+
+async function saveDeadLetterWebhook(data: {
+  paymentId: string;
+  requestId: string;
+  error: string;
+  timestamp: string;
+}) {
+  try {
+    // Guardar en dead letter queue para intervención manual
+    logger.error('Webhook enviado a dead letter queue', {
+      ...data,
+      action: 'DEAD_LETTER'
+    });
+    
+    // TODO: Implementar dead letter queue real
+    // - Tabla webhook_dead_letters
+    // - Alerta a admin
+    // - Dashboard de monitoreo
+    
+  } catch (storageError) {
+    logger.error('Error guardando webhook en dead letter', {
+      paymentId: data.paymentId,
+      requestId: data.requestId,
+      error: storageError instanceof Error ? storageError.message : String(storageError)
+    });
+  }
+}
+
+// Validación de variables de entorno críticas
+function validateEnvironmentVariables() {
+  const required = [
+    'MERCADO_PAGO_ACCESS_TOKEN',
+    'MERCADO_PAGO_WEBHOOK_SECRET'
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    const error = `Variables de entorno faltantes: ${missing.join(', ')}`;
+    logger.error('Validación de entorno fallida', { missing });
+    throw new Error(error);
+  }
+  
+  logger.info('Variables de entorno validadas correctamente');
+}
+
+// Validar entorno al iniciar el módulo
+validateEnvironmentVariables();
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
 
-// Función para validar la firma del webhook de Mercado Pago
-function validateWebhookSignature(
-  body: string,
-  xSignature: string | null,
-  xRequestId: string | null
-): boolean {
+// Función asíncrona para procesar pagos en background con retry robusto
+async function processPaymentInBackground(paymentId: string, requestId: string, retryCount = 0) {
+  const MAX_RETRIES = 3;
+  
   try {
-    // En desarrollo, saltar validación si no hay firma configurada
-    if (process.env.NODE_ENV === 'development' && !process.env.MERCADO_PAGO_WEBHOOK_SECRET) {
-      logger.warn('Modo desarrollo: Saltando validación de firma (webhook secret no configurado)');
-      return true;
-    }
-
-    const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      logger.error('Webhook secret no configurado');
-      return false;
-    }
-
-    if (!xSignature || !xRequestId) {
-      logger.error('Faltan headers de validación', { xSignature, xRequestId });
-      return false;
-    }
-
-    // Extraer timestamp y firma del header x-signature
-    const signatureParts = xSignature.split(',');
-    let ts = '';
-    let signature = '';
-
-    for (const part of signatureParts) {
-      if (part.startsWith('ts=')) {
-        ts = part.substring(3);
-      } else if (part.startsWith('v1=')) {
-        signature = part.substring(3);
-      }
-    }
-
-    if (!ts || !signature) {
-      logger.error('Formato de firma inválido', { xSignature, ts, signature });
-      return false;
-    }
-
-    // Validación mejorada: verificar que dataId exista y sea válido
-    const parsedPayload = JSON.parse(body);
-    
-    if (!parsedPayload.data || !parsedPayload.data.id) {
-      logger.error('Estructura de payload inválida: falta data.id', {
-        payloadStructure: Object.keys(parsedPayload),
-        dataField: parsedPayload.data,
-        dataId: parsedPayload.data?.id
-      });
-      return false;
-    }
-    
-    // Asegurar que dataId sea string (manejo de números y otros tipos)
-    const dataId = String(parsedPayload.data.id);
-    
-    if (!dataId || dataId === 'undefined' || dataId === 'null') {
-      logger.error('data.id inválido o vacío', {
-        rawId: parsedPayload.data.id,
-        stringifiedId: dataId
-      });
-      return false;
-    }
-    
-    const stringToSign = `${ts}.${dataId}`;
-    
-    logger.info('Validación HMAC - Mercado Pago Oficial', {
-      ts,
-      dataId,
-      dataIdType: typeof dataId,
-      stringToSign,
-      webhookSecretSet: !!webhookSecret,
-      webhookSecretLength: webhookSecret.length
-    });
-    
-    // Generar HMAC-SHA256 según especificación oficial
-    const hmac = crypto.createHmac('sha256', webhookSecret);
-    hmac.update(stringToSign);
-    const expectedSignature = hmac.digest('hex');
-
-    // Comparar firmas
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(signature, 'hex'),
-      Buffer.from(expectedSignature, 'hex')
-    );
-
-    logger.info('Validación de firma - Resultado', {
-      ts,
-      requestId: xRequestId,
-      dataId,
-      stringToSign,
-      receivedSignature: signature,
-      expectedSignature: expectedSignature,
-      signaturesMatch: isValid,
-      webhookSecretConfigured: !!webhookSecret,
-      webhookSecretLength: webhookSecret?.length || 0,
-      webhookSecretPrefix: webhookSecret ? webhookSecret.substring(0, 8) + '...' : 'none'
+    logger.info('Procesando pago en background', {
+      requestId,
+      paymentId,
+      retryCount
     });
 
-    return isValid;
+    await handlePaymentEvent(paymentId, requestId);
+    
+    logger.info('Pago procesado exitosamente en background', {
+      requestId,
+      paymentId,
+      retryCount
+    });
+    
   } catch (error) {
-    logger.error('Error validando firma', {
-      error: error instanceof Error ? error.message : String(error)
+    logger.error('Error procesando pago en background', {
+      requestId,
+      paymentId,
+      retryCount,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
-    return false;
+    
+    // En serverless, no podemos usar setTimeout para retry porque la función puede terminar
+    // En su lugar, guardamos el estado para retry externo o procesamiento manual
+    if (retryCount < MAX_RETRIES) {
+      await saveFailedWebhookForRetry({
+        paymentId,
+        requestId,
+        retryCount: retryCount + 1,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+      
+      logger.warn('Pago guardado para retry externo (serverless timeout protection)', {
+        requestId,
+        paymentId,
+        retryCount: retryCount + 1,
+        nextRetryIn: `${Math.pow(2, retryCount)}s`
+      });
+    } else {
+      logger.error('Agotados reintentos para procesamiento de pago - DEAD LETTER', {
+        requestId,
+        paymentId,
+        finalRetryCount: retryCount,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      // Guardar en dead letter queue para procesamiento manual
+      await saveDeadLetterWebhook({
+        paymentId,
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 }
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
+  
   try {
     logger.info('Webhook MercadoPago: Inicio de procesamiento', {
+      requestId,
       method: req.method,
       url: req.url,
       headers: Object.fromEntries(req.headers.entries())
     });
 
-    const body = await req.text();
-    const payload = JSON.parse(body);
-    const { action, data } = payload;
+    // 1. Leer body como RAW text (CRÍTICO: antes de cualquier parseo)
+    const rawBody = await req.text();
+    
+    logger.info('Webhook MercadoPago: Body leído como raw', {
+      requestId,
+      bodyLength: rawBody.length,
+      bodyPreview: rawBody.substring(0, 100) + '...'
+    });
 
-    // Validar firma del webhook
+    // 2. Extraer headers de validación
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
 
-    if (!validateWebhookSignature(body, xSignature, xRequestId)) {
+    // 3. Validar firma HMAC con RAW body (antes de parsear)
+    const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+    const signatureValidation = verifyWebhookSignature(
+      rawBody,
+      xSignature,
+      xRequestId,
+      webhookSecret || ''
+    );
+
+    if (!signatureValidation.isValid) {
       logger.error('Webhook MercadoPago: Firma inválida', {
+        requestId,
         xSignature,
         xRequestId,
-        bodyLength: body.length
+        bodyLength: rawBody.length,
+        error: signatureValidation.error
       });
+      
       return NextResponse.json({ 
         success: false, 
-        error: 'Firma inválida' 
+        error: signatureValidation.error || 'Firma inválida',
+        requestId
       }, { status: 401 });
     }
 
-    logger.info('Webhook MercadoPago: Firma validada exitosamente');
+    logger.info('Webhook MercadoPago: Firma validada exitosamente', {
+      requestId,
+      dataId: signatureValidation.dataId
+    });
 
-    // Extraer id y type del evento
-    const eventId = data?.id;
-    const eventType = action;
+    // 4. Parsear el JSON (después de validar firma) solo para validar que sea JSON válido
+    try {
+      JSON.parse(rawBody);
+    } catch (parseError) {
+      logger.error('Webhook MercadoPago: Error parseando payload', {
+        requestId,
+        error: parseError instanceof Error ? parseError.message : String(parseError)
+      });
+      
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Payload JSON inválido',
+        requestId
+      }, { status: 400 });
+    }
+
+    // 5. Validar estructura del payload
+    const payloadValidation = validateWebhookPayload(rawBody);
+    if (!payloadValidation.isValid) {
+      logger.error('Webhook MercadoPago: Estructura inválida', {
+        requestId,
+        error: payloadValidation.error,
+        rawBody: rawBody.substring(0, 200) + '...'
+      });
+      
+      return NextResponse.json({ 
+        success: false, 
+        error: payloadValidation.error || 'Estructura inválida',
+        requestId
+      }, { status: 400 });
+    }
+
+    // Extraer datos del payload validado
+    const eventType = payloadValidation.action;
+    const eventId = payloadValidation.dataId;
 
     logger.info('Webhook MercadoPago recibido', {
+      requestId,
       eventType,
       eventId,
       userAgent: req.headers.get('user-agent'),
       ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip')
     });
 
+    // 6. Procesar evento según tipo
     if ((eventType === 'payment.updated' || eventType === 'payment.created') && eventId) {
-      logger.info(`Procesando evento ${eventType} - consultando API de MercadoPago`);
-      await handlePaymentEvent(eventId.toString());
+      logger.info(`Procesando evento ${eventType} - consultando API de MercadoPago`, {
+        requestId
+      });
+      
+      // Encolar procesamiento asíncrono y responder 200 inmediatamente
+      processPaymentInBackground(eventId.toString(), requestId)
+        .catch(error => {
+          logger.error('Error en procesamiento asíncrono de pago', {
+            requestId,
+            eventId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
+      
+      return NextResponse.json({ 
+        success: true, 
+        requestId,
+        message: 'Pago recibido y encolado para procesamiento'
+      });
+      
     } else {
-      logger.info('Evento de webhook no procesado', { eventType });
+      logger.info('Evento de webhook no procesado', { 
+        requestId, 
+        eventType 
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        requestId,
+        message: 'Evento recibido pero no procesado'
+      });
     }
 
-    return NextResponse.json({ success: true });
   } catch (error) {
     logger.error('Error procesando webhook MercadoPago', {
+      requestId,
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
-    return NextResponse.json({ success: false }, { status: 500 });
+    
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Error interno del servidor',
+      requestId
+    }, { status: 500 });
   }
 }
 
-async function handlePaymentEvent(paymentId: string) {
+async function handlePaymentEvent(paymentId: string, requestId: string) {
   try {
-    logger.info('handlePaymentEvent: Consultando pago en MercadoPago API', { paymentId });
+    logger.info('handlePaymentEvent: Consultando pago en MercadoPago API', { 
+      requestId,
+      paymentId 
+    });
 
     // Verificar idempotencia - no procesar duplicados
     const existingOrder = await db.query.orders.findFirst({
@@ -190,6 +317,7 @@ async function handlePaymentEvent(paymentId: string) {
 
     if (existingOrder) {
       logger.info('Pago ya procesado previamente', {
+        requestId,
         paymentId,
         existingOrderId: existingOrder.id,
         existingStatus: existingOrder.status

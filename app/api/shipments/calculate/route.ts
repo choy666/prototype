@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth/session';
-import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
+import { calculateME2Shipping } from '@/lib/mercado-envios/me2Api';
+import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
 import { logger } from '@/lib/utils/logger';
 import { z } from 'zod';
-import { db } from '@/lib/db';
-import { products } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+// Imports no utilizados eliminados para limpiar warnings
 import type { MLShippingMethod } from '@/lib/types/shipping';
 
 const calculateShippingSchema = z.object({
@@ -24,13 +23,17 @@ const calculateShippingSchema = z.object({
   })).min(1, 'Se requiere al menos un item'),
   sellerAddressId: z.string().optional(),
   logisticType: z.enum(['drop_off', 'me2', 'me1']).default('me2'),
+  allowFallback: z.boolean().default(true),
+  requestId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
+    const requestId = crypto.randomUUID();
     logger.info('[ME2] API: Iniciando cálculo de envío', {
       method: 'POST',
       url: request.url,
+      requestId,
       userAgent: request.headers.get('user-agent')
     });
 
@@ -38,6 +41,7 @@ export async function POST(request: NextRequest) {
     
     if (!session?.user?.email) {
       logger.warn('[ME2] API: Acceso no autorizado', {
+        requestId,
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')
       });
       return NextResponse.json(
@@ -47,12 +51,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { zipcode, items, logisticType } = calculateShippingSchema.parse(body);
+    const { zipcode, items, logisticType, allowFallback, requestId: clientRequestId } = calculateShippingSchema.parse(body);
+
+    const effectiveRequestId = clientRequestId || requestId;
 
     logger.info('[ME2] Request: Datos recibidos', {
+      requestId: effectiveRequestId,
       zipcode,
       itemsCount: items.length,
       logisticType,
+      allowFallback,
       userEmail: session.user.email,
       items: items.map(i => ({ 
         id: i.id, 
@@ -64,85 +72,38 @@ export async function POST(request: NextRequest) {
       }))
     });
 
-    // Enriquecer items con datos de la base de datos
-    const enrichedItems = await Promise.all(
-      items.map(async (item) => {
-        const productId = parseInt(item.id, 10);
-        if (isNaN(productId)) {
-          return {
-            ...item,
-            shippingMode: undefined,
-            me2Compatible: false,
-          };
-        }
+    // Obtener productos enriquecidos desde la base de datos
+    const productIds = items.map(item => parseInt(item.id, 10)).filter(id => !isNaN(id));
+    const dbProducts = await getProductsByIds(productIds);
 
-        const dbProduct = await db.query.products.findFirst({
-          where: eq(products.id, productId),
-          columns: {
-            id: true,
-            mlItemId: true,
-            weight: true,
-            height: true,
-            width: true,
-            length: true,
-            shippingMode: true,
-            me2Compatible: true,
-          }
-        });
-
-        // Usar valores de BD si no se proporcionan en el request
-        return {
-          ...item,
-          mlItemId: item.mlItemId || dbProduct?.mlItemId || undefined,
-          weight: item.weight || Number(dbProduct?.weight) || 0.5,
-          dimensions: item.dimensions || {
-            height: Number(dbProduct?.height) || 10,
-            width: Number(dbProduct?.width) || 10,
-            length: Number(dbProduct?.length) || 10,
-          },
-          shippingMode: dbProduct?.shippingMode,
-          me2Compatible: dbProduct?.me2Compatible,
-        };
-      })
-    );
-
-    // Validar que los productos sean compatibles con ME2
-    const incompatibleProducts = enrichedItems.filter(item => !item.me2Compatible);
-    if (incompatibleProducts.length > 0) {
-      logger.warn('[ME2] Validación: Productos no compatibles con ME2', {
-        zipcode,
-        incompatibleProducts: incompatibleProducts.map(p => p.id),
-        fallbackActivated: true
-      });
-    }
-
-    // Calcular dimensiones totales para el request
-    const totalDimensions = {
-      height: enrichedItems.reduce((sum, item) => sum + (item.dimensions?.height || 10) * item.quantity, 0),
-      width: Math.max(...enrichedItems.map(item => item.dimensions?.width || 10)),
-      length: Math.max(...enrichedItems.map(item => item.dimensions?.length || 10)),
-      weight: enrichedItems.reduce((sum, item) => sum + (item.weight || 0.5) * item.quantity, 0),
-    };
-
-    logger.info('[ME2] Request: Dimensiones calculadas', {
-      zipcode,
-      dimensions: totalDimensions,
-      totalWeight: totalDimensions.weight
-    });
-
-    // Llamar a la función principal de cálculo ME2
-    const shippingData = await calculateME2ShippingCost({
-      zipcode,
-      items: enrichedItems.map(item => ({
-        id: item.id,
+    // Mapear items con datos completos
+    const enrichedItems = items.map(item => {
+      const productId = parseInt(item.id, 10);
+      const dbProduct = dbProducts.find(p => p.id === productId);
+      
+      return {
+        id: productId,
+        name: dbProduct?.name || 'Producto desconocido',
         quantity: item.quantity,
         price: item.price,
-        mlItemId: item.mlItemId,
-      })),
-      dimensions: totalDimensions,
+        mlItemId: item.mlItemId || dbProduct?.mlItemId || undefined,
+        weight: item.weight || dbProduct?.weight,
+        height: item.dimensions?.height || dbProduct?.height,
+        width: item.dimensions?.width || dbProduct?.width,
+        length: item.dimensions?.length || dbProduct?.length,
+        shippingMode: dbProduct?.shippingMode,
+        me2Compatible: dbProduct?.me2Compatible,
+      };
     });
 
-    // Formatear respuesta mejorada según especificación
+    // Llamar al nuevo servicio centralizado ME2
+    const shippingData = await calculateME2Shipping({
+      zipcode,
+      items: enrichedItems,
+      allowFallback,
+    });
+
+    // Formatear respuesta manteniendo compatibilidad
     const options = shippingData.shippingOptions.map(option => ({
       name: option.name,
       cost: option.cost || 0,
@@ -153,7 +114,6 @@ export async function POST(request: NextRequest) {
 
     // Agregar opciones específicas ME2 si aplica
     if (shippingData.source === 'me2' && !shippingData.fallback) {
-      // Asegurar que tengamos las opciones estándar ME2
       const me2Options = [
         { name: 'ME2 Standard', cost: options[0]?.cost || 2390, estimated: '3-5 días' },
         { name: 'ME2 Prioritario', cost: options[1]?.cost || 3120, estimated: '1-2 días' },
@@ -174,6 +134,7 @@ export async function POST(request: NextRequest) {
 
       const response = {
         success: true,
+        requestId: effectiveRequestId,
         coverage: shippingData.coverage,
         destination: shippingData.destination,
         methods: shippingData.shippingOptions,
@@ -189,17 +150,25 @@ export async function POST(request: NextRequest) {
         },
         fallback: shippingData.fallback ?? false,
         message: shippingData.message || 'Cálculo ME2 exitoso',
-        // Nuevos campos para compatibilidad con especificación
         options: me2Options,
+        warnings: shippingData.warnings,
+        metadata: {
+          calculationSource: shippingData.fallback ? 'FALLBACK' : 'ME2',
+          calculationHash: `${zipcode}-${items.map(i => `${i.id}:${i.quantity}`).sort().join('-')}`,
+          timestamp: new Date().toISOString(),
+        }
       };
 
       logger.info('[ME2] Response: Cálculo ME2 completado', {
+        requestId: effectiveRequestId,
         zipcode,
         success: true,
         optionsCount: me2Options.length,
         source: response.source,
+        fallback: response.fallback,
         hasFreeShipping: me2Options.some(opt => opt.cost === 0),
-        totalCost: Math.min(...me2Options.map(opt => opt.cost))
+        totalCost: Math.min(...me2Options.map(opt => opt.cost)),
+        warningsCount: response.warnings?.length || 0
       });
 
       return NextResponse.json(response);
@@ -208,6 +177,7 @@ export async function POST(request: NextRequest) {
     // Respuesta fallback local
     const response = {
       success: true,
+      requestId: effectiveRequestId,
       coverage: shippingData.coverage,
       destination: shippingData.destination,
       methods: shippingData.shippingOptions,
@@ -223,24 +193,33 @@ export async function POST(request: NextRequest) {
       },
       fallback: shippingData.fallback ?? false,
       message: shippingData.message || (shippingData.fallback ? 'Usando métodos de envío locales' : 'Cálculo exitoso'),
-      // Nuevos campos para compatibilidad
       options,
-      warnings: shippingData.fallback ? ['Código postal sin cobertura ME2, usando envío local'] : undefined,
+      warnings: shippingData.warnings,
+      metadata: {
+        calculationSource: shippingData.fallback ? 'FALLBACK' : 'ME2',
+        calculationHash: `${zipcode}-${items.map(i => `${i.id}:${i.quantity}`).sort().join('-')}`,
+        timestamp: new Date().toISOString(),
+      }
     };
 
     logger.info('[ME2] Response: Cálculo completado', {
+      requestId: effectiveRequestId,
       zipcode,
       success: true,
       optionsCount: options.length,
       source: response.source,
+      fallback: response.fallback,
       hasFreeShipping: options.some(opt => opt.cost === 0),
-      totalCost: Math.min(...options.map(opt => opt.cost))
+      totalCost: Math.min(...options.map(opt => opt.cost)),
+      warningsCount: response.warnings?.length || 0
     });
 
     return NextResponse.json(response);
     
   } catch (error) {
+    const requestId = crypto.randomUUID();
     logger.error('[ME2] Error: Error en endpoint /api/shipments/calculate', {
+      requestId,
       error: error instanceof Error ? error.message : String(error),
       errorType: error instanceof z.ZodError ? 'VALIDATION_ERROR' : 'UNKNOWN',
       statusCode: error instanceof z.ZodError ? 400 : 500,
@@ -251,6 +230,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Datos inválidos', 
+          requestId,
           details: error.issues.map(issue => ({
             field: issue.path.join('.'),
             message: issue.message
@@ -264,28 +244,28 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error) {
       if (error.message.includes('rate limit')) {
         return NextResponse.json(
-          { error: 'Límite de solicitudes excedido, intente en unos minutos' },
+          { error: 'Límite de solicitudes excedido, intente en unos minutos', requestId },
           { status: 429 }
         );
       }
       
       if (error.message.includes('zip_code') || error.message.includes('código postal')) {
         return NextResponse.json(
-          { error: 'Código postal no cubierto por el servicio de envío' },
+          { error: 'Código postal no cubierto por el servicio de envío', requestId },
           { status: 400 }
         );
       }
       
       if (error.message.includes('product') || error.message.includes('item')) {
         return NextResponse.json(
-          { error: 'Algunos productos no están disponibles para envío' },
+          { error: 'Algunos productos no están disponibles para envío', requestId },
           { status: 400 }
         );
       }
     }
 
     return NextResponse.json(
-      { error: 'Error al calcular costo de envío' },
+      { error: 'Error al calcular costo de envío', requestId },
       { status: 500 }
     );
   }
@@ -316,9 +296,9 @@ export async function GET(request: NextRequest) {
     }
     
     const items = [{
-      id: itemId,
+      id: parseInt(itemId),
       quantity: parseInt(quantity),
-      price: 0, // El precio no es necesario para cálculo básico
+      price: 0, // Will be fetched from DB
       mlItemId: mlItemId ?? undefined,
     }];
     
@@ -329,7 +309,7 @@ export async function GET(request: NextRequest) {
       userEmail: session.user.email 
     });
     
-    const shippingData = await calculateME2ShippingCost({
+    const shippingData = await calculateME2Shipping({
       zipcode,
       items,
     });
