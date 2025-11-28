@@ -71,12 +71,12 @@ export function ShippingForm({ onSubmit, isLoading = false, initialData }: Shipp
       {/* Dirección */}
       <div className="space-y-2">
         <Label htmlFor="direccion">
-          Dirección <span className="text-red-500">*</span>
+          Calle <span className="text-red-500">*</span>
         </Label>
         <Input
           id="direccion"
           type="text"
-          placeholder="Av. Corrientes 1234, Piso 5, Depto B"
+          placeholder="Av. Corrientes"
           disabled={isFormLoading}
           {...register('direccion')}
           aria-invalid={!!errors.direccion}
@@ -87,6 +87,69 @@ export function ShippingForm({ onSubmit, isLoading = false, initialData }: Shipp
             {errors.direccion.message}
           </p>
         )}
+      </div>
+
+      {/* Número, Piso y Departamento */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="numero">
+            Número <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="numero"
+            type="text"
+            placeholder="1234"
+            disabled={isFormLoading}
+            {...register('numero')}
+            aria-invalid={!!errors.numero}
+            aria-describedby={errors.numero ? 'numero-error' : undefined}
+          />
+          {errors.numero && (
+            <p id="numero-error" className="text-sm text-red-500" role="alert">
+              {errors.numero.message}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="piso">
+            Piso (opcional)
+          </Label>
+          <Input
+            id="piso"
+            type="text"
+            placeholder="5"
+            disabled={isFormLoading}
+            {...register('piso')}
+            aria-invalid={!!errors.piso}
+            aria-describedby={errors.piso ? 'piso-error' : undefined}
+          />
+          {errors.piso && (
+            <p id="piso-error" className="text-sm text-red-500" role="alert">
+              {errors.piso.message}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="departamento">
+            Depto (opcional)
+          </Label>
+          <Input
+            id="departamento"
+            type="text"
+            placeholder="B"
+            disabled={isFormLoading}
+            {...register('departamento')}
+            aria-invalid={!!errors.departamento}
+            aria-describedby={errors.departamento ? 'departamento-error' : undefined}
+          />
+          {errors.departamento && (
+            <p id="departamento-error" className="text-sm text-red-500" role="alert">
+              {errors.departamento.message}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Ciudad y Provincia */}

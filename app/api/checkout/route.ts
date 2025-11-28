@@ -292,7 +292,7 @@ export async function POST(req: NextRequest) {
           receiver_address: {
             zip_code: shippingAddress.codigoPostal,
             street_name: shippingAddress.direccion,
-            street_number: shippingAddress.numero ? String(parseInt(shippingAddress.numero) || 0) : "0", // Evitar undefined
+            street_number: shippingAddress.numero || "0", // Usar fallback 0 si no hay número
             floor: shippingAddress.piso || "", // Evitar undefined
             apartment: shippingAddress.departamento || "", // Evitar undefined
             city_name: shippingAddress.ciudad,

@@ -43,6 +43,14 @@ export const shippingAddressSchema = z.object({
       'Teléfono inválido (ej: 1123456789, 01123456789)'
     )
     .trim(),
+  
+  numero: z
+    .string()
+    .min(1, 'El número de calle es requerido')
+    .regex(/^\d+[A-Za-z0-9]*$/, 'Número de calle inválido (ej: 123, 123A)'),
+  
+  piso: z.string().optional(),
+  departamento: z.string().optional(),
 });
 
 /**
@@ -127,7 +135,7 @@ export const checkoutSchema = z.object({
     telefono: z.string().min(1, 'El teléfono es requerido'),
     piso: z.string().optional(),
     departamento: z.string().optional(),
-    numero: z.string().optional(),
+    numero: z.string().min(1, 'El número de calle es requerido'),
   }),
 
   shippingMethod: z.object({
