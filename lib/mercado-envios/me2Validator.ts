@@ -239,9 +239,22 @@ export async function validateME2Calculation(request: ME2CalculationRequest): Pr
                     productsWithoutMLId.length === 0 && 
                     incompatibleProducts.length === 0;
 
+  let reason: string;
+  if (canUseME2) {
+    reason = 'VALID';
+  } else if (!productValidation.allValid) {
+    reason = 'MISSING_ATTRIBUTES';
+  } else if (productsWithoutMLId.length > 0) {
+    reason = 'NO_ML_ITEM_ID';
+  } else if (incompatibleProducts.length > 0) {
+    reason = 'NOT_COMPATIBLE';
+  } else {
+    reason = 'UNKNOWN_FALLBACK';
+  }
+
   return {
     canUseME2,
-    reason: canUseME2 ? 'VALID' : undefined,
+    reason,
     missingAttributes: canUseME2 ? [] : productValidation.results
       .filter(r => !r.isValid)
       .flatMap(r => r.missingAttributes),
