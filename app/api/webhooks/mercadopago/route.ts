@@ -53,39 +53,38 @@ function validateWebhookSignature(
       return false;
     }
 
-    // Crear el string a firmar según documentación OFICIAL de Mercado Pago (2024-2025)
-    // Formato exacto: signature = HMAC_SHA256(secret, `${ts}.${id}`)
-    // donde id = data.id del payload
+    // Validación mejorada: verificar que dataId exista y sea válido
     const parsedPayload = JSON.parse(body);
     
-    // Debug detallado para identificar el problema
-    logger.info('DEBUG: Análisis completo del payload', {
-      rawBody: body,
-      parsedPayload: parsedPayload,
-      dataField: parsedPayload.data,
-      dataIdValue: parsedPayload.data?.id,
-      dataIdType: typeof parsedPayload.data?.id,
-      dataIdAsString: String(parsedPayload.data?.id),
-      dataIdLength: String(parsedPayload.data?.id).length
-    });
+    if (!parsedPayload.data || !parsedPayload.data.id) {
+      logger.error('Estructura de payload inválida: falta data.id', {
+        payloadStructure: Object.keys(parsedPayload),
+        dataField: parsedPayload.data,
+        dataId: parsedPayload.data?.id
+      });
+      return false;
+    }
     
-    // Asegurar que dataId sea string
-    const dataId = String(parsedPayload.data?.id || '');
+    // Asegurar que dataId sea string (manejo de números y otros tipos)
+    const dataId = String(parsedPayload.data.id);
     
-    logger.info('DEBUG: Valores finales usados', {
-      ts,
-      dataId,
-      dataIdType: typeof dataId,
-      stringToSignPreview: `${ts}.${dataId}`
-    });
+    if (!dataId || dataId === 'undefined' || dataId === 'null') {
+      logger.error('data.id inválido o vacío', {
+        rawId: parsedPayload.data.id,
+        stringifiedId: dataId
+      });
+      return false;
+    }
     
     const stringToSign = `${ts}.${dataId}`;
     
-    logger.info('Validación HMAC - Formato oficial Mercado Pago', {
+    logger.info('Validación HMAC - Mercado Pago Oficial', {
       ts,
       dataId,
+      dataIdType: typeof dataId,
       stringToSign,
-      xRequestId
+      webhookSecretSet: !!webhookSecret,
+      webhookSecretLength: webhookSecret.length
     });
     
     // Generar HMAC-SHA256 según especificación oficial
@@ -99,19 +98,17 @@ function validateWebhookSignature(
       Buffer.from(expectedSignature, 'hex')
     );
 
-    logger.info('Validación de firma - DEBUG COMPLETO', {
+    logger.info('Validación de firma - Resultado', {
       ts,
       requestId: xRequestId,
       dataId,
       stringToSign,
       receivedSignature: signature,
       expectedSignature: expectedSignature,
-      signatureLength: signature.length,
-      expectedSignatureLength: expectedSignature.length,
-      webhookSecretLength: webhookSecret.length,
-      webhookSecretPrefix: webhookSecret.substring(0, 8) + '...',
-      bodyPreview: body.substring(0, 100) + (body.length > 100 ? '...' : ''),
-      isValid
+      signaturesMatch: isValid,
+      webhookSecretConfigured: !!webhookSecret,
+      webhookSecretLength: webhookSecret?.length || 0,
+      webhookSecretPrefix: webhookSecret ? webhookSecret.substring(0, 8) + '...' : 'none'
     });
 
     return isValid;
