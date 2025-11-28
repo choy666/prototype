@@ -176,9 +176,13 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Error al procesar el checkout');
       }
 
-      if (data.init_point) {
+      // Checkout Pro siempre usa init_point (producción) incluso con credenciales de test
+      const paymentUrl = data.init_point;
+      console.log('Usando Checkout Pro URL:', paymentUrl);
+      
+      if (paymentUrl) {
         // Redirigir a Mercado Pago
-        window.location.href = data.init_point;
+        window.location.href = paymentUrl;
       } else {
         throw new Error('No se recibió la URL de pago');
       }

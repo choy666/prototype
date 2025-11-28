@@ -307,6 +307,9 @@ export async function POST(req: NextRequest) {
 
     // Debug: Verificar estructura de respuesta de Mercado Pago
     console.log("Respuesta completa de Mercado Pago:", JSON.stringify(preference, null, 2));
+    console.log("Environment check - NODE_ENV:", process.env.NODE_ENV);
+    console.log("Environment check - SUCCESS_URL:", process.env.MERCADO_PAGO_SUCCESS_URL);
+    console.log("Environment check - VERCEL_URL:", process.env.VERCEL_URL);
     
     logger.info('Checkout: Preferencia de MercadoPago creada exitosamente', {
       preferenceId: preference.id,
