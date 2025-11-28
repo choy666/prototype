@@ -149,13 +149,14 @@ export default function CheckoutPage() {
           quantity: item.quantity,
           image: item.image,
           discount: item.discount,
-          weight: item.weight,
-          variantId: item.variantId,
+          weight: item.weight ?? undefined,
+          variantId: item.variantId ?? undefined,
         })),
         shippingAddress,
         shippingMethod: {
           id: selectedShippingMethod.shipping_method_id.toString(),
           name: selectedShippingMethod.name,
+          cost: selectedShippingMethod.cost,
         },
         userId: session.user.id,
       };

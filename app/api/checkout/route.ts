@@ -24,7 +24,7 @@ function mapMLShippingToInternal(mlResponse: MLShippingResponse): ShippingRespon
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
 import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
-import { Preference } from 'mercadopago';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 // Tipo para items del checkout (sin stock requerido)
 type CheckoutItem = {
@@ -38,10 +38,12 @@ type CheckoutItem = {
   variantId?: number | null;
 };
 
-// Configuración de Mercado Pago según documentación oficial
-const mercadopago = new Preference({
+// Configuración de Mercado Pago según documentación oficial (SDK v2)
+const mpClient = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
+
+const mercadopago = new Preference(mpClient);
 
 export async function POST(req: NextRequest) {
   try {
@@ -228,15 +230,15 @@ export async function POST(req: NextRequest) {
 
     // Preparar metadata incluyendo variantId en items
     const metadata = {
-      userId: userId.toString(),
-      shippingAddress: JSON.stringify(shippingAddress),
-      shippingMethodId: shippingMethod.id.toString(),
+      user_id: userId.toString(),
+      shipping_address: JSON.stringify(shippingAddress),
+      shipping_method_id: shippingMethod.id.toString(),
       items: JSON.stringify(items.map((item: CheckoutItem) => ({
         ...item,
         variantId: item.variantId || null
       }))),
       subtotal: subtotal.toString(),
-      shippingCost: shippingCost.toString(),
+      shipping_cost: shippingCost.toString(),
       total: total.toString(),
     };
 
@@ -276,8 +278,8 @@ export async function POST(req: NextRequest) {
           pending: process.env.MERCADO_PAGO_PENDING_URL,
         },
         auto_return: "approved",
-        notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
-        external_reference: metadata.userId,
+        notification_url: process.env.MERCADO_PAGO_NOTIFICATION_URL || `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`,
+        external_reference: metadata.user_id,
         metadata: metadata,
         payment_methods: {
           excluded_payment_types: [
@@ -323,12 +325,12 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     logger.error('Checkout: Error procesando checkout', {
-      error: error instanceof Error ? error.message : String(error),
+      error,
       stack: error instanceof Error ? error.stack : undefined
     });
-    
+
     return NextResponse.json(
-      { 
+      {
         error: "Error procesando el pago",
         details: error instanceof Error ? error.message : String(error)
       },

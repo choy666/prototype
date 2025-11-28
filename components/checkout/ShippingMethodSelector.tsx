@@ -37,6 +37,23 @@ export function ShippingMethodSelector({
       return;
     }
 
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      const win = window as Window & { __mlShippingFetches?: Set<string> };
+      const guardKey = `ml-shipping-${zipcode}-${items
+        .map((item) => `${item.id}:${item.quantity}`)
+        .join(',')}-${subtotal}`;
+
+      if (!win.__mlShippingFetches) {
+        win.__mlShippingFetches = new Set<string>();
+      }
+
+      if (win.__mlShippingFetches.has(guardKey)) {
+        return;
+      }
+
+      win.__mlShippingFetches.add(guardKey);
+    }
+
     const fetchShippingMethods = async () => {
       setIsLoading(true);
       setIsFallback(false);
@@ -118,12 +135,23 @@ export function ShippingMethodSelector({
       </div>
 
       <div className="space-y-3">
-        {shippingMethods.map((method) => {
+        {shippingMethods.map((method, index) => {
           const isSelected = selectedMethod?.shipping_method_id === method.shipping_method_id;
+
+          const baseId =
+            (typeof method.shipping_method_id !== 'undefined'
+              ? method.shipping_method_id.toString()
+              : 'no-id') +
+            '-' +
+            (typeof method.order_priority !== 'undefined'
+              ? method.order_priority.toString()
+              : index.toString());
+
+          const inputId = `shipping-${baseId}`;
 
           return (
             <div
-              key={method.shipping_method_id}
+              key={baseId}
               className={`border rounded-lg p-4 cursor-pointer transition-colors ${
                 isSelected
                   ? 'border-blue-500 bg-gray-900'
@@ -135,14 +163,14 @@ export function ShippingMethodSelector({
                 <div className="flex items-center space-x-3">
                   <input
                     type="radio"
-                    id={`shipping-${method.shipping_method_id}`}
+                    id={inputId}
                     name="shipping-method"
                     checked={isSelected}
                     onChange={() => onMethodSelect(method)}
                     className="w-4 h-4 text-blue-600 focus:ring-blue-500"
                   />
                   <label
-                    htmlFor={`shipping-${method.shipping_method_id}`}
+                    htmlFor={inputId}
                     className="font-medium cursor-pointer"
                   >
                     {method.name}

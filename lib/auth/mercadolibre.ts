@@ -10,7 +10,7 @@ export const MERCADOLIBRE_CONFIG = {
   clientId: process.env.MERCADOLIBRE_CLIENT_ID!,
   clientSecret: process.env.MERCADOLIBRE_CLIENT_SECRET!,
   redirectUri: process.env.MERCADOLIBRE_REDIRECT_URI || 'https://prototype-ten-dun.vercel.app/api/auth/mercadolibre/callback',
-  baseUrl: 'https://auth.mercadolibre.com.ar',
+  baseUrl: 'https://api.mercadolibre.com',
   apiUrl: 'https://api.mercadolibre.com',
 };
 

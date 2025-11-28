@@ -70,37 +70,14 @@ export async function POST(request: NextRequest) {
       items: enrichedItems,
     });
     
-    // Formatear respuesta para el frontend
-    const formattedMethods = shippingData.shippingOptions.map((method: MLShippingMethod) => ({
-      id: method.shipping_method_id,
-      name: method.name,
-      description: method.description,
-      cost: method.cost,
-      currencyId: method.currency_id,
-      estimatedDelivery: {
-        date: method.estimated_delivery?.date,
-        timeFrom: method.estimated_delivery?.time_from,
-        timeTo: method.estimated_delivery?.time_to,
-      },
-      estimatedTime: {
-        type: method.estimated_delivery_time?.type,
-        unit: method.estimated_delivery_time?.unit,
-        value: method.estimated_delivery_time?.value,
-      },
-      shippingMode: method.shipping_mode,
-      logisticType: method.logistic_type,
-      treatment: method.treatment,
-      guaranteed: method.guaranteed,
-      orderPriority: method.order_priority,
-      tags: method.tags,
-      speed: method.speed,
-    }));
+    // Devolver directamente los métodos en formato MLShippingMethod
+    const methods: MLShippingMethod[] = shippingData.shippingOptions;
     
     return NextResponse.json({
       success: true,
       coverage: shippingData.coverage,
       destination: shippingData.destination,
-      methods: formattedMethods,
+      methods,
       source: shippingData.source,
       input: shippingData.input && {
         zipcodeTarget: shippingData.input.zipcode_target,
