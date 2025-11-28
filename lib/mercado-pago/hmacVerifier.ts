@@ -53,8 +53,20 @@ export function verifyHmacSHA256(
   let ts: string | undefined;
   let signature: string | undefined;
   
+  // TEMPORAL: Log del header completo para debugging
+  logger.info('DEBUG - Header x-signature completo', {
+    rawXSignature: xSignature,
+    xSignatureType: typeof xSignature,
+    xSignatureLength: xSignature?.length
+  });
+  
   try {
     const signatureParts = xSignature.split(',');
+    logger.info('DEBUG - Partes del signature parseadas', {
+      signatureParts,
+      partsCount: signatureParts.length
+    });
+    
     for (const part of signatureParts) {
       if (part.startsWith('ts=')) {
         ts = part.substring(3);
@@ -62,6 +74,13 @@ export function verifyHmacSHA256(
         signature = part.substring(3);
       }
     }
+    
+    logger.info('DEBUG - Componentes extraídos', {
+      ts,
+      signature,
+      hasTs: !!ts,
+      hasSignature: !!signature
+    });
   } catch (parseError) {
     logger.error('Error parseando header x-signature', {
       error: parseError instanceof Error ? parseError.message : String(parseError),
@@ -107,6 +126,21 @@ export function verifyHmacSHA256(
     data?: { id?: unknown };
     id?: unknown;
   };
+
+  // TEMPORAL: Log completo para debugging de payload real
+  logger.info('DEBUG - Payload completo sin redactar', {
+    rawPayload: JSON.stringify(parsedPayload, null, 2),
+    payloadKeys: Object.keys(parsedPayload),
+    hasAction: !!p.action,
+    hasType: !!p.type,
+    hasData: !!p.data,
+    hasDataId: !!p.data?.id,
+    hasTopLevelId: !!p.id,
+    actionValue: p.action,
+    typeValue: p.type,
+    dataIdValue: p.data?.id,
+    topLevelIdValue: p.id
+  });
 
   if (p.action === 'test.notification') {
     logger.info('Webhook de prueba recibido, saltando validación');
