@@ -53,13 +53,21 @@ function validateWebhookSignature(
       return false;
     }
 
-    // Crear el string a firmar según documentación de Mercado Pago: data.id + . + timestamp
-    // El cuerpo del webhook no se usa en la firma, solo el data.id
+    // Crear el string a firmar según documentación OFICIAL de Mercado Pago (2024-2025)
+    // Formato exacto: signature = HMAC_SHA256(secret, `${ts}.${id}`)
+    // donde id = data.id del payload
     const parsedPayload = JSON.parse(body);
     const dataId = parsedPayload.data?.id || '';
-    const stringToSign = `${dataId}.${ts}`;
+    const stringToSign = `${ts}.${dataId}`;
     
-    // Generar HMAC-SHA256
+    logger.info('Validación HMAC - Formato oficial Mercado Pago', {
+      ts,
+      dataId,
+      stringToSign,
+      xRequestId
+    });
+    
+    // Generar HMAC-SHA256 según especificación oficial
     const hmac = crypto.createHmac('sha256', webhookSecret);
     hmac.update(stringToSign);
     const expectedSignature = hmac.digest('hex');
@@ -70,14 +78,19 @@ function validateWebhookSignature(
       Buffer.from(expectedSignature, 'hex')
     );
 
-    logger.info('Validación de firma', {
-      isValid,
+    logger.info('Validación de firma - DEBUG COMPLETO', {
       ts,
       requestId: xRequestId,
       dataId,
       stringToSign,
-      receivedSignature: signature.substring(0, 8) + '...',
-      expectedSignature: expectedSignature.substring(0, 8) + '...'
+      receivedSignature: signature,
+      expectedSignature: expectedSignature,
+      signatureLength: signature.length,
+      expectedSignatureLength: expectedSignature.length,
+      webhookSecretLength: webhookSecret.length,
+      webhookSecretPrefix: webhookSecret.substring(0, 8) + '...',
+      bodyPreview: body.substring(0, 100) + (body.length > 100 ? '...' : ''),
+      isValid
     });
 
     return isValid;
