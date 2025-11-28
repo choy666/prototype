@@ -67,6 +67,11 @@ export function verifyHmacSHA256(
 
     // Validar estructura del payload
     if (!parsedPayload.data || !(parsedPayload.data as { id: unknown })?.id) {
+      // Permitir webhooks de prueba que no tienen data.id
+      if (parsedPayload.action === 'test.notification') {
+        logger.info('Webhook de prueba recibido, saltando validación de data.id');
+        return { isValid: true };
+      }
       logger.error('Estructura de payload inválida: falta data.id', {
         payloadStructure: Object.keys(parsedPayload),
         dataField: parsedPayload.data,
@@ -94,7 +99,7 @@ export function verifyHmacSHA256(
     }
 
     // Construir string a firmar según especificación oficial de Mercado Pago
-    const stringToSign = `${ts}.${dataId}`;
+    const stringToSign = `ts:${ts};data.id:${dataId}`;
     
     logger.info('Validación HMAC - Mercado Pago Oficial', {
       ts,
@@ -254,6 +259,13 @@ export function validateWebhookPayload(rawBody: string): {
     const parsed = JSON.parse(rawBody);
     
     if (!parsed.action || !parsed.data || !parsed.data.id) {
+      logger.error('Estructura de payload inválida en validateWebhookPayload', {
+        error: 'Faltan campos action o data.id',
+        payloadKeys: Object.keys(parsed),
+        hasAction: !!parsed.action,
+        hasData: !!parsed.data,
+        hasDataId: !!parsed.data?.id,
+      });
       return {
         isValid: false,
         error: 'Estructura inválida: faltan campos action o data.id'
@@ -266,7 +278,11 @@ export function validateWebhookPayload(rawBody: string): {
       dataId: String(parsed.data.id)
     };
     
-  } catch {
+  } catch (e) {
+    logger.error('Error parseando JSON en validateWebhookPayload', {
+        error: e instanceof Error ? e.message : String(e),
+        rawBodyPreview: rawBody.substring(0, 100) + '...'
+    });
     return {
       isValid: false,
       error: 'JSON inválido'
