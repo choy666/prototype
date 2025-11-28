@@ -37,12 +37,10 @@ type CheckoutItem = {
   weight?: number | null;
   variantId?: number | null;
 };
-
 // Configuración de Mercado Pago según documentación oficial (SDK v2)
 const mpClient = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
 });
-
 const mercadopago = new Preference(mpClient);
 
 export async function POST(req: NextRequest) {
@@ -283,25 +281,24 @@ export async function POST(req: NextRequest) {
         external_reference: metadata.user_id,
         metadata: metadata,
         payment_methods: {
-          excluded_payment_types: [
-            { id: "ticket" }, // Excluir pago en efectivo
-          ],
+          // No excluir tipos de pago para pruebas - mostrar todo lo disponible
           installments: 12, // Permitir hasta 12 cuotas
         },
-        shipments: {
-          receiver_address: {
-            zip_code: shippingAddress.codigoPostal,
-            street_name: shippingAddress.direccion,
-            street_number: shippingAddress.numero || "0", // Usar fallback 0 si no hay número
-            floor: shippingAddress.piso || "", // Evitar undefined
-            apartment: shippingAddress.departamento || "", // Evitar undefined
-            city_name: shippingAddress.ciudad,
-            state_name: shippingAddress.provincia,
-            country_name: "Argentina",
-          },
-          mode: "custom", // ME2 no está activo en esta cuenta - usar custom
-          dimensions: "10x10x10,500", // defaults seguros
-        },
+        // Remover shipments temporalmente para evitar error fatal
+        // shipments: {
+        //   receiver_address: {
+        //     zip_code: shippingAddress.codigoPostal,
+        //     street_name: shippingAddress.direccion,
+        //     street_number: shippingAddress.numero || "1", // Evitar 0 que causa rechazo
+        //     floor: shippingAddress.piso || "",
+        //     apartment: shippingAddress.departamento || "",
+        //     city_name: shippingAddress.ciudad,
+        //     state_name: shippingAddress.provincia,
+        //     country_name: "Argentina",
+        //   },
+        //   mode: "custom",
+        //   dimensions: "10x10x10,500",
+        // },
       },
     });
 
@@ -321,11 +318,9 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({
       preferenceId: preference.id,
-      init_point: preference.init_point, // Campo que espera el frontend
+      init_point: preference.init_point, // Mercado Pago maneja sandbox/producción automáticamente
       initPoint: preference.init_point,
-      sandbox_init_point: preference.sandbox_init_point, // Campo que espera el frontend
-      sandboxInitPoint: preference.sandbox_init_point,
-      paymentUrl: preference.init_point, // Campo adicional para compatibilidad
+      paymentUrl: preference.init_point, // Siempre usar init_point - MP detecta el entorno
       total,
       subtotal,
       shippingCost,
