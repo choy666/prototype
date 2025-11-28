@@ -601,8 +601,12 @@ export const integrationMetrics = pgTable("integration_metrics", {
 // ======================
 // Relaciones de la base de datos
 // ======================
-export const productsRelations = relations(products, ({ many }) => ({
+export const productsRelations = relations(products, ({ one, many }) => ({
   variants: many(productVariants),
+  mlSync: one(mercadolibreProductsSync, {
+    fields: [products.id],
+    references: [mercadolibreProductsSync.productId],
+  }),
 }));
 
 export const productVariantsRelations = relations(productVariants, ({ one }) => ({

@@ -15,6 +15,7 @@ interface ShippingItem {
   id: string;
   quantity: number;
   price: number;
+  mlItemId?: string;
 }
 
 interface ShippingDimensions {
@@ -42,6 +43,58 @@ interface ME2ShippingResult {
   input?: MLShippingCalculateResponse['input'];
   fallback?: boolean;
   message?: string;
+}
+
+interface MLItemShippingOption {
+  id: number;
+  name: string;
+  currency_id: string;
+  base_cost: number;
+  cost: number;
+  list_cost: number;
+  shipping_method_id: number;
+  shipping_method_type: string;
+  shipping_option_type: string;
+  estimated_delivery_time?: {
+    type?: string;
+    date?: string;
+    unit?: string;
+    offset?: {
+      date?: string | null;
+      shipping?: number | null;
+    };
+    time_frame?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    pay_before?: string;
+    shipping?: number;
+    handling?: number;
+    schedule?: string | null;
+  };
+}
+
+interface MLItemShippingOptionsApiResponse {
+  destination: {
+    zip_code: string;
+    city: {
+      id: string | null;
+      name: string | null;
+    } | null;
+    state: {
+      id: string;
+      name: string;
+    } | null;
+    country: {
+      id: string;
+      name: string;
+    } | null;
+  };
+  options: MLItemShippingOption[];
+  custom_message?: {
+    display_mode?: string | null;
+    reason?: string;
+  } | null;
 }
 
 // Obtener dimensiones reales de los productos desde la base de datos
@@ -220,9 +273,20 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       );
     }
 
+    const mlItemId = firstItem.mlItemId;
+
+    if (!mlItemId) {
+      logger.info('ME2: mlItemId no presente para el item, usando fallback local', {
+        zipcode: options.zipcode,
+        localProductId: firstItem.id,
+      });
+
+      return calculateLocalShippingFallback(options.zipcode, options.items);
+    }
+
     const requestBody = {
       zipcode: options.zipcode,
-      item_id: firstItem.id,
+      item_id: mlItemId,
       quantity: firstItem.quantity,
       dimensions: {
         height: dimensions.height,
@@ -235,22 +299,35 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     };
 
     const response = await retryWithBackoff(async () => {
-      const res = await fetch(`${MERCADOLIBRE_API_URL}/shipping_options/${firstItem.id}`, {
-        method: 'POST',
+      const url = `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options?zip_code=${encodeURIComponent(options.zipcode)}`;
+      const res = await fetch(url, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify(requestBody),
       });
       
       if (!res.ok) {
-        const error = await res.text();
+        const errorBody = await res.text();
+
+        if (process.env.NODE_ENV === 'development') {
+          // Log de depuración SIN sanitizar para entorno de desarrollo
+          // eslint-disable-next-line no-console
+          console.error('ME2 DEV - Error response from ML shipping_options', {
+            status: res.status,
+            zipcode: options.zipcode,
+            itemId: mlItemId,
+            url,
+            requestBody,
+            responseBody: errorBody,
+          });
+        }
+
         throw new MercadoLibreError(
           MercadoLibreErrorCode.SHIPPING_CALCULATION_FAILED,
-          `Error calculando envío ME2: ${error}`,
-          { status: res.status, zipcode: options.zipcode, dimensions, itemId: firstItem.id }
+          `Error calculando envío ME2: ${errorBody}`,
+          { status: res.status, zipcode: options.zipcode, dimensions, itemId: mlItemId }
         );
       }
       
@@ -265,15 +342,90 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       }
     });
 
-    const data = (await response.json()) as MLShippingCalculateResponse;
+    const rawData = (await response.json()) as MLItemShippingOptionsApiResponse;
     
     // Procesar resultados según la estructura real de la API de ML
-    const shippingOptions: MLShippingMethod[] = (data.methods ?? []) as MLShippingMethod[];
+    const shippingOptions: MLShippingMethod[] = (rawData.options ?? []).map((option): MLShippingMethod => ({
+      shipping_method_id: option.shipping_method_id,
+      name: option.name,
+      description: option.shipping_option_type === 'address'
+        ? 'Envío a domicilio'
+        : option.shipping_option_type === 'agency'
+          ? 'Retiro en sucursal de correo'
+          : 'Opción de envío',
+      currency_id: option.currency_id,
+      list_cost: option.list_cost,
+      cost: option.cost,
+      estimated_delivery: {
+        date: option.estimated_delivery_time?.date ?? '',
+        time_from: option.estimated_delivery_time?.time_frame?.from ?? '',
+        time_to: option.estimated_delivery_time?.time_frame?.to ?? '',
+      },
+      estimated_delivery_time: option.estimated_delivery_time
+        ? {
+            type: option.estimated_delivery_time.type ?? 'unknown_frame',
+            unit: option.estimated_delivery_time.unit ?? 'hour',
+            value: option.estimated_delivery_time.shipping ?? 0,
+          }
+        : undefined,
+      estimated_delivery_final: option.estimated_delivery_time?.date
+        ? {
+            date: option.estimated_delivery_time.date,
+            time_from: option.estimated_delivery_time.time_frame?.from ?? '',
+            time_to: option.estimated_delivery_time.time_frame?.to ?? '',
+          }
+        : undefined,
+      shipping_mode: 'me2',
+      logistic_type: option.shipping_option_type,
+      treatment: option.shipping_method_type,
+      guaranteed: false,
+      order_priority: option.id,
+      tags: [],
+      speed: {
+        handling: option.estimated_delivery_time?.handling ?? 0,
+        shipping: option.estimated_delivery_time?.shipping ?? 0,
+      },
+    }));
+
     const cheapestOption = shippingOptions.length > 0 
       ? shippingOptions.reduce((min, option) => 
           (option.cost || 0) < (min.cost || 0) ? option : min
         )
       : null;
+
+    const coverage: MLShippingCalculateResponse['coverage'] = {
+      all_country: true,
+      excluded_places: [],
+    };
+
+    const destination: MLShippingCalculateResponse['destination'] | undefined = rawData.destination
+      ? {
+          type: 'address',
+          zip_code: rawData.destination.zip_code,
+          city_id: rawData.destination.city?.id ?? '',
+          city_name: rawData.destination.city?.name ?? '',
+          state_id: rawData.destination.state?.id ?? '',
+          state_name: rawData.destination.state?.name ?? '',
+          country_id: rawData.destination.country?.id ?? '',
+          country_name: rawData.destination.country?.name ?? '',
+        }
+      : undefined;
+
+    const input: MLShippingCalculateResponse['input'] = {
+      zipcode_source: '',
+      zipcode_target: options.zipcode,
+      dimensions: {
+        height: dimensions.height,
+        width: dimensions.width,
+        length: dimensions.length,
+        weight: dimensions.weight,
+      },
+      item_price: firstItem.price,
+      free_shipping: false,
+      list_cost: cheapestOption?.list_cost ?? 0,
+      cost: cheapestOption?.cost ?? 0,
+      seller_id: 0,
+    };
 
     const result: ME2ShippingResult = {
       shippingOptions,
@@ -281,10 +433,10 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       estimatedDelivery: cheapestOption?.estimated_delivery_time?.value ?? 5,
       totalCost: cheapestOption?.cost || 0,
       currency: cheapestOption?.currency_id || 'ARS',
-      coverage: data.coverage,
-      destination: data.destination,
-      source: data.source,
-      input: data.input,
+      coverage,
+      destination,
+      source: 'me2',
+      input,
       fallback: false,
     };
 
@@ -302,6 +454,15 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       zipcode: options.zipcode,
       error: error instanceof Error ? error.message : String(error)
     });
+
+    if (process.env.NODE_ENV === 'development') {
+      // Log adicional de depuración en desarrollo con el error completo
+      // eslint-disable-next-line no-console
+      console.error('ME2 DEV - Error in calculateME2ShippingCost', {
+        zipcode: options.zipcode,
+        error,
+      });
+    }
 
     // En caso de error, usar métodos locales configurados en BD como fallback
     const fallbackResult = await calculateLocalShippingFallback(options.zipcode, options.items);

@@ -43,6 +43,7 @@ const productFiltersSchema = z.object({
     .enum(['name', 'price', 'category', 'created_at', 'updated_at', 'stock', 'discount'])
     .default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  mlSyncStatus: z.enum(['pending', 'syncing', 'synced', 'error', 'conflict']).optional(),
 });
 
 // ✅ Obtener productos con paginación y filtros
@@ -69,6 +70,7 @@ export async function getProducts(
       search,
       sortBy,
       sortOrder,
+      mlSyncStatus,
     } = validatedFilters;
 
     // Construir condiciones de filtro
@@ -105,6 +107,9 @@ export async function getProducts(
     if (search) {
       conditions.push(like(products.name, `%${search}%`));
     }
+    if (mlSyncStatus) {
+      conditions.push(eq(products.mlSyncStatus, mlSyncStatus));
+    }
 
     // Obtener datos y conteo total en paralelo
     const [data, countResult] = await Promise.all([
@@ -113,6 +118,10 @@ export async function getProducts(
         orderBy: (sortOrder === 'desc' ? desc : asc)(products[sortBy]),
         limit: validatedLimit,
         offset,
+        // Incluir información de sincronización con Mercado Libre (syncError, etc.)
+        with: {
+          mlSync: true,
+        },
       }),
       db
         .select({ count: sql<number>`count(*)` })
@@ -122,10 +131,12 @@ export async function getProducts(
 
     const count = Number(countResult[0]?.count ?? 0);
 
-    // Normalizar imágenes para cada producto
+    // Normalizar imágenes para cada producto y aplanar información de sincronización ML relevante
     const normalizedData = data.map(product => ({
       ...product,
       images: normalizeImages(product.images),
+      // Exponer motivo de error de sincronización ME2 (si existe)
+      syncError: product.mlSync?.syncError ?? null,
     }));
 
     return {

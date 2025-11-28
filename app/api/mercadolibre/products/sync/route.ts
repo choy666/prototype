@@ -121,6 +121,85 @@ function mapProductAttributesToMercadoLibreAttributes(
   return mapped;
 }
 
+interface MLItemDetailsForMe2Validation {
+  id: string;
+  shipping?: {
+    mode?: string;
+    local_pick_up?: boolean;
+    free_shipping?: boolean;
+    logistic_type?: string;
+    store_pick_up?: boolean;
+    dimensions?: string | null;
+    methods?: unknown[];
+    tags?: string[];
+  };
+  [key: string]: unknown;
+}
+
+async function validateMe2ReadyForItem(
+  userId: number,
+  mlItemId: string,
+): Promise<{ isMe2Ready: boolean; reason?: string }> {
+  try {
+    const response = await makeAuthenticatedRequest(userId, `/items/${mlItemId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Error desconocido');
+      logger.error('Error obteniendo tem de ML para validacin ME2', {
+        mlItemId,
+        status: response.status,
+        error: errorText,
+      });
+      return {
+        isMe2Ready: false,
+        reason:
+          'La publicacin se cre en Mercado Libre pero no se pudo verificar la configuracin de envos ME2. Revisa el tem en Mercado Libre.',
+      };
+    }
+
+    const item = (await response.json()) as MLItemDetailsForMe2Validation;
+    const shipping = item.shipping;
+
+    if (!shipping) {
+      return {
+        isMe2Ready: false,
+        reason:
+          'La publicacin en Mercado Libre no tiene configuracin de envo. Configura Mercado Envos 2 (ME2) en la publicacin.',
+      };
+    }
+
+    if (shipping.mode !== 'me2') {
+      return {
+        isMe2Ready: false,
+        reason:
+          'La publicacin en Mercado Libre no est configurada con Mercado Envos 2 (shipping.mode != "me2"). Ajusta el modo de envo en ML.',
+      };
+    }
+
+    if (!shipping.dimensions || typeof shipping.dimensions !== 'string') {
+      return {
+        isMe2Ready: false,
+        reason:
+          'La publicacin en Mercado Libre no tiene dimensiones de envo configuradas. Debes informar peso, alto, ancho y largo para ME2.',
+      };
+    }
+
+    return { isMe2Ready: true };
+  } catch (error) {
+    logger.error('Error inesperado validando configuracin ME2 del tem de ML', {
+      mlItemId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      isMe2Ready: false,
+      reason:
+        'Ocurri un error al verificar la configuracin de ME2 en Mercado Libre. Intenta nuevamente o revisa la publicacin en ML.',
+    };
+  }
+}
+
 export async function POST(req: Request) {
   let productId: number | null = null;
   let productIdNum: number | null = null;
@@ -728,6 +807,7 @@ export async function POST(req: Request) {
       id: string;
       permalink?: string;
       thumbnail?: string;
+      variations?: Array<{ id: string | number; seller_custom_field?: string | null }>;
       [key: string]: unknown;
     }
     
@@ -738,23 +818,77 @@ export async function POST(req: Request) {
       if (timeoutId) clearTimeout(timeoutId);
       logger.error('Error parseando respuesta JSON de Mercado Libre', { 
         error: parseError instanceof Error ? parseError.message : String(parseError),
-        productId: productIdNum 
+        productId: productIdNum, 
       });
       throw new MercadoLibreError(
         MercadoLibreErrorCode.INVALID_REQUEST,
         'Respuesta inválida de Mercado Libre',
-        { originalError: parseError }
+        { originalError: parseError },
       );
     }
-    
-    const mlItemId = mlItem?.id;
+
+    const mlItemId = mlItem.id;
     if (!mlItemId) {
       if (timeoutId) clearTimeout(timeoutId);
       logger.error('Respuesta de ML no contiene ID válido', { mlItem, productId: productIdNum });
       throw new MercadoLibreError(
         MercadoLibreErrorCode.INVALID_REQUEST,
         'La respuesta de Mercado Libre no contiene un ID válido',
-        { mlItem }
+        { mlItem },
+      );
+    }
+
+    const me2Validation = await validateMe2ReadyForItem(parseInt(session.user.id), mlItemId);
+
+    if (!me2Validation.isMe2Ready) {
+      try {
+        await db.update(products)
+          .set({
+            mlItemId,
+            mlSyncStatus: 'error',
+            mlLastSync: new Date(),
+            mlPermalink: mlItem.permalink || null,
+            mlThumbnail: mlItem.thumbnail || null,
+            updated_at: new Date(),
+          })
+          .where(eq(products.id, productIdNum!));
+
+        await db.update(mercadolibreProductsSync)
+          .set({
+            mlItemId,
+            syncStatus: 'error',
+            lastSyncAt: new Date(),
+            mlData: mlItem,
+            syncError: me2Validation.reason ?? 'Error validando configuración de ME2',
+            updatedAt: new Date(),
+          })
+          .where(eq(mercadolibreProductsSync.id, syncRecord[0].id));
+      } catch (dbError) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Error actualizando estado de sincronización tras validación ME2', {
+          error: dbError instanceof Error ? dbError.message : String(dbError),
+          productId: productIdNum,
+          mlItemId,
+        });
+        throw new MercadoLibreError(
+          MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
+          'Error actualizando base de datos local después de validar ME2',
+          { originalError: dbError },
+        );
+      }
+
+      if (timeoutId) clearTimeout(timeoutId);
+
+      return NextResponse.json(
+        {
+          success: false,
+          productId: productIdNum!,
+          mlItemId,
+          mlPermalink: mlItem.permalink,
+          syncStatus: 'error',
+          error: me2Validation.reason,
+        },
+        { status: 400 },
       );
     }
 
@@ -775,12 +909,12 @@ export async function POST(req: Request) {
       // Actualizar IDs de variación si el producto tiene variantes
       if (hasVariants && mlItem.variations && Array.isArray(mlItem.variations)) {
         for (const mlVariation of mlItem.variations) {
-          // Mapear usando seller_custom_field que guardamos como referencia
-          const localVariantId = parseInt(mlVariation.seller_custom_field);
-          if (!isNaN(localVariantId)) {
+          const sellerCustomField = (mlVariation as { seller_custom_field?: string | null }).seller_custom_field;
+          const localVariantId = sellerCustomField ? parseInt(sellerCustomField) : NaN;
+          if (!Number.isNaN(localVariantId)) {
             await db.update(productVariants)
               .set({
-                mlVariationId: mlVariation.id.toString(),
+                mlVariationId: String((mlVariation as { id?: string | number }).id ?? ''),
                 mlSyncStatus: 'synced',
                 updated_at: new Date(),
               })
@@ -788,8 +922,8 @@ export async function POST(req: Request) {
             
             logger.info('Variante actualizada con ID de ML', {
               localVariantId,
-              mlVariationId: mlVariation.id,
-              productId: productIdNum
+              mlVariationId: (mlVariation as { id?: string | number }).id,
+              productId: productIdNum,
             });
           }
         }
@@ -799,12 +933,12 @@ export async function POST(req: Request) {
       logger.error('Error actualizando producto local con datos de ML', { 
         error: dbError instanceof Error ? dbError.message : String(dbError),
         productId: productIdNum,
-        mlItemId 
+        mlItemId, 
       });
       throw new MercadoLibreError(
         MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
         'Error actualizando base de datos local',
-        { originalError: dbError }
+        { originalError: dbError },
       );
     }
 
@@ -824,12 +958,12 @@ export async function POST(req: Request) {
       logger.error('Error actualizando registro de sincronización', { 
         error: dbError instanceof Error ? dbError.message : String(dbError),
         productId: productIdNum,
-        syncRecordId: syncRecord[0]?.id 
+        syncRecordId: syncRecord[0]?.id, 
       });
       throw new MercadoLibreError(
         MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
         'Error actualizando registro de sincronización',
-        { originalError: dbError }
+        { originalError: dbError },
       );
     }
 

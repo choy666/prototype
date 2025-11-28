@@ -62,6 +62,20 @@ export async function GET(request: NextRequest) {
     const maxStock = searchParams.get('maxStock') ? parseInt(searchParams.get('maxStock')!) : undefined
     const minDiscount = searchParams.get('minDiscount') ? parseInt(searchParams.get('minDiscount')!) : undefined
     const featured = searchParams.get('featured') === 'true' ? true : searchParams.get('featured') === 'false' ? false : undefined
+    const mlSyncStatusParam = searchParams.get('mlSyncStatus')
+
+    const allowedMlSyncStatuses = new Set([
+      'pending',
+      'syncing',
+      'synced',
+      'error',
+      'conflict',
+    ])
+
+    const mlSyncStatus =
+      mlSyncStatusParam && allowedMlSyncStatuses.has(mlSyncStatusParam)
+        ? (mlSyncStatusParam as 'pending' | 'syncing' | 'synced' | 'error' | 'conflict')
+        : undefined
 
     // Para admin, mostrar todos los productos (activos e inactivos)
     const result = await getProducts(page, limit, {
@@ -75,6 +89,7 @@ export async function GET(request: NextRequest) {
       maxStock,
       minDiscount,
       featured,
+      mlSyncStatus,
     }, true) // includeInactive = true para admin
 
     return NextResponse.json(result)

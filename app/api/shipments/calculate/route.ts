@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth/session';
 import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 import { logger } from '@/lib/utils/logger';
 import { z } from 'zod';
+import { db } from '@/lib/db';
 import type { MLShippingMethod } from '@/lib/types/shipping';
 
 const calculateShippingSchema = z.object({
@@ -10,7 +11,8 @@ const calculateShippingSchema = z.object({
   items: z.array(z.object({
     id: z.string().min(1, 'ID del item requerido'),
     quantity: z.number().min(1, 'Cantidad debe ser mayor a 0'),
-    price: z.number().min(0, 'Precio debe ser mayor o igual a 0')
+    price: z.number().min(0, 'Precio debe ser mayor o igual a 0'),
+    mlItemId: z.string().optional(),
   })).min(1, 'Se requiere al menos un item'),
   sellerAddressId: z.string().optional(),
   logisticType: z.enum(['drop_off', 'me2', 'me1']).default('drop_off'),
@@ -29,17 +31,43 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { zipcode, items, logisticType } = calculateShippingSchema.parse(body);
-    
+
+    // Enriquecer items con mlItemId desde la base de datos cuando esté disponible
+    const productIds = items
+      .map(item => parseInt(item.id, 10))
+      .filter(id => !Number.isNaN(id));
+
+    let enrichedItems = items;
+
+    if (productIds.length > 0) {
+      const dbProducts = await db.query.products.findMany({
+        where: (products, { inArray }) => inArray(products.id, productIds),
+        columns: {
+          id: true,
+          mlItemId: true,
+        },
+      });
+
+      const mlItemById = new Map<string, string | null>(
+        dbProducts.map(p => [p.id.toString(), p.mlItemId ?? null]),
+      );
+
+      enrichedItems = items.map(item => ({
+        ...item,
+        mlItemId: item.mlItemId ?? mlItemById.get(item.id) ?? undefined,
+      }));
+    }
+
     logger.info('Calculating ML shipping cost', { 
       zipcode, 
-      itemsCount: items.length,
+      itemsCount: enrichedItems.length,
       logisticType,
       userEmail: session.user.email 
     });
     
     const shippingData = await calculateME2ShippingCost({
       zipcode,
-      items,
+      items: enrichedItems,
     });
     
     // Formatear respuesta para el frontend
@@ -119,6 +147,7 @@ export async function GET(request: NextRequest) {
     const zipcode = searchParams.get('zipcode');
     const itemId = searchParams.get('item_id');
     const quantity = searchParams.get('quantity');
+    const mlItemId = searchParams.get('ml_item_id');
     
     if (!zipcode || !itemId || !quantity) {
       return NextResponse.json(
@@ -130,7 +159,8 @@ export async function GET(request: NextRequest) {
     const items = [{
       id: itemId,
       quantity: parseInt(quantity),
-      price: 0 // El precio no es necesario para cálculo básico
+      price: 0, // El precio no es necesario para cálculo básico
+      mlItemId: mlItemId ?? undefined,
     }];
     
     logger.info('Calculating ML shipping cost (GET)', { 

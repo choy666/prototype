@@ -39,6 +39,7 @@ interface Product {
   created_at: string
   mlItemId?: string | null
   mlSyncStatus?: string
+  syncError?: string | null
 }
 
 interface ApiResponse {
@@ -67,6 +68,7 @@ export default function AdminProductsPage() {
     maxStock: '',
     minDiscount: '',
     featured: '',
+    mlSyncStatus: '',
   })
   const [showFilters] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
@@ -93,6 +95,7 @@ export default function AdminProductsPage() {
         ...(filters.maxStock && { maxStock: filters.maxStock }),
         ...(filters.minDiscount && { minDiscount: filters.minDiscount }),
         ...(filters.featured && { featured: filters.featured }),
+        ...(filters.mlSyncStatus && { mlSyncStatus: filters.mlSyncStatus }),
       })
       const response = await fetch(`/api/admin/products?${params}`)
       if (!response.ok) throw new Error('Failed to fetch products')
@@ -364,6 +367,25 @@ export default function AdminProductsPage() {
                   />
                 </div>
                 <div>
+                  <label className="text-sm font-medium">Estado ME2</label>
+                  <Select
+                    value={filters.mlSyncStatus}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, mlSyncStatus: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="synced">ME2 ready</SelectItem>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="syncing">Sincronizando</SelectItem>
+                      <SelectItem value="error">Con error</SelectItem>
+                      <SelectItem value="conflict">Conflicto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <label className="text-sm font-medium">Destacado</label>
                   <Select value={filters.featured} onValueChange={(value) => setFilters(prev => ({ ...prev, featured: value }))}>
                     <SelectTrigger>
@@ -388,6 +410,7 @@ export default function AdminProductsPage() {
                       maxStock: '',
                       minDiscount: '',
                       featured: '',
+                      mlSyncStatus: '',
                     })}
                     className="w-full"
                   >
@@ -455,6 +478,11 @@ export default function AdminProductsPage() {
                       <p className="text-sm text-muted-foreground">
                         {product.category}
                       </p>
+                      {product.mlSyncStatus === 'error' && product.syncError && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400 truncate" title={product.syncError}>
+                          Motivo ME2: {product.syncError}
+                        </p>
+                      )}
                       <div className="flex items-center text-sm mt-1">
                         Stock: {product.stock}
                         {product.stock === 0 ? (
@@ -473,6 +501,11 @@ export default function AdminProductsPage() {
                         ) : (
                           <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
                             Inactivo
+                          </span>
+                        )}
+                        {product.mlSyncStatus === 'synced' && product.mlItemId && (
+                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
+                            ME2 ready
                           </span>
                         )}
                       </div>

@@ -67,6 +67,7 @@ export interface ProductFilters {
   limit?: number;
   minDiscount?: number; // 🔥 agregado para la categoría OFERTAS
   featured?: boolean;
+  mlSyncStatus?: 'pending' | 'syncing' | 'synced' | 'error' | 'conflict';
 }
 
 export interface Pagination {
