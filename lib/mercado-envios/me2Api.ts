@@ -479,9 +479,11 @@ export async function calculateME2Shipping(request: ME2CalculationRequest): Prom
           // Usar ME2 real
           const firstItem = items[0];
           if (!firstItem?.mlItemId) {
+      const errorMsg = `Falta mlItemId para el item ${firstItem.id} para el zipcode ${zipcode}`;
+      logger.error('[ME2] Error: ' + errorMsg, { zipcode, localProductId: firstItem.id });
             throw new MercadoLibreError(
               MercadoLibreErrorCode.SHIPPING_CALCULATION_FAILED,
-              'Se requiere mlItemId para cálculo ME2'
+        errorMsg
             );
           }
 
