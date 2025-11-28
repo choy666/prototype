@@ -29,6 +29,9 @@ export const categories = pgTable("categories", {
   mlCategoryId: text("ml_category_id").unique(), // ID de categoría de Mercado Libre
   isMlOfficial: boolean("is_ml_official").default(false).notNull(), // Indica si es categoría oficial de ML
   isLeaf: boolean("is_leaf").default(false).notNull(), // Indica si es categoría hoja (se puede usar para publicar)
+  // Nuevos campos ME2
+  attributes: jsonb("attributes"), // Atributos de la categoría desde ML API
+  me2Compatible: boolean("me2_compatible").default(false), // Indica si la categoría tiene atributos suficientes para ME2
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -66,6 +69,10 @@ export const products = pgTable("products", {
   mlPermalink: text("ml_permalink"),
   mlThumbnail: text("ml_thumbnail"),
   mlVideoId: text("ml_video_id"),
+  // Nuevos campos ME2
+  shippingMode: varchar("shipping_mode", { length: 20 }).default("me2"), // Modo de envío ML
+  shippingAttributes: jsonb("shipping_attributes"), // Atributos de envío específicos para ME2
+  me2Compatible: boolean("me2_compatible").default(false), // Indica si el producto es compatible con ME2
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });

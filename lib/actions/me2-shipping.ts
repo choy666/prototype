@@ -7,6 +7,7 @@ import { shippingMethods } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import type { MLShippingMethod } from '@/lib/types/shipping';
 import type { MLShippingCalculateResponse } from '@/types/mercadolibre';
+import { getValidatedME2Dimensions } from '@/lib/validations/me2-products';
 
 // Configuración de Mercado Libre
 const MERCADOLIBRE_API_URL = 'https://api.mercadolibre.com';
@@ -97,76 +98,6 @@ interface MLItemShippingOptionsApiResponse {
   } | null;
 }
 
-// Obtener dimensiones reales de los productos desde la base de datos
-async function getProductsDimensions(items: ShippingItem[]): Promise<ShippingDimensions> {
-  try {
-    const productIds = items.map(item => parseInt(item.id)).filter(id => !isNaN(id));
-    
-    if (productIds.length === 0) {
-      throw new Error('No hay IDs de productos válidos');
-    }
-
-    const dbProducts = await db.query.products.findMany({
-      where: (products, { inArray }) => inArray(products.id, productIds),
-      columns: {
-        id: true,
-        height: true,
-        width: true,
-        length: true,
-        weight: true
-      }
-    });
-
-    if (dbProducts.length === 0) {
-      throw new Error('No se encontraron productos en la base de datos');
-    }
-
-    // Calcular dimensiones totales (suma de volúmenes, peso total)
-    let totalHeight = 0;
-    let totalWidth = 0;
-    let totalLength = 0;
-    let totalWeight = 0;
-
-    for (const item of items) {
-      const product = dbProducts.find(p => p.id === parseInt(item.id));
-      if (!product) {
-        logger.warn(`Producto ${item.id} no encontrado en BD, usando dimensiones por defecto`);
-        continue;
-      }
-
-      const itemHeight = Number(product.height) || 10;
-      const itemWidth = Number(product.width) || 10;
-      const itemLength = Number(product.length) || 10;
-      const itemWeight = Number(product.weight) || 0.5;
-
-      // Para múltiples items, acumular peso
-      totalWeight += itemWeight * item.quantity;
-      
-      // Calcular dimensiones aproximadas del paquete combinado
-      totalLength = Math.max(totalLength, itemLength);
-      totalWidth = Math.max(totalWidth, itemWidth);
-      totalHeight += itemHeight * item.quantity;
-    }
-
-    return {
-      height: totalHeight,
-      width: totalWidth,
-      length: totalLength,
-      weight: totalWeight
-    };
-
-  } catch (error) {
-    logger.error('Error obteniendo dimensiones de productos:', error);
-    // Retornar dimensiones por defecto en caso de error
-    return {
-      height: 10,
-      width: 10,
-      length: 10,
-      weight: 0.5
-    };
-  }
-}
-
 async function calculateLocalShippingFallback(zipcode: string, items: ShippingItem[]): Promise<ME2ShippingResult> {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -244,14 +175,27 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
 // Calcular costo de envío usando API de Mercado Libre ME2
 export async function calculateME2ShippingCost(options: ME2ShippingOptions): Promise<ME2ShippingResult> {
   try {
-    logger.info('Calculando costo de envío ME2', { zipcode: options.zipcode, itemCount: options.items.length });
+    logger.info('[ME2] Request: Iniciando cálculo de envío', { 
+      zipcode: options.zipcode, 
+      itemCount: options.items.length,
+      items: options.items.map(i => ({ id: i.id, quantity: i.quantity, price: i.price, mlItemId: i.mlItemId }))
+    });
 
-    // Obtener dimensiones reales de los productos
-    const dimensions = options.dimensions || await getProductsDimensions(options.items);
+    // Obtener dimensiones validadas de los productos con validaciones ME2
+    const productIds = options.items.map(item => parseInt(item.id)).filter(id => !isNaN(id));
+    const dimensionsData = await getValidatedME2Dimensions(productIds);
+    const dimensions = options.dimensions || dimensionsData.dimensions;
     
-    logger.info('Dimensiones calculadas', dimensions);
-
-    // Preparar el payload para la API de ML
+    // Log de advertencias ME2 si hay productos inválidos
+    if (dimensionsData.hasInvalidProducts) {
+      logger.warn('[ME2] Validación: Advertencias de productos detectadas', {
+        zipcode: options.zipcode,
+        warnings: dimensionsData.validationWarnings.slice(0, 5), // Limitar a primeras 5 advertencias
+        hasInvalidProducts: dimensionsData.hasInvalidProducts
+      });
+    }
+    
+    logger.info('[ME2] Request: Obteniendo dimensiones de productos', { dimensions });
 
     // Hacer request a la API de Mercado Libre con reintentos
     const auth = await MercadoLibreAuth.getInstance();
@@ -275,11 +219,19 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
 
     const mlItemId = firstItem.mlItemId;
 
+    logger.info('[ME2] Request: Consultando API de Mercado Libre', {
+      url: `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options`,
+      zipcode: options.zipcode,
+      itemId: mlItemId,
+      dimensions,
+      logisticType: 'me2'
+    });
+
     if (!mlItemId) {
-      logger.info('ME2: mlItemId no presente para el item, usando fallback local', {
-        zipcode: options.zipcode,
-        localProductId: firstItem.id,
-      });
+        logger.error('[ME2] Error: Falta mlItemId para el item', {
+          zipcode: options.zipcode,
+          localProductId: firstItem.id,
+        });
 
       return calculateLocalShippingFallback(options.zipcode, options.items);
     }
@@ -343,6 +295,12 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     });
 
     const rawData = (await response.json()) as MLItemShippingOptionsApiResponse;
+    
+    logger.info('[ME2] Response: Opciones obtenidas de Mercado Libre', {
+      optionsCount: rawData.options?.length || 0,
+      zipcode: options.zipcode,
+      destination: rawData.destination
+    });
     
     // Procesar resultados según la estructura real de la API de ML
     const shippingOptions: MLShippingMethod[] = (rawData.options ?? []).map((option): MLShippingMethod => ({
@@ -440,29 +398,42 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       fallback: false,
     };
 
-    logger.info('Cálculo de envío ME2 completado', {
+    logger.info('[ME2] Response: Cálculo completado', {
       zipcode: options.zipcode,
       totalCost: result.totalCost,
       optionsCount: shippingOptions.length,
-      deliveryDays: result.estimatedDelivery
+      deliveryDays: result.estimatedDelivery,
+      cheapestOption: cheapestOption?.name || 'N/A',
+      source: result.source,
+      fallback: result.fallback
     });
 
     return result;
 
   } catch (error) {
-    logger.error('Error en cálculo de envío ME2', {
+    logger.error('[ME2] Error: Error en cálculo de envío', {
       zipcode: options.zipcode,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      errorType: error instanceof MercadoLibreError ? error.code : 'UNKNOWN',
+      statusCode: error instanceof MercadoLibreError && error.details ? (error.details as { status?: number }).status : 'N/A'
     });
 
     if (process.env.NODE_ENV === 'development') {
       // Log adicional de depuración en desarrollo con el error completo
       // eslint-disable-next-line no-console
-      console.error('ME2 DEV - Error in calculateME2ShippingCost', {
+      console.error('[ME2] DEV - Error detallado', {
         zipcode: options.zipcode,
         error,
+        errorStack: error instanceof Error ? error.stack : 'N/A',
+        details: error instanceof MercadoLibreError ? error.details : 'N/A'
       });
     }
+
+    logger.warn('[ME2] Fallback: Activando envío local por error de ML', {
+      zipcode: options.zipcode,
+      originalError: error instanceof Error ? error.message : String(error),
+      itemCount: options.items.length
+    });
 
     // En caso de error, usar métodos locales configurados en BD como fallback
     const fallbackResult = await calculateLocalShippingFallback(options.zipcode, options.items);
