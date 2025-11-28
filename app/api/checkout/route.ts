@@ -299,7 +299,7 @@ export async function POST(req: NextRequest) {
             state_name: shippingAddress.provincia,
             country_name: "Argentina",
           },
-          mode: "me2", // Cambiar a me2 que es más compatible con receiver_address
+          mode: "custom", // ME2 no está activo en esta cuenta - usar custom
           dimensions: "10x10x10,500", // defaults seguros
         },
       },
