@@ -242,9 +242,6 @@ export async function POST(req: NextRequest) {
       total: total.toString(),
     };
 
-    // Loggear antes de enviar a MercadoPago
-    console.log("Metadata enviada a MP:", metadata);
-
     // Crear preferencia de pago según documentación oficial de Mercado Pago
     const preference = await mercadopago.create({
       body: {
@@ -273,12 +270,12 @@ export async function POST(req: NextRequest) {
           name: payerInfo.name,
         },
         back_urls: {
-          success: process.env.MERCADO_PAGO_SUCCESS_URL,
-          failure: process.env.MERCADO_PAGO_FAILURE_URL,
-          pending: process.env.MERCADO_PAGO_PENDING_URL,
+          success: process.env.MERCADO_PAGO_SUCCESS_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/payment-success`,
+          failure: process.env.MERCADO_PAGO_FAILURE_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/payment-failure`,
+          pending: process.env.MERCADO_PAGO_PENDING_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/payment-pending`,
         },
         auto_return: "approved",
-        notification_url: process.env.MERCADO_PAGO_NOTIFICATION_URL || `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`,
+        notification_url: process.env.MERCADO_PAGO_NOTIFICATION_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/api/webhooks/mercadopago`,
         external_reference: metadata.user_id,
         metadata: metadata,
         payment_methods: {
@@ -295,15 +292,19 @@ export async function POST(req: NextRequest) {
             floor: shippingAddress.piso,
             apartment: shippingAddress.departamento,
           },
-          mode: "me2", // Mercado Envíos 2
-          dimensions: "10x10x10,500", // defaults seguros para ME2
+          mode: process.env.MERCADO_PAGO_SHIPMENTS_MODE || "custom", // Configurable via env var
+          dimensions: "10x10x10,500", // defaults seguros
         },
       },
     });
 
+    // Debug: Verificar estructura de respuesta de Mercado Pago
+    console.log("Respuesta completa de Mercado Pago:", JSON.stringify(preference, null, 2));
+    
     logger.info('Checkout: Preferencia de MercadoPago creada exitosamente', {
       preferenceId: preference.id,
       initPoint: preference.init_point,
+      sandboxInitPoint: preference.sandbox_init_point,
       total,
       itemsCount: items.length,
       shippingCost
@@ -311,8 +312,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       preferenceId: preference.id,
+      init_point: preference.init_point, // Campo que espera el frontend
       initPoint: preference.init_point,
+      sandbox_init_point: preference.sandbox_init_point, // Campo que espera el frontend
       sandboxInitPoint: preference.sandbox_init_point,
+      paymentUrl: preference.init_point, // Campo adicional para compatibilidad
       total,
       subtotal,
       shippingCost,
