@@ -91,17 +91,18 @@ const client = new MercadoPagoConfig({
 });
 
 // Función asíncrona para procesar pagos en background con retry robusto
-async function processPaymentInBackground(paymentId: string, requestId: string, retryCount = 0) {
+async function processPaymentInBackground(paymentId: string, requestId: string, eventType?: string, retryCount = 0) {
   const MAX_RETRIES = 3;
   
   try {
     logger.info('Procesando pago en background', {
       requestId,
       paymentId,
+      eventType,
       retryCount
     });
 
-    await handlePaymentEvent(paymentId, requestId);
+    await handlePaymentEvent(paymentId, requestId, eventType);
     
     logger.info('Pago procesado exitosamente en background', {
       requestId,
@@ -259,7 +260,7 @@ export async function POST(req: Request) {
       });
       
       // Encolar procesamiento asíncrono y responder 200 inmediatamente
-      processPaymentInBackground(eventId.toString(), requestId)
+      processPaymentInBackground(eventId.toString(), requestId, eventType)
         .catch(error => {
           logger.error('Error en procesamiento asíncrono de pago', {
             requestId,
@@ -280,7 +281,7 @@ export async function POST(req: Request) {
       });
       
       // Encolar procesamiento asíncrono para merchant order y responder 200 inmediatamente
-      processPaymentInBackground(eventId.toString(), requestId)
+      processPaymentInBackground(eventId.toString(), requestId, eventType)
         .catch(error => {
           logger.error('Error en procesamiento asíncrono de merchant_order', {
             requestId,
@@ -322,11 +323,12 @@ export async function POST(req: Request) {
   }
 }
 
-async function handlePaymentEvent(paymentId: string, requestId: string) {
+async function handlePaymentEvent(paymentId: string, requestId: string, eventType?: string) {
   try {
-    logger.info('handlePaymentEvent: Consultando pago en MercadoPago API', { 
+    logger.info('handlePaymentEvent: Consultando en MercadoPago API', { 
       requestId,
-      paymentId 
+      paymentId,
+      eventType
     });
 
     // Verificar idempotencia - no procesar duplicados
@@ -396,8 +398,60 @@ async function handlePaymentEvent(paymentId: string, requestId: string) {
       return;
     }
 
-    // Hacer consulta directa a la API de Mercado Pago con ACCESS_TOKEN
-    const payment = await new Payment(client).get({ id: paymentId });
+    let payment: any;
+
+    // Usar endpoint diferente según el tipo de evento
+    if (eventType === 'merchant_order') {
+      logger.info('Consultando merchant order en API de Mercado Pago', { paymentId });
+      
+      // Importar MerchantOrder client
+      const { MerchantOrder } = await import('mercadopago');
+      const merchantOrderClient = new MerchantOrder(client);
+      const merchantOrder = await merchantOrderClient.get({ merchantOrderId: paymentId });
+      
+      if (!merchantOrder) {
+        logger.error('Merchant order no encontrado', { paymentId });
+        return;
+      }
+      
+      // Extraer pagos del merchant order
+      if (!merchantOrder.payments || merchantOrder.payments.length === 0) {
+        logger.error('Merchant order sin pagos asociados', { paymentId });
+        return;
+      }
+      
+      logger.info('Merchant order encontrado, buscando pago aprobado', {
+        merchantOrderId: paymentId,
+        paymentCount: merchantOrder.payments.length
+      });
+      
+      // Buscar pago aprobado o el primero disponible
+      let approvedPayment = merchantOrder.payments.find((p: any) => p.status === 'approved');
+      if (!approvedPayment) {
+        approvedPayment = merchantOrder.payments[0]; // Usar el primero si no hay aprobados
+        logger.warn('No se encontró pago aprobado, usando primer pago', {
+          firstPaymentStatus: approvedPayment.status,
+          firstPaymentId: approvedPayment.id
+        });
+      }
+      
+      // Obtener detalles completos del pago usando el Payment client
+      const { Payment } = await import('mercadopago');
+      const paymentClient = new Payment(client);
+      payment = await paymentClient.get({ id: approvedPayment.id! });
+      
+      logger.info('Detalles completos del pago obtenidos', {
+        paymentId: payment.id,
+        status: payment.status,
+        merchantOrderId: paymentId
+      });
+    } else {
+      // Endpoint normal para payments
+      logger.info('Consultando payment en API de Mercado Pago', { paymentId });
+      const { Payment } = await import('mercadopago');
+      const paymentClient = new Payment(client);
+      payment = await paymentClient.get({ id: paymentId });
+    }
 
     if (!payment) {
       logger.error('Pago no encontrado en MercadoPago API', { paymentId });
