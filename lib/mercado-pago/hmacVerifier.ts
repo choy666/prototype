@@ -238,6 +238,12 @@ export function verifyHmacSHA256(
   console.log('EXPECTED SIGNATURE:', expectedSignature);
   console.log('RECEIVED SIGNATURE:', signature);
   console.log('SIGNATURES MATCH:', signature === expectedSignature);
+  
+  // TEMPORAL: Probar firmando el raw body directamente
+  const rawBodySignature = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+  console.log('RAW BODY SIGNATURE:', rawBodySignature);
+  console.log('RAW BODY MATCHES:', signature === rawBodySignature);
+  
   console.log('==================');
 
   // Comparar firmas de forma segura
