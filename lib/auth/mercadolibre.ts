@@ -477,6 +477,49 @@ export class MercadoLibreAuth {
     return MercadoLibreAuth.instance;
   }
   
+  private async refreshAndPersist(userId: number, refreshToken: string): Promise<string> {
+    try {
+      const newTokens = await refreshAccessToken(refreshToken);
+      
+      // Guardar tokens actualizados en BD
+      const now = new Date();
+      const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
+      
+      await db.update(users)
+        .set({
+          mercadoLibreAccessToken: newTokens.access_token,
+          mercadoLibreRefreshToken: newTokens.refresh_token,
+          mercadoLibreAccessTokenExpiresAt: newAccessTokenExpiresAt,
+          mercadoLibreScopes: newTokens.scope || '',
+          updatedAt: now,
+        })
+        .where(eq(users.id, userId));
+
+      logger.info('MercadoLibreAuth: Tokens refrescados y persistidos', { userId });
+      return newTokens.access_token;
+      
+    } catch (error) {
+      logger.error('MercadoLibreAuth: Error refrescando y persistiendo tokens', {
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      // Limpiar tokens inválidos
+      await db.update(users)
+        .set({
+          mercadoLibreAccessToken: null,
+          mercadoLibreRefreshToken: null,
+          mercadoLibreAccessTokenExpiresAt: null,
+          mercadoLibreRefreshTokenExpiresAt: null,
+          mercadoLibreScopes: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+      
+      throw error;
+    }
+  }
+  
   public async getAccessToken(): Promise<string> {
     // Obtener el primer usuario con tokens de ML
     const user = await db.query.users.findFirst({
@@ -496,13 +539,30 @@ export class MercadoLibreAuth {
     // Verificar si el token ha expirado y refresh si es necesario
     if (user.mercadoLibreAccessTokenExpiresAt && new Date() > user.mercadoLibreAccessTokenExpiresAt) {
       if (user.mercadoLibreRefreshToken) {
-        const newTokens = await refreshAccessToken(user.mercadoLibreRefreshToken);
-        return newTokens.access_token;
+        return await this.refreshAndPersist(user.id, user.mercadoLibreRefreshToken);
       } else {
         throw new Error('Token de acceso expirado y no hay refresh token');
       }
     }
     
     return user.mercadoLibreAccessToken;
+  }
+  
+  // Método público para refresh explícito (usado por me2-shipping.ts)
+  public async refreshAccessToken(): Promise<string> {
+    // Obtener el primer usuario con refresh token
+    const user = await db.query.users.findFirst({
+      where: (users, { isNotNull }) => isNotNull(users.mercadoLibreRefreshToken),
+      columns: {
+        mercadoLibreRefreshToken: true,
+        id: true,
+      },
+    });
+    
+    if (!user?.mercadoLibreRefreshToken) {
+      throw new Error('No se encontró refresh token de Mercado Libre');
+    }
+    
+    return await this.refreshAndPersist(user.id, user.mercadoLibreRefreshToken);
   }
 }

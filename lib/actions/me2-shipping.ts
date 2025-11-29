@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import type { MLShippingMethod } from '@/lib/types/shipping';
 import type { MLShippingCalculateResponse } from '@/types/mercadolibre';
 import { getValidatedME2Dimensions } from '@/lib/validations/me2-products';
+import { me2ShippingCircuitBreaker } from '@/lib/utils/circuit-breaker';
 
 // Configuración de Mercado Libre
 const MERCADOLIBRE_API_URL = 'https://api.mercadolibre.com';
@@ -250,48 +251,108 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       logistic_type: 'me2'
     };
 
-    const response = await retryWithBackoff(async () => {
-      const url = `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options?zip_code=${encodeURIComponent(options.zipcode)}`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-        },
-      });
-      
-      if (!res.ok) {
-        const errorBody = await res.text();
+    const response = await me2ShippingCircuitBreaker.execute(async () => {
+      return await retryWithBackoff(async () => {
+        const url = `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options?zip_code=${encodeURIComponent(options.zipcode)}`;
+        
+        // Timeout handling con Promise.race() - 8 segundos máximo para API calls
+        const timeoutPromise = new Promise<Response>((_, reject) => {
+          setTimeout(() => {
+            reject(new MercadoLibreError(
+              MercadoLibreErrorCode.TIMEOUT_ERROR,
+              'Timeout en llamada a API de Mercado Libre (8s)',
+              { url, zipcode: options.zipcode, timeout: 8000 }
+            ));
+          }, 8000);
+        });
 
-        if (process.env.NODE_ENV === 'development') {
-          // Log de depuración SIN sanitizar para entorno de desarrollo
-          // eslint-disable-next-line no-console
-          console.error('ME2 DEV - Error response from ML shipping_options', {
-            status: res.status,
-            zipcode: options.zipcode,
-            itemId: mlItemId,
-            url,
-            requestBody,
-            responseBody: errorBody,
-          });
+        const apiCall = fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        const res = await Promise.race([apiCall, timeoutPromise]) as Response;
+        
+        if (!res.ok) {
+          const errorBody = await res.text();
+
+          if (process.env.NODE_ENV === 'development') {
+            // Log de depuración SIN sanitizar para entorno de desarrollo
+            // eslint-disable-next-line no-console
+            console.error('ME2 DEV - Error response from ML shipping_options', {
+              status: res.status,
+              zipcode: options.zipcode,
+              itemId: mlItemId,
+              url,
+              requestBody,
+              responseBody: errorBody,
+            });
+          }
+
+          // Rate limit handling específico
+          if (res.status === 429) {
+            throw new MercadoLibreError(
+              MercadoLibreErrorCode.RATE_LIMIT_EXCEEDED,
+              `Rate limit excedido en API de Mercado Libre: ${errorBody}`,
+              { status: res.status, zipcode: options.zipcode, retryAfter: res.headers.get('Retry-After') }
+            );
+          }
+
+          // Authentication errors - excluir del circuit breaker
+          if (res.status === 401 || res.status === 403) {
+            logger.warn('[ME2] Error: Problema de autenticación con Mercado Libre', {
+              status: res.status,
+              zipcode: options.zipcode,
+              itemId: mlItemId,
+              errorBody: errorBody.substring(0, 200) // Limitar longitud
+            });
+            
+            // Forzar refresh de token
+            const auth = await MercadoLibreAuth.getInstance();
+            await auth.refreshAccessToken();
+            
+            // Lanzar error especial que no afecta al circuit breaker
+            const authError = new MercadoLibreError(
+              MercadoLibreErrorCode.AUTH_FAILED,
+              `Error de autenticación con Mercado Libre: ${errorBody}`,
+              { status: res.status, zipcode: options.zipcode }
+            );
+            // Marcar para que circuit breaker no cuente este fallo
+            (authError as MercadoLibreError & { skipCircuitBreaker?: boolean }).skipCircuitBreaker = true;
+            throw authError;
+          }
+
+          throw new MercadoLibreError(
+            MercadoLibreErrorCode.SHIPPING_CALCULATION_FAILED,
+            `Error calculando envío ME2: ${errorBody}`,
+            { status: res.status, zipcode: options.zipcode, dimensions, itemId: mlItemId }
+          );
         }
-
-        throw new MercadoLibreError(
-          MercadoLibreErrorCode.SHIPPING_CALCULATION_FAILED,
-          `Error calculando envío ME2: ${errorBody}`,
-          { status: res.status, zipcode: options.zipcode, dimensions, itemId: mlItemId }
-        );
-      }
-      
-      return res;
-    }, {
-      maxRetries: 3,
-      shouldRetry: (error) => {
-        return error instanceof MercadoLibreError && 
-               (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
-                error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
-                error.code === MercadoLibreErrorCode.API_UNAVAILABLE);
-      }
+        
+        return res;
+      }, {
+        maxRetries: 3,
+        shouldRetry: (error) => {
+          if (error instanceof MercadoLibreError) {
+            // No reintentar en errores de autenticación (se refresh el token)
+            if (error.code === MercadoLibreErrorCode.AUTH_FAILED) return false;
+            
+            // Reintentar con más backoff para rate limits
+            if (error.code === MercadoLibreErrorCode.RATE_LIMIT_EXCEEDED) return true;
+            
+            // Reintentar errores de conexión y timeout
+            return error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
+                   error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
+                   error.code === MercadoLibreErrorCode.API_UNAVAILABLE;
+          }
+          return false;
+        },
+        initialDelay: 1000, // 1 segundo base delay
+        maxDelay: 10000  // 10 segundos máximo delay
+      });
     });
 
     const rawData = (await response.json()) as MLItemShippingOptionsApiResponse;
