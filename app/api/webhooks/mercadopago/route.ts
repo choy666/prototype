@@ -263,7 +263,6 @@ export async function POST(req: Request) {
         .catch(error => {
           logger.error('Error en procesamiento asíncrono de pago', {
             requestId,
-            eventId,
             error: error instanceof Error ? error.message : String(error)
           });
         });
@@ -272,6 +271,27 @@ export async function POST(req: Request) {
         success: true, 
         requestId,
         message: 'Pago recibido y encolado para procesamiento'
+      });
+      
+    } else if (eventType === 'merchant_order' && eventId) {
+      logger.info(`Procesando evento merchant_order - consultando API de MercadoPago`, {
+        requestId,
+        eventId
+      });
+      
+      // Encolar procesamiento asíncrono para merchant order y responder 200 inmediatamente
+      processPaymentInBackground(eventId.toString(), requestId)
+        .catch(error => {
+          logger.error('Error en procesamiento asíncrono de merchant_order', {
+            requestId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
+      
+      return NextResponse.json({ 
+        success: true, 
+        requestId,
+        message: 'Merchant order recibido y encolado para procesamiento'
       });
       
     } else {
