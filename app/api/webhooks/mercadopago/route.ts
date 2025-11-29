@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/webhooks/mercadopago/route.ts
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Payment } from 'mercadopago';
+import { MercadoPagoConfig } from 'mercadopago';
 import { logger } from '@/lib/utils/logger';
 import { db } from '@/lib/db';
 import { orders, orderItems, carts, cartItems } from '@/lib/schema';
@@ -426,7 +427,7 @@ async function handlePaymentEvent(paymentId: string, requestId: string, eventTyp
       });
       
       // Buscar pago aprobado o el primero disponible
-      let approvedPayment = merchantOrder.payments.find((p: any) => p.status === 'approved');
+      let approvedPayment = merchantOrder.payments.find((p) => p.status === 'approved');
       if (!approvedPayment) {
         approvedPayment = merchantOrder.payments[0]; // Usar el primero si no hay aprobados
         logger.warn('No se encontró pago aprobado, usando primer pago', {
