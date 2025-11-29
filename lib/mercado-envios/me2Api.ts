@@ -405,6 +405,7 @@ async function calculateLocalShippingFallback(zipcode: string, items: ProductFor
       estimatedDelivery: 5,
       totalCost: cheapestOption?.cost || 0,
       currency: 'ARS',
+      source: 'local',
       fallback: true,
       message: 'Usando métodos de envío locales configurados en la tienda',
     };

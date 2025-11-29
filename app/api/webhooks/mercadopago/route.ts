@@ -333,19 +333,21 @@ async function handlePaymentEvent(paymentId: string, requestId: string, eventTyp
     });
 
     // Verificar idempotencia - no procesar duplicados
-    const existingOrder = await db.query.orders.findFirst({
-      where: eq(orders.paymentId, paymentId),
-      columns: { id: true, status: true }
-    });
-
-    if (existingOrder) {
-      logger.info('Pago ya procesado previamente', {
-        requestId,
-        paymentId,
-        existingOrderId: existingOrder.id,
-        existingStatus: existingOrder.status
+    if (eventType !== 'merchant_order') {
+      const existingOrder = await db.query.orders.findFirst({
+        where: eq(orders.paymentId, paymentId),
+        columns: { id: true, status: true }
       });
-      return; // Salir silenciosamente, ya fue procesado
+
+      if (existingOrder) {
+        logger.info('Pago ya procesado previamente', {
+          requestId,
+          paymentId,
+          existingOrderId: existingOrder.id,
+          existingStatus: existingOrder.status
+        });
+        return; // Salir silenciosamente, ya fue procesado
+      }
     }
 
     // Para testing local, simular respuesta de MercadoPago
@@ -496,6 +498,29 @@ async function handlePaymentEvent(paymentId: string, requestId: string, eventTyp
 async function createOrderFromPayment(payment: any) {
   try {
     logger.info('Creando orden desde pago aprobado', { paymentId: payment.id });
+
+    const paymentId = payment && payment.id !== undefined && payment.id !== null
+      ? String(payment.id)
+      : null;
+
+    if (!paymentId) {
+      logger.error('Metadata incompleta: pago sin id válido, abortando creación de orden');
+      return;
+    }
+
+    const existingOrder = await db.query.orders.findFirst({
+      where: eq(orders.paymentId, paymentId),
+      columns: { id: true, status: true }
+    });
+
+    if (existingOrder) {
+      logger.info('Pago ya procesado previamente en createOrderFromPayment', {
+        paymentId,
+        existingOrderId: existingOrder.id,
+        existingStatus: existingOrder.status
+      });
+      return;
+    }
 
     // Extraer metadata del pago
     const metadata = payment.metadata || {};
@@ -768,37 +793,52 @@ async function createOrderFromPayment(payment: any) {
     await db.insert(orderItems).values(orderItemsData);
     logger.info('Items de orden creados', { orderId, itemsCount: orderItemsData.length });
 
-    // Deducción de stock después de crear la orden exitosamente
-    logger.info('Deducir stock para orden creada', { orderId, itemsCount: items.length });
-    for (const item of items) {
-      if (item.variantId) {
-        // Deducción de stock de variante
-        const { adjustVariantStock } = await import('@/lib/actions/stock');
-        await adjustVariantStock({
-          variantId: item.variantId,
-          change: -item.quantity,
-          reason: `Venta - Orden ${orderId}`
-        }, {
-          bypassAuth: true,
-          userId: userId
-        });
-        logger.info('Stock de variante deducido', { variantId: item.variantId, quantity: item.quantity });
-      } else {
-        // Deducción de stock del producto base
-        const { adjustProductStock } = await import('@/lib/actions/stock');
-        await adjustProductStock({
-          productId: parseInt(item.id),
-          change: -item.quantity,
-          reason: `Venta - Orden ${orderId}`
-        }, {
-          bypassAuth: true,
-          userId: userId
-        });
-        logger.info('Stock de producto deducido', { productId: item.id, quantity: item.quantity });
-      }
-    }
+    // Comprobar si el stock ya fue deducido para esta orden
+    const orderRecord = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      columns: { stockDeducted: true }
+    });
 
-    logger.info('Deducción de stock completada para orden', { orderId });
+    if (orderRecord?.stockDeducted) {
+      logger.warn('Stock ya fue deducido previamente para esta orden, omitiendo nueva deducción', { orderId });
+    } else {
+      // Deducción de stock después de crear la orden exitosamente
+      logger.info('Deducir stock para orden creada', { orderId, itemsCount: items.length });
+      for (const item of items) {
+        if (item.variantId) {
+          // Deducción de stock de variante
+          const { adjustVariantStock } = await import('@/lib/actions/stock');
+          await adjustVariantStock({
+            variantId: item.variantId,
+            change: -item.quantity,
+            reason: `Venta - Orden ${orderId}`
+          }, {
+            bypassAuth: true,
+            userId: userId
+          });
+          logger.info('Stock de variante deducido', { variantId: item.variantId, quantity: item.quantity });
+        } else {
+          // Deducción de stock del producto base
+          const { adjustProductStock } = await import('@/lib/actions/stock');
+          await adjustProductStock({
+            productId: parseInt(item.id),
+            change: -item.quantity,
+            reason: `Venta - Orden ${orderId}`
+          }, {
+            bypassAuth: true,
+            userId: userId
+          });
+          logger.info('Stock de producto deducido', { productId: item.id, quantity: item.quantity });
+        }
+      }
+
+      // Marcar la orden como con stock ya deducido
+      await db.update(orders)
+        .set({ stockDeducted: true })
+        .where(eq(orders.id, orderId));
+
+      logger.info('Deducción de stock completada para orden y flag actualizado', { orderId });
+    }
 
     // Limpiar el carrito del usuario después de una compra exitosa
     logger.info('Limpiando carrito del usuario después de compra exitosa', { userId });
@@ -841,6 +881,29 @@ async function createOrderFromPayment(payment: any) {
 async function createRejectedOrderFromPayment(payment: any) {
   try {
     logger.info('Procesando pago rechazado', { paymentId: payment.id });
+
+    const paymentId = payment && payment.id !== undefined && payment.id !== null
+      ? String(payment.id)
+      : null;
+
+    if (!paymentId) {
+      logger.error('Metadata incompleta para pago rechazado: pago sin id válido, abortando creación de orden');
+      return;
+    }
+
+    const existingOrder = await db.query.orders.findFirst({
+      where: eq(orders.paymentId, paymentId),
+      columns: { id: true, status: true }
+    });
+
+    if (existingOrder) {
+      logger.info('Pago rechazado ya procesado previamente, omitiendo creación de orden duplicada', {
+        paymentId,
+        existingOrderId: existingOrder.id,
+        existingStatus: existingOrder.status
+      });
+      return;
+    }
 
     // Extraer metadata del pago
     const metadata = payment.metadata || {};

@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye, Truck, AlertCircle, CheckCircle } from 'lucide-react'
 import { ImageManager } from '@/components/ui/ImageManager'
 import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
@@ -45,6 +45,9 @@ interface Product {
   height?: string
   width?: string
   length?: string
+  mlItemId?: string | null
+  shippingMode?: string | null
+  me2Compatible?: boolean | null
 }
 
 interface ProductForm {
@@ -68,6 +71,9 @@ interface ProductForm {
   height: string
   width: string
   length: string
+  mlItemId: string
+  shippingMode: string
+  me2Compatible: boolean
 }
 
 type RecommendedAttributeConfig = {
@@ -75,6 +81,15 @@ type RecommendedAttributeConfig = {
   label: string
   aliases: string[]
   required?: boolean
+}
+
+type ProductMe2Status = {
+  loading: boolean
+  error?: string
+  isValid?: boolean
+  canUseME2?: boolean
+  missingAttributes: string[]
+  warnings: string[]
 }
 
 export default function EditProductPage() {
@@ -105,12 +120,20 @@ export default function EditProductPage() {
     videoId: '',
     height: '',
     width: '',
-    length: ''
+    length: '',
+    mlItemId: '',
+    shippingMode: 'me2',
+    me2Compatible: false,
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
   const [attributesSaving, setAttributesSaving] = useState(false)
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [recommendedAttributes, setRecommendedAttributes] = useState<RecommendedAttributeConfig[]>([])
+  const [me2Status, setMe2Status] = useState<ProductMe2Status>({
+    loading: true,
+    missingAttributes: [],
+    warnings: [],
+  })
 
   const [showPreview, setShowPreview] = useState(false)
 
@@ -119,6 +142,43 @@ export default function EditProductPage() {
   const mlCategories = categories.filter(
     (category) => category.mlCategoryId && category.isMlOfficial && category.isLeaf
   )
+
+  const loadMe2Status = async (productId: number) => {
+    try {
+      setMe2Status(prev => ({
+        ...prev,
+        loading: true,
+        error: undefined,
+      }))
+
+      const response = await fetch(`/api/admin/products/${productId}/me2-validation`)
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok || !data) {
+        throw new Error(data?.error || 'No se pudo validar compatibilidad ME2')
+      }
+
+      const result = data.result
+
+      setMe2Status({
+        loading: false,
+        error: undefined,
+        isValid: result?.isValid,
+        canUseME2: result?.canUseME2,
+        missingAttributes: result?.missingAttributes ?? [],
+        warnings: result?.warnings ?? [],
+      })
+    } catch (error) {
+      setMe2Status({
+        loading: false,
+        error: error instanceof Error ? error.message : 'No se pudo validar compatibilidad ME2',
+        isValid: undefined,
+        canUseME2: undefined,
+        missingAttributes: [],
+        warnings: [],
+      })
+    }
+  }
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -166,11 +226,15 @@ export default function EditProductPage() {
           height: (product.height as string | undefined) || '',
           width: (product.width as string | undefined) || '',
           length: (product.length as string | undefined) || '',
-          variants: [] // Se cargarán desde ProductVariants
+          variants: [], // Se cargarán desde ProductVariants
+          mlItemId: (product.mlItemId as string | null) || '',
+          shippingMode: (product.shippingMode as string | null) || 'me2',
+          me2Compatible: (product.me2Compatible as boolean | null) ?? false,
         }
 
         setForm(initialForm)
         setAttributes((product as unknown as { attributes?: DynamicAttribute[] }).attributes || [])
+        await loadMe2Status(product.id)
       } catch {
         toast({
           title: 'Error',
@@ -238,7 +302,10 @@ export default function EditProductPage() {
         mlVideoId: form.videoId || undefined,
         height: form.height || undefined,
         width: form.width || undefined,
-        length: form.length || undefined
+        length: form.length || undefined,
+        mlItemId: form.mlItemId || undefined,
+        shippingMode: form.shippingMode || undefined,
+        me2Compatible: form.me2Compatible,
       }
 
       const response = await fetch(`/api/admin/products/${id}`, {
@@ -384,6 +451,63 @@ export default function EditProductPage() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            Estado de compatibilidad para Mercado Envíos (ME2)
+          </p>
+          {me2Status.loading ? (
+            <p className="text-xs text-muted-foreground">Validando atributos ME2 del producto…</p>
+          ) : me2Status.error ? (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              {me2Status.error}
+            </p>
+          ) : (
+            <>
+              {me2Status.canUseME2 ? (
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  Este producto cumple todos los requisitos para usar ME2 sin fallback.
+                </p>
+              ) : me2Status.isValid ? (
+                <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  El producto está casi listo para ME2, pero aún falta vincular o confirmar la
+                  publicación en Mercado Libre.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  Faltan datos obligatorios para usar ME2 sin fallback.
+                </p>
+              )}
+              {me2Status.missingAttributes.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Faltan: {me2Status.missingAttributes.join(', ')}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const numericId = parseInt(id, 10)
+              if (!Number.isNaN(numericId)) {
+                void loadMe2Status(numericId)
+              }
+            }}
+            className="min-h-[32px]"
+          >
+            Revalidar ME2
+          </Button>
+        </div>
+      </div>
+
       <Tabs defaultValue="basic" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basic" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
@@ -497,6 +621,122 @@ export default function EditProductPage() {
                       onImagesChange={handleImagesReorder}
                       maxImages={10}
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="stock">Stock</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="0"
+                      value={form.stock}
+                      onChange={(e) => handleChange('stock', e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="discount">Descuento (%)</Label>
+                    <Input
+                      id="discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={form.discount}
+                      onChange={(e) => handleChange('discount', e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="height">Alto (cm)</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.height}
+                      onChange={(e) => handleChange('height', e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="width">Ancho (cm)</Label>
+                    <Input
+                      id="width"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.width}
+                      onChange={(e) => handleChange('width', e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="length">Largo (cm)</Label>
+                    <Input
+                      id="length"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.length}
+                      onChange={(e) => handleChange('length', e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weight">Peso (kg)</Label>
+                    <Input
+                      id="weight"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.weight}
+                      onChange={(e) => handleChange('weight', e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label htmlFor="mlItemId">ML Item ID (opcional)</Label>
+                    <Input
+                      id="mlItemId"
+                      value={form.mlItemId}
+                      onChange={(e) => handleChange('mlItemId', e.target.value)}
+                      placeholder="MLA123456789"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Se completa automáticamente al sincronizar con Mercado Libre, pero puedes ajustarlo si ya existe una publicación.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="shippingMode">Modo de envío ML</Label>
+                    <select
+                      id="shippingMode"
+                      value={form.shippingMode}
+                      onChange={(e) => handleChange('shippingMode', e.target.value)}
+                      className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
+                    >
+                      <option value="me2">Mercado Envíos (ME2)</option>
+                      <option value="custom">Envío personalizado / local</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2 flex items-center">
+                    <input
+                      type="checkbox"
+                      id="me2Compatible"
+                      checked={form.me2Compatible}
+                      onChange={(e) => handleChange('me2Compatible', e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <Label htmlFor="me2Compatible" className="ml-2 block text-sm font-medium">
+                      Producto compatible con Mercado Envíos (ME2)
+                    </Label>
                   </div>
 
                   <div className="md:col-span-2 flex items-center">

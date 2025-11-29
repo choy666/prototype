@@ -11,7 +11,8 @@ export interface WebhookValidationResult {
 export function verifyHmacSHA256(
   xSignature: string | undefined,
   rawBody: string,
-  webhookSecret: string
+  webhookSecret: string,
+  xRequestId?: string | null
 ): { isValid: boolean; dataId?: string; error?: string } {
   logger.info('Iniciando validación HMAC SHA256', {
     hasXSignature: !!xSignature,
@@ -104,12 +105,6 @@ export function verifyHmacSHA256(
     };
   }
 
-  // TEMPORAL: Console.log directo para debugging sin redacción
-  console.log('=== WEBHOOK DEBUG RAW ===');
-  console.log('RAW PAYLOAD:', rawBody);
-  console.log('RAW X-SIGNATURE:', xSignature);
-  console.log('========================');
-
   // Parsear el payload para obtener data.id
   let parsedPayload: Record<string, unknown>;
   try {
@@ -199,17 +194,6 @@ export function verifyHmacSHA256(
     }
   }
 
-  // TEMPORAL: Bypass para merchant_orders y payments mientras verificamos el secret correcto
-  if (p.topic === 'merchant_order' || p.action === 'payment.created' || p.action === 'payment.updated') {
-    logger.warn('BYPASS TEMPORAL: webhook aceptado sin validación HMAC', {
-      action: p.action,
-      topic: p.topic,
-      resource: p.resource,
-      extractedId: dataId
-    });
-    return { isValid: true };
-  }
-
   if (!dataId || dataId === 'undefined' || dataId === 'null') {
     logger.error('No se pudo extraer data.id del payload', {
       payloadStructure: Object.keys(parsedPayload),
@@ -224,38 +208,29 @@ export function verifyHmacSHA256(
     };
   }
 
-  // Construir string a firmar según especificación oficial de Mercado Pago
-  const stringToSign = `id=${dataId}&ts=${ts}`;
-  
-  console.log('=== HMAC DEBUG ===');
-  console.log('DATA ID:', dataId);
-  console.log('TIMESTAMP:', ts);
-  console.log('STRING TO SIGN:', stringToSign);
-  console.log('WEBHOOK SECRET LENGTH:', webhookSecret.length);
-  console.log('==================');
-  
-  logger.info('Construyendo string para validación HMAC', {
+  if (!xRequestId) {
+    logger.error('Header x-request-id faltante para validación HMAC oficial');
+    return {
+      isValid: false,
+      error: 'Header x-request-id requerido para validación HMAC'
+    };
+  }
+
+  // Construir manifest a firmar según especificación oficial de Mercado Pago
+  const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+
+  logger.info('Construyendo manifest para validación HMAC', {
     ts,
     dataId,
-    stringToSign,
+    xRequestId,
+    manifest,
     webhookSecretSet: !!webhookSecret
   });
   
-  // Generar HMAC-SHA256
+  // Generar HMAC-SHA256 sobre el manifest
   const hmac = crypto.createHmac('sha256', webhookSecret);
-  hmac.update(stringToSign);
+  hmac.update(manifest);
   const expectedSignature = hmac.digest('hex');
-
-  console.log('EXPECTED SIGNATURE:', expectedSignature);
-  console.log('RECEIVED SIGNATURE:', signature);
-  console.log('SIGNATURES MATCH:', signature === expectedSignature);
-  
-  // TEMPORAL: Probar firmando el raw body directamente
-  const rawBodySignature = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-  console.log('RAW BODY SIGNATURE:', rawBodySignature);
-  console.log('RAW BODY MATCHES:', signature === rawBodySignature);
-  
-  console.log('==================');
 
   // Comparar firmas de forma segura
   const isValid = crypto.timingSafeEqual(
@@ -266,7 +241,7 @@ export function verifyHmacSHA256(
   logger.info('Resultado de validación HMAC', {
     ts,
     dataId,
-    stringToSign,
+    manifest,
     receivedSignature: signature,
     expectedSignature,
     signaturesMatch: isValid
@@ -307,7 +282,7 @@ export function verifyWebhookSignature(
     }
 
     // Intentar validación oficial primero
-    const officialResult = verifyHmacSHA256(xSignature || undefined, rawBody, webhookSecret);
+    const officialResult = verifyHmacSHA256(xSignature || undefined, rawBody, webhookSecret, xRequestId);
     if (officialResult.isValid) {
       return officialResult;
     }

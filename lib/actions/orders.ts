@@ -137,6 +137,7 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         shippingStatus: orders.shippingStatus,
         paymentId: orders.paymentId,
         mercadoPagoId: orders.mercadoPagoId,
+        stockDeducted: orders.stockDeducted,
         shippingAddress: orders.shippingAddress,
         shippingAddressId: orders.shippingAddressId,
         shippingMethodId: orders.shippingMethodId,

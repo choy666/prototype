@@ -299,12 +299,14 @@ export const orders = pgTable("orders", {
   mlShippingInfo: jsonb("ml_shipping_info"),
   mlPaymentInfo: jsonb("ml_payment_info"),
   mlFeedback: jsonb("ml_feedback"),
+  stockDeducted: boolean("stock_deducted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("orders_mercado_libre_shipment_id_idx").on(table.mercadoLibreShipmentId),
   index("orders_shipping_status_idx").on(table.shippingStatus),
   index("orders_shipping_mode_idx").on(table.shippingMode),
+  uniqueIndex("orders_payment_id_unique").on(table.paymentId),
 ]);
 
 // ======================
