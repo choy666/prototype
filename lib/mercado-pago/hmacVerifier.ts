@@ -132,6 +132,8 @@ export function verifyHmacSHA256(
     type?: string;
     data?: { id?: unknown };
     id?: unknown;
+    topic?: string;
+    resource?: string;
   };
 
   // TEMPORAL: Log completo para debugging de payload real
@@ -143,12 +145,17 @@ export function verifyHmacSHA256(
     hasData: !!p.data,
     hasDataId: !!p.data?.id,
     hasTopLevelId: !!p.id,
+    hasTopic: !!p.topic,
+    hasResource: !!p.resource,
     actionValue: p.action,
     typeValue: p.type,
     dataIdValue: p.data?.id,
-    topLevelIdValue: p.id
+    topLevelIdValue: p.id,
+    topicValue: p.topic,
+    resourceValue: p.resource
   });
 
+  // Permitir webhooks de prueba (action format)
   if (p.action === 'test.notification') {
     logger.info('Webhook de prueba recibido, saltando validación');
     return { isValid: true };
@@ -164,6 +171,18 @@ export function verifyHmacSHA256(
   // Estructura alternativa: {action, type, id} (IPN style)
   else if (p.id) {
     dataId = String(p.id);
+  }
+  // Estructura merchant_order: {topic, resource}
+  else if (p.topic === 'merchant_order' && p.resource) {
+    // Extraer ID de la URL: https://api.mercadolibre.com/merchant_orders/35935869461
+    const match = p.resource.match(/\/(\d+)$/);
+    if (match && match[1]) {
+      dataId = match[1];
+      logger.info('ID extraído de merchant_order resource', {
+        resource: p.resource,
+        extractedId: dataId
+      });
+    }
   }
   // Estructura alternativa: {action, type} sin id (ignorar)
   else {
@@ -197,6 +216,13 @@ export function verifyHmacSHA256(
   // Construir string a firmar según especificación oficial de Mercado Pago
   const stringToSign = `id=${dataId}&ts=${ts}`;
   
+  console.log('=== HMAC DEBUG ===');
+  console.log('DATA ID:', dataId);
+  console.log('TIMESTAMP:', ts);
+  console.log('STRING TO SIGN:', stringToSign);
+  console.log('WEBHOOK SECRET LENGTH:', webhookSecret.length);
+  console.log('==================');
+  
   logger.info('Construyendo string para validación HMAC', {
     ts,
     dataId,
@@ -208,6 +234,11 @@ export function verifyHmacSHA256(
   const hmac = crypto.createHmac('sha256', webhookSecret);
   hmac.update(stringToSign);
   const expectedSignature = hmac.digest('hex');
+
+  console.log('EXPECTED SIGNATURE:', expectedSignature);
+  console.log('RECEIVED SIGNATURE:', signature);
+  console.log('SIGNATURES MATCH:', signature === expectedSignature);
+  console.log('==================');
 
   // Comparar firmas de forma segura
   const isValid = crypto.timingSafeEqual(
@@ -337,11 +368,21 @@ export function validateWebhookPayload(rawBody: string): {
   try {
     const parsed = JSON.parse(rawBody);
     
-    // Permitir webhooks de prueba
-    if (parsed.action === 'test.notification') {
+    // Tipar payload con todas las estructuras posibles
+    const p = parsed as {
+      action?: string;
+      type?: string;
+      data?: { id?: unknown };
+      id?: unknown;
+      topic?: string;
+      resource?: string;
+    };
+    
+    // Permitir webhooks de prueba (action format)
+    if (p.action === 'test.notification') {
       return {
         isValid: true,
-        action: parsed.action
+        action: p.action
       };
     }
     
@@ -349,40 +390,52 @@ export function validateWebhookPayload(rawBody: string): {
     let dataId: string | undefined;
     
     // Estructura estándar: {action, data: {id}}
-    if (parsed.data && (parsed.data as { id: unknown })?.id) {
-      dataId = String((parsed.data as { id: unknown }).id);
+    if (p.data?.id) {
+      dataId = String(p.data.id);
     }
     // Estructura alternativa: {action, type, id} (IPN style)
-    else if (parsed.id) {
-      dataId = String(parsed.id);
+    else if (p.id) {
+      dataId = String(p.id);
+    }
+    // Estructura merchant_order: {topic, resource}
+    else if (p.topic === 'merchant_order' && p.resource) {
+      // Extraer ID de la URL: https://api.mercadolibre.com/merchant_orders/35935869461
+      const match = p.resource.match(/\/(\d+)$/);
+      if (match && match[1]) {
+        dataId = match[1];
+      }
     }
     // Estructura alternativa: {action, type} sin id (ignorar)
-    else if (parsed.type && !parsed.data?.id && !parsed.id) {
+    else if (p.type && !p.data?.id && !p.id) {
       return {
         isValid: true,
-        action: parsed.action
+        action: p.action
       };
     }
     
-    if (!parsed.action || !dataId) {
+    // Validar que tengamos action o topic y dataId
+    const hasActionOrTopic = p.action || p.topic;
+    if (!hasActionOrTopic || !dataId) {
       logger.error('Estructura de payload inválida en validateWebhookPayload', {
-        error: 'Faltan campos action o data.id',
+        error: 'Faltan campos action/topic o data.id',
         payloadKeys: Object.keys(parsed),
-        hasAction: !!parsed.action,
-        hasData: !!parsed.data,
-        hasDataId: !!parsed.data?.id,
-        hasTopLevelId: !!parsed.id,
-        hasType: !!parsed.type
+        hasAction: !!p.action,
+        hasTopic: !!p.topic,
+        hasData: !!p.data,
+        hasDataId: !!p.data?.id,
+        hasTopLevelId: !!p.id,
+        hasResource: !!p.resource,
+        extractedDataId: dataId
       });
       return {
         isValid: false,
-        error: 'Estructura inválida: faltan campos action o data.id'
+        error: 'Estructura inválida: faltan campos action/topic o data.id'
       };
     }
 
     return {
       isValid: true,
-      action: parsed.action,
+      action: p.action || p.topic,
       dataId
     };
     
