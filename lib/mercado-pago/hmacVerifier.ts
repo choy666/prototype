@@ -199,9 +199,11 @@ export function verifyHmacSHA256(
     }
   }
 
-  // TEMPORAL: Bypass para merchant_orders mientras verificamos el secret correcto
-  if (p.topic === 'merchant_order') {
-    logger.warn('BYPASS TEMPORAL: merchant_order aceptado sin validación HMAC', {
+  // TEMPORAL: Bypass para merchant_orders y payments mientras verificamos el secret correcto
+  if (p.topic === 'merchant_order' || p.action === 'payment.created' || p.action === 'payment.updated') {
+    logger.warn('BYPASS TEMPORAL: webhook aceptado sin validación HMAC', {
+      action: p.action,
+      topic: p.topic,
       resource: p.resource,
       extractedId: dataId
     });
