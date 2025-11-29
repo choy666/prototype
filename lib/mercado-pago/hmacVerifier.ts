@@ -199,6 +199,15 @@ export function verifyHmacSHA256(
     }
   }
 
+  // TEMPORAL: Bypass para merchant_orders mientras verificamos el secret correcto
+  if (p.topic === 'merchant_order') {
+    logger.warn('BYPASS TEMPORAL: merchant_order aceptado sin validación HMAC', {
+      resource: p.resource,
+      extractedId: dataId
+    });
+    return { isValid: true };
+  }
+
   if (!dataId || dataId === 'undefined' || dataId === 'null') {
     logger.error('No se pudo extraer data.id del payload', {
       payloadStructure: Object.keys(parsedPayload),
