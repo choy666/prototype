@@ -104,10 +104,17 @@ export function verifyHmacSHA256(
     };
   }
 
+  // TEMPORAL: Console.log directo para debugging sin redacción
+  console.log('=== WEBHOOK DEBUG RAW ===');
+  console.log('RAW PAYLOAD:', rawBody);
+  console.log('RAW X-SIGNATURE:', xSignature);
+  console.log('========================');
+
   // Parsear el payload para obtener data.id
   let parsedPayload: Record<string, unknown>;
   try {
     parsedPayload = JSON.parse(rawBody);
+    console.log('PARSED PAYLOAD:', JSON.stringify(parsedPayload, null, 2));
   } catch (parseError) {
     logger.error('Error parseando payload JSON', {
       error: parseError instanceof Error ? parseError.message : String(parseError),

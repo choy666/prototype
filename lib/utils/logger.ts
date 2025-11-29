@@ -4,7 +4,7 @@ import { z } from 'zod';
 const loggerConfigSchema = z.object({
   level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   enableConsole: z.boolean().default(true),
-  sanitizeSensitiveData: z.boolean().default(true),
+  sanitizeSensitiveData: z.boolean().default(false), // TEMPORAL: Desactivado para debugging de webhook
   development: z.boolean().default(false),
 });
 
