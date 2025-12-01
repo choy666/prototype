@@ -2,28 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { products, users, productVariants } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
-import { MLShippingResponse, ShippingResponse, ShippingMethod } from '@/lib/types/shipping';
-
-// Mapper function to transform ML API response to internal model
-function mapMLShippingToInternal(mlResponse: MLShippingResponse): ShippingResponse {
-  return {
-    methods: mlResponse.methods.map(mlMethod => ({
-      order_priority: mlMethod.shipping_method_id,
-      name: mlMethod.name,
-      cost: mlMethod.cost,
-      estimated_delivery: mlMethod.estimated_delivery,
-      shipping_mode: mlMethod.shipping_mode
-    })),
-    coverage: {
-      all: mlResponse.coverage.all_country,
-      partially_covered: mlResponse.coverage.excluded_places.length > 0
-    }
-  };
-}
-
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
-import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
+import { calculateME2Shipping } from '@/lib/mercado-envios/me2Api';
+import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 // Tipo para items del checkout (sin stock requerido)
@@ -175,45 +157,67 @@ export async function POST(req: NextRequest) {
       return acc + finalPrice * item.quantity;
     }, 0);
 
-    // Calcular costo de envío usando API de Mercado Libre ME2 con fallback interno basado en BD
-    const me2Response = await calculateME2ShippingCost({
-      zipcode: shippingAddress.codigoPostal,
-      items: items.map((item: CheckoutItem) => ({
-        id: item.id.toString(),
+    // Calcular costo de envío usando el mismo motor ME2 que /api/shipments/calculate,
+    // respetando el método seleccionado por el usuario y con fallback a métodos locales.
+
+    // 1) Obtener productos enriquecidos desde la base de datos para ME2
+    const productIds = items.map((item: CheckoutItem) => item.id);
+    const dbProducts = await getProductsByIds(productIds);
+
+    const me2Items = items.map((item: CheckoutItem) => {
+      const dbProduct = dbProducts.find(p => p.id === item.id);
+
+      const basePrice = item.price;
+      const finalPrice = item.discount && item.discount > 0
+        ? basePrice * (1 - item.discount / 100)
+        : basePrice;
+
+      return {
+        id: item.id,
+        name: dbProduct?.name || item.name,
+        weight: dbProduct?.weight ?? undefined,
+        height: dbProduct?.height ?? undefined,
+        width: dbProduct?.width ?? undefined,
+        length: dbProduct?.length ?? undefined,
+        shippingMode: dbProduct?.shippingMode ?? undefined,
+        shippingAttributes: dbProduct?.shippingAttributes ?? undefined,
+        me2Compatible: dbProduct?.me2Compatible ?? false,
+        mlItemId: dbProduct?.mlItemId ?? undefined,
         quantity: item.quantity,
-        price: item.discount && item.discount > 0
-          ? item.price * (1 - item.discount / 100)
-          : item.price
-      })),
+        price: finalPrice,
+      };
     });
 
-      // Adaptar resultado ME2 a MLShippingResponse esperado por mapMLShippingToInternal
-    const mlShippingResponse: MLShippingResponse = {
-      methods: me2Response.shippingOptions,
-      coverage: me2Response.coverage || {
-        all_country: true,
-        excluded_places: [],
-      },
-    };
+    const me2Response = await calculateME2Shipping({
+      zipcode: shippingAddress.codigoPostal,
+      items: me2Items,
+      allowFallback: true,
+    });
 
-    const shippingResponse = mapMLShippingToInternal(mlShippingResponse);
-
-    // Usar método estándar (order_priority: 1) o el más barato si no hay estándar
-    if (shippingResponse.methods.length === 0) {
+    if (!me2Response.shippingOptions || me2Response.shippingOptions.length === 0) {
       throw new Error('No shipping methods available for this zipcode');
     }
 
-    const standardMethod = shippingResponse.methods.find((m: ShippingMethod) => m.order_priority === 1);
-    const cheapestMethod = shippingResponse.methods.reduce((min: ShippingMethod, curr: ShippingMethod) => 
-      curr.cost < min.cost ? curr : min
+    // 2) Intentar usar exactamente el método seleccionado por el usuario (shippingMethod.id)
+    const selectedMethodFromEngine = me2Response.shippingOptions.find(opt =>
+      String(opt.shipping_method_id) === String(shippingMethod.id),
     );
 
-    const shippingCost = standardMethod?.cost ?? cheapestMethod?.cost ?? 0;
+    // 3) Si no se encuentra (por cambios en ML o fallback), usar el más barato como respaldo
+    const cheapestMethod = me2Response.shippingOptions.reduce((min, curr) =>
+      (curr.cost || 0) < (min.cost || 0) ? curr : min,
+    me2Response.shippingOptions[0]);
+
+    const effectiveMethod = selectedMethodFromEngine || cheapestMethod;
+    const shippingCost = effectiveMethod?.cost ?? 0;
 
     logger.info('Shipping cost calculated via ME2/core', { 
       zipcode: shippingAddress.codigoPostal,
       cost: shippingCost,
-      method: standardMethod?.name || cheapestMethod?.name,
+      method: effectiveMethod?.name,
+      selectedMethodId: shippingMethod.id,
+      matchedSelectedMethod: Boolean(selectedMethodFromEngine),
+      source: me2Response.source,
       fallback: me2Response.fallback ?? false,
     });
 
@@ -270,39 +274,46 @@ export async function POST(req: NextRequest) {
         payer: {
           email: payerInfo.email,
           name: payerInfo.name,
+          phone: {
+            number: shippingAddress.telefono,
+          },
+          address: {
+            zip_code: shippingAddress.codigoPostal,
+            street_name: shippingAddress.direccion,
+            street_number: shippingAddress.numero || "1",
+          },
+          identification: userExists[0].documentType && userExists[0].documentNumber
+            ? {
+                type: userExists[0].documentType,
+                number: userExists[0].documentNumber,
+              }
+            : undefined,
         },
         back_urls: {
-          success: process.env.MERCADO_PAGO_SUCCESS_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/payment-success`,
-          failure: process.env.MERCADO_PAGO_FAILURE_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/payment-failure`,
-          pending: process.env.MERCADO_PAGO_PENDING_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/payment-pending`,
+          success:
+            process.env.MERCADO_PAGO_SUCCESS_URL
+            || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-success`,
+          failure:
+            process.env.MERCADO_PAGO_FAILURE_URL
+            || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-failure`,
+          pending:
+            process.env.MERCADO_PAGO_PENDING_URL
+            || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-pending`,
         },
         auto_return: "approved",
-        notification_url: process.env.MERCADO_PAGO_NOTIFICATION_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}/api/webhooks/mercadopago`,
+        notification_url:
+          process.env.MERCADO_PAGO_NOTIFICATION_URL
+          || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/webhooks/mercadopago`,
         external_reference: metadata.user_id,
         metadata: metadata,
         payment_methods: {
           // No excluir tipos de pago para pruebas - mostrar todo lo disponible
           installments: 12, // Permitir hasta 12 cuotas
         },
-        // Remover shipments temporalmente para evitar error fatal
-        // shipments: {
-        //   receiver_address: {
-        //     zip_code: shippingAddress.codigoPostal,
-        //     street_name: shippingAddress.direccion,
-        //     street_number: shippingAddress.numero || "1", // Evitar 0 que causa rechazo
-        //     floor: shippingAddress.piso || "",
-        //     apartment: shippingAddress.departamento || "",
-        //     city_name: shippingAddress.ciudad,
-        //     state_name: shippingAddress.provincia,
-        //     country_name: "Argentina",
-        //   },
-        //   mode: "custom",
-        //   dimensions: "10x10x10,500",
-        // },
       },
     });
 
-    // Debug: Verificar estructura de respuesta de Mercado Pago
+        // Debug: Verificar estructura de respuesta de Mercado Pago
     console.log("Respuesta completa de Mercado Pago:", JSON.stringify(preference, null, 2));
     console.log("Environment check - NODE_ENV:", process.env.NODE_ENV);
     console.log("Environment check - SUCCESS_URL:", process.env.MERCADO_PAGO_SUCCESS_URL);
@@ -311,16 +322,13 @@ export async function POST(req: NextRequest) {
     logger.info('Checkout: Preferencia de MercadoPago creada exitosamente', {
       preferenceId: preference.id,
       initPoint: preference.init_point,
-      sandboxInitPoint: preference.sandbox_init_point,
       total,
       itemsCount: items.length,
       shippingCost
     });
     return NextResponse.json({
       preferenceId: preference.id,
-      init_point: preference.init_point, // Mercado Pago maneja sandbox/producción automáticamente
       initPoint: preference.init_point,
-      paymentUrl: preference.init_point, // Siempre usar init_point - MP detecta el entorno
       total,
       subtotal,
       shippingCost,

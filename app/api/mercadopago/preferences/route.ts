@@ -10,7 +10,6 @@ interface PreferenceResponse {
   id: string;
   external_reference: string;
   init_point: string;
-  sandbox_init_point: string;
   items: Array<unknown>;
   payer: Record<string, unknown>;
   payment_methods: Record<string, unknown>;
@@ -170,7 +169,6 @@ export async function POST(req: Request) {
       orderId: body.orderId || null,
       userId: parseInt(session.user.id),
       initPoint: preferenceResponse.init_point,
-      sandboxInitPoint: preferenceResponse.sandbox_init_point,
       items: preferenceResponse.items || [],
       payer: preferenceResponse.payer || {},
       paymentMethods: preferenceResponse.payment_methods || {},
@@ -195,7 +193,6 @@ export async function POST(req: Request) {
       preference: {
         id: preferenceResponse.id,
         initPoint: preferenceResponse.init_point,
-        sandboxInitPoint: preferenceResponse.sandbox_init_point,
         externalReference: preferenceResponse.external_reference,
         expires: preferenceResponse.expires,
         expirationDateFrom: preferenceResponse.expiration_date_from,

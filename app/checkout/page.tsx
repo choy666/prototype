@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/lib/stores/useCartStore';
 import { ShippingForm } from '@/components/checkout/ShippingForm';
@@ -25,6 +25,30 @@ export default function CheckoutPage() {
   const [selectedAddress, setSelectedAddress] = useState<Address & { id: number } | null>(null);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<MLShippingMethod | null>(null);
   const [shippingAddress, setShippingAddress] = useState<ShippingFormData | null>(null);
+  const [documentType, setDocumentType] = useState<'DNI' | 'CUIT' | ''>('');
+  const [documentNumber, setDocumentNumber] = useState<string>('');
+  const [documentErrors, setDocumentErrors] = useState<{
+    documentType?: string;
+    documentNumber?: string;
+  } | null>(null);
+
+  // Cargar documento del usuario al montar
+  useEffect(() => {
+    const fetchDocument = async () => {
+      try {
+        const res = await fetch('/api/user/document');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        setDocumentType((data.documentType as 'DNI' | 'CUIT' | null) ?? '');
+        setDocumentNumber(data.documentNumber ?? '');
+      } catch (error) {
+        console.error('Error fetching user document:', error);
+      }
+    };
+
+    fetchDocument();
+  }, []);
 
   // Verificar autenticación
   if (status === 'loading') {
@@ -123,8 +147,66 @@ export default function CheckoutPage() {
   };
 
   const handleShippingSubmit = async (shippingData: ShippingFormData) => {
-    setShippingAddress(shippingData);
-    setCurrentStep('shipping-method');
+    // Primero intentar actualizar el documento del usuario
+    try {
+      setDocumentErrors(null);
+
+      const payload = {
+        documentType: documentType || null,
+        documentNumber: documentNumber || null,
+      };
+
+      const res = await fetch('/api/user/document', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 400 && data.details) {
+          const fieldErrors: { documentType?: string; documentNumber?: string } = {};
+          for (const issue of data.details as Array<{ field: string; message: string }>) {
+            if (issue.field === 'documentType') {
+              fieldErrors.documentType = issue.message;
+            }
+            if (issue.field === 'documentNumber') {
+              fieldErrors.documentNumber = issue.message;
+            }
+          }
+          setDocumentErrors(fieldErrors);
+          toast.error('Revisa los datos del documento');
+          return;
+        }
+
+        throw new Error(data.error || 'Error al actualizar el documento');
+      }
+
+      // Actualizar estado con valores normalizados desde el backend
+      setDocumentType((data.documentType as 'DNI' | 'CUIT' | null) ?? '');
+      setDocumentNumber(data.documentNumber ?? '');
+      setDocumentErrors(null);
+
+      // Si el documento es válido (o se limpió), avanzar al siguiente paso
+      setShippingAddress(shippingData);
+      setCurrentStep('shipping-method');
+    } catch (error) {
+      console.error('Error updating user document:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Error al actualizar el documento del usuario'
+      );
+    }
+  };
+
+  const handleDocumentChange = (type: string, number: string) => {
+    setDocumentType((type as 'DNI' | 'CUIT' | '') || '');
+    setDocumentNumber(number);
+    setDocumentErrors(null);
   };
 
   const handleShippingMethodSelect = (method: MLShippingMethod) => {
@@ -175,11 +257,9 @@ export default function CheckoutPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Error al procesar el checkout');
       }
-
       // Checkout Pro siempre usa init_point (producción) incluso con credenciales de test
-      const paymentUrl = data.init_point;
+      const paymentUrl = data.paymentUrl || data.initPoint || data.init_point;
       console.log('Usando Checkout Pro URL:', paymentUrl);
-      
       if (paymentUrl) {
         // Redirigir a Mercado Pago
         window.location.href = paymentUrl;
@@ -232,6 +312,10 @@ export default function CheckoutPage() {
                 codigoPostal: selectedAddress.codigoPostal,
                 telefono: selectedAddress.telefono,
               } : undefined}
+              documentType={documentType}
+              documentNumber={documentNumber}
+              onDocumentChange={handleDocumentChange}
+              documentErrors={documentErrors}
             />
           )}
 

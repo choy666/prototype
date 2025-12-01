@@ -33,6 +33,8 @@ export default function RegisterPage() {
       email: '',
       password: '',
       confirmPassword: '',
+      documentType: undefined,
+      documentNumber: '',
     },
   });
 
@@ -209,6 +211,56 @@ export default function RegisterPage() {
                 {errors.confirmPassword && (
                   <p className="mt-1 text-sm text-red-500">
                     {errors.confirmPassword.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="documentType"
+                  className="mb-2 block text-lg dark:text-gray-300"
+                >
+                  Tipo de documento (opcional)
+                </label>
+                <select
+                  id="documentType"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-md border px-3 py-2 text-base outline-none transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] dark:bg-gray-800 dark:text-gray-100 ${
+                    errors.documentType ? 'border-red-500' : ''
+                  }`}
+                  {...register('documentType')}
+                >
+                  <option value="">Selecciona una opción</option>
+                  <option value="DNI">DNI</option>
+                  <option value="CUIT">CUIT</option>
+                </select>
+                {errors.documentType && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.documentType.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="documentNumber"
+                  className="mb-2 block text-lg dark:text-gray-300"
+                >
+                  Número de documento (opcional)
+                </label>
+                <Input
+                  id="documentNumber"
+                  type="text"
+                  placeholder="Solo números"
+                  disabled={isSubmitting}
+                  className={`transition duration-300 hover:scale-105 focus:ring-2 focus:ring-[#ff7b00] ${
+                    errors.documentNumber ? 'border-red-500' : ''
+                  }`}
+                  {...register('documentNumber')}
+                />
+                {errors.documentNumber && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.documentNumber.message}
                   </p>
                 )}
               </div>

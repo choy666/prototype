@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, password } = validation.data;
+    const { name, email, password, documentType, documentNumber } = validation.data;
 
     // Verificar si el usuario ya existe
     try {
@@ -119,6 +119,8 @@ export async function POST(request: Request) {
           name,
           email,
           password: hashedPassword,
+          documentType,
+          documentNumber,
           role: 'user',
           emailVerified: new Date(),
           createdAt: new Date(),

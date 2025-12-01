@@ -4,7 +4,6 @@ export interface MercadoPagoPreference {
   id: string;
   external_reference: string;
   init_point: string;
-  sandbox_init_point: string;
   items: PreferenceItem[];
   payer?: Payer;
   payment_methods?: PaymentMethods;
@@ -601,7 +600,6 @@ export interface CreatePreferenceRequest {
 export interface CreatePreferenceResponse {
   id: string;
   init_point: string;
-  sandbox_init_point: string;
   external_reference: string;
   collector_id: number;
   client_id: number;

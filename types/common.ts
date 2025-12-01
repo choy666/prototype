@@ -194,7 +194,6 @@ export interface AppConfig {
     enabled: boolean;
     accessToken?: string;
     webhookUrl?: string;
-    sandbox?: boolean;
   };
   mercadoLibre: {
     enabled: boolean;

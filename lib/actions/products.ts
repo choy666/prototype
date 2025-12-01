@@ -10,6 +10,7 @@ import type { ProductFilters } from '@/types';
 import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
 import { validateProductForMercadoLibre } from '@/lib/validations/mercadolibre';
+import { validateProductME2Attributes } from '@/lib/validations/me2-products';
 import { calculateAvailableQuantityFromProduct } from '@/lib/domain/ml-stock';
 
 // ✅ Esquema de validación para los filtros de productos
@@ -118,7 +119,6 @@ export async function getProducts(
         orderBy: (sortOrder === 'desc' ? desc : asc)(products[sortBy]),
         limit: validatedLimit,
         offset,
-        // Incluir información de sincronización con Mercado Libre (syncError, etc.)
         with: {
           mlSync: true,
         },
@@ -131,13 +131,20 @@ export async function getProducts(
 
     const count = Number(countResult[0]?.count ?? 0);
 
-    // Normalizar imágenes para cada producto y aplanar información de sincronización ML relevante
-    const normalizedData = data.map(product => ({
-      ...product,
-      images: normalizeImages(product.images),
-      // Exponer motivo de error de sincronización ME2 (si existe)
-      syncError: product.mlSync?.syncError ?? null,
-    }));
+    const me2Validations = await Promise.all(
+      data.map(product => validateProductME2Attributes(product.id)),
+    );
+    const me2ValidationMap = new Map(me2Validations.map(result => [result.productId, result]));
+
+    const normalizedData = data.map(product => {
+      const me2Validation = me2ValidationMap.get(product.id);
+      return {
+        ...product,
+        images: normalizeImages(product.images),
+        syncError: product.mlSync?.syncError ?? null,
+        me2CanUse: me2Validation?.canUseME2 ?? false,
+      };
+    });
 
     return {
       data: normalizedData,

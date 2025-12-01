@@ -12,9 +12,24 @@ interface ShippingFormProps {
   onSubmit: (data: ShippingFormData) => void;
   isLoading?: boolean;
   initialData?: Partial<ShippingFormData>;
+  documentType?: 'DNI' | 'CUIT' | '';
+  documentNumber?: string;
+  onDocumentChange?: (type: string, number: string) => void;
+  documentErrors?: {
+    documentType?: string;
+    documentNumber?: string;
+  } | null;
 }
 
-export function ShippingForm({ onSubmit, isLoading = false, initialData }: ShippingFormProps) {
+export function ShippingForm({
+  onSubmit,
+  isLoading = false,
+  initialData,
+  documentType = '',
+  documentNumber = '',
+  onDocumentChange,
+  documentErrors,
+}: ShippingFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -233,6 +248,52 @@ export function ShippingForm({ onSubmit, isLoading = false, initialData }: Shipp
           {errors.telefono && (
             <p id="telefono-error" className="text-sm text-red-500" role="alert">
               {errors.telefono.message}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Documento (opcional) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="documentType">
+            Tipo de documento (opcional)
+          </Label>
+          <select
+            id="documentType"
+            disabled={isFormLoading}
+            className={`w-full rounded-md border px-3 py-2 text-base outline-none transition duration-300 focus:ring-2 focus:ring-primary disabled:opacity-50 ${
+              documentErrors?.documentType ? 'border-red-500' : ''
+            }`}
+            value={documentType}
+            onChange={(e) => onDocumentChange?.(e.target.value, documentNumber)}
+          >
+            <option value="">Selecciona una opción</option>
+            <option value="DNI">DNI</option>
+            <option value="CUIT">CUIT</option>
+          </select>
+          {documentErrors?.documentType && (
+            <p className="text-sm text-red-500" role="alert">
+              {documentErrors.documentType}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="documentNumber">
+            Número de documento (opcional)
+          </Label>
+          <Input
+            id="documentNumber"
+            type="text"
+            placeholder="Solo números"
+            disabled={isFormLoading}
+            value={documentNumber}
+            onChange={(e) => onDocumentChange?.(documentType, e.target.value)}
+          />
+          {documentErrors?.documentNumber && (
+            <p className="text-sm text-red-500" role="alert">
+              {documentErrors.documentNumber}
             </p>
           )}
         </div>

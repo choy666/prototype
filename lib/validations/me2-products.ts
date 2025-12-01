@@ -79,7 +79,6 @@ export async function validateProductME2Attributes(productId: number): Promise<P
 
     // Validar atributos de envío
     if (!product.shippingAttributes) {
-      missingAttributes.push('shipping_attributes');
       warnings.push('⚠️ Atributos de envío no configurados');
     }
 

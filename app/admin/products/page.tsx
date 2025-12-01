@@ -40,6 +40,7 @@ interface Product {
   mlItemId?: string | null
   mlSyncStatus?: string
   syncError?: string | null
+  me2CanUse?: boolean
 }
 
 interface ApiResponse {
@@ -503,7 +504,7 @@ export default function AdminProductsPage() {
                             Inactivo
                           </span>
                         )}
-                        {product.mlSyncStatus === 'synced' && product.mlItemId && (
+                        {product.mlSyncStatus === 'synced' && product.mlItemId && product.me2CanUse && (
                           <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
                             ME2 ready
                           </span>

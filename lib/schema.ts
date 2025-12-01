@@ -99,6 +99,9 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 256 }).unique().notNull(),
   name: varchar("name", { length: 256 }).notNull(),
+  // Documento del usuario (para integraciones de pago, ej. Mercado Pago)
+  documentType: varchar("document_type", { length: 10 }), // Ej: DNI, CUIT
+  documentNumber: varchar("document_number", { length: 20 }),
   password: varchar("password", { length: 256 }), // Para autenticación tradicional
   emailVerified: timestamp("email_verified"),
   image: text("image"),
@@ -542,7 +545,6 @@ export const mercadopagoPreferences = pgTable("mercadopago_preferences", {
   orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
   userId: integer("user_id").references(() => users.id),
   initPoint: text("init_point"),
-  sandboxInitPoint: text("sandbox_init_point"),
   items: jsonb("items").notNull(),
   payer: jsonb("payer"),
   paymentMethods: jsonb("payment_methods"),
