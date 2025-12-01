@@ -8,6 +8,9 @@ import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 export default function PaymentSuccess() {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(true);
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
+  const [orderStatusLoading, setOrderStatusLoading] = useState(false);
+  const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
 
   // Usar el hook personalizado para manejar la limpieza del carrito
   const { paymentInfo } = useCartClearOnSuccess({
@@ -19,6 +22,59 @@ export default function PaymentSuccess() {
       console.log('🛒 Carrito limpiado exitosamente en payment-success');
     },
   });
+
+  useEffect(() => {
+    const { merchantOrderId } = paymentInfo;
+    const numericOrderId =
+      merchantOrderId && !Number.isNaN(Number(merchantOrderId))
+        ? merchantOrderId
+        : null;
+
+    if (!numericOrderId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStatus = async () => {
+      try {
+        setOrderStatusLoading(true);
+        setOrderStatusError(null);
+
+        const res = await fetch(`/api/order-status?order_id=${numericOrderId}`);
+        if (!res.ok) {
+          throw new Error('No se pudo obtener el estado del pedido');
+        }
+
+        const data = await res.json();
+        if (cancelled) {
+          return;
+        }
+
+        setOrderStatus(data.status ?? null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setOrderStatusError(
+          error instanceof Error ? error.message : String(error)
+        );
+      } finally {
+        if (!cancelled) {
+          setOrderStatusLoading(false);
+        }
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [paymentInfo]);
 
   useEffect(() => {
     // Dar tiempo para mostrar el estado antes de redirigir
@@ -46,6 +102,40 @@ export default function PaymentSuccess() {
 
   const getStatusInfo = () => {
     const { collectionStatus, status } = paymentInfo;
+
+    if (orderStatus === 'paid' || orderStatus === 'delivered') {
+      return {
+        icon: <CheckCircle className='w-16 h-16 text-green-500' />,
+        title: '¡Pago Aprobado!',
+        message: 'Tu pago ha sido procesado exitosamente.',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
+      };
+    } else if (
+      orderStatus === 'pending' ||
+      orderStatus === 'processing'
+    ) {
+      return {
+        icon: <Clock className='w-16 h-16 text-yellow-500' />,
+        title: 'Pago Pendiente',
+        message: 'Tu pago está siendo procesado. Te notificaremos cuando esté completo.',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200',
+      };
+    } else if (
+      orderStatus === 'rejected' ||
+      orderStatus === 'cancelled' ||
+      orderStatus === 'failed' ||
+      orderStatus === 'returned'
+    ) {
+      return {
+        icon: <XCircle className='w-16 h-16 text-red-500' />,
+        title: 'Pago Rechazado',
+        message: 'Hubo un problema con tu pago. Por favor, intenta nuevamente.',
+        bgColor: 'bg-red-50',
+        borderColor: 'border-red-200',
+      };
+    }
 
     if (collectionStatus === 'approved' || status === 'approved') {
       return {
@@ -106,6 +196,20 @@ export default function PaymentSuccess() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {merchantOrderId && (
+            <div className='mb-4 text-sm text-gray-600'>
+              Estado del pedido:{' '}
+              {orderStatusLoading
+                ? 'Verificando...'
+                : orderStatus || 'No disponible'}
+            </div>
+          )}
+          {orderStatusError && (
+            <div className='mb-4 text-sm text-red-500'>
+              {orderStatusError}
             </div>
           )}
 

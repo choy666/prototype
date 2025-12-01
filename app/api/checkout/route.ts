@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { products, users, productVariants } from '@/lib/schema';
+import { products, users, productVariants, orders, mercadopagoPreferences } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
@@ -224,6 +224,24 @@ export async function POST(req: NextRequest) {
     // Calcular total final
     const total = subtotal + shippingCost;
 
+    // Crear orden local pendiente vinculada al checkout
+    const [newOrder] = await db
+      .insert(orders)
+      .values({
+        userId: userExists[0].id,
+        email: userExists[0].email,
+        total: total.toString(),
+        status: 'pending',
+        shippingAddress,
+        shippingMethodId: null,
+        shippingCost: shippingCost.toString(),
+        shippingMode: 'me2',
+        source: 'local',
+      })
+      .returning({ id: orders.id });
+
+    const orderId = newOrder.id;
+
     // Obtener información del usuario para el pagador
     const payerInfo = {
       email: userExists[0].email,
@@ -233,6 +251,7 @@ export async function POST(req: NextRequest) {
     // Preparar metadata incluyendo variantId en items
     const metadata = {
       user_id: userId.toString(),
+      order_id: orderId.toString(),
       shipping_address: JSON.stringify(shippingAddress),
       shipping_method_id: shippingMethod.id.toString(),
       items: JSON.stringify(items.map((item: CheckoutItem) => ({
@@ -303,14 +322,30 @@ export async function POST(req: NextRequest) {
         auto_return: "approved",
         notification_url:
           process.env.MERCADO_PAGO_NOTIFICATION_URL
-          || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/webhooks/mercadopago`,
-        external_reference: metadata.user_id,
+          || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/mercadopago/payments/notify`,
+        external_reference: orderId.toString(),
         metadata: metadata,
         payment_methods: {
           // No excluir tipos de pago para pruebas - mostrar todo lo disponible
           installments: 12, // Permitir hasta 12 cuotas
         },
       },
+    });
+
+    await db.insert(mercadopagoPreferences).values({
+      preferenceId: preference.id,
+      externalReference: orderId.toString(),
+      orderId,
+      userId: Number(userId),
+      initPoint: preference.init_point,
+      items: preference.items || [],
+      payer: preference.payer || {},
+      paymentMethods: preference.payment_methods || {},
+      expires: preference.expires ?? false,
+      expirationDateFrom: preference.expiration_date_from ? new Date(preference.expiration_date_from) : null,
+      expirationDateTo: preference.expiration_date_to ? new Date(preference.expiration_date_to) : null,
+      notificationUrl: preference.notification_url,
+      status: 'pending',
     });
 
         // Debug: Verificar estructura de respuesta de Mercado Pago
@@ -324,9 +359,11 @@ export async function POST(req: NextRequest) {
       initPoint: preference.init_point,
       total,
       itemsCount: items.length,
-      shippingCost
+      shippingCost,
+      orderId,
     });
     return NextResponse.json({
+      orderId,
       preferenceId: preference.id,
       initPoint: preference.init_point,
       total,

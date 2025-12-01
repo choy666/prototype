@@ -14,6 +14,9 @@ export default function PaymentFailurePage() {
     paymentType: '',
     merchantOrderId: ''
   });
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
+  const [orderStatusLoading, setOrderStatusLoading] = useState(false);
+  const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     // Extraer parámetros de la URL de Mercado Pago
@@ -24,6 +27,61 @@ export default function PaymentFailurePage() {
       merchantOrderId: searchParams.get('merchant_order_id') || ''
     });
   }, [searchParams]);
+
+  useEffect(() => {
+    const externalReference = searchParams.get('external_reference');
+    const orderIdSource = externalReference || paymentDetails.merchantOrderId;
+
+    const numericOrderId =
+      orderIdSource && !Number.isNaN(Number(orderIdSource))
+        ? orderIdSource
+        : null;
+
+    if (!numericOrderId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStatus = async () => {
+      try {
+        setOrderStatusLoading(true);
+        setOrderStatusError(null);
+
+        const res = await fetch(`/api/order-status?order_id=${numericOrderId}`);
+        if (!res.ok) {
+          throw new Error('No se pudo obtener el estado del pedido');
+        }
+
+        const data = await res.json();
+        if (cancelled) {
+          return;
+        }
+
+        setOrderStatus(data.status ?? null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setOrderStatusError(
+          error instanceof Error ? error.message : String(error)
+        );
+      } finally {
+        if (!cancelled) {
+          setOrderStatusLoading(false);
+        }
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [searchParams, paymentDetails.merchantOrderId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -41,6 +99,20 @@ export default function PaymentFailurePage() {
             Lo sentimos, pero no hemos podido procesar tu pago. Por favor, 
             inténtalo de nuevo o contacta con soporte si el problema persiste.
           </p>
+
+          {(searchParams.get('external_reference') || paymentDetails.merchantOrderId) && (
+            <div className="mb-4 text-sm text-gray-600">
+              Estado del pedido:{' '}
+              {orderStatusLoading
+                ? 'Verificando...'
+                : orderStatus || 'No disponible'}
+            </div>
+          )}
+          {orderStatusError && (
+            <div className="mb-4 text-sm text-red-500">
+              {orderStatusError}
+            </div>
+          )}
 
           {paymentDetails.paymentId && (
             <div className="bg-white rounded-md p-4 mb-6 border">

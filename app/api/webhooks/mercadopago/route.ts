@@ -1,11 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/webhooks/mercadopago/route.ts
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig } from 'mercadopago';
 import { logger } from '@/lib/utils/logger';
-import { db } from '@/lib/db';
-import { orders, orderItems, carts, cartItems } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
 import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier';
 import crypto from 'crypto';
 
@@ -86,78 +82,87 @@ function validateEnvironmentVariables() {
 
 // Validar entorno al iniciar el módulo
 validateEnvironmentVariables();
-
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
-});
-
-// Función asíncrona para procesar pagos en background con retry robusto
-async function processPaymentInBackground(paymentId: string, requestId: string, eventType?: string, retryCount = 0) {
-  const MAX_RETRIES = 3;
-  
+ 
+async function forwardToPaymentsNotify(rawBody: string, requestId: string, paymentId?: string | null) {
   try {
-    logger.info('Procesando pago en background', {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
+    const notifyUrl = `${baseUrl}/api/mercadopago/payments/notify`;
+
+    logger.info('Reenviando webhook de pago a /api/mercadopago/payments/notify', {
       requestId,
+      notifyUrl,
       paymentId,
-      eventType,
-      retryCount
     });
 
-    await handlePaymentEvent(paymentId, requestId, eventType);
-    
-    logger.info('Pago procesado exitosamente en background', {
-      requestId,
-      paymentId,
-      retryCount
+    const response = await fetch(notifyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: rawBody,
     });
-    
-  } catch (error) {
-    logger.error('Error procesando pago en background', {
-      requestId,
-      paymentId,
-      retryCount,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    
-    // En serverless, no podemos usar setTimeout para retry porque la función puede terminar
-    // En su lugar, guardamos el estado para retry externo o procesamiento manual
-    if (retryCount < MAX_RETRIES) {
-      await saveFailedWebhookForRetry({
-        paymentId,
+
+    if (!response.ok) {
+      const text = await response.text();
+      logger.error('Error reenviando webhook a payments/notify', {
         requestId,
-        retryCount: retryCount + 1,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString()
+        status: response.status,
+        body: text,
+        paymentId,
       });
-      
-      logger.warn('Pago guardado para retry externo (serverless timeout protection)', {
+
+      await saveFailedWebhookForRetry({
+        paymentId: paymentId || 'unknown',
         requestId,
-        paymentId,
-        retryCount: retryCount + 1,
-        nextRetryIn: `${Math.pow(2, retryCount)}s`
+        retryCount: 1,
+        error: `HTTP ${response.status}: ${text}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      await saveDeadLetterWebhook({
+        paymentId: paymentId || 'unknown',
+        requestId,
+        error: `HTTP ${response.status}: ${text}`,
+        timestamp: new Date().toISOString(),
       });
     } else {
-      logger.error('Agotados reintentos para procesamiento de pago - DEAD LETTER', {
+      logger.info('Webhook reenviado exitosamente a payments/notify', {
         requestId,
         paymentId,
-        finalRetryCount: retryCount,
-        error: error instanceof Error ? error.message : String(error)
-      });
-      
-      // Guardar en dead letter queue para procesamiento manual
-      await saveDeadLetterWebhook({
-        paymentId,
-        requestId,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString()
+        status: response.status,
       });
     }
+  } catch (error) {
+    logger.error('Error crítico reenviando webhook a payments/notify', {
+      requestId,
+      paymentId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    await saveFailedWebhookForRetry({
+      paymentId: paymentId || 'unknown',
+      requestId,
+      retryCount: 1,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+
+    await saveDeadLetterWebhook({
+      paymentId: paymentId || 'unknown',
+      requestId,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
   }
 }
 
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
+
   
   try {
     logger.info('Webhook MercadoPago: Inicio de procesamiento', {
@@ -256,44 +261,35 @@ export async function POST(req: Request) {
 
     // 6. Procesar evento según tipo
     if ((eventType === 'payment.updated' || eventType === 'payment.created') && eventId) {
-      logger.info(`Procesando evento ${eventType} - consultando API de MercadoPago`, {
-        requestId
+      logger.info(`Procesando evento ${eventType} - reenviando a payments/notify`, {
+        requestId,
+        eventId,
       });
-      
-      // Encolar procesamiento asíncrono y responder 200 inmediatamente
-      processPaymentInBackground(eventId.toString(), requestId, eventType)
+
+      forwardToPaymentsNotify(rawBody, requestId, eventId.toString())
         .catch(error => {
-          logger.error('Error en procesamiento asíncrono de pago', {
+          logger.error('Error en procesamiento asíncrono de pago (forwardToPaymentsNotify)', {
             requestId,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           });
         });
-      
-      return NextResponse.json({ 
-        success: true, 
+
+      return NextResponse.json({
+        success: true,
         requestId,
-        message: 'Pago recibido y encolado para procesamiento'
+        message: 'Pago recibido y encolado para procesamiento',
       });
-      
+
     } else if (eventType === 'merchant_order' && eventId) {
-      logger.info(`Procesando evento merchant_order - consultando API de MercadoPago`, {
+      logger.info('Evento merchant_order recibido; no se procesa en este webhook', {
         requestId,
-        eventId
+        eventId,
       });
-      
-      // Encolar procesamiento asíncrono para merchant order y responder 200 inmediatamente
-      processPaymentInBackground(eventId.toString(), requestId, eventType)
-        .catch(error => {
-          logger.error('Error en procesamiento asíncrono de merchant_order', {
-            requestId,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        });
-      
-      return NextResponse.json({ 
-        success: true, 
+
+      return NextResponse.json({
+        success: true,
         requestId,
-        message: 'Merchant order recibido y encolado para procesamiento'
+        message: 'Merchant order recibido (sin procesamiento)',
       });
       
     } else {
@@ -321,695 +317,5 @@ export async function POST(req: Request) {
       error: 'Error interno del servidor',
       requestId
     }, { status: 500 });
-  }
-}
-
-async function handlePaymentEvent(paymentId: string, requestId: string, eventType?: string) {
-  try {
-    logger.info('handlePaymentEvent: Consultando en MercadoPago API', { 
-      requestId,
-      paymentId,
-      eventType
-    });
-
-    // Verificar idempotencia - no procesar duplicados
-    if (eventType !== 'merchant_order') {
-      const existingOrder = await db.query.orders.findFirst({
-        where: eq(orders.paymentId, paymentId),
-        columns: { id: true, status: true }
-      });
-
-      if (existingOrder) {
-        logger.info('Pago ya procesado previamente', {
-          requestId,
-          paymentId,
-          existingOrderId: existingOrder.id,
-          existingStatus: existingOrder.status
-        });
-        return; // Salir silenciosamente, ya fue procesado
-      }
-    }
-
-    // Para testing local, simular respuesta de MercadoPago
-    if (process.env.NODE_ENV === 'development' && (paymentId === '123456789' || paymentId === '987654321')) {
-      logger.info('Modo desarrollo: simulando respuesta de MercadoPago API');
-
-      // Simular respuesta de MercadoPago con metadata
-      const mockPayment = {
-        id: paymentId,
-        status: paymentId === '123456789' ? 'approved' : 'rejected',
-        metadata: paymentId === '123456789' ? {
-          user_id: '4', // Usar ID de usuario existente (snake_case)
-          shipping_address: JSON.stringify({
-            nombre: 'Test User',
-            direccion: 'Calle Falsa 123',
-            ciudad: 'Buenos Aires',
-            provincia: 'Buenos Aires',
-            codigoPostal: '1000',
-            telefono: '1123456789'
-          }),
-          shipping_method_id: '1',
-          items: JSON.stringify([{
-            id: '1', // Usar ID de producto existente
-            name: 'Producto de Prueba',
-            price: '1000.00',
-            quantity: 2
-          }]),
-          shipping_cost: '500.00',
-          subtotal: '2000.00',
-          total: '2500.00'
-        } : {
-          user_id: '4', // Usar ID de usuario existente (snake_case)
-          total: '2500.00'
-        }
-      };
-
-      logger.info('Pago simulado confirmado: válido, pertenece a la cuenta y estado correcto', {
-        paymentId,
-        status: mockPayment.status,
-        belongsToAccount: true,
-        metadata: mockPayment.metadata || {}
-      });
-
-      // Manejar según el status del pago
-      if (mockPayment.status === 'approved') {
-        await createOrderFromPayment(mockPayment);
-      } else if (mockPayment.status === 'rejected') {
-        await createRejectedOrderFromPayment(mockPayment);
-      }
-
-      return;
-    }
-
-    let payment: any;
-
-    // Usar endpoint diferente según el tipo de evento
-    if (eventType === 'merchant_order') {
-      logger.info('Consultando merchant order en API de Mercado Pago', { paymentId });
-      
-      // Importar MerchantOrder client
-      const { MerchantOrder } = await import('mercadopago');
-      const merchantOrderClient = new MerchantOrder(client);
-      const merchantOrder = await merchantOrderClient.get({ merchantOrderId: paymentId });
-      
-      if (!merchantOrder) {
-        logger.error('Merchant order no encontrado', { paymentId });
-        return;
-      }
-      
-      // Extraer pagos del merchant order
-      if (!merchantOrder.payments || merchantOrder.payments.length === 0) {
-        logger.error('Merchant order sin pagos asociados', { paymentId });
-        return;
-      }
-      
-      logger.info('Merchant order encontrado, buscando pago aprobado', {
-        merchantOrderId: paymentId,
-        paymentCount: merchantOrder.payments.length
-      });
-      
-      // Buscar pago aprobado o el primero disponible
-      let approvedPayment = merchantOrder.payments.find((p) => p.status === 'approved');
-      if (!approvedPayment) {
-        approvedPayment = merchantOrder.payments[0]; // Usar el primero si no hay aprobados
-        logger.warn('No se encontró pago aprobado, usando primer pago', {
-          firstPaymentStatus: approvedPayment.status,
-          firstPaymentId: approvedPayment.id
-        });
-      }
-      
-      // Obtener detalles completos del pago usando el Payment client
-      const { Payment } = await import('mercadopago');
-      const paymentClient = new Payment(client);
-      payment = await paymentClient.get({ id: approvedPayment.id! });
-      
-      logger.info('Detalles completos del pago obtenidos', {
-        paymentId: payment.id,
-        status: payment.status,
-        merchantOrderId: paymentId
-      });
-    } else {
-      // Endpoint normal para payments
-      logger.info('Consultando payment en API de Mercado Pago', { paymentId });
-      const { Payment } = await import('mercadopago');
-      const paymentClient = new Payment(client);
-      payment = await paymentClient.get({ id: paymentId });
-    }
-
-    if (!payment) {
-      logger.error('Pago no encontrado en MercadoPago API', { paymentId });
-      return;
-    }
-
-    // Confirmar que el pago es válido, pertenece a tu cuenta y tiene el estado correcto
-    const validStatuses = ['approved', 'pending', 'rejected'];
-    if (!payment.status || !validStatuses.includes(payment.status)) {
-      logger.info('Pago con estado no válido', { paymentId, status: payment.status });
-      return;
-    }
-
-    logger.info('Pago confirmado: válido, pertenece a la cuenta y estado correcto', {
-      paymentId,
-      status: payment.status,
-      belongsToAccount: true, // Confirmado por el access token usado en la consulta
-      metadata: payment.metadata || {}
-    });
-
-    // Manejar según el status del pago
-    if (payment.status === 'approved') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await createOrderFromPayment(payment as any);
-    } else if (payment.status === 'rejected') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await createRejectedOrderFromPayment(payment as any);
-    }
-    // Para 'pending', no hacer nada adicional por ahora
-
-  } catch (error) {
-    logger.error('Error procesando evento de pago', {
-      paymentId,
-      error: error instanceof Error ? error.message : String(error)
-    });
-    throw error;
-  }
-}
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-async function createOrderFromPayment(payment: any) {
-  try {
-    logger.info('Creando orden desde pago aprobado', { paymentId: payment.id });
-
-    const paymentId = payment && payment.id !== undefined && payment.id !== null
-      ? String(payment.id)
-      : null;
-
-    if (!paymentId) {
-      logger.error('Metadata incompleta: pago sin id válido, abortando creación de orden');
-      return;
-    }
-
-    const existingOrder = await db.query.orders.findFirst({
-      where: eq(orders.paymentId, paymentId),
-      columns: { id: true, status: true }
-    });
-
-    if (existingOrder) {
-      logger.info('Pago ya procesado previamente en createOrderFromPayment', {
-        paymentId,
-        existingOrderId: existingOrder.id,
-        existingStatus: existingOrder.status
-      });
-      return;
-    }
-
-    // Extraer metadata del pago
-    const metadata = payment.metadata || {};
-    logger.info('Metadata recibida del pago', {
-      paymentId: payment.id,
-      metadataKeys: Object.keys(metadata),
-      metadata: metadata
-    });
-
-    // Validación robusta de userId (usando snake_case como MercadoPago)
-    if (metadata.user_id === undefined || metadata.user_id === null) {
-      logger.error('Metadata incompleta: user_id es undefined o null', {
-        user_id: metadata.user_id,
-        userIdType: typeof metadata.user_id,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    if (typeof metadata.user_id !== 'string') {
-      logger.error('Metadata incompleta: user_id no es string - loggeando valor crudo y abortando creación de orden', {
-        user_id: metadata.user_id,
-        userIdType: typeof metadata.user_id,
-        metadataKeys: Object.keys(metadata),
-        rawMetadata: metadata
-      });
-      return;
-    }
-
-    const trimmedUserId = metadata.user_id.trim();
-    if (trimmedUserId === '') {
-      logger.error('Metadata incompleta: user_id es string vacío', {
-        user_id: metadata.user_id,
-        trimmedUserId,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    const userId = parseInt(trimmedUserId, 10);
-    if (isNaN(userId) || userId <= 0) {
-      logger.error('Metadata incompleta: user_id no es un número válido positivo', {
-        user_id: metadata.user_id,
-        trimmedUserId,
-        userIdParsed: userId,
-        isNaN: isNaN(userId),
-        isPositive: userId > 0,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    // Validación de items (usando snake_case)
-    if (metadata.items === undefined || metadata.items === null) {
-      logger.error('Metadata incompleta: items es undefined o null', {
-        items: metadata.items,
-        itemsType: typeof metadata.items,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    if (typeof metadata.items !== 'string') {
-      logger.error('Metadata incompleta: items no es string', {
-        items: metadata.items,
-        itemsType: typeof metadata.items,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    const trimmedItems = metadata.items.trim();
-    if (trimmedItems === '') {
-      logger.error('Metadata incompleta: items es string vacío', {
-        items: metadata.items,
-        trimmedItems,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    let parsedItems: any[];
-    try {
-      parsedItems = JSON.parse(trimmedItems);
-    } catch (error) {
-      logger.error('Metadata incompleta: items no es JSON válido', {
-        items: metadata.items,
-        trimmedItems,
-        parseError: error instanceof Error ? error.message : String(error),
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    if (!Array.isArray(parsedItems)) {
-      logger.error('Metadata incompleta: items parseado no es array', {
-        itemsParsed: parsedItems,
-        itemsType: typeof parsedItems,
-        isArray: Array.isArray(parsedItems),
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    if (parsedItems.length === 0) {
-      logger.error('Metadata incompleta: items array está vacío', {
-        itemsParsed: parsedItems,
-        itemsCount: parsedItems.length,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    // Validación de shippingAddress (usando snake_case)
-    let shippingAddress = null;
-    if (metadata.shipping_address) {
-      if (typeof metadata.shipping_address !== 'string') {
-        logger.error('Metadata incompleta: shipping_address no es string', {
-          shipping_address: metadata.shipping_address,
-          shippingAddressType: typeof metadata.shipping_address,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-      const trimmedShippingAddress = metadata.shipping_address.trim();
-      if (trimmedShippingAddress !== '') {
-        try {
-          shippingAddress = JSON.parse(trimmedShippingAddress);
-        } catch (error) {
-          logger.error('Metadata incompleta: shipping_address no es JSON válido', {
-            shipping_address: metadata.shipping_address,
-            trimmedShippingAddress,
-            parseError: error instanceof Error ? error.message : String(error),
-            metadataKeys: Object.keys(metadata)
-          });
-          return;
-        }
-      }
-    }
-
-    // Validación de shippingMethodId (usando snake_case)
-    if (metadata.shipping_method_id === undefined || metadata.shipping_method_id === null) {
-      logger.error('Metadata incompleta: shipping_method_id es undefined o null', {
-        shipping_method_id: metadata.shipping_method_id,
-        shippingMethodIdType: typeof metadata.shipping_method_id,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    let shippingMethodId: number;
-    if (typeof metadata.shipping_method_id === 'string') {
-      const trimmedShippingMethodId = metadata.shipping_method_id.trim();
-      shippingMethodId = parseInt(trimmedShippingMethodId, 10);
-      if (isNaN(shippingMethodId) || shippingMethodId <= 0) {
-        logger.error('Metadata incompleta: shipping_method_id no es número válido', {
-          shipping_method_id: metadata.shipping_method_id,
-          trimmedShippingMethodId,
-          shippingMethodIdParsed: shippingMethodId,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-    } else if (typeof metadata.shipping_method_id === 'number') {
-      shippingMethodId = metadata.shipping_method_id;
-      if (shippingMethodId <= 0) {
-        logger.error('Metadata incompleta: shipping_method_id no es positivo', {
-          shippingMethodId,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-    } else {
-      logger.error('Metadata incompleta: shipping_method_id no es string ni number', {
-        shipping_method_id: metadata.shipping_method_id,
-        shippingMethodIdType: typeof metadata.shipping_method_id,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    const items = parsedItems;
-
-    // Validación de shippingCost (usando snake_case)
-    let shippingCost = 0;
-    if (metadata.shipping_cost !== undefined && metadata.shipping_cost !== null) {
-      if (typeof metadata.shipping_cost === 'string') {
-        shippingCost = parseFloat(metadata.shipping_cost.trim());
-      } else if (typeof metadata.shipping_cost === 'number') {
-        shippingCost = metadata.shipping_cost;
-      } else {
-        logger.error('Metadata incompleta: shipping_cost no es string ni number', {
-          shipping_cost: metadata.shipping_cost,
-          shippingCostType: typeof metadata.shipping_cost,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-      if (isNaN(shippingCost)) {
-        logger.error('Metadata incompleta: shipping_cost no es número válido', {
-          shipping_cost: metadata.shipping_cost,
-          shippingCostParsed: shippingCost,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-    }
-
-    // Validación de total (usando snake_case)
-    let total = 0;
-    if (metadata.total !== undefined && metadata.total !== null) {
-      if (typeof metadata.total === 'string') {
-        total = parseFloat(metadata.total.trim());
-      } else if (typeof metadata.total === 'number') {
-        total = metadata.total;
-      } else {
-        logger.error('Metadata incompleta: total no es string ni number', {
-          total: metadata.total,
-          totalType: typeof metadata.total,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-      if (isNaN(total) || total < 0) {
-        logger.error('Metadata incompleta: total no es número válido positivo', {
-          total: metadata.total,
-          totalParsed: total,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-    }
-
-    logger.info('Metadata validada correctamente', {
-      userId,
-      shippingMethodId,
-      itemsCount: items.length,
-      hasShippingAddress: !!shippingAddress,
-      metadataKeys: Object.keys(metadata)
-    });
-
-    // Crear la orden
-    const newOrder = await db.insert(orders).values({
-      userId,
-      total: total.toString(),
-      // Estado financiero confirmado por webhook
-      status: 'paid',
-      paymentId: payment.id.toString(),
-      mercadoPagoId: payment.id.toString(),
-      shippingAddress,
-      shippingMethodId,
-      shippingCost: shippingCost.toString(),
-    }).returning({ id: orders.id });
-
-    const orderId = newOrder[0].id;
-    logger.info('Orden creada exitosamente', { orderId, userId });
-
-    // Crear los items de la orden
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orderItemsData = items.map((item: any) => ({
-      orderId,
-      productId: parseInt(item.id),
-      variantId: item.variantId || null,
-      quantity: item.quantity,
-      price: (item.discount && item.discount > 0
-        ? parseFloat(item.price) * (1 - item.discount / 100)
-        : parseFloat(item.price)).toString(),
-    }));
-
-    await db.insert(orderItems).values(orderItemsData);
-    logger.info('Items de orden creados', { orderId, itemsCount: orderItemsData.length });
-
-    // Comprobar si el stock ya fue deducido para esta orden
-    const orderRecord = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-      columns: { stockDeducted: true }
-    });
-
-    if (orderRecord?.stockDeducted) {
-      logger.warn('Stock ya fue deducido previamente para esta orden, omitiendo nueva deducción', { orderId });
-    } else {
-      // Deducción de stock después de crear la orden exitosamente
-      logger.info('Deducir stock para orden creada', { orderId, itemsCount: items.length });
-      for (const item of items) {
-        if (item.variantId) {
-          // Deducción de stock de variante
-          const { adjustVariantStock } = await import('@/lib/actions/stock');
-          await adjustVariantStock({
-            variantId: item.variantId,
-            change: -item.quantity,
-            reason: `Venta - Orden ${orderId}`
-          }, {
-            bypassAuth: true,
-            userId: userId
-          });
-          logger.info('Stock de variante deducido', { variantId: item.variantId, quantity: item.quantity });
-        } else {
-          // Deducción de stock del producto base
-          const { adjustProductStock } = await import('@/lib/actions/stock');
-          await adjustProductStock({
-            productId: parseInt(item.id),
-            change: -item.quantity,
-            reason: `Venta - Orden ${orderId}`
-          }, {
-            bypassAuth: true,
-            userId: userId
-          });
-          logger.info('Stock de producto deducido', { productId: item.id, quantity: item.quantity });
-        }
-      }
-
-      // Marcar la orden como con stock ya deducido
-      await db.update(orders)
-        .set({ stockDeducted: true })
-        .where(eq(orders.id, orderId));
-
-      logger.info('Deducción de stock completada para orden y flag actualizado', { orderId });
-    }
-
-    // Limpiar el carrito del usuario después de una compra exitosa
-    logger.info('Limpiando carrito del usuario después de compra exitosa', { userId });
-    try {
-      // Limpiar directamente en la base de datos sin verificar autenticación
-      const cart = await db
-        .select()
-        .from(carts)
-        .where(eq(carts.userId, userId))
-        .limit(1);
-
-      if (cart.length > 0) {
-        await db
-          .delete(cartItems)
-          .where(eq(cartItems.cartId, cart[0].id));
-        logger.info('Carrito limpiado exitosamente', { userId, cartId: cart[0].id });
-      } else {
-        logger.info('No se encontró carrito para limpiar', { userId });
-      }
-    } catch (cartError) {
-      logger.error('Error al limpiar el carrito', {
-        userId,
-        error: cartError instanceof Error ? cartError.message : String(cartError)
-      });
-      // No fallar la creación de orden por error en limpieza de carrito
-    }
-
-  } catch (error) {
-    logger.error('Error creando orden desde pago', {
-      paymentId: payment.id,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      metadata: payment.metadata || {}
-    });
-    throw error;
-  }
-}
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-async function createRejectedOrderFromPayment(payment: any) {
-  try {
-    logger.info('Procesando pago rechazado', { paymentId: payment.id });
-
-    const paymentId = payment && payment.id !== undefined && payment.id !== null
-      ? String(payment.id)
-      : null;
-
-    if (!paymentId) {
-      logger.error('Metadata incompleta para pago rechazado: pago sin id válido, abortando creación de orden');
-      return;
-    }
-
-    const existingOrder = await db.query.orders.findFirst({
-      where: eq(orders.paymentId, paymentId),
-      columns: { id: true, status: true }
-    });
-
-    if (existingOrder) {
-      logger.info('Pago rechazado ya procesado previamente, omitiendo creación de orden duplicada', {
-        paymentId,
-        existingOrderId: existingOrder.id,
-        existingStatus: existingOrder.status
-      });
-      return;
-    }
-
-    // Extraer metadata del pago
-    const metadata = payment.metadata || {};
-    logger.info('Metadata recibida del pago rechazado', {
-      paymentId: payment.id,
-      metadataKeys: Object.keys(metadata),
-      metadata: metadata
-    });
-
-    // Validación básica de userId (usando snake_case como MercadoPago)
-    if (metadata.user_id === undefined || metadata.user_id === null) {
-      logger.error('Metadata incompleta para pago rechazado: user_id es undefined o null', {
-        user_id: metadata.user_id,
-        userIdType: typeof metadata.user_id,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    if (typeof metadata.user_id !== 'string') {
-      logger.error('Metadata incompleta para pago rechazado: user_id no es string', {
-        user_id: metadata.user_id,
-        userIdType: typeof metadata.user_id,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    const trimmedUserId = metadata.user_id.trim();
-    if (trimmedUserId === '') {
-      logger.error('Metadata incompleta para pago rechazado: user_id es string vacío', {
-        user_id: metadata.user_id,
-        trimmedUserId,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    const userId = parseInt(trimmedUserId, 10);
-    if (isNaN(userId) || userId <= 0) {
-      logger.error('Metadata incompleta para pago rechazado: user_id no es un número válido positivo', {
-        user_id: metadata.user_id,
-        trimmedUserId,
-        userIdParsed: userId,
-        isNaN: isNaN(userId),
-        isPositive: userId > 0,
-        metadataKeys: Object.keys(metadata)
-      });
-      return;
-    }
-
-    // Validación de total (usando snake_case)
-    let total = 0;
-    if (metadata.total !== undefined && metadata.total !== null) {
-      if (typeof metadata.total === 'string') {
-        total = parseFloat(metadata.total.trim());
-      } else if (typeof metadata.total === 'number') {
-        total = metadata.total;
-      } else {
-        logger.error('Metadata incompleta para pago rechazado: total no es string ni number', {
-          total: metadata.total,
-          totalType: typeof metadata.total,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-      if (isNaN(total) || total < 0) {
-        logger.error('Metadata incompleta para pago rechazado: total no es número válido positivo', {
-          total: metadata.total,
-          totalParsed: total,
-          metadataKeys: Object.keys(metadata)
-        });
-        return;
-      }
-    }
-
-    logger.info('Metadata validada para pago rechazado', {
-      userId,
-      total,
-      metadataKeys: Object.keys(metadata)
-    });
-
-    // Crear la orden con status 'rejected'
-    const newOrder = await db.insert(orders).values({
-      userId,
-      total: total.toString(),
-      status: 'rejected',
-      paymentId: payment.id.toString(),
-      mercadoPagoId: payment.id.toString(),
-      shippingAddress: null, // No incluir dirección de envío para rechazos
-      shippingMethodId: null, // No incluir método de envío para rechazos
-      shippingCost: '0.00',
-    }).returning({ id: orders.id });
-
-    const orderId = newOrder[0].id;
-    logger.info('Orden rechazada creada exitosamente', { orderId, userId, paymentId: payment.id });
-
-    // Nota: No crear items de orden para pagos rechazados, ya que no se procesaron
-
-  } catch (error) {
-    logger.error('Error procesando pago rechazado', {
-      paymentId: payment.id,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      metadata: payment.metadata || {}
-    });
-    throw error;
   }
 }

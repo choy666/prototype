@@ -52,7 +52,10 @@ export function useCartClearOnSuccess(options: UseCartClearOnSuccessOptions = {}
   const getPaymentInfo = useCallback((): PaymentInfo => {
     return {
       paymentId: searchParams.get('payment_id'),
-      merchantOrderId: searchParams.get('merchant_order_id') || searchParams.get('order_id'),
+      merchantOrderId:
+        searchParams.get('external_reference') ||
+        searchParams.get('merchant_order_id') ||
+        searchParams.get('order_id'),
       status: searchParams.get('status'),
       collectionStatus: searchParams.get('collection_status'),
       paymentType: searchParams.get('payment_type'),

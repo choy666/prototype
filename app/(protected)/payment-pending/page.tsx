@@ -15,6 +15,9 @@ export default function PaymentPendingPage() {
     merchantOrderId: '',
     externalReference: ''
   });
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
+  const [orderStatusLoading, setOrderStatusLoading] = useState(false);
+  const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     // Extraer parámetros de la URL de Mercado Pago
@@ -26,6 +29,61 @@ export default function PaymentPendingPage() {
       externalReference: searchParams.get('external_reference') || ''
     });
   }, [searchParams]);
+
+  useEffect(() => {
+    const orderIdSource =
+      paymentDetails.externalReference || paymentDetails.merchantOrderId;
+
+    const numericOrderId =
+      orderIdSource && !Number.isNaN(Number(orderIdSource))
+        ? orderIdSource
+        : null;
+
+    if (!numericOrderId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStatus = async () => {
+      try {
+        setOrderStatusLoading(true);
+        setOrderStatusError(null);
+
+        const res = await fetch(`/api/order-status?order_id=${numericOrderId}`);
+        if (!res.ok) {
+          throw new Error('No se pudo obtener el estado del pedido');
+        }
+
+        const data = await res.json();
+        if (cancelled) {
+          return;
+        }
+
+        setOrderStatus(data.status ?? null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setOrderStatusError(
+          error instanceof Error ? error.message : String(error)
+        );
+      } finally {
+        if (!cancelled) {
+          setOrderStatusLoading(false);
+        }
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [paymentDetails.externalReference, paymentDetails.merchantOrderId]);
 
   const isOfflinePayment = paymentDetails.paymentType === 'ticket' || 
                           paymentDetails.paymentType === 'atm';
@@ -46,6 +104,20 @@ export default function PaymentPendingPage() {
             Tu pago está pendiente de confirmación. Te notificaremos una vez que 
             se haya completado.
           </p>
+
+          {(paymentDetails.externalReference || paymentDetails.merchantOrderId) && (
+            <div className="mb-4 text-sm text-gray-600">
+              Estado del pedido:{' '}
+              {orderStatusLoading
+                ? 'Verificando...'
+                : orderStatus || 'No disponible'}
+            </div>
+          )}
+          {orderStatusError && (
+            <div className="mb-4 text-sm text-red-500">
+              {orderStatusError}
+            </div>
+          )}
 
           {paymentDetails.paymentId && (
             <div className="bg-white rounded-md p-4 mb-6 border">
