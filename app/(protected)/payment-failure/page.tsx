@@ -42,13 +42,28 @@ export default function PaymentFailurePage() {
     }
 
     let cancelled = false;
+    let cooldownUntil = 0;
 
     const fetchStatus = async () => {
+      if (cancelled) return;
+
+      const now = Date.now();
+      if (now < cooldownUntil) {
+        return;
+      }
+
       try {
         setOrderStatusLoading(true);
         setOrderStatusError(null);
 
         const res = await fetch(`/api/order-status?order_id=${numericOrderId}`);
+
+        if (res.status === 429) {
+          cooldownUntil = Date.now() + 15000;
+          setOrderStatusError('Demasiadas consultas, reintentando en unos segundos...');
+          return;
+        }
+
         if (!res.ok) {
           throw new Error('No se pudo obtener el estado del pedido');
         }
@@ -58,6 +73,7 @@ export default function PaymentFailurePage() {
           return;
         }
 
+        cooldownUntil = 0;
         setOrderStatus(data.status ?? null);
       } catch (error) {
         if (cancelled) {

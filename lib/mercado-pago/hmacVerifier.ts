@@ -179,6 +179,17 @@ export function verifyHmacSHA256(
       });
     }
   }
+  else if (p.topic === 'payment' && p.resource) {
+    const resourceStr = String(p.resource);
+    const simpleIdMatch = resourceStr.match(/(\d+)$/);
+    if (simpleIdMatch && simpleIdMatch[1]) {
+      dataId = simpleIdMatch[1];
+      logger.info('ID extraído de payment resource simple', {
+        resource: p.resource,
+        extractedId: dataId
+      });
+    }
+  }
   // Estructura alternativa: {action, type} sin id (ignorar)
   else {
     const hasType = p.type;
@@ -395,6 +406,13 @@ export function validateWebhookPayload(rawBody: string): {
       const match = p.resource.match(/\/(\d+)$/);
       if (match && match[1]) {
         dataId = match[1];
+      }
+    }
+    else if (p.topic === 'payment' && p.resource) {
+      const resourceStr = String(p.resource);
+      const simpleIdMatch = resourceStr.match(/(\d+)$/);
+      if (simpleIdMatch && simpleIdMatch[1]) {
+        dataId = simpleIdMatch[1];
       }
     }
     // Estructura alternativa: {action, type} sin id (ignorar)

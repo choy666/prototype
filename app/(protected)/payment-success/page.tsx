@@ -35,13 +35,30 @@ export default function PaymentSuccess() {
     }
 
     let cancelled = false;
+    let cooldownUntil = 0;
 
     const fetchStatus = async () => {
+      if (cancelled) return;
+
+      const now = Date.now();
+      if (now < cooldownUntil) {
+        // En periodo de enfriamiento tras un 429, no hacer nuevas requests
+        return;
+      }
+
       try {
         setOrderStatusLoading(true);
         setOrderStatusError(null);
 
         const res = await fetch(`/api/order-status?order_id=${numericOrderId}`);
+
+        if (res.status === 429) {
+          // Demasiadas solicitudes: aplicar backoff suave
+          cooldownUntil = Date.now() + 15000; // 15s sin nuevas requests
+          setOrderStatusError('Demasiadas consultas, reintentando en unos segundos...');
+          return;
+        }
+
         if (!res.ok) {
           throw new Error('No se pudo obtener el estado del pedido');
         }
@@ -51,6 +68,8 @@ export default function PaymentSuccess() {
           return;
         }
 
+        // Si la llamada fue exitosa, limpiar cooldown
+        cooldownUntil = 0;
         setOrderStatus(data.status ?? null);
       } catch (error) {
         if (cancelled) {

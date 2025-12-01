@@ -260,8 +260,16 @@ export async function POST(req: Request) {
     });
 
     // 6. Procesar evento según tipo
-    if ((eventType === 'payment.updated' || eventType === 'payment.created') && eventId) {
-      logger.info(`Procesando evento ${eventType} - reenviando a payments/notify`, {
+    const isPaymentEvent =
+      !!eventType && (
+        eventType === 'payment' ||
+        eventType === 'payment.updated' ||
+        eventType === 'payment.created' ||
+        eventType.startsWith('payment.')
+      );
+
+    if (isPaymentEvent && eventId) {
+      logger.info(`Procesando evento de pago ${eventType} - reenviando a payments/notify`, {
         requestId,
         eventId,
       });
