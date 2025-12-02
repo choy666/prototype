@@ -52,6 +52,18 @@ export function validateMercadoPagoHmac(
     throw new Error('Webhook secret no configurado');
   }
 
+  // TEMPORAL: Normalizar secreto para eliminar comillas/espacios
+  const normalizedSecret = webhookSecret.replace(/^["']|["']$/g, '').trim();
+  logger.info('🔍 [DEBUG SECRET] Secret normalizado', {
+    originalLength: webhookSecret.length,
+    normalizedLength: normalizedSecret.length,
+    secretChanged: webhookSecret !== normalizedSecret,
+    originalFirst4: webhookSecret.substring(0, 4),
+    originalLast4: webhookSecret.substring(webhookSecret.length - 4),
+    normalizedFirst4: normalizedSecret.substring(0, 4),
+    normalizedLast4: normalizedSecret.substring(normalizedSecret.length - 4)
+  });
+
   /* ------------------------------
    * Leer headers requeridos
    * ------------------------------ */
@@ -87,6 +99,11 @@ export function validateMercadoPagoHmac(
   let ts: string | undefined;
   let signature: string | undefined;
 
+  logger.info('DEBUG - Header x-signature completo', {
+    rawXSignature: xSignature,
+    xSignatureLength: xSignature.length,
+  });
+
   try {
     const parts = xSignature.split(',');
     for (const rawPart of parts) {
@@ -99,8 +116,14 @@ export function validateMercadoPagoHmac(
   }
 
   if (!ts || !signature) {
-    throw new Error('Formato inválido: faltan ts o v1');
+    throw new Error('Formato de firma inválido: faltan ts o v1');
   }
+
+  logger.info('DEBUG - Componentes extraídos de x-signature', {
+    ts,
+    signature,
+    signatureLength: signature.length
+  });
 
   /* ------------------------------
    * Parsear payload e identificar data.id
@@ -141,25 +164,100 @@ export function validateMercadoPagoHmac(
   }
 
   /* ------------------------------
-   * Construir string_to_sign EXACTO
+   * Probar múltiples IDs candidatos para merchant_order
    * ------------------------------ */
-  const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts}`;
+  const candidateIds: string[] = [];
+  
+  // ID principal: extraído de resource URL
+  if (dataId) candidateIds.push(dataId);
+  
+  // ID alternativos para merchant_order
+  if (p.resource) {
+    candidateIds.push(String(p.resource)); // URL completa
+    candidateIds.push('merchant_order'); // topic
+  }
+  
+  // Eliminar duplicados
+  const uniqueCandidates = [...new Set(candidateIds)];
+  
+  logger.info('🔍 [DEBUG CANDIDATES] IDs a probar para firma', {
+    candidates: uniqueCandidates,
+    candidateCount: uniqueCandidates.length
+  });
 
   /* ------------------------------
-   * Generar HMAC SHA256 esperado
+   * Probar cada candidato hasta encontrar coincidencia
    * ------------------------------ */
-  const hmac = crypto.createHmac('sha256', webhookSecret);
-  hmac.update(stringToSign);
-  const expected = hmac.digest('hex');
-
-  const received = Buffer.from(signature, 'hex');
-  const expectedBuf = Buffer.from(expected, 'hex');
-
-  if (!crypto.timingSafeEqual(received, expectedBuf)) {
-    throw new Error('Firma inválida');
+  for (const candidateId of uniqueCandidates) {
+    const stringToSign = `id:${candidateId};request-id:${xRequestId};ts:${ts}`;
+    
+    // Probar con secret original y normalizado
+    const secrets = [
+      { name: 'original', value: webhookSecret },
+      { name: 'normalized', value: normalizedSecret }
+    ];
+    
+    for (const secret of secrets) {
+      const hmac = crypto.createHmac('sha256', secret.value);
+      hmac.update(stringToSign);
+      const expectedSignature = hmac.digest('hex');
+      
+      // Verificar longitudes antes de comparar
+      const receivedLength = signature.length;
+      const expectedLength = expectedSignature.length;
+      const lengthsMatch = receivedLength === expectedLength;
+      
+      logger.info('🔍 [DEBUG HMAC] Verificación de longitudes', {
+        candidateId,
+        secretType: secret.name,
+        receivedLength,
+        expectedLength,
+        lengthsMatch,
+        receivedSignature: signature,
+        expectedSignature,
+        stringToSign
+      });
+      
+      // Solo comparar si las longitudes coinciden
+      if (!lengthsMatch) {
+        logger.warn('⚠️ [LENGTH MISMATCH] Longitudes diferentes, omitiendo comparación', {
+          candidateId,
+          secretType: secret.name,
+          receivedLength,
+          expectedLength
+        });
+        continue;
+      }
+      
+      const signaturesMatch = signature === expectedSignature;
+      
+      logger.info('🔍 [DEBUG HMAC] Intento de validación', {
+        candidateId,
+        secretType: secret.name,
+        stringToSign,
+        expectedSignature,
+        receivedSignature: signature,
+        signaturesMatch,
+        matchPrefix: signaturesMatch ? '✅' : '❌'
+      });
+      
+      if (signaturesMatch) {
+        logger.info('🎯 [SUCCESS] Firma validada exitosamente', {
+          candidateId,
+          secretType: secret.name,
+          stringToSign
+        });
+        return { ok: true, dataId: candidateId };
+      }
+    }
   }
-
-  return { ok: true, dataId };
+  
+  logger.error('❌ [FAILED] Ningún candidato coincidió con la firma recibida', {
+    receivedSignature: signature,
+    totalAttempts: uniqueCandidates.length * 2
+  });
+  
+  throw new Error('Firma inválida - ningún ID candidato coincidió');
 }
 
 /* --------------------------------------------------
