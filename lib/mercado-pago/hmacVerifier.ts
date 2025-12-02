@@ -130,6 +130,9 @@ export function validateMercadoPagoHmac(
   const p = parsedPayload as {
     action?: string;
     data?: { id?: unknown };
+    id?: unknown;
+    topic?: string;
+    resource?: unknown;
   };
 
   if (p.action === 'test.notification') {
@@ -137,7 +140,19 @@ export function validateMercadoPagoHmac(
     return { ok: true };
   }
 
-  const dataIdRaw = p.data?.id;
+  let dataIdRaw = p.data?.id;
+
+  if (!dataIdRaw && p.id) {
+    dataIdRaw = p.id;
+  }
+
+  if (!dataIdRaw && p.resource) {
+    const resourceStr = String(p.resource);
+    const match = resourceStr.match(/(\d+)$/);
+    if (match && match[1]) {
+      dataIdRaw = match[1];
+    }
+  }
 
   if (!dataIdRaw) {
     logger.error('No se pudo extraer data.id del payload para construir string_to_sign', {
