@@ -205,8 +205,19 @@ export async function POST(req: Request) {
     };
     
     const debugBase64 = Buffer.from(JSON.stringify(debugData, null, 2)).toString('base64');
-    logger.info(`🔍 [DEBUG BASE64] Datos codificados en base64 para diagnóstico`);
-    logger.info(`🔍 [DEBUG BASE64] Copiar este texto y decodificar: ${debugBase64.substring(0, 100)}...`);
+    
+    // Dividir base64 en chunks para evitar truncamiento de logs
+    const chunkSize = 200;
+    const totalChunks = Math.ceil(debugBase64.length / chunkSize);
+    
+    logger.info(`🔍 [DEBUG BASE64] Datos codificados (${totalChunks} partes, ${debugBase64.length} chars total)`);
+    
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = debugBase64.substring(i * chunkSize, (i + 1) * chunkSize);
+      logger.info(`🔍 [DEBUG BASE64] PART${i + 1}/${totalChunks}: ${chunk}`);
+    }
+    
+    logger.info(`🔍 [DEBUG BASE64] Instrucciones: Copiar todas las partes en orden y decodificar`);
 
     // 4. Validar firma HMAC con RAW body (antes de parsear)
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
