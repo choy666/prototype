@@ -24,7 +24,16 @@ export default function PaymentSuccess() {
   });
 
   useEffect(() => {
-    const { merchantOrderId } = paymentInfo;
+    const { merchantOrderId, collectionStatus, status } = paymentInfo;
+
+    // Si Mercado Pago ya indica aprobado, no hacemos polling al estado local
+    const isApproved =
+      collectionStatus === 'approved' || status === 'approved';
+
+    if (isApproved) {
+      return;
+    }
+
     const numericOrderId =
       merchantOrderId && !Number.isNaN(Number(merchantOrderId))
         ? merchantOrderId

@@ -239,7 +239,6 @@ export function verifyHmacSHA256(
     };
   }
 }
-
 // Validar firma con soporte para múltiples formatos (compatibilidad)
 export function verifyWebhookSignature(
   rawBody: string,

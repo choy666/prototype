@@ -93,7 +93,7 @@ export default function PaymentPendingPage() {
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
+    const interval = setInterval(fetchStatus, 10000);
 
     return () => {
       cancelled = true;
