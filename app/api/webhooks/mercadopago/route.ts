@@ -191,6 +191,23 @@ export async function POST(req: Request) {
       webhookSecretLast4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(process.env.MERCADO_PAGO_WEBHOOK_SECRET.length - 4) || 'MISSING'
     });
 
+    // 3.1 GUARDAR DATOS EN RESPUESTA BASE64 para diagnóstico (TEMPORAL)
+    const debugData = {
+      requestId,
+      timestamp: new Date().toISOString(),
+      xSignature,
+      xRequestId,
+      rawBody,
+      headers: Object.fromEntries(req.headers.entries()),
+      webhookSecretLength: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.length || 0,
+      webhookSecretFirst4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(0, 4) || 'MISSING',
+      webhookSecretLast4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(process.env.MERCADO_PAGO_WEBHOOK_SECRET.length - 4) || 'MISSING'
+    };
+    
+    const debugBase64 = Buffer.from(JSON.stringify(debugData, null, 2)).toString('base64');
+    logger.info(`🔍 [DEBUG BASE64] Datos codificados en base64 para diagnóstico`);
+    logger.info(`🔍 [DEBUG BASE64] Copiar este texto y decodificar: ${debugBase64.substring(0, 100)}...`);
+
     // 4. Validar firma HMAC con RAW body (antes de parsear)
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
     const signatureValidation = verifyWebhookSignature(
@@ -212,7 +229,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         success: false, 
         error: signatureValidation.error || 'Firma inválida',
-        requestId
+        requestId,
+        debug: debugBase64 // Incluir datos completos en base64
       }, { status: 401 });
     }
 
