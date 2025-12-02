@@ -175,17 +175,23 @@ export async function POST(req: Request) {
     // 1. Leer body como RAW text (CRÍTICO: antes de cualquier parseo)
     const rawBody = await req.text();
     
-    logger.info('Webhook MercadoPago: Body leído como raw', {
-      requestId,
-      bodyLength: rawBody.length,
-      bodyPreview: rawBody.substring(0, 100) + '...'
-    });
-
-    // 2. Extraer headers de validación
+    // 2. Extraer headers de validación ANTES de cualquier procesamiento
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
+    
+    // 3. LOG COMPLETO SIN CENSURA para diagnóstico (TEMPORAL)
+    logger.info('🔍 [DEBUG] Webhook completo sin censura', {
+      requestId,
+      xSignature: xSignature || 'MISSING',
+      xRequestId: xRequestId || 'MISSING',
+      rawBody: rawBody,
+      rawBodyLength: rawBody.length,
+      webhookSecretLength: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.length || 0,
+      webhookSecretFirst4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(0, 4) || 'MISSING',
+      webhookSecretLast4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(process.env.MERCADO_PAGO_WEBHOOK_SECRET.length - 4) || 'MISSING'
+    });
 
-    // 3. Validar firma HMAC con RAW body (antes de parsear)
+    // 4. Validar firma HMAC con RAW body (antes de parsear)
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
     const signatureValidation = verifyWebhookSignature(
       rawBody,
