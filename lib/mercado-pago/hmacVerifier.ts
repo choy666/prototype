@@ -66,7 +66,7 @@ export async function validateMercadoPagoHmac(
 
   // TEMPORAL: Normalizar secreto para eliminar comillas/espacios
   const normalizedSecret = webhookSecret.replace(/^["']|["']$/g, '').trim();
-  
+    
   // DEBUG: Mostrar bytes exactos del secret para detectar caracteres invisibles
   const secretHex = Buffer.from(webhookSecret, 'utf8').toString('hex');
   const normalizedSecretHex = Buffer.from(normalizedSecret, 'utf8').toString('hex');
