@@ -6,7 +6,7 @@
 - MERCADOLIBRE_WEBHOOK_URL : https://prototype-ten-dun.vercel.app/api/mercadolibre/webhooks
 ----
 
-### DevCenter de Mercado Pago
+### DevCenter de Mercado Pago - ID 123456 de test para el simulador de mercadopago
 # Configuración de la aplicación prototypeMC (Mercado Pago)
 - Producto integrado : Checkout Pro
 - MERCADO_PAGO_WEBHOOK_URL : https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago
