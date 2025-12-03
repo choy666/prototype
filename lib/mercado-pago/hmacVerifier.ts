@@ -66,6 +66,11 @@ export async function validateMercadoPagoHmac(
 
   // TEMPORAL: Normalizar secreto para eliminar comillas/espacios
   const normalizedSecret = webhookSecret.replace(/^["']|["']$/g, '').trim();
+  
+  // DEBUG: Mostrar bytes exactos del secret para detectar caracteres invisibles
+  const secretHex = Buffer.from(webhookSecret, 'utf8').toString('hex');
+  const normalizedSecretHex = Buffer.from(normalizedSecret, 'utf8').toString('hex');
+  
   logger.info('🔍 [DEBUG SECRET] Secret normalizado', {
     originalLength: webhookSecret.length,
     normalizedLength: normalizedSecret.length,
@@ -73,7 +78,9 @@ export async function validateMercadoPagoHmac(
     originalFirst4: webhookSecret.substring(0, 4),
     originalLast4: webhookSecret.substring(webhookSecret.length - 4),
     normalizedFirst4: normalizedSecret.substring(0, 4),
-    normalizedLast4: normalizedSecret.substring(normalizedSecret.length - 4)
+    normalizedLast4: normalizedSecret.substring(normalizedSecret.length - 4),
+    secretHex: secretHex.substring(0, 32) + '...',
+    normalizedSecretHex: normalizedSecretHex.substring(0, 32) + '...'
   });
 
   /* ------------------------------
@@ -114,6 +121,10 @@ export async function validateMercadoPagoHmac(
   logger.info('DEBUG - Header x-signature completo', {
     rawXSignature: xSignature,
     xSignatureLength: xSignature.length,
+    signatureLength: signature ? signature.length : 0,
+    signatureHexLength: signature ? Buffer.from(signature, 'hex').length * 2 : 0,
+    signaturePreview: signature ? signature.substring(0, 20) + '...' : 'none',
+    signatureEnd: signature ? '...' + signature.substring(signature.length - 20) : 'none'
   });
 
   try {
