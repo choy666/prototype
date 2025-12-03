@@ -16,6 +16,18 @@ export interface MercadoPagoHmacValidationResult {
 }
 
 /* --------------------------------------------------
+ * Tipos para merchant order data
+ * -------------------------------------------------- */
+interface MerchantOrderPayment {
+  id: string | number;
+  status?: string;
+}
+
+interface MerchantOrderData {
+  payments?: MerchantOrderPayment[];
+}
+
+/* --------------------------------------------------
  * Helper seguro para leer headers
  * -------------------------------------------------- */
 function getHeader(headers: Headers, name: string): string | null {
@@ -37,11 +49,11 @@ function getHeader(headers: Headers, name: string): string | null {
  * string_to_sign EXACTO:
  *   id:{id};request-id:{x-request-id};ts:{ts}
  * -------------------------------------------------- */
-export function validateMercadoPagoHmac(
+export async function validateMercadoPagoHmac(
   rawBody: string,
   headers: Headers,
   webhookSecret: string
-): MercadoPagoHmacValidationResult {
+): Promise<MercadoPagoHmacValidationResult> {
   logger.info('Iniciando validateMercadoPagoHmac', {
     rawBodyLength: rawBody.length,
     webhookSecretSet: !!webhookSecret,
@@ -177,18 +189,86 @@ export function validateMercadoPagoHmac(
     candidateIds.push('merchant_order'); // topic
   }
   
+  // TEMPORAL: Para merchant_order, obtener payment IDs reales del API
+  if (p.resource && p.resource.toString().includes('merchant_orders')) {
+    try {
+      logger.info('🔍 [DEBUG MERCHANT ORDER] Obteniendo datos reales del merchant_order', {
+        resourceUrl: p.resource
+      });
+      
+      const merchantOrderId = dataId;
+      if (merchantOrderId) {
+        // Obtener token de Mercado Pago del entorno
+        const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+        if (mpToken) {
+          try {
+            const response = await fetch(`https://api.mercadolibre.com/merchant_orders/${merchantOrderId}`, {
+              headers: {
+                'Authorization': `Bearer ${mpToken}`
+              }
+            });
+            
+            if (response.ok) {
+              const merchantOrderData = await response.json() as MerchantOrderData;
+              logger.info('🔍 [DEBUG MERCHANT ORDER] Datos del merchant_order obtenidos', {
+                merchantOrderId,
+                payments: merchantOrderData.payments?.map((p: MerchantOrderPayment) => ({ id: p.id, status: p.status })) || []
+              });
+              
+              // Agregar payment IDs reales como candidatos
+              if (merchantOrderData.payments && Array.isArray(merchantOrderData.payments)) {
+                for (const payment of merchantOrderData.payments) {
+                  if (payment.id) {
+                    candidateIds.push(String(payment.id));
+                    logger.info('🔍 [DEBUG MERCHANT ORDER] Payment ID agregado como candidato', {
+                      paymentId: payment.id
+                    });
+                  }
+                }
+              }
+            } else {
+              logger.warn('🔍 [DEBUG MERCHANT ORDER] Error obteniendo merchant_order', {
+                status: response.status,
+                statusText: response.statusText
+              });
+            }
+          } catch (fetchError) {
+            logger.warn('🔍 [DEBUG MERCHANT ORDER] Error de fetch al merchant_order', {
+              error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+            });
+          }
+        } else {
+          logger.warn('🔍 [DEBUG MERCHANT ORDER] No hay MERCADO_PAGO_ACCESS_TOKEN configurado');
+        }
+      }
+    } catch (error) {
+      logger.warn('🔍 [DEBUG MERCHANT ORDER] Error procesando merchant_order', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  
   // Eliminar duplicados
   const uniqueCandidates = [...new Set(candidateIds)];
   
   logger.info('🔍 [DEBUG CANDIDATES] IDs a probar para firma', {
     candidates: uniqueCandidates,
-    candidateCount: uniqueCandidates.length
+    candidateCount: uniqueCandidates.length,
+    merchantOrderDetected: p.resource?.toString().includes('merchant_orders')
   });
 
   /* ------------------------------
    * Probar cada candidato hasta encontrar coincidencia
    * ------------------------------ */
-  for (const candidateId of uniqueCandidates) {
+  const foundMatch = false;
+  
+  // Primera ronda: IDs básicos sin hacer fetch
+  const basicCandidates = uniqueCandidates.filter(id => 
+    !id.toString().includes('payment_') && 
+    !id.toString().includes('_payment')
+  );
+  
+  for (const candidateId of basicCandidates) {
     const stringToSign = `id:${candidateId};request-id:${xRequestId};ts:${ts}`;
     
     // Probar con secret original y normalizado
@@ -252,6 +332,81 @@ export function validateMercadoPagoHmac(
     }
   }
   
+  // Si no encontramos coincidencia y es merchant_order, hacer fetch para obtener payment IDs
+  if (!foundMatch && p.resource && p.resource.toString().includes('merchant_orders')) {
+    logger.info('🔍 [DEBUG MERCHANT ORDER] IDs básicos fallaron, obteniendo payment IDs del API');
+    
+    const merchantOrderId = dataId;
+    if (merchantOrderId) {
+      const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+      if (mpToken) {
+        try {
+          const response = await fetch(`https://api.mercadolibre.com/merchant_orders/${merchantOrderId}`, {
+            headers: {
+              'Authorization': `Bearer ${mpToken}`
+            }
+          });
+          
+          if (response.ok) {
+            const merchantOrderData = await response.json() as MerchantOrderData;
+            logger.info('🔍 [DEBUG MERCHANT ORDER] Datos del merchant_order obtenidos', {
+              merchantOrderId,
+              payments: merchantOrderData.payments?.map((p: MerchantOrderPayment) => ({ id: p.id, status: p.status })) || []
+            });
+            
+            // Probar con payment IDs reales
+            if (merchantOrderData.payments && Array.isArray(merchantOrderData.payments)) {
+              for (const payment of merchantOrderData.payments) {
+                if (payment.id) {
+                  const paymentId = String(payment.id);
+                  const stringToSign = `id:${paymentId};request-id:${xRequestId};ts:${ts}`;
+                  
+                  for (const secret of [{ name: 'original', value: webhookSecret }, { name: 'normalized', value: normalizedSecret }]) {
+                    const hmac = crypto.createHmac('sha256', secret.value);
+                    hmac.update(stringToSign);
+                    const expectedSignature = hmac.digest('hex');
+                    
+                    const signaturesMatch = signature === expectedSignature;
+                    
+                    logger.info('🔍 [DEBUG PAYMENT ID] Intento con payment ID real', {
+                      paymentId,
+                      secretType: secret.name,
+                      stringToSign,
+                      expectedSignature,
+                      receivedSignature: signature,
+                      signaturesMatch,
+                      matchPrefix: signaturesMatch ? '✅' : '❌'
+                    });
+                    
+                    if (signaturesMatch) {
+                      logger.info('🎯 [SUCCESS] Firma validada con payment ID', {
+                        paymentId,
+                        secretType: secret.name,
+                        stringToSign
+                      });
+                      return { ok: true, dataId: paymentId };
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            logger.warn('🔍 [DEBUG MERCHANT ORDER] Error obteniendo merchant_order', {
+              status: response.status,
+              statusText: response.statusText
+            });
+          }
+        } catch (fetchError) {
+          logger.warn('🔍 [DEBUG MERCHANT ORDER] Error de fetch al merchant_order', {
+            error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+          });
+        }
+      } else {
+        logger.warn('🔍 [DEBUG MERCHANT ORDER] No hay MERCADO_PAGO_ACCESS_TOKEN configurado');
+      }
+    }
+  }
+  
   logger.error('❌ [FAILED] Ningún candidato coincidió con la firma recibida', {
     receivedSignature: signature,
     totalAttempts: uniqueCandidates.length * 2
@@ -264,12 +419,12 @@ export function validateMercadoPagoHmac(
  * Wrapper simplificado: verifyHmacSHA256
  * Cascade te va a pedir llamarlo desde el route handler
  * -------------------------------------------------- */
-export function verifyHmacSHA256(
+export async function verifyHmacSHA256(
   xSignature: string | undefined,
   rawBody: string,
   webhookSecret: string,
   xRequestId?: string | null
-): WebhookValidationResult {
+): Promise<WebhookValidationResult> {
   logger.info('verifyHmacSHA256 INIT', {
     xSignatureLength: xSignature?.length,
     hasRequestId: !!xRequestId,
@@ -280,7 +435,7 @@ export function verifyHmacSHA256(
     if (xSignature) headers.set('x-signature', xSignature);
     if (xRequestId) headers.set('x-request-id', xRequestId);
 
-    const result = validateMercadoPagoHmac(rawBody, headers, webhookSecret);
+    const result = await validateMercadoPagoHmac(rawBody, headers, webhookSecret);
 
     return { isValid: result.ok, dataId: result.dataId };
   } catch (err) {
@@ -295,12 +450,12 @@ export function verifyHmacSHA256(
  * verifyWebhookSignature
  * (Modo compatibilidad y fallback)
  * -------------------------------------------------- */
-export function verifyWebhookSignature(
+export async function verifyWebhookSignature(
   rawBody: string,
   xSignature: string | null,
   xRequestId: string | null,
   webhookSecret: string
-): WebhookValidationResult {
+): Promise<WebhookValidationResult> {
   try {
     // En desarrollo sin secret → permitir
     if (process.env.NODE_ENV === 'development' && !webhookSecret) {
@@ -320,7 +475,7 @@ export function verifyWebhookSignature(
     if (xSignature) headers.set('x-signature', xSignature);
     if (xRequestId) headers.set('x-request-id', xRequestId);
 
-    const result = validateMercadoPagoHmac(rawBody, headers, webhookSecret);
+    const result = await validateMercadoPagoHmac(rawBody, headers, webhookSecret);
 
     return { isValid: result.ok, dataId: result.dataId };
   } catch (err) {
