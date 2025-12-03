@@ -189,6 +189,16 @@ export async function POST(req: Request) {
 
     // 4. Validar firma HMAC con RAW body (antes de parsear)
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+    
+    logger.info('🔍 [WEBHOOK DEBUG] Iniciando validación de firma', {
+      requestId,
+      hasWebhookSecret: !!webhookSecret,
+      xSignature: xSignature ? xSignature.substring(0, 50) + '...' : 'null',
+      xRequestId,
+      bodyLength: rawBody.length,
+      bodyPreview: rawBody.substring(0, 100) + '...'
+    });
+    
     const signatureValidation = await verifyWebhookSignature(
       rawBody,
       xSignature,

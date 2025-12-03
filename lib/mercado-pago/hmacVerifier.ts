@@ -98,21 +98,39 @@ export async function validateMercadoPagoHmac(
    * Permitir test.notification sin firma
    * TEMPORAL: Permitir Data ID 123456 (simulador MP) sin firma válida
    * ------------------------------ */
+  
+  // PRIMERO: Verificar si es el simulador (antes de cualquier validación)
+  try {
+    const parsed = JSON.parse(rawBody);
+    const dataId = parsed?.data?.id ?? parsed?.id;
+    
+    logger.info('🔍 [SIMULATOR CHECK] Verificando ID del simulador', {
+      dataId,
+      dataType: typeof dataId,
+      parsedData: parsed?.data,
+      parsedId: parsed?.id,
+      isSimulator: dataId === '123456' || dataId === 123456
+    });
+    
+    // Permitir siempre el ID 123456 del simulador
+    if (dataId === '123456' || dataId === 123456) {
+      logger.warn('🔧 [SIMULATOR MODE] Permitiendo webhook del simulador MP (ID: 123456) sin validar firma');
+      return { ok: true, dataId: String(dataId) };
+    }
+    
+    // Permitir test.notification sin firma
+    if (!xSignature && parsed?.action === 'test.notification') {
+      logger.info('Webhook test.notification detectado sin firma → OK');
+      return { ok: true };
+    }
+  } catch (parseError) {
+    logger.error('Error parseando JSON para detección de simulador', {
+      error: parseError instanceof Error ? parseError.message : String(parseError)
+    });
+  }
+
+  // Si no es el simulador, requerir headers
   if (!xSignature) {
-    try {
-      const parsed = JSON.parse(rawBody);
-      if (parsed?.action === 'test.notification') {
-        logger.info('Webhook test.notification detectado sin firma → OK');
-        return { ok: true };
-      }
-      
-      // TEMPORAL: Permitir ID 123456 del simulador de Mercado Pago
-      const dataId = parsed?.data?.id ?? parsed?.id;
-      if (dataId === '123456' || dataId === 123456) {
-        logger.warn('🔧 [SIMULATOR MODE] Permitiendo webhook del simulador MP (ID: 123456) sin firma');
-        return { ok: true, dataId: String(dataId) };
-      }
-    } catch {}
     throw new Error('Header x-signature requerido');
   }
 
