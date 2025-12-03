@@ -187,48 +187,6 @@ export async function POST(req: Request) {
       webhookSecretSet: !!process.env.MERCADO_PAGO_WEBHOOK_SECRET
     });
 
-    // 3.1 HEX DUMP de bytes exactos para diagnóstico avanzado (TEMPORAL)
-    const rawBodyHex = Buffer.from(rawBody, 'utf8').toString('hex');
-    const signatureHex = xSignature ? Buffer.from(xSignature, 'utf8').toString('hex') : 'MISSING';
-    const requestIdHex = xRequestId ? Buffer.from(xRequestId, 'utf8').toString('hex') : 'MISSING';
-    
-    logger.info('🔍 [HEX DUMP] Bytes exactos del request', {
-      requestId,
-      rawBodyHex: rawBodyHex.substring(0, 200) + (rawBodyHex.length > 200 ? '...' : ''),
-      rawBodyHexLength: rawBodyHex.length,
-      signatureHex: signatureHex.substring(0, 100) + (signatureHex.length > 100 ? '...' : ''),
-      requestIdHex: requestIdHex,
-      allHeaders: Object.fromEntries(req.headers.entries())
-    });
-
-    // 3.1 GUARDAR DATOS EN RESPUESTA BASE64 para diagnóstico (TEMPORAL)
-    const debugData = {
-      requestId,
-      timestamp: new Date().toISOString(),
-      xSignature,
-      xRequestId,
-      rawBody,
-      headers: Object.fromEntries(req.headers.entries()),
-      webhookSecretLength: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.length || 0,
-      webhookSecretFirst4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(0, 4) || 'MISSING',
-      webhookSecretLast4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(process.env.MERCADO_PAGO_WEBHOOK_SECRET.length - 4) || 'MISSING'
-    };
-    
-    const debugBase64 = Buffer.from(JSON.stringify(debugData, null, 2)).toString('base64');
-    
-    // Dividir base64 en chunks para evitar truncamiento de logs
-    const chunkSize = 200;
-    const totalChunks = Math.ceil(debugBase64.length / chunkSize);
-    
-    logger.info(`🔍 [DEBUG BASE64] Datos codificados (${totalChunks} partes, ${debugBase64.length} chars total)`);
-    
-    for (let i = 0; i < totalChunks; i++) {
-      const chunk = debugBase64.substring(i * chunkSize, (i + 1) * chunkSize);
-      logger.info(`🔍 [DEBUG BASE64] PART${i + 1}/${totalChunks}: ${chunk}`);
-    }
-    
-    logger.info(`🔍 [DEBUG BASE64] Instrucciones: Copiar todas las partes en orden y decodificar`);
-
     // 4. Validar firma HMAC con RAW body (antes de parsear)
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
     const signatureValidation = await verifyWebhookSignature(
@@ -251,7 +209,7 @@ export async function POST(req: Request) {
         success: false, 
         error: signatureValidation.error || 'Firma inválida',
         requestId,
-        debug: debugBase64 // Incluir datos completos en base64
+        debug: Buffer.from(rawBody).toString('base64') // Incluir datos completos en base64
       }, { status: 401 });
     }
 
