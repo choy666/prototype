@@ -179,16 +179,26 @@ export async function POST(req: Request) {
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
     
-    // 3. LOG COMPLETO SIN CENSURA para diagnóstico (TEMPORAL)
-    logger.info('🔍 [DEBUG] Webhook completo sin censura', {
+    // 3. Log esencial para validación
+    logger.info('Webhook recibido', {
       requestId,
-      xSignature: xSignature || 'MISSING',
-      xRequestId: xRequestId || 'MISSING',
-      rawBody: rawBody,
-      rawBodyLength: rawBody.length,
-      webhookSecretLength: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.length || 0,
-      webhookSecretFirst4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(0, 4) || 'MISSING',
-      webhookSecretLast4: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.substring(process.env.MERCADO_PAGO_WEBHOOK_SECRET.length - 4) || 'MISSING'
+      xSignature: xSignature?.substring(0, 20) + '...',
+      xRequestId,
+      webhookSecretSet: !!process.env.MERCADO_PAGO_WEBHOOK_SECRET
+    });
+
+    // 3.1 HEX DUMP de bytes exactos para diagnóstico avanzado (TEMPORAL)
+    const rawBodyHex = Buffer.from(rawBody, 'utf8').toString('hex');
+    const signatureHex = xSignature ? Buffer.from(xSignature, 'utf8').toString('hex') : 'MISSING';
+    const requestIdHex = xRequestId ? Buffer.from(xRequestId, 'utf8').toString('hex') : 'MISSING';
+    
+    logger.info('🔍 [HEX DUMP] Bytes exactos del request', {
+      requestId,
+      rawBodyHex: rawBodyHex.substring(0, 200) + (rawBodyHex.length > 200 ? '...' : ''),
+      rawBodyHexLength: rawBodyHex.length,
+      signatureHex: signatureHex.substring(0, 100) + (signatureHex.length > 100 ? '...' : ''),
+      requestIdHex: requestIdHex,
+      allHeaders: Object.fromEntries(req.headers.entries())
     });
 
     // 3.1 GUARDAR DATOS EN RESPUESTA BASE64 para diagnóstico (TEMPORAL)
