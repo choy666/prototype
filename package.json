@@ -18,6 +18,7 @@
     "test": "jest",
     "check:env": "ts-node scripts/check-env.ts",
     "validate:env": "ts-node -e \"require('./lib/utils/env-validation').validateEnvOnStartup()\"",
+    "mp:webhook-secret": "node scripts/get-mp-webhook-secret.js",
     "dev:safe": "npm run validate:env && npm run dev",
     "build:safe": "npm run validate:env && npm run build",
     "verify:checkout": "node scripts/verify-checkout.js",

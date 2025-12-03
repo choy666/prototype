@@ -7,8 +7,8 @@
 
 const crypto = require('crypto');
 
-// Obtener el webhook secret del entorno
-const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET || 'c427050f6853aa330e5be6daed8375f1a1a6b7a606a6afd6a16d2ad6070c8dfd';
+// Obtener el webhook secret del entorno - SIN FALLBACK PARA DETECTAR EL ERROR REAL
+const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
 
 console.log('=== DEPURACIÓN WEBHOOK SECRET ===\n');
 
