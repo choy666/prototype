@@ -196,6 +196,19 @@ export async function verifyWebhookSignature(
       }
     }
 
+    // MODO DEBUG: Log temporal para diagnóstico sin redactar
+    if (process.env.NODE_ENV === 'production' && process.env.MERCADO_PAGO_WEBHOOK_SECRET) {
+      logger.info('[HMAC-DEBUG] Datos completos para diagnóstico', {
+        xSignature: xSignature,
+        xRequestId: xRequestId,
+        dataIdFromUrl: dataIdFromUrl,
+        clientIp: clientIp,
+        webhookSecretLength: webhookSecret.length,
+        webhookSecretPreview: `${webhookSecret.slice(0, 8)}...${webhookSecret.slice(-8)}`,
+        rawBodyPreview: rawBody.slice(0, 200)
+      });
+    }
+
     // Primero intentar validación HMAC con logging detallado
     const headers = new Headers();
     if (xSignature) headers.set('x-signature', xSignature);
@@ -219,6 +232,22 @@ export async function verifyWebhookSignature(
         clientIp,
         reason: 'HMAC_validation_failed_but_IP_whitelisted',
         hmacError: hmacResult.error
+      });
+      
+      try {
+        const p = JSON.parse(rawBody);
+        return { isValid: true, dataId: p?.data?.id ?? undefined };
+      } catch {
+        return { isValid: true };
+      }
+    }
+
+    // NUEVO: Fallback temporal en producción para diagnóstico
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_WEBHOOK_FALLBACK === 'true') {
+      logger.warn('[HMAC] Fallback temporal activado para diagnóstico', {
+        clientIp,
+        hmacError: hmacResult.error,
+        note: 'Procesando webhook sin validación HMAC - REVISAR CONFIGURACIÓN'
       });
       
       try {
