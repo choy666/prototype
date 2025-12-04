@@ -15,7 +15,6 @@ export interface MercadoPagoHmacValidationResult {
   dataId?: string;
 }
 
-
 /* --------------------------------------------------
  * Helper seguro para leer headers
  * -------------------------------------------------- */
@@ -90,16 +89,29 @@ export async function validateMercadoPagoHmac(
     logger.error('ERROR_PRE_VALIDATION: Missing x-request-id header');
     throw new Error('Header x-request-id requerido para validación HMAC');
   }
-  if (!dataIdFromUrl) {
-    logger.error('ERROR_PRE_VALIDATION: Missing data.id from URL');
-    throw new Error('data.id de la URL es requerido para construir el string_to_sign');
+  const dataIdFromBody = (() => {
+    try {
+      const parsed = JSON.parse(rawBody);
+      return parsed?.data?.id ?? parsed?.id ?? (parsed?.resource ? String(parsed.resource).match(/(\d+)$/)?.[1] : undefined);
+    } catch {
+      return undefined;
+    }
+  })();
+
+  const dataId = dataIdFromUrl || dataIdFromBody;
+
+  if (!dataId) {
+    logger.error('ERROR_PRE_VALIDATION: Could not find data.id in URL or body');
+    throw new Error('No se pudo encontrar data.id en la URL o en el cuerpo de la solicitud');
   }
 
   logger.info('DEBUG_PRE_VALIDATION: All required headers and params are present', {
     xSignature,
     xRequestId,
-    dataIdFromUrl,
+    dataId,
+    source: dataIdFromUrl ? 'URL' : 'Body',
   });
+
 
   let ts: string | undefined;
   let signature: string | undefined;
@@ -119,7 +131,7 @@ export async function validateMercadoPagoHmac(
     throw new Error('Formato de firma inválido: faltan ts o v1');
   }
 
-  const stringToSign = `id:${dataIdFromUrl};request-id:${xRequestId};ts:${ts};`;
+  const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
 
   const hmac = crypto.createHmac('sha256', normalizedSecret);
   hmac.update(stringToSign);
@@ -151,7 +163,7 @@ export async function validateMercadoPagoHmac(
 
 
   logger.info('🔍 [DEBUG HMAC] Intento de validación', {
-    dataId: dataIdFromUrl,
+    dataId: dataId,
     stringToSign,
     expectedSignature,
     receivedSignature: signature,
@@ -161,10 +173,10 @@ export async function validateMercadoPagoHmac(
 
   if (signaturesMatch) {
     logger.info('🎯 [SUCCESS] Firma validada exitosamente', {
-      dataId: dataIdFromUrl,
+      dataId: dataId,
       stringToSign
     });
-    return { ok: true, dataId: dataIdFromUrl };
+    return { ok: true, dataId: dataId };
   }
 
   logger.error('❌ [FAILED] La firma recibida no coincide con la esperada', {
