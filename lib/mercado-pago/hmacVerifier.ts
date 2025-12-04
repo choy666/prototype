@@ -52,11 +52,13 @@ function getHeader(headers: Headers, name: string): string | null {
 export async function validateMercadoPagoHmac(
   rawBody: string,
   headers: Headers,
-  webhookSecret: string
+  webhookSecret: string,
+  dataIdFromUrl: string | null
 ): Promise<MercadoPagoHmacValidationResult> {
   logger.info('Iniciando validateMercadoPagoHmac', {
     rawBodyLength: rawBody.length,
     webhookSecretSet: !!webhookSecret,
+    dataIdFromUrl,
   });
 
   if (!webhookSecret) {
@@ -64,28 +66,8 @@ export async function validateMercadoPagoHmac(
     throw new Error('Webhook secret no configurado');
   }
 
-  // TEMPORAL: Normalizar secreto para eliminar comillas/espacios
   const normalizedSecret = webhookSecret.replace(/^["']|["']$/g, '').trim();
-    
-  // DEBUG: Mostrar bytes exactos del secret para detectar caracteres invisibles
-  const secretHex = Buffer.from(webhookSecret, 'utf8').toString('hex');
-  const normalizedSecretHex = Buffer.from(normalizedSecret, 'utf8').toString('hex');
-  
-  logger.info('🔍 [DEBUG SECRET] Secret normalizado', {
-    originalLength: webhookSecret.length,
-    normalizedLength: normalizedSecret.length,
-    secretChanged: webhookSecret !== normalizedSecret,
-    originalFirst4: webhookSecret.substring(0, 4),
-    originalLast4: webhookSecret.substring(webhookSecret.length - 4),
-    normalizedFirst4: normalizedSecret.substring(0, 4),
-    normalizedLast4: normalizedSecret.substring(normalizedSecret.length - 4),
-    secretHex: secretHex.substring(0, 32) + '...',
-    normalizedSecretHex: normalizedSecretHex.substring(0, 32) + '...'
-  });
 
-  /* ------------------------------
-   * Leer headers requeridos
-   * ------------------------------ */
   const xSignature = getHeader(headers, 'x-signature');
   const xRequestId = getHeader(headers, 'x-request-id');
 
@@ -94,31 +76,13 @@ export async function validateMercadoPagoHmac(
     xRequestIdPresent: !!xRequestId,
   });
 
-  /* ------------------------------
-   * Permitir test.notification sin firma
-   * TEMPORAL: Permitir Data ID 123456 (simulador MP) sin firma válida
-   * ------------------------------ */
-  
-  // PRIMERO: Verificar si es el simulador (antes de cualquier validación)
   try {
     const parsed = JSON.parse(rawBody);
-    const dataId = parsed?.data?.id ?? parsed?.id;
-    
-    logger.info('🔍 [SIMULATOR CHECK] Verificando ID del simulador', {
-      dataId,
-      dataType: typeof dataId,
-      parsedData: parsed?.data,
-      parsedId: parsed?.id,
-      isSimulator: dataId === '123456' || dataId === 123456
-    });
-    
-    // Permitir siempre el ID 123456 del simulador
-    if (dataId === '123456' || dataId === 123456) {
+    const dataIdFromBody = parsed?.data?.id ?? parsed?.id;
+    if (dataIdFromBody === '123456' || dataIdFromBody === 123456) {
       logger.warn('🔧 [SIMULATOR MODE] Permitiendo webhook del simulador MP (ID: 123456) sin validar firma');
-      return { ok: true, dataId: String(dataId) };
+      return { ok: true, dataId: String(dataIdFromBody) };
     }
-    
-    // Permitir test.notification sin firma
     if (!xSignature && parsed?.action === 'test.notification') {
       logger.info('Webhook test.notification detectado sin firma → OK');
       return { ok: true };
@@ -129,29 +93,18 @@ export async function validateMercadoPagoHmac(
     });
   }
 
-  // Si no es el simulador, requerir headers
   if (!xSignature) {
     throw new Error('Header x-signature requerido');
   }
-
   if (!xRequestId) {
     throw new Error('Header x-request-id requerido para validación HMAC');
   }
+  if (!dataIdFromUrl) {
+    throw new Error('data.id de la URL es requerido para construir el string_to_sign');
+  }
 
-  /* ------------------------------
-   * Parsear x-signature: ts=...,v1=...
-   * ------------------------------ */
   let ts: string | undefined;
   let signature: string | undefined;
-
-  logger.info('DEBUG - Header x-signature completo', {
-    rawXSignature: xSignature,
-    xSignatureLength: xSignature.length,
-    signatureLength: signature ? signature.length : 0,
-    signatureHexLength: signature ? Buffer.from(signature, 'hex').length * 2 : 0,
-    signaturePreview: signature ? signature.substring(0, 20) + '...' : 'none',
-    signatureEnd: signature ? '...' + signature.substring(signature.length - 20) : 'none'
-  });
 
   try {
     const parts = xSignature.split(',');
@@ -168,288 +121,41 @@ export async function validateMercadoPagoHmac(
     throw new Error('Formato de firma inválido: faltan ts o v1');
   }
 
-  logger.info('DEBUG - Componentes extraídos de x-signature', {
-    ts,
-    signature,
-    signatureLength: signature.length
-  });
+  const stringToSign = `id:${dataIdFromUrl};request-id:${xRequestId};ts:${ts};`;
 
-  /* ------------------------------
-   * Parsear payload e identificar data.id
-   * ------------------------------ */
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawBody);
-  } catch {
-    throw new Error('Payload JSON inválido');
-  }
+  const hmac = crypto.createHmac('sha256', normalizedSecret);
+  hmac.update(stringToSign);
+  const expectedSignature = hmac.digest('hex');
 
-  const p = parsed as {
-    action?: string;
-    data?: { id?: unknown };
-    id?: unknown;
-    resource?: unknown;
-  };
-
-  // test.notification firmada
-  if (p.action === 'test.notification') {
-    return { ok: true };
-  }
-
-  const dataId: string | undefined =
-    (p.data?.id != null ? String(p.data.id) : undefined) ??
-    (p.id != null ? String(p.id) : undefined) ??
-    (() => {
-      // merchant_order o payment con resource URL
-      if (p.resource != null) {
-        const m = String(p.resource).match(/(\d+)$/);
-        return m?.[1];
-      }
-      return undefined;
-    })();
-
-  if (!dataId) {
-    throw new Error('Falta data.id en payload para construir string_to_sign');
-  }
-
-  /* ------------------------------
-   * Probar múltiples IDs candidatos para merchant_order
-   * ------------------------------ */
-  const candidateIds: string[] = [];
-  
-  // ID principal: extraído de resource URL
-  if (dataId) candidateIds.push(dataId);
-  
-  // ID alternativos para merchant_order
-  if (p.resource) {
-    candidateIds.push(String(p.resource)); // URL completa
-    candidateIds.push('merchant_order'); // topic
-  }
-  
-  // TEMPORAL: Para merchant_order, obtener payment IDs reales del API
-  if (p.resource && p.resource.toString().includes('merchant_orders')) {
-    try {
-      logger.info('🔍 [DEBUG MERCHANT ORDER] Obteniendo datos reales del merchant_order', {
-        resourceUrl: p.resource
-      });
-      
-      const merchantOrderId = dataId;
-      if (merchantOrderId) {
-        // Obtener token de Mercado Pago del entorno
-        const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-        if (mpToken) {
-          try {
-            const response = await fetch(`https://api.mercadolibre.com/merchant_orders/${merchantOrderId}`, {
-              headers: {
-                'Authorization': `Bearer ${mpToken}`
-              }
-            });
-            
-            if (response.ok) {
-              const merchantOrderData = await response.json() as MerchantOrderData;
-              logger.info('🔍 [DEBUG MERCHANT ORDER] Datos del merchant_order obtenidos', {
-                merchantOrderId,
-                payments: merchantOrderData.payments?.map((p: MerchantOrderPayment) => ({ id: p.id, status: p.status })) || []
-              });
-              
-              // Agregar payment IDs reales como candidatos
-              if (merchantOrderData.payments && Array.isArray(merchantOrderData.payments)) {
-                for (const payment of merchantOrderData.payments) {
-                  if (payment.id) {
-                    candidateIds.push(String(payment.id));
-                    logger.info('🔍 [DEBUG MERCHANT ORDER] Payment ID agregado como candidato', {
-                      paymentId: payment.id
-                    });
-                  }
-                }
-              }
-            } else {
-              logger.warn('🔍 [DEBUG MERCHANT ORDER] Error obteniendo merchant_order', {
-                status: response.status,
-                statusText: response.statusText
-              });
-            }
-          } catch (fetchError) {
-            logger.warn('🔍 [DEBUG MERCHANT ORDER] Error de fetch al merchant_order', {
-              error: fetchError instanceof Error ? fetchError.message : String(fetchError)
-            });
-          }
-        } else {
-          logger.warn('🔍 [DEBUG MERCHANT ORDER] No hay MERCADO_PAGO_ACCESS_TOKEN configurado');
-        }
-      }
-    } catch (error) {
-      logger.warn('🔍 [DEBUG MERCHANT ORDER] Error procesando merchant_order', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  }
-  
-  // Eliminar duplicados
-  const uniqueCandidates = [...new Set(candidateIds)];
-  
-  logger.info('🔍 [DEBUG CANDIDATES] IDs a probar para firma', {
-    candidates: uniqueCandidates,
-    candidateCount: uniqueCandidates.length,
-    merchantOrderDetected: p.resource?.toString().includes('merchant_orders')
-  });
-
-  /* ------------------------------
-   * Probar cada candidato hasta encontrar coincidencia
-   * ------------------------------ */
-  const foundMatch = false;
-  
-  // Primera ronda: IDs básicos sin hacer fetch
-  const basicCandidates = uniqueCandidates.filter(id => 
-    !id.toString().includes('payment_') && 
-    !id.toString().includes('_payment')
+  const signaturesMatch = crypto.timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex')
   );
-  
-  for (const candidateId of basicCandidates) {
-    const stringToSign = `id:${candidateId};request-id:${xRequestId};ts:${ts}`;
-    
-    // Probar con secret original y normalizado
-    const secrets = [
-      { name: 'original', value: webhookSecret },
-      { name: 'normalized', value: normalizedSecret }
-    ];
-    
-    for (const secret of secrets) {
-      const hmac = crypto.createHmac('sha256', secret.value);
-      hmac.update(stringToSign);
-      const expectedSignature = hmac.digest('hex');
-      
-      // Verificar longitudes antes de comparar
-      const receivedLength = signature.length;
-      const expectedLength = expectedSignature.length;
-      const lengthsMatch = receivedLength === expectedLength;
-      
-      logger.info('🔍 [DEBUG HMAC] Verificación de longitudes', {
-        candidateId,
-        secretType: secret.name,
-        receivedLength,
-        expectedLength,
-        lengthsMatch,
-        receivedSignature: signature,
-        expectedSignature,
-        stringToSign
-      });
-      
-      // Solo comparar si las longitudes coinciden
-      if (!lengthsMatch) {
-        logger.warn('⚠️ [LENGTH MISMATCH] Longitudes diferentes, omitiendo comparación', {
-          candidateId,
-          secretType: secret.name,
-          receivedLength,
-          expectedLength
-        });
-        continue;
-      }
-      
-      const signaturesMatch = signature === expectedSignature;
-      
-      logger.info('🔍 [DEBUG HMAC] Intento de validación', {
-        candidateId,
-        secretType: secret.name,
-        stringToSign,
-        expectedSignature,
-        receivedSignature: signature,
-        signaturesMatch,
-        matchPrefix: signaturesMatch ? '✅' : '❌'
-      });
-      
-      if (signaturesMatch) {
-        logger.info('🎯 [SUCCESS] Firma validada exitosamente', {
-          candidateId,
-          secretType: secret.name,
-          stringToSign
-        });
-        return { ok: true, dataId: candidateId };
-      }
-    }
-  }
-  
-  // Si no encontramos coincidencia y es merchant_order, hacer fetch para obtener payment IDs
-  if (!foundMatch && p.resource && p.resource.toString().includes('merchant_orders')) {
-    logger.info('🔍 [DEBUG MERCHANT ORDER] IDs básicos fallaron, obteniendo payment IDs del API');
-    
-    const merchantOrderId = dataId;
-    if (merchantOrderId) {
-      const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-      if (mpToken) {
-        try {
-          const response = await fetch(`https://api.mercadolibre.com/merchant_orders/${merchantOrderId}`, {
-            headers: {
-              'Authorization': `Bearer ${mpToken}`
-            }
-          });
-          
-          if (response.ok) {
-            const merchantOrderData = await response.json() as MerchantOrderData;
-            logger.info('🔍 [DEBUG MERCHANT ORDER] Datos del merchant_order obtenidos', {
-              merchantOrderId,
-              payments: merchantOrderData.payments?.map((p: MerchantOrderPayment) => ({ id: p.id, status: p.status })) || []
-            });
-            
-            // Probar con payment IDs reales
-            if (merchantOrderData.payments && Array.isArray(merchantOrderData.payments)) {
-              for (const payment of merchantOrderData.payments) {
-                if (payment.id) {
-                  const paymentId = String(payment.id);
-                  const stringToSign = `id:${paymentId};request-id:${xRequestId};ts:${ts}`;
-                  
-                  for (const secret of [{ name: 'original', value: webhookSecret }, { name: 'normalized', value: normalizedSecret }]) {
-                    const hmac = crypto.createHmac('sha256', secret.value);
-                    hmac.update(stringToSign);
-                    const expectedSignature = hmac.digest('hex');
-                    
-                    const signaturesMatch = signature === expectedSignature;
-                    
-                    logger.info('🔍 [DEBUG PAYMENT ID] Intento con payment ID real', {
-                      paymentId,
-                      secretType: secret.name,
-                      stringToSign,
-                      expectedSignature,
-                      receivedSignature: signature,
-                      signaturesMatch,
-                      matchPrefix: signaturesMatch ? '✅' : '❌'
-                    });
-                    
-                    if (signaturesMatch) {
-                      logger.info('🎯 [SUCCESS] Firma validada con payment ID', {
-                        paymentId,
-                        secretType: secret.name,
-                        stringToSign
-                      });
-                      return { ok: true, dataId: paymentId };
-                    }
-                  }
-                }
-              }
-            }
-          } else {
-            logger.warn('🔍 [DEBUG MERCHANT ORDER] Error obteniendo merchant_order', {
-              status: response.status,
-              statusText: response.statusText
-            });
-          }
-        } catch (fetchError) {
-          logger.warn('🔍 [DEBUG MERCHANT ORDER] Error de fetch al merchant_order', {
-            error: fetchError instanceof Error ? fetchError.message : String(fetchError)
-          });
-        }
-      } else {
-        logger.warn('🔍 [DEBUG MERCHANT ORDER] No hay MERCADO_PAGO_ACCESS_TOKEN configurado');
-      }
-    }
-  }
-  
-  logger.error('❌ [FAILED] Ningún candidato coincidió con la firma recibida', {
+
+  logger.info('🔍 [DEBUG HMAC] Intento de validación', {
+    dataId: dataIdFromUrl,
+    stringToSign,
+    expectedSignature,
     receivedSignature: signature,
-    totalAttempts: uniqueCandidates.length * 2
+    signaturesMatch,
+    matchPrefix: signaturesMatch ? '✅' : '❌'
   });
-  
-  throw new Error('Firma inválida - ningún ID candidato coincidió');
+
+  if (signaturesMatch) {
+    logger.info('🎯 [SUCCESS] Firma validada exitosamente', {
+      dataId: dataIdFromUrl,
+      stringToSign
+    });
+    return { ok: true, dataId: dataIdFromUrl };
+  }
+
+  logger.error('❌ [FAILED] La firma recibida no coincide con la esperada', {
+    receivedSignature: signature,
+    expectedSignature,
+    stringToSign,
+  });
+
+  throw new Error('Firma inválida - la firma recibida no coincide con la esperada');
 }
 
 /* --------------------------------------------------
@@ -460,7 +166,8 @@ export async function verifyHmacSHA256(
   xSignature: string | undefined,
   rawBody: string,
   webhookSecret: string,
-  xRequestId?: string | null
+  xRequestId?: string | null,
+  dataIdFromUrl?: string | null,
 ): Promise<WebhookValidationResult> {
   logger.info('verifyHmacSHA256 INIT', {
     xSignatureLength: xSignature?.length,
@@ -472,7 +179,7 @@ export async function verifyHmacSHA256(
     if (xSignature) headers.set('x-signature', xSignature);
     if (xRequestId) headers.set('x-request-id', xRequestId);
 
-    const result = await validateMercadoPagoHmac(rawBody, headers, webhookSecret);
+    const result = await validateMercadoPagoHmac(rawBody, headers, webhookSecret, dataIdFromUrl || null);
 
     return { isValid: result.ok, dataId: result.dataId };
   } catch (err) {
@@ -491,7 +198,8 @@ export async function verifyWebhookSignature(
   rawBody: string,
   xSignature: string | null,
   xRequestId: string | null,
-  webhookSecret: string
+  webhookSecret: string,
+  dataIdFromUrl: string | null
 ): Promise<WebhookValidationResult> {
   try {
     // En desarrollo sin secret → permitir
@@ -512,7 +220,7 @@ export async function verifyWebhookSignature(
     if (xSignature) headers.set('x-signature', xSignature);
     if (xRequestId) headers.set('x-request-id', xRequestId);
 
-    const result = await validateMercadoPagoHmac(rawBody, headers, webhookSecret);
+    const result = await validateMercadoPagoHmac(rawBody, headers, webhookSecret, dataIdFromUrl);
 
     return { isValid: result.ok, dataId: result.dataId };
   } catch (err) {
