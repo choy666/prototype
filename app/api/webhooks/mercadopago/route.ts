@@ -105,7 +105,9 @@ export async function POST(req: Request) {
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
     const { searchParams } = new URL(req.url);
-    const dataIdFromUrl = searchParams.get('data.id');
+    
+    // Extraer dataId para ambos formatos: payment (data.id) y merchant_order (id)
+    const dataIdFromUrl = searchParams.get('data.id') || searchParams.get('id');
 
     logger.info('Stage: Pre-validación de firma', {
       requestId,

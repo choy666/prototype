@@ -57,28 +57,79 @@ function verifySignatureOfProvider(
   dataId: string | null
 ): boolean {
   if (isEmptyOrNull(signature) || isEmptyOrNull(xRequestId) || isEmptyOrNull(dataId)) {
+    logger.error('[HMAC] Parámetros faltantes', {
+      hasSignature: !!signature,
+      hasXRequestId: !!xRequestId,
+      hasDataId: !!dataId
+    });
     return false;
   }
 
-  const [timestamp, xSignature] = signature!.split(',');
-  const [, valueOfTimestamp] = timestamp.split('=');
-  const [, valueOfXSignature] = xSignature.split('=');
+  // TypeScript: signature no es null aquí debido al early return anterior
+  const safeSignature = signature!;
+
+  // Verificar formato exacto del header según documentación MP
+  logger.info('[HMAC] Header original recibido', {
+    rawSignature: safeSignature,
+    expectedFormat: 'ts=<timestamp>,v1=<signature>'
+  });
+
+  if (!safeSignature.includes('ts=') || !safeSignature.includes('v1=')) {
+    logger.error('[HMAC] Formato de header inválido', {
+      signature: safeSignature,
+      hasTs: safeSignature.includes('ts='),
+      hasV1: safeSignature.includes('v1=')
+    });
+    return false;
+  }
+
+  const parts = safeSignature.split(',');
+  if (parts.length !== 2) {
+    logger.error('[HMAC] Número de partes incorrecto', {
+      signature: safeSignature,
+      partsCount: parts.length,
+      parts
+    });
+    return false;
+  }
+
+  const [tsPart, v1Part] = parts;
+  const [, valueOfTimestamp] = tsPart.split('=');
+  const [, valueOfXSignature] = v1Part.split('=');
+
+  if (!valueOfTimestamp || !valueOfXSignature) {
+    logger.error('[HMAC] No se pudieron extraer valores', {
+      tsPart,
+      v1Part,
+      valueOfTimestamp,
+      valueOfXSignature
+    });
+    return false;
+  }
 
   // Logging detallado para diagnóstico
-  logger.debug('[HMAC] Componentes de validación', {
+  logger.info('[HMAC] Componentes de validación', {
     dataId,
     xRequestId,
     timestamp: valueOfTimestamp,
-    receivedSignature: valueOfXSignature?.slice(0, 20) + '...',
+    receivedSignature: valueOfXSignature,
     secretPresent: !!process.env.MERCADO_PAGO_WEBHOOK_SECRET,
-    secretLength: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.length
+    secretLength: process.env.MERCADO_PAGO_WEBHOOK_SECRET?.length,
+    secretPreview: process.env.MERCADO_PAGO_WEBHOOK_SECRET ? 
+      `${process.env.MERCADO_PAGO_WEBHOOK_SECRET.slice(0, 4)}...${process.env.MERCADO_PAGO_WEBHOOK_SECRET.slice(-4)}` : 'none'
   });
 
+  // Template exacto según documentación de Mercado Pago
   const signatureTemplateParsed = `id:${dataId};request-id:${xRequestId};ts:${valueOfTimestamp};`;
   
-  logger.debug('[HMAC] Template construido', {
+  logger.info('[HMAC] Template construido', {
     template: signatureTemplateParsed,
-    templateLength: signatureTemplateParsed.length
+    templateLength: signatureTemplateParsed.length,
+    templateComponents: {
+      id: dataId,
+      requestId: xRequestId,
+      ts: valueOfTimestamp
+    }
   });
 
   const cyphedSignature = crypto
@@ -86,11 +137,13 @@ function verifySignatureOfProvider(
     .update(signatureTemplateParsed)
     .digest('hex');
 
-  logger.debug('[HMAC] Resultado validación', {
-    expectedSignature: cyphedSignature.slice(0, 20) + '...',
+  logger.info('[HMAC] Resultado validación', {
+    expectedSignature: cyphedSignature,
+    receivedSignature: valueOfXSignature,
     signaturesMatch: valueOfXSignature === cyphedSignature,
     receivedLength: valueOfXSignature?.length,
-    expectedLength: cyphedSignature.length
+    expectedLength: cyphedSignature.length,
+    matchDetails: valueOfXSignature === cyphedSignature ? '✅ Firmas coinciden' : '❌ Firmas difieren'
   });
 
   return valueOfXSignature === cyphedSignature;
