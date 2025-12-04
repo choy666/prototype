@@ -237,6 +237,7 @@ export async function POST(req: NextRequest) {
         shippingCost: shippingCost.toString(),
         shippingMode: 'me2',
         source: 'local',
+        metadata: {},
       })
       .returning({ id: orders.id });
 
@@ -248,7 +249,7 @@ export async function POST(req: NextRequest) {
       name: userExists[0].name || '',
     };
 
-    // Preparar metadata incluyendo variantId en items
+    // Preparar metadata incluyendo variantId en items y tracking de migración
     const metadata = {
       user_id: userId.toString(),
       order_id: orderId.toString(),
@@ -261,6 +262,12 @@ export async function POST(req: NextRequest) {
       subtotal: subtotal.toString(),
       shipping_cost: shippingCost.toString(),
       total: total.toString(),
+      // Metadata de tracking y versión
+      checkout_version: '1.0',
+      migration_applied: true,
+      me2_source: me2Response.source,
+      me2_fallback: me2Response.fallback ?? false,
+      created_at: new Date().toISOString(),
     };
 
     // Crear preferencia de pago según documentación oficial de Mercado Pago
