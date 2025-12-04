@@ -97,6 +97,33 @@ export async function validateMercadoPagoHmac(
   if (!xSignature) throw new Error('Header x-signature requerido');
   if (!xRequestId) throw new Error('Header x-request-id requerido');
 
+  // Debug del header x-signature completo
+  console.log('=== X-SIGNATURE HEADER DEBUG ===');
+  console.log('Raw x-signature:', xSignature);
+  
+  // Parsear x-signature: ts=...,v1=...
+  const parts = xSignature.split(',');
+  console.log('x-signature parts:', parts);
+  
+  let ts: string | undefined;
+  let signature: string | undefined;
+
+  for (const part of parts) {
+    const [key, value] = part.split('=');
+    console.log(`Part parsed: key="${key}", value="${value}"`);
+    
+    if (key === 'ts') {
+      ts = value;
+    } else if (key === 'v1') {
+      signature = value;
+    }
+  }
+
+  console.log('Final parsed values:');
+  console.log('ts:', ts);
+  console.log('signature (v1):', signature);
+  console.log('=== END X-SIGNATURE DEBUG ===');
+
   /* --------------------------------------------
    * Extraer data.id
    * ------------------------------------------ */
@@ -122,21 +149,8 @@ export async function validateMercadoPagoHmac(
   }
 
   if (!dataId) throw new Error('No se pudo encontrar data.id en URL o body');
-
-  /* --------------------------------------------
-   * Parsear x-signature → ts y v1
-   * ------------------------------------------ */
-
-  let ts: string | undefined;
-  let signature: string | undefined;
-
-  xSignature.split(',').forEach((part) => {
-    const [key, value] = part.trim().split('=');
-    if (key === 'ts') ts = value;
-    if (key === 'v1') signature = value;
-  });
-
-  if (!ts || !signature) throw new Error('Formato x-signature inválido: falta ts o v1');
+  if (!ts) throw new Error('No se pudo extraer ts del header x-signature');
+  if (!signature) throw new Error('No se pudo extraer v1 del header x-signature');
 
   const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
 
