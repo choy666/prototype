@@ -178,6 +178,19 @@ export async function validateMercadoPagoHmac(
   console.log('webhookSecret length:', normalizedSecret.length);
   console.log('webhookSecret first5:', normalizedSecret.slice(0, 5));
   console.log('webhookSecret last5:', normalizedSecret.slice(-5));
+  
+  // Timestamp validation debug
+  const currentTs = Math.floor(Date.now() / 1000);
+  const tsDiff = Math.abs(currentTs - Number(ts));
+  console.log('=== TIMESTAMP DEBUG ===');
+  console.log('Current timestamp (seconds):', currentTs);
+  console.log('Received ts:', ts);
+  console.log('Difference (seconds):', tsDiff);
+  console.log('Difference (minutes):', Math.round(tsDiff / 60));
+  console.log('Is within 5 minutes?', tsDiff <= 300);
+  console.log('Is within 15 minutes?', tsDiff <= 900);
+  console.log('=== END TIMESTAMP DEBUG ===');
+  
   console.log('=== END HMAC DEBUG ===');
 
   logger.info('[DEBUG HMAC RESULT]', {
