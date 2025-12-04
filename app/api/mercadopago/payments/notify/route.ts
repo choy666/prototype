@@ -161,9 +161,25 @@ export async function POST(req: Request) {
       amount: paymentData.transaction_amount,
     });
 
+    // DEBUG: Log completo para diagnóstico
+    logger.info('[DEBUG] PaymentData completo', {
+      paymentId,
+      paymentData: JSON.stringify(paymentData, null, 2),
+      paymentDataKeys: Object.keys(paymentData),
+      hasOrder: !!paymentData.order,
+      hasMetadata: !!paymentData.metadata,
+      externalReference: paymentData.external_reference,
+    });
+
     // Verificar si el pago ya fue procesado
     const existingPayment = await db.query.mercadopagoPayments.findFirst({
       where: eq(mercadopagoPayments.paymentId, paymentId),
+    });
+
+    logger.info('[DEBUG] Verificación de pago existente', {
+      paymentId,
+      existingPayment: !!existingPayment,
+      existingPaymentId: existingPayment?.id,
     });
 
     if (existingPayment) {
@@ -195,8 +211,8 @@ export async function POST(req: Request) {
       });
     }
 
-    // Guardar información del pago
-    await db.insert(mercadopagoPayments).values({
+    // DEBUG: Log antes de insertar
+    const insertData = {
       paymentId: paymentData.id?.toString() || paymentId,
       preferenceId: paymentData.order?.id?.toString() || null,
       status: paymentData.status,
@@ -215,10 +231,31 @@ export async function POST(req: Request) {
       dateLastUpdated: paymentData.date_last_updated ? new Date(paymentData.date_last_updated) : new Date(),
       rawData: paymentData,
       createdAt: new Date(),
-    }).returning();
+    };
+
+    logger.info('[DEBUG] Datos a insertar', {
+      insertDataKeys: Object.keys(insertData),
+      paymentId: insertData.paymentId,
+      status: insertData.status,
+      externalReference: insertData.externalReference,
+      hasRawData: !!insertData.rawData,
+    });
+
+    // Guardar información del pago
+    await db.insert(mercadopagoPayments).values(insertData).returning();
+
+    logger.info('[DEBUG] Pago insertado exitosamente', { paymentId });
 
     // Procesar el pago según su estado
+    logger.info('[DEBUG] Iniciando processPayment', {
+      paymentId,
+      status: paymentData.status,
+      externalReference: paymentData.external_reference,
+    });
+
     await processPayment(paymentData as unknown as PaymentData);
+
+    logger.info('[DEBUG] processPayment completado', { paymentId });
 
     const endTime = Date.now();
     const duration = endTime - startTime;
