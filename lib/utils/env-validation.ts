@@ -19,7 +19,7 @@ const configs: Record<string, EnvConfig> = {
   
   // NextAuth
   auth: {
-    required: ['NEXTAUTH_SECRET', 'NEXTAUTH_URL'],
+    required: ['NEXTAUTH_SECRET', 'NEXTAUTH_URL', 'JWT_SECRET'],
     optional: ['NEXTAUTH_COOKIE_DOMAIN', 'NEXTAUTH_DEBUG'],
   },
   
@@ -31,8 +31,8 @@ const configs: Record<string, EnvConfig> = {
   
   // Mercado Pago
   mercadopago: {
-    required: ['MERCADO_PAGO_ACCESS_TOKEN', 'NEXT_PUBLIC_MP_PUBLIC_KEY'],
-    optional: ['MERCADO_PAGO_WEBHOOK_SECRET', 'MERCADO_PAGO_WEBHOOK_URL'],
+    required: ['MERCADO_PAGO_ACCESS_TOKEN', 'MERCADO_PAGO_WEBHOOK_SECRET', 'NEXT_PUBLIC_MP_PUBLIC_KEY'],
+    optional: ['MERCADO_PAGO_WEBHOOK_URL'],
     development: ['MERCADO_PAGO_SUCCESS_URL', 'MERCADO_PAGO_FAILURE_URL', 'MERCADO_PAGO_PENDING_URL'],
   },
   

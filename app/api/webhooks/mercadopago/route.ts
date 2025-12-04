@@ -4,73 +4,8 @@
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier';
+import { saveFailedWebhookForRetry, saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
 import crypto from 'crypto';
-
-/* ---------------------------------------------------------------------------
- * Helpers: Persistencia (serverless-safe)
- * ------------------------------------------------------------------------- */
-
-async function saveFailedWebhookForRetry(data: {
-  paymentId: string;
-  requestId: string;
-  retryCount: number;
-  error: string;
-  timestamp: string;
-}) {
-  try {
-    logger.warn('Webhook guardado para retry externo', {
-      ...data,
-      action: 'RETRY_LATER',
-    });
-
-    // TODO → Persistencia real (Redis / DB / Queue)
-  } catch (storageError) {
-    logger.error('Error guardando webhook para retry', {
-      ...data,
-      error: storageError instanceof Error ? storageError.message : String(storageError),
-    });
-  }
-}
-
-async function saveDeadLetterWebhook(data: {
-  paymentId: string;
-  requestId: string;
-  error: string;
-  timestamp: string;
-}) {
-  try {
-    logger.error('Webhook enviado a DEAD LETTER', {
-      ...data,
-      action: 'DEAD_LETTER',
-    });
-
-    // TODO → Dead-letter real (tabla / alerta / dashboard)
-  } catch (storageError) {
-    logger.error('Error guardando webhook en dead letter', {
-      ...data,
-      error: storageError instanceof Error ? storageError.message : String(storageError),
-    });
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Validación del entorno crítico
- * ------------------------------------------------------------------------- */
-
-function validateEnvironmentVariables() {
-  const required = ['MERCADO_PAGO_ACCESS_TOKEN', 'MERCADO_PAGO_WEBHOOK_SECRET'];
-
-  const missing = required.filter((k) => !process.env[k]);
-
-  if (missing.length > 0) {
-    logger.error('Variables de entorno faltantes', { missing });
-    throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
-  }
-
-  logger.info('Variables de entorno validadas correctamente');
-}
-
-validateEnvironmentVariables();
 
 /* ---------------------------------------------------------------------------
  * Forward interno → /api/mercadopago/payments/notify
@@ -79,7 +14,9 @@ validateEnvironmentVariables();
 async function forwardToPaymentsNotify(
   rawBody: string,
   requestId: string,
-  paymentId?: string | null
+  paymentId?: string | null,
+  headers?: Record<string, string>,
+  clientIp?: string
 ) {
   try {
     const baseUrl =
@@ -111,20 +48,16 @@ async function forwardToPaymentsNotify(
         paymentId,
       });
 
+      // Guardar en DB para retry posterior
       await saveFailedWebhookForRetry({
         paymentId: paymentId ?? 'unknown',
         requestId,
-        retryCount: 1,
-        error: `HTTP ${response.status}: ${text}`,
-        timestamp: new Date().toISOString(),
+        rawBody,
+        headers: headers || {},
+        errorMessage: `HTTP ${response.status}: ${text}`,
+        clientIp,
       });
 
-      await saveDeadLetterWebhook({
-        paymentId: paymentId ?? 'unknown',
-        requestId,
-        error: `HTTP ${response.status}: ${text}`,
-        timestamp: new Date().toISOString(),
-      });
     } else {
       logger.info('Webhook reenviado exitosamente', {
         requestId,
@@ -139,19 +72,14 @@ async function forwardToPaymentsNotify(
       error: error instanceof Error ? error.message : String(error),
     });
 
-    await saveFailedWebhookForRetry({
-      paymentId: paymentId ?? 'unknown',
-      requestId,
-      retryCount: 1,
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-    });
-
+    // Guardar como dead letter si falla completamente
     await saveDeadLetterWebhook({
       paymentId: paymentId ?? 'unknown',
       requestId,
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
+      rawBody,
+      headers: headers || {},
+      errorMessage: error instanceof Error ? error.message : String(error),
+      clientIp,
     });
   }
 }
@@ -188,15 +116,20 @@ export async function POST(req: Request) {
     });
 
     /* ----------------------------------------------
-     * 2) Validación HMAC oficial
+     * 2) Validación HMAC oficial con fallback IP
      * -------------------------------------------- */
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET!;
+    const clientIp = req.headers.get('x-forwarded-for') || 
+                    req.headers.get('x-real-ip') || 
+                    'unknown';
+    
     const signatureValidation = await verifyWebhookSignature(
       rawBody,
       xSignature,
       xRequestId,
       webhookSecret,
-      dataIdFromUrl
+      dataIdFromUrl,
+      clientIp
     );
 
     if (!signatureValidation.isValid) {
@@ -258,7 +191,13 @@ export async function POST(req: Request) {
         action === 'payment.created');
 
     if (isPayment && dataId) {
-      forwardToPaymentsNotify(rawBody, requestId, dataId).catch((error) => {
+      forwardToPaymentsNotify(
+        rawBody, 
+        requestId, 
+        dataId, 
+        Object.fromEntries(req.headers.entries()),
+        clientIp
+      ).catch((error) => {
         logger.error('Error async forwarding', {
           requestId,
           error: error instanceof Error ? error.message : String(error),

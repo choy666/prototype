@@ -15,6 +15,41 @@ import {
 import { relations } from "drizzle-orm";
 
 // ======================
+// Enums para Webhooks
+// ======================
+export const webhookStatusEnum = pgEnum("webhook_status", ["failed", "retrying", "success", "dead_letter"]);
+
+// ======================
+// Webhooks Fallidos
+// ======================
+export const webhookFailures = pgTable("webhook_failures", {
+  id: serial("id").primaryKey(),
+  paymentId: text("payment_id").notNull(), // ID del pago de Mercado Pago
+  requestId: text("request_id").notNull(), // UUID para correlación
+  rawBody: jsonb("raw_body").notNull(), // Payload completo
+  headers: jsonb("headers").notNull(), // Headers del request
+  errorMessage: text("error_message"), // Error principal
+  errorStack: text("error_stack"), // Stack completo si aplica
+  clientIp: text("client_ip"), // IP de origen para análisis
+  retryCount: integer("retry_count").default(0).notNull(), // Contador de reintentos
+  status: webhookStatusEnum("status").default("failed").notNull(), // Estado actual
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  lastRetryAt: timestamp("last_retry_at"), // Último intento de retry
+  nextRetryAt: timestamp("next_retry_at"), // Próximo retry programado
+  processedAt: timestamp("processed_at"), // Cuándo se procesó exitosamente
+}, (table) => ({
+  // Índice para consultas de admin dashboard por pago
+  paymentIdx: index("webhook_failures_payment_idx").on(table.paymentId, table.createdAt.desc()),
+  // Índice compuesto para cola de reintentos
+  retryQueueIdx: index("webhook_failures_retry_queue_idx").on(table.status, table.nextRetryAt),
+  // Índice para análisis por estado
+  statusIdx: index("webhook_failures_status_idx").on(table.status),
+  // Índice para correlación con logs
+  requestIdIdx: index("webhook_failures_request_id_idx").on(table.requestId),
+}));
+
+// ======================
 // User roles type
 // ======================
 export type UserRole = "user" | "admin";
@@ -303,6 +338,9 @@ export const orders = pgTable("orders", {
   mlPaymentInfo: jsonb("ml_payment_info"),
   mlFeedback: jsonb("ml_feedback"),
   stockDeducted: boolean("stock_deducted").default(false).notNull(),
+  // Nuevos campos para pagos y metadata
+  paymentStatus: varchar("payment_status", { length: 50 }).default("pending"), // Estado del pago
+  metadata: jsonb("metadata"), // Metadata adicional para auditoría
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

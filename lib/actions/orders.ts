@@ -158,6 +158,9 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         mlShippingInfo: orders.mlShippingInfo,
         mlPaymentInfo: orders.mlPaymentInfo,
         mlFeedback: orders.mlFeedback,
+        // Nuevos campos para pagos y metadata
+        paymentStatus: orders.paymentStatus,
+        metadata: orders.metadata,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         // Campos del join con users
