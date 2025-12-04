@@ -1,11 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/webhooks/mercadopago/route.ts
+
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier';
 import crypto from 'crypto';
 
-// Funciones de persistencia para failed webhooks (serverless-safe)
+/* ---------------------------------------------------------------------------
+ * Helpers: Persistencia (serverless-safe)
+ * ------------------------------------------------------------------------- */
+
 async function saveFailedWebhookForRetry(data: {
   paymentId: string;
   requestId: string;
@@ -14,23 +18,16 @@ async function saveFailedWebhookForRetry(data: {
   timestamp: string;
 }) {
   try {
-    // En producción, esto podría guardar en Redis, DB, o cola de mensajes
-    // Por ahora, loggear para retry manual o procesamiento externo
     logger.warn('Webhook guardado para retry externo', {
       ...data,
-      action: 'RETRY_LATER'
+      action: 'RETRY_LATER',
     });
-    
-    // TODO: Implementar persistencia real según infraestructura
-    // - Redis con TTL para retry automático
-    // - Tabla en BD para procesamiento batch
-    // - SQS/SNS para cola de reintentos
-    
+
+    // TODO → Persistencia real (Redis / DB / Queue)
   } catch (storageError) {
     logger.error('Error guardando webhook para retry', {
-      paymentId: data.paymentId,
-      requestId: data.requestId,
-      error: storageError instanceof Error ? storageError.message : String(storageError)
+      ...data,
+      error: storageError instanceof Error ? storageError.message : String(storageError),
     });
   }
 }
@@ -42,48 +39,48 @@ async function saveDeadLetterWebhook(data: {
   timestamp: string;
 }) {
   try {
-    // Guardar en dead letter queue para intervención manual
-    logger.error('Webhook enviado a dead letter queue', {
+    logger.error('Webhook enviado a DEAD LETTER', {
       ...data,
-      action: 'DEAD_LETTER'
+      action: 'DEAD_LETTER',
     });
-    
-    // TODO: Implementar dead letter queue real
-    // - Tabla webhook_dead_letters
-    // - Alerta a admin
-    // - Dashboard de monitoreo
-    
+
+    // TODO → Dead-letter real (tabla / alerta / dashboard)
   } catch (storageError) {
     logger.error('Error guardando webhook en dead letter', {
-      paymentId: data.paymentId,
-      requestId: data.requestId,
-      error: storageError instanceof Error ? storageError.message : String(storageError)
+      ...data,
+      error: storageError instanceof Error ? storageError.message : String(storageError),
     });
   }
 }
 
-// Validación de variables de entorno críticas
+/* ---------------------------------------------------------------------------
+ * Validación del entorno crítico
+ * ------------------------------------------------------------------------- */
+
 function validateEnvironmentVariables() {
-  const required = [
-    'MERCADO_PAGO_ACCESS_TOKEN',
-    'MERCADO_PAGO_WEBHOOK_SECRET'
-  ];
-  
-  const missing = required.filter(key => !process.env[key]);
-  
+  const required = ['MERCADO_PAGO_ACCESS_TOKEN', 'MERCADO_PAGO_WEBHOOK_SECRET'];
+
+  const missing = required.filter((k) => !process.env[k]);
+
   if (missing.length > 0) {
-    const error = `Variables de entorno faltantes: ${missing.join(', ')}`;
-    logger.error('Validación de entorno fallida', { missing });
-    throw new Error(error);
+    logger.error('Variables de entorno faltantes', { missing });
+    throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
   }
-  
+
   logger.info('Variables de entorno validadas correctamente');
 }
 
-// Validar entorno al iniciar el módulo
 validateEnvironmentVariables();
- 
-async function forwardToPaymentsNotify(rawBody: string, requestId: string, paymentId?: string | null) {
+
+/* ---------------------------------------------------------------------------
+ * Forward interno → /api/mercadopago/payments/notify
+ * ------------------------------------------------------------------------- */
+
+async function forwardToPaymentsNotify(
+  rawBody: string,
+  requestId: string,
+  paymentId?: string | null
+) {
   try {
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
@@ -92,7 +89,7 @@ async function forwardToPaymentsNotify(rawBody: string, requestId: string, payme
 
     const notifyUrl = `${baseUrl}/api/mercadopago/payments/notify`;
 
-    logger.info('Reenviando webhook de pago a /api/mercadopago/payments/notify', {
+    logger.info('Reenviando webhook a payments/notify', {
       requestId,
       notifyUrl,
       paymentId,
@@ -100,23 +97,22 @@ async function forwardToPaymentsNotify(rawBody: string, requestId: string, payme
 
     const response = await fetch(notifyUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: rawBody,
     });
 
     if (!response.ok) {
       const text = await response.text();
-      logger.error('Error reenviando webhook a payments/notify', {
+
+      logger.error('Error reenviando webhook', {
         requestId,
         status: response.status,
-        body: text,
+        text,
         paymentId,
       });
 
       await saveFailedWebhookForRetry({
-        paymentId: paymentId || 'unknown',
+        paymentId: paymentId ?? 'unknown',
         requestId,
         retryCount: 1,
         error: `HTTP ${response.status}: ${text}`,
@@ -124,27 +120,27 @@ async function forwardToPaymentsNotify(rawBody: string, requestId: string, payme
       });
 
       await saveDeadLetterWebhook({
-        paymentId: paymentId || 'unknown',
+        paymentId: paymentId ?? 'unknown',
         requestId,
         error: `HTTP ${response.status}: ${text}`,
         timestamp: new Date().toISOString(),
       });
     } else {
-      logger.info('Webhook reenviado exitosamente a payments/notify', {
+      logger.info('Webhook reenviado exitosamente', {
         requestId,
         paymentId,
         status: response.status,
       });
     }
   } catch (error) {
-    logger.error('Error crítico reenviando webhook a payments/notify', {
+    logger.error('Error crítico forwarding webhook', {
       requestId,
       paymentId,
       error: error instanceof Error ? error.message : String(error),
     });
 
     await saveFailedWebhookForRetry({
-      paymentId: paymentId || 'unknown',
+      paymentId: paymentId ?? 'unknown',
       requestId,
       retryCount: 1,
       error: error instanceof Error ? error.message : String(error),
@@ -152,7 +148,7 @@ async function forwardToPaymentsNotify(rawBody: string, requestId: string, payme
     });
 
     await saveDeadLetterWebhook({
-      paymentId: paymentId || 'unknown',
+      paymentId: paymentId ?? 'unknown',
       requestId,
       error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString(),
@@ -160,189 +156,144 @@ async function forwardToPaymentsNotify(rawBody: string, requestId: string, payme
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * POST Handler principal — Híbrido PRO limpio
+ * ------------------------------------------------------------------------- */
+
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
 
-  
   try {
-    logger.info('Webhook MercadoPago: Inicio de procesamiento', {
+    /* ----------------------------------------------
+     * 1) Log inicial del webhook
+     * -------------------------------------------- */
+    logger.info('Webhook MercadoPago recibido', {
       requestId,
-      method: req.method,
       url: req.url,
-      headers: Object.fromEntries(req.headers.entries())
+      method: req.method,
     });
 
-    // 1. Leer body como RAW text (CRÍTICO: antes de cualquier parseo)
     const rawBody = await req.text();
-    
-    // 2. Extraer headers de validación ANTES de cualquier procesamiento
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
-    
-    // 3. Log esencial para validación
-    logger.info('Webhook recibido', {
-      requestId,
-      xSignature: xSignature?.substring(0, 20) + '...',
-      xRequestId,
-      webhookSecretSet: !!process.env.MERCADO_PAGO_WEBHOOK_SECRET
-    });
-
-    // 4. Validar firma HMAC con RAW body (antes de parsear)
-    const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
-    
-    // 4.1. Extraer data.id de la URL (CRÍTICO para la firma)
     const { searchParams } = new URL(req.url);
     const dataIdFromUrl = searchParams.get('data.id');
-    
-    logger.info('🔍 [WEBHOOK DEBUG] Iniciando validación de firma', {
+
+    logger.info('Stage: Pre-validación de firma', {
       requestId,
-      hasWebhookSecret: !!webhookSecret,
-      xSignature: xSignature ? xSignature.substring(0, 50) + '...' : 'null',
+      xSignature: xSignature?.slice(0, 25) + '...',
       xRequestId,
-      bodyLength: rawBody.length,
-      bodyPreview: rawBody.substring(0, 100) + '...',
       dataIdFromUrl,
+      bodyLength: rawBody.length,
     });
-    
+
+    /* ----------------------------------------------
+     * 2) Validación HMAC oficial
+     * -------------------------------------------- */
+    const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET!;
     const signatureValidation = await verifyWebhookSignature(
       rawBody,
       xSignature,
       xRequestId,
-      webhookSecret || '',
+      webhookSecret,
       dataIdFromUrl
     );
 
     if (!signatureValidation.isValid) {
-      logger.error('Webhook MercadoPago: Firma inválida', {
+      logger.error('Firma HMAC inválida', {
         requestId,
         xSignature,
-        xRequestId,
-        bodyLength: rawBody.length,
-        error: signatureValidation.error
+        error: signatureValidation.error,
       });
-      
-      return NextResponse.json({ 
-        success: false, 
-        error: signatureValidation.error || 'Firma inválida',
-        requestId,
-        debug: Buffer.from(rawBody).toString('base64') // Incluir datos completos en base64
-      }, { status: 401 });
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: signatureValidation.error,
+          requestId,
+          debug: Buffer.from(rawBody).toString('base64'),
+        },
+        { status: 401 }
+      );
     }
 
-    logger.info('Webhook MercadoPago: Firma validada exitosamente', {
+    logger.info('Firma HMAC validada OK', {
       requestId,
-      dataId: signatureValidation.dataId
+      dataId: signatureValidation.dataId,
     });
 
-    // 4. Parsear el JSON (después de validar firma) solo para validar que sea JSON válido
-    try {
-      JSON.parse(rawBody);
-    } catch (parseError) {
-      logger.error('Webhook MercadoPago: Error parseando payload', {
-        requestId,
-        error: parseError instanceof Error ? parseError.message : String(parseError)
-      });
-      
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Payload JSON inválido',
-        requestId
-      }, { status: 400 });
-    }
-
-    // 5. Validar estructura del payload
+    /* ----------------------------------------------
+     * 3) Validar estructura del payload
+     * -------------------------------------------- */
     const payloadValidation = validateWebhookPayload(rawBody);
+
     if (!payloadValidation.isValid) {
-      logger.error('Webhook MercadoPago: Estructura inválida', {
+      logger.error('Payload inválido', {
         requestId,
         error: payloadValidation.error,
-        rawBody: rawBody.substring(0, 200) + '...'
       });
-      
-      return NextResponse.json({ 
-        success: false, 
-        error: payloadValidation.error || 'Estructura inválida',
-        requestId
-      }, { status: 400 });
+
+      return NextResponse.json(
+        { success: false, error: payloadValidation.error, requestId },
+        { status: 400 }
+      );
     }
 
-    // Extraer datos del payload validado
-    const eventType = payloadValidation.action;
-    const eventId = payloadValidation.dataId;
+    const { action, dataId } = payloadValidation;
 
-    logger.info('Webhook MercadoPago recibido', {
+    logger.info('Payload válido', {
       requestId,
-      eventType,
-      eventId,
-      userAgent: req.headers.get('user-agent'),
-      ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip')
+      action,
+      dataId,
     });
 
-    // 6. Procesar evento según tipo
-    const isPaymentEvent =
-      !!eventType && (
-        eventType === 'payment' ||
-        eventType === 'payment.updated' ||
-        eventType === 'payment.created' ||
-        eventType.startsWith('payment.')
-      );
+    /* ----------------------------------------------
+     * 4) Procesar eventos
+     * -------------------------------------------- */
+    const isPayment =
+      action &&
+      (action === 'payment' ||
+        action.startsWith('payment.') ||
+        action === 'payment.updated' ||
+        action === 'payment.created');
 
-    if (isPaymentEvent && eventId) {
-      logger.info(`Procesando evento de pago ${eventType} - reenviando a payments/notify`, {
-        requestId,
-        eventId,
-      });
-
-      forwardToPaymentsNotify(rawBody, requestId, eventId.toString())
-        .catch(error => {
-          logger.error('Error en procesamiento asíncrono de pago (forwardToPaymentsNotify)', {
-            requestId,
-            error: error instanceof Error ? error.message : String(error),
-          });
+    if (isPayment && dataId) {
+      forwardToPaymentsNotify(rawBody, requestId, dataId).catch((error) => {
+        logger.error('Error async forwarding', {
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
         });
+      });
 
       return NextResponse.json({
         success: true,
         requestId,
         message: 'Pago recibido y encolado para procesamiento',
       });
+    }
 
-    } else if (eventType === 'merchant_order' && eventId) {
-      logger.info('Evento merchant_order recibido; no se procesa en este webhook', {
-        requestId,
-        eventId,
-      });
-
+    if (action === 'merchant_order') {
       return NextResponse.json({
         success: true,
         requestId,
-        message: 'Merchant order recibido (sin procesamiento)',
-      });
-      
-    } else {
-      logger.info('Evento de webhook no procesado', { 
-        requestId, 
-        eventType 
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        requestId,
-        message: 'Evento recibido pero no procesado'
+        message: 'Merchant order recibido (no procesado)',
       });
     }
 
+    return NextResponse.json({
+      success: true,
+      requestId,
+      message: 'Evento desconocido ignorado',
+    });
   } catch (error) {
-    logger.error('Error procesando webhook MercadoPago', {
+    logger.error('Error interno procesando webhook', {
       requestId,
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
     });
-    
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Error interno del servidor',
-      requestId
-    }, { status: 500 });
+
+    return NextResponse.json(
+      { success: false, error: 'Error interno del servidor', requestId },
+      { status: 500 }
+    );
   }
 }
