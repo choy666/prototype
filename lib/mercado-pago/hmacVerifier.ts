@@ -242,23 +242,17 @@ export async function verifyWebhookSignature(
       }
     }
 
-    // NUEVO: Fallback temporal en producción para diagnóstico
-    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_WEBHOOK_FALLBACK === 'true') {
-      logger.warn('[HMAC] Fallback temporal activado para diagnóstico', {
-        clientIp,
-        hmacError: hmacResult.error,
-        note: 'Procesando webhook sin validación HMAC - REVISAR CONFIGURACIÓN'
-      });
-      
-      try {
-        const p = JSON.parse(rawBody);
-        return { isValid: true, dataId: p?.data?.id ?? undefined };
-      } catch {
-        return { isValid: true };
-      }
-    }
+    // ELIMINADO: Fallback temporal inseguro
+    // El fallback por ALLOW_WEBHOOK_FALLBACK ha sido removido por seguridad
+    // Solo se permite fallback por IP whitelist de Mercado Pago
 
-    // Si no hay fallback, retornar error HMAC
+    // Si no hay fallback válido, retornar error HMAC
+    logger.error('[HMAC] Validación fallida sin fallback disponible', {
+      clientIp,
+      hmacError: hmacResult.error,
+      ipWhitelisted: clientIp ? isMercadoPagoIp(clientIp) : false,
+    });
+    
     return { isValid: false, error: hmacResult.error };
     
   } catch (err) {

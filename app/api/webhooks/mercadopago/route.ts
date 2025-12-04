@@ -1,88 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/webhooks/mercadopago/route.ts
+// UNIFICADO: Procesa webhooks directamente sin doble salto
 
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier';
-import { saveFailedWebhookForRetry, saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
+import { saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
+import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
 import crypto from 'crypto';
-
-/* ---------------------------------------------------------------------------
- * Forward interno → /api/mercadopago/payments/notify
- * ------------------------------------------------------------------------- */
-
-async function forwardToPaymentsNotify(
-  rawBody: string,
-  requestId: string,
-  paymentId?: string | null,
-  headers?: Record<string, string>,
-  clientIp?: string
-) {
-  try {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.APP_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-
-    const notifyUrl = `${baseUrl}/api/mercadopago/payments/notify`;
-
-    logger.info('Reenviando webhook a payments/notify', {
-      requestId,
-      notifyUrl,
-      paymentId,
-    });
-
-    const response = await fetch(notifyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: rawBody,
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-
-      logger.error('Error reenviando webhook', {
-        requestId,
-        status: response.status,
-        text,
-        paymentId,
-      });
-
-      // Guardar en DB para retry posterior
-      await saveFailedWebhookForRetry({
-        paymentId: paymentId ?? 'unknown',
-        requestId,
-        rawBody,
-        headers: headers || {},
-        errorMessage: `HTTP ${response.status}: ${text}`,
-        clientIp,
-      });
-
-    } else {
-      logger.info('Webhook reenviado exitosamente', {
-        requestId,
-        paymentId,
-        status: response.status,
-      });
-    }
-  } catch (error) {
-    logger.error('Error crítico forwarding webhook', {
-      requestId,
-      paymentId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    // Guardar como dead letter si falla completamente
-    await saveDeadLetterWebhook({
-      paymentId: paymentId ?? 'unknown',
-      requestId,
-      rawBody,
-      headers: headers || {},
-      errorMessage: error instanceof Error ? error.message : String(error),
-      clientIp,
-    });
-  }
-}
 
 /* ---------------------------------------------------------------------------
  * POST Handler principal — Híbrido PRO limpio
@@ -183,7 +108,7 @@ export async function POST(req: Request) {
     });
 
     /* ----------------------------------------------
-     * 4) Procesar eventos
+     * 4) Procesar eventos de pago DIRECTAMENTE (sin doble salto)
      * -------------------------------------------- */
     const isPayment =
       action &&
@@ -193,24 +118,74 @@ export async function POST(req: Request) {
         action === 'payment.created');
 
     if (isPayment && dataId) {
-      forwardToPaymentsNotify(
-        rawBody, 
-        requestId, 
-        dataId, 
-        Object.fromEntries(req.headers.entries()),
-        clientIp
-      ).catch((error) => {
-        logger.error('Error async forwarding', {
+      // IDEMPOTENCIA: Verificar si ya está siendo procesado
+      const idempotencyCheck = await checkPaymentIdempotency(dataId);
+      
+      if (!idempotencyCheck.canProcess) {
+        logger.info('[Webhook] Pago duplicado ignorado', {
           requestId,
-          error: error instanceof Error ? error.message : String(error),
+          paymentId: dataId,
+          reason: idempotencyCheck.reason,
+          existingStatus: idempotencyCheck.existingStatus,
         });
-      });
 
-      return NextResponse.json({
+        // Responder 200 OK para que MP no reintente
+        return NextResponse.json({
+          success: true,
+          requestId,
+          message: 'Pago ya procesado anteriormente',
+          duplicate: true,
+        });
+      }
+
+      // RESPUESTA INMEDIATA: Retornar 200 OK antes de procesar
+      // Esto evita que MP envíe retries
+      const responsePromise = NextResponse.json({
         success: true,
         requestId,
-        message: 'Pago recibido y encolado para procesamiento',
+        message: 'Pago recibido y procesando',
       });
+
+      // PROCESAMIENTO ASYNC: Procesar en background sin bloquear respuesta
+      processPaymentWebhook(dataId, requestId)
+        .then((result: { success: boolean; status?: string; error?: string; alreadyProcessed?: boolean }) => {
+          if (result.success) {
+            logger.info('[Webhook] Pago procesado exitosamente', {
+              requestId,
+              paymentId: dataId,
+              status: result.status,
+            });
+          } else {
+            logger.error('[Webhook] Error procesando pago', {
+              requestId,
+              paymentId: dataId,
+              error: result.error,
+            });
+            
+            // Guardar para retry manual si falla
+            saveDeadLetterWebhook({
+              paymentId: dataId,
+              requestId,
+              rawBody,
+              headers: Object.fromEntries(req.headers.entries()),
+              errorMessage: result.error || 'Error desconocido',
+              clientIp,
+            }).catch((err: Error) => {
+              logger.error('[Webhook] Error guardando dead letter', {
+                error: err.message,
+              });
+            });
+          }
+        })
+        .catch((error: Error) => {
+          logger.error('[Webhook] Error crítico en procesamiento async', {
+            requestId,
+            paymentId: dataId,
+            error: error.message,
+          });
+        });
+
+      return responsePromise;
     }
 
     if (action === 'merchant_order') {
@@ -232,9 +207,12 @@ export async function POST(req: Request) {
       error: error instanceof Error ? error.message : String(error),
     });
 
-    return NextResponse.json(
-      { success: false, error: 'Error interno del servidor', requestId },
-      { status: 500 }
-    );
+    // IMPORTANTE: Siempre retornar 200 para evitar retries de MP
+    // Los errores se manejan internamente
+    return NextResponse.json({
+      success: false,
+      error: 'Error interno del servidor',
+      requestId,
+    });
   }
 }
