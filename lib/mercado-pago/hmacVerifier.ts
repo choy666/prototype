@@ -193,18 +193,6 @@ export async function validateMercadoPagoHmac(
   console.log('webhookSecret first5:', normalizedSecret.slice(0, 5));
   console.log('webhookSecret last5:', normalizedSecret.slice(-5));
   
-  // Timestamp validation debug
-  const currentTs = Math.floor(Date.now() / 1000);
-  const tsDiff = Math.abs(currentTs - Number(ts));
-  console.log('=== TIMESTAMP DEBUG ===');
-  console.log('Current timestamp (seconds):', currentTs);
-  console.log('Received ts:', ts);
-  console.log('Difference (seconds):', tsDiff);
-  console.log('Difference (minutes):', Math.round(tsDiff / 60));
-  console.log('Is within 5 minutes?', tsDiff <= 300);
-  console.log('Is within 15 minutes?', tsDiff <= 900);
-  console.log('=== END TIMESTAMP DEBUG ===');
-  
   console.log('=== END HMAC DEBUG ===');
 
   logger.info('[DEBUG HMAC RESULT]', {
@@ -230,6 +218,43 @@ export async function validateMercadoPagoHmac(
   });
 
   if (!match) throw new Error('Firma inválida — no coincide con la esperada');
+
+  // Validación de timestamp - prevenir ataques de replay
+  const maxAgeSeconds = parseInt(process.env.MP_WEBHOOK_MAX_AGE_SECONDS || '900', 10);
+  const currentTsSec = Math.floor(Date.now() / 1000);
+  const currentTsMs = Date.now();
+  const receivedTsNum = Number(ts);
+  
+  // Determinar si está en segundos o milisegundos y validar
+  let isValidTimestamp = false;
+  
+  if (receivedTsNum < 10000000000) {
+    // Está en segundos
+    const diff = Math.abs(currentTsSec - receivedTsNum);
+    isValidTimestamp = diff <= maxAgeSeconds;
+    logger.info('Timestamp validation (seconds)', {
+      received: receivedTsNum,
+      current: currentTsSec,
+      diff,
+      maxAge: maxAgeSeconds,
+      isValid: isValidTimestamp
+    });
+  } else {
+    // Está en milisegundos
+    const diff = Math.abs(currentTsMs - receivedTsNum);
+    isValidTimestamp = diff <= (maxAgeSeconds * 1000);
+    logger.info('Timestamp validation (milliseconds)', {
+      received: receivedTsNum,
+      current: currentTsMs,
+      diff,
+      maxAge: maxAgeSeconds * 1000,
+      isValid: isValidTimestamp
+    });
+  }
+  
+  if (!isValidTimestamp) {
+    throw new Error(`Timestamp inválido — muy antiguo o futuro (máximo ${maxAgeSeconds} segundos permitidos)`);
+  }
 
   return { ok: true, dataId };
 }
