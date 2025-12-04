@@ -46,11 +46,65 @@ export async function POST(req: Request) {
     });
 
     /* ----------------------------------------------
-     * 2) Validación HMAC oficial con fallback IP
+     * 2) RESPUESTA INMEDIATA 200 OK para detener reintentos
+     * -------------------------------------------- */
+    // Retornar 200 inmediatamente para que MP no reintente
+    // Procesaremos todo en background incluyendo validación HMAC
+    const immediateResponse = NextResponse.json({
+      success: true,
+      requestId,
+      message: 'Webhook recibido, procesando en background',
+      processing: 'async',
+    });
+
+    /* ----------------------------------------------
+     * 3) PROCESAMIENTO ASYNC COMPLETO (incluyendo validación)
+     * -------------------------------------------- */
+    // Procesar en background sin bloquear la respuesta
+    processWebhookAsync(requestId, rawBody, xSignature, xRequestId, dataIdFromUrl, req.headers)
+      .catch((error) => {
+        logger.error('[Webhook] Error crítico en procesamiento async', {
+          requestId,
+          error: error.message,
+        });
+      });
+
+    // Retornar respuesta inmediata para detener reintentos
+    return immediateResponse;
+
+  } catch (error) {
+    logger.error('Error interno procesando webhook', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    // IMPORTANTE: Siempre retornar 200 para evitar retries de MP
+    return NextResponse.json({
+      success: false,
+      error: 'Error interno del servidor',
+      requestId,
+    });
+  }
+}
+
+/* ----------------------------------------------
+ * Función async para procesamiento completo
+ * -------------------------------------------- */
+async function processWebhookAsync(
+  requestId: string,
+  rawBody: string,
+  xSignature: string | null,
+  xRequestId: string | null,
+  dataIdFromUrl: string | null,
+  headers: Headers
+) {
+  try {
+    /* ----------------------------------------------
+     * 1) Validación HMAC oficial con fallback IP
      * -------------------------------------------- */
     const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET!;
-    const clientIp = req.headers.get('x-forwarded-for') || 
-                    req.headers.get('x-real-ip') || 
+    const clientIp = headers.get('x-forwarded-for') || 
+                    headers.get('x-real-ip') || 
                     'unknown';
     
     const signatureValidation = await verifyWebhookSignature(
@@ -63,55 +117,53 @@ export async function POST(req: Request) {
     );
 
     if (!signatureValidation.isValid) {
-      logger.error('Firma HMAC inválida', {
+      logger.error('Firma HMAC inválida (procesamiento async)', {
         requestId,
         xSignature,
         error: signatureValidation.error,
       });
 
-      return NextResponse.json(
-        {
-          success: false,
-          error: signatureValidation.error,
-          requestId,
-          debug: Buffer.from(rawBody).toString('base64'),
-        },
-        { status: 401 }
-      );
+      // Guardar en dead letter para análisis manual
+      await saveDeadLetterWebhook({
+        paymentId: dataIdFromUrl || 'unknown',
+        requestId,
+        rawBody,
+        headers: Object.fromEntries(headers.entries()),
+        errorMessage: signatureValidation.error || 'HMAC inválido',
+        clientIp,
+      });
+
+      return; // No procesar más si HMAC es inválido
     }
 
-    logger.info('Firma HMAC validada OK', {
+    logger.info('Firma HMAC validada OK (async)', {
       requestId,
       dataId: signatureValidation.dataId,
     });
 
     /* ----------------------------------------------
-     * 3) Validar estructura del payload
+     * 2) Validar estructura del payload
      * -------------------------------------------- */
     const payloadValidation = validateWebhookPayload(rawBody);
 
     if (!payloadValidation.isValid) {
-      logger.error('Payload inválido', {
+      logger.error('Payload inválido (async)', {
         requestId,
         error: payloadValidation.error,
       });
-
-      return NextResponse.json(
-        { success: false, error: payloadValidation.error, requestId },
-        { status: 400 }
-      );
+      return;
     }
 
     const { action, dataId } = payloadValidation;
 
-    logger.info('Payload válido', {
+    logger.info('Payload válido (async)', {
       requestId,
       action,
       dataId,
     });
 
     /* ----------------------------------------------
-     * 4) Procesar eventos de pago DIRECTAMENTE (sin doble salto)
+     * 3) Procesar eventos de pago
      * -------------------------------------------- */
     const isPayment =
       action &&
@@ -125,97 +177,53 @@ export async function POST(req: Request) {
       const idempotencyCheck = await checkPaymentIdempotency(dataId);
       
       if (!idempotencyCheck.canProcess) {
-        logger.info('[Webhook] Pago duplicado ignorado', {
+        logger.info('[Webhook] Pago duplicado ignorado (async)', {
           requestId,
           paymentId: dataId,
           reason: idempotencyCheck.reason,
           existingStatus: idempotencyCheck.existingStatus,
         });
-
-        // Responder 200 OK para que MP no reintente
-        return NextResponse.json({
-          success: true,
-          requestId,
-          message: 'Pago ya procesado anteriormente',
-          duplicate: true,
-        });
+        return;
       }
 
-      // RESPUESTA INMEDIATA: Retornar 200 OK antes de procesar
-      // Esto evita que MP envíe retries
-      const responsePromise = NextResponse.json({
-        success: true,
-        requestId,
-        message: 'Pago recibido y procesando',
-      });
-
-      // PROCESAMIENTO ASYNC: Procesar en background sin bloquear respuesta
-      processPaymentWebhook(dataId, requestId)
-        .then((result: { success: boolean; status?: string; error?: string; alreadyProcessed?: boolean }) => {
-          if (result.success) {
-            logger.info('[Webhook] Pago procesado exitosamente', {
-              requestId,
-              paymentId: dataId,
-              status: result.status,
-            });
-          } else {
-            logger.error('[Webhook] Error procesando pago', {
-              requestId,
-              paymentId: dataId,
-              error: result.error,
-            });
-            
-            // Guardar para retry manual si falla
-            saveDeadLetterWebhook({
-              paymentId: dataId,
-              requestId,
-              rawBody,
-              headers: Object.fromEntries(req.headers.entries()),
-              errorMessage: result.error || 'Error desconocido',
-              clientIp,
-            }).catch((err: Error) => {
-              logger.error('[Webhook] Error guardando dead letter', {
-                error: err.message,
-              });
-            });
-          }
-        })
-        .catch((error: Error) => {
-          logger.error('[Webhook] Error crítico en procesamiento async', {
-            requestId,
-            paymentId: dataId,
-            error: error.message,
-          });
+      // Procesar pago
+      const result = await processPaymentWebhook(dataId, requestId);
+      
+      if (result.success) {
+        logger.info('[Webhook] Pago procesado exitosamente (async)', {
+          requestId,
+          paymentId: dataId,
+          status: result.status,
         });
-
-      return responsePromise;
+      } else {
+        logger.error('[Webhook] Error procesando pago (async)', {
+          requestId,
+          paymentId: dataId,
+          error: result.error,
+        });
+        
+        // Guardar para retry manual si falla
+        await saveDeadLetterWebhook({
+          paymentId: dataId,
+          requestId,
+          rawBody,
+          headers: Object.fromEntries(headers.entries()),
+          errorMessage: result.error || 'Error desconocido',
+          clientIp,
+        });
+      }
     }
 
     if (action === 'merchant_order') {
-      return NextResponse.json({
-        success: true,
+      logger.info('[Webhook] Merchant order recibido (async)', {
         requestId,
-        message: 'Merchant order recibido (no procesado)',
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      requestId,
-      message: 'Evento desconocido ignorado',
-    });
   } catch (error) {
-    logger.error('Error interno procesando webhook', {
+    logger.error('[Webhook] Error en procesamiento async', {
       requestId,
       error: error instanceof Error ? error.message : String(error),
-    });
-
-    // IMPORTANTE: Siempre retornar 200 para evitar retries de MP
-    // Los errores se manejan internamente
-    return NextResponse.json({
-      success: false,
-      error: 'Error interno del servidor',
-      requestId,
     });
   }
 }

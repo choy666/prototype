@@ -23,6 +23,57 @@ export default function PaymentSuccess() {
     },
   });
 
+  // Procesar pago vía fallback si es aprobado
+  useEffect(() => {
+    const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
+
+    // Solo procesar si el pago está aprobado y tenemos paymentId
+    if ((collectionStatus === 'approved' || status === 'approved') && paymentId) {
+      const processPayment = async () => {
+        try {
+          // Pequeño delay para dar prioridad al webhook
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          console.log('[SUCCESS-FALLBACK] Procesando pago aprobado vía fallback', {
+            paymentId,
+            merchantOrderId,
+            status,
+            collectionStatus,
+          });
+          
+          const response = await fetch('/api/checkout/process-success', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              payment_id: paymentId,
+              merchant_order_id: merchantOrderId,
+              status: status,
+              collection_status: collectionStatus,
+            }),
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            console.log('✅ [SUCCESS-FALLBACK] Pago procesado correctamente:', {
+              paymentId,
+              result: result.status,
+            });
+          } else {
+            console.error('❌ [SUCCESS-FALLBACK] Error procesando pago:', result.error);
+          }
+        } catch (error) {
+          console.error('❌ [SUCCESS-FALLBACK] Error en llamada de fallback:', error);
+        }
+      };
+
+      // Procesar en background para no bloquear UI
+      processPayment();
+    }
+  }, [paymentInfo]);
+
   useEffect(() => {
     const { merchantOrderId, collectionStatus, status } = paymentInfo;
 
