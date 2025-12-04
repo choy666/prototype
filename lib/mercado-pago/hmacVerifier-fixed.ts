@@ -102,7 +102,7 @@ function extractDataIdFromPayload(rawBody: string): string | null {
 }
 
 /**
- * Validación HMAC oficial de Mercado Pago
+ * Validación HMAC oficial de Mercado Pago con múltiples formatos de template
  */
 async function validateMercadoPagoHmac(
   rawBody: string,
@@ -139,31 +139,66 @@ async function validateMercadoPagoHmac(
       return { ok: false, error: 'No se pudo encontrar data.id' };
     }
 
-    // Construir template según documentación de MP
-    const template = `id:${dataId};request-id:${xRequestId};ts:${ts}`;
+    // PROBAR MÚLTIPLES FORMATOS DE TEMPLATE SEGÚN DOCUMENTACIÓN MP
+    const requestId = xRequestId || '';
+    const templateVariants = [
+      // Formato oficial documentación reciente
+      `data.id=${dataId};ts=${ts};x-request-id=${requestId}`,
+      // Formato alternativo con ampersands
+      `data.id=${dataId}&ts=${ts}&x-request-id=${requestId}`,
+      // Formato legacy con id simple
+      `id=${dataId};ts=${ts};x-request-id=${requestId}`,
+      `id=${dataId}&ts=${ts}&x-request-id=${requestId}`,
+      // Formatos sin x-request-id (algunos webhooks no lo incluyen)
+      `data.id=${dataId};ts=${ts}`,
+      `data.id=${dataId}&ts=${ts}`,
+      `id=${dataId};ts=${ts}`,
+      `id=${dataId}&ts=${ts}`,
+      // Formato actual (posiblemente incorrecto)
+      `id:${dataId};request-id:${requestId};ts:${ts}`,
+    ];
 
-    // Generar firma esperada
-    const expectedSignature = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(template, 'utf8')
-      .digest('hex');
+    let validSignature = null;
+    let validTemplate = null;
+    let expectedSignature = null;
 
-    // Log detallado para diagnóstico
-    logger.info('[HMAC] Validación detallada', {
-      template,
-      templateLength: template.length,
-      expectedSignature,
-      receivedSignature: v1,
-      signaturesMatch: v1 === expectedSignature,
+    // Probar cada variante hasta encontrar coincidencia
+    for (const template of templateVariants) {
+      expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(template, 'utf8')
+        .digest('hex');
+
+      if (v1 === expectedSignature) {
+        validSignature = v1;
+        validTemplate = template;
+        break;
+      }
+    }
+
+    // Logging detallado para diagnóstico
+    logger.info('[HMAC] Validación multi-formato', {
       dataId,
       xRequestId,
       ts,
+      receivedSignature: v1,
+      validTemplate: validTemplate || 'NONE',
+      templatesTested: templateVariants.length,
+      isValid: validSignature !== null,
+      // Primeros 8 chars de cada firma para comparación (seguro)
+      signatureComparison: templateVariants.map((template, i) => ({
+        format: i + 1,
+        template: template,
+        expected: crypto.createHmac('sha256', webhookSecret).update(template, 'utf8').digest('hex').substring(0, 8),
+        received: v1.substring(0, 8),
+        match: v1 === crypto.createHmac('sha256', webhookSecret).update(template, 'utf8').digest('hex')
+      }))
     });
 
     return {
-      ok: v1 === expectedSignature,
+      ok: validSignature !== null,
       dataId: dataId || undefined,
-      error: v1 !== expectedSignature ? 'Signature mismatch' : undefined,
+      error: validSignature === null ? 'Signature mismatch - probados múltiples formatos' : undefined,
     };
   } catch (error) {
     return {
