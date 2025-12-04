@@ -51,7 +51,20 @@ export async function validateMercadoPagoHmac(
   });
 
   if (!webhookSecret) throw new Error('Webhook secret no configurado');
+  // Normalizar secret: quitar comillas y espacios
   const normalizedSecret = webhookSecret.replace(/^["']|["']$/g, '').trim();
+  
+  // Debug del secret original vs normalizado
+  logger.info('Webhook Secret Debug', {
+    originalLength: webhookSecret.length,
+    normalizedLength: normalizedSecret.length,
+    originalFirst5: webhookSecret.slice(0, 5),
+    originalLast5: webhookSecret.slice(-5),
+    normalizedFirst5: normalizedSecret.slice(0, 5),
+    normalizedLast5: normalizedSecret.slice(-5),
+    hasQuotes: webhookSecret !== normalizedSecret,
+    hasLeadingTrailingSpaces: webhookSecret.length !== webhookSecret.trim().length
+  });
 
   const xSignature = getHeader(headers, 'x-signature');
   const xRequestId = getHeader(headers, 'x-request-id');
@@ -88,20 +101,26 @@ export async function validateMercadoPagoHmac(
    * Extraer data.id
    * ------------------------------------------ */
 
-  const dataIdFromBody = (() => {
+  /* --------------------------------------------
+   * Extraer data.id - PRIORIDAD: URL > body
+   * ------------------------------------------ */
+
+  // Primero intentar desde la URL (recomendado por MP)
+  let dataId: string | undefined = dataIdFromUrl || undefined;
+
+  // Si no hay en URL, extraer del body
+  if (!dataId) {
     try {
       const parsed = JSON.parse(rawBody);
-      return (
+      dataId =
         parsed?.data?.id ??
         parsed?.id ??
-        (parsed?.resource ? String(parsed.resource).match(/(\d+)$/)?.[1] : undefined)
-      );
+        (parsed?.resource ? String(parsed.resource).match(/(\d+)$/)?.[1] : undefined);
     } catch {
-      return undefined;
+      /* ignore parsing error */
     }
-  })();
+  }
 
-  const dataId = dataIdFromUrl || dataIdFromBody;
   if (!dataId) throw new Error('No se pudo encontrar data.id en URL o body');
 
   /* --------------------------------------------
@@ -154,6 +173,20 @@ export async function validateMercadoPagoHmac(
     expected,
     received: signature,
     match,
+    // Debug sin redactar (temporal)
+    rawSecret: {
+      length: normalizedSecret.length,
+      first5: normalizedSecret.slice(0, 5),
+      last5: normalizedSecret.slice(-5),
+      full: normalizedSecret
+    },
+    rawValues: {
+      dataId,
+      xRequestId,
+      ts,
+      signature,
+      webhookSecret: normalizedSecret
+    }
   });
 
   if (!match) throw new Error('Firma inválida — no coincide con la esperada');
