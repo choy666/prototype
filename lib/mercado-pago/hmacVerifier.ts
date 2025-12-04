@@ -95,8 +95,31 @@ async function tryHmacValidation(
 ): Promise<{ ok: boolean; dataId?: string; error?: string }> {
   const normalizedSecret = webhookSecret.replace(/^["']|["']$/g, '').trim();
 
+  // DEBUG AMBIENTAL: Comparar secrets y configuración
+  logger.info('[ENV DEBUG] Validación HMAC', {
+    environment: process.env.NODE_ENV,
+    webhookSecretLength: webhookSecret.length,
+    normalizedSecretLength: normalizedSecret.length,
+    webhookSecretHash: crypto.createHash('sha256').update(webhookSecret).digest('hex').slice(0, 16),
+    normalizedSecretHash: crypto.createHash('sha256').update(normalizedSecret).digest('hex').slice(0, 16),
+    hasQuotes: webhookSecret !== normalizedSecret,
+    hasLeadingTrailingSpaces: webhookSecret.length !== webhookSecret.trim().length,
+    vercelEnv: process.env.VERCEL_ENV,
+    isProduction: process.env.NODE_ENV === 'production'
+  });
+
   const xSignature = getHeader(headers, 'x-signature');
   const xRequestId = getHeader(headers, 'x-request-id');
+
+  // DEBUG HEADERS: Verificar si llegan completos
+  logger.info('[HEADERS DEBUG]', {
+    xSignaturePresent: !!xSignature,
+    xRequestIdPresent: !!xRequestId,
+    xSignatureLength: xSignature?.length,
+    xRequestIdLength: xRequestId?.length,
+    xSignaturePreview: xSignature?.slice(0, 50),
+    allHeaders: Object.fromEntries(headers.entries())
+  });
 
   if (!xSignature) return { ok: false, error: 'Header x-signature requerido' };
   if (!xRequestId) return { ok: false, error: 'Header x-request-id requerido' };
@@ -127,11 +150,51 @@ async function tryHmacValidation(
     }
   }
 
+  // DEBUG CRÍTICO: Verificar componentes del stringToSign
+  const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+  
+  // DEBUG BODY: Detectar transformaciones de proxy/reverse proxy
+  const contentType = headers.get('content-type');
+  const contentLength = headers.get('content-length');
+  const actualBodyLength = rawBody.length;
+  const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
+  
+  // Detectar encoding y caracteres problemáticos
+  const hasBom = rawBody.charCodeAt(0) === 0xFEFF;
+  const hasTrailingWhitespace = rawBody !== rawBody.trim();
+  const bodySample = rawBody.slice(0, 100) + (rawBody.length > 100 ? '...' : '');
+  
+  logger.info('[STRING_TO_SIGN DEBUG]', {
+    dataId,
+    dataIdSource: dataIdFromUrl ? 'URL' : 'body',
+    xRequestId,
+    ts,
+    tsAsNumber: Number(ts),
+    tsFormat: Number(ts) < 10000000000 ? 'seconds' : 'milliseconds',
+    stringToSign,
+    stringToSignLength: stringToSign.length,
+    // Body analysis
+    contentType,
+    contentLength,
+    actualBodyLength,
+    contentLengthMatch: contentLength ? String(contentLength) === String(actualBodyLength) : 'unknown',
+    bodyHash: bodyHash.slice(0, 16),
+    hasBom,
+    hasTrailingWhitespace,
+    bodySample: bodySample.replace(/\n/g, '\\n').replace(/\r/g, '\\r'),
+    // Environment detection
+    userAgent: headers.get('user-agent'),
+    xForwardedFor: headers.get('x-forwarded-for'),
+    xForwardedProto: headers.get('x-forwarded-proto'),
+    xRealIp: headers.get('x-real-ip'),
+    via: headers.get('via'),
+    cfRay: headers.get('cf-ray'), // Cloudflare
+    xVercelId: headers.get('x-vercel-id') // Vercel
+  });
+
   if (!dataId) return { ok: false, error: 'No se pudo encontrar data.id' };
   if (!ts) return { ok: false, error: 'No se pudo extraer ts del header' };
   if (!signature) return { ok: false, error: 'No se pudo extraer v1 del header' };
-
-  const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
 
   const hmac = crypto.createHmac('sha256', normalizedSecret);
   hmac.update(stringToSign);
@@ -141,6 +204,7 @@ async function tryHmacValidation(
   try {
     const recv = Buffer.from(signature, 'hex');
     const exp = Buffer.from(expected, 'hex');
+
     if (recv.length === exp.length) {
       match = crypto.timingSafeEqual(recv, exp);
     }
@@ -148,12 +212,18 @@ async function tryHmacValidation(
     /* ignore */
   }
 
-  logger.info('[HMAC VALIDATION]', {
-    dataId,
-    stringToSign,
-    expected: expected.slice(0, 16) + '...',
-    received: signature.slice(0, 16) + '...',
+  // DEBUG COMPARACIÓN: Mostrar diferencias exactas
+  logger.info('[HMAC COMPARISON DEBUG]', {
+    expectedLength: expected.length,
+    receivedLength: signature?.length,
+    expectedFirst16: expected.slice(0, 16),
+    receivedFirst16: signature?.slice(0, 16),
+    expectedLast16: expected.slice(-16),
+    receivedLast16: signature?.slice(-16),
     match,
+    lengthsMatch: expected.length === signature?.length,
+    first8Match: expected.slice(0, 8) === signature?.slice(0, 8),
+    last8Match: expected.slice(-8) === signature?.slice(-8)
   });
 
   if (!match) return { ok: false, dataId, error: 'Firma HMAC no coincide' };
