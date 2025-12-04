@@ -50,6 +50,20 @@ export const webhookFailures = pgTable("webhook_failures", {
 }));
 
 // ======================
+// Webhook Replay Cache (Prevención de ataques)
+// ======================
+export const webhookReplayCache = pgTable("webhook_replay_cache", {
+  requestId: varchar("request_id", { length: 255 }).primaryKey(), // x-request-id único
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(), // Para limpieza automática
+}, (table) => ({
+  // Índice para limpieza de registros expirados
+  expiresIdx: index("webhook_replay_cache_expires_idx").on(table.expiresAt),
+  // Índice para búsquedas rápidas
+  requestIdIdx: index("webhook_replay_cache_request_idx").on(table.requestId),
+}));
+
+// ======================
 // User roles type
 // ======================
 export type UserRole = "user" | "admin";

@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
-import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier';
+import { verifyWebhookSignature, validateWebhookPayload } from '@/lib/mercado-pago/hmacVerifier-fixed';
 import { saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
 import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
 import crypto from 'crypto';
@@ -26,7 +26,10 @@ export async function POST(req: Request) {
       method: req.method,
     });
 
-    const rawBody = await req.text();
+    // Capturar body raw sin modificaciones para HMAC
+    // Usar arrayBuffer para preservar bytes exactos que envía MP
+    const rawBuffer = await req.arrayBuffer();
+    const rawBody = new TextDecoder('utf-8', { fatal: false }).decode(rawBuffer);
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
     const { searchParams } = new URL(req.url);
