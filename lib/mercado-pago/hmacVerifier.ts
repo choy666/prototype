@@ -167,6 +167,19 @@ export async function validateMercadoPagoHmac(
     });
   }
 
+  // Debug sin redactar - console.log directo para bypass
+  console.log('=== HMAC DEBUG UNREDACTED ===');
+  console.log('dataId:', dataId);
+  console.log('xRequestId:', xRequestId);
+  console.log('ts:', ts);
+  console.log('stringToSign:', stringToSign);
+  console.log('expected:', expected);
+  console.log('received:', signature);
+  console.log('webhookSecret length:', normalizedSecret.length);
+  console.log('webhookSecret first5:', normalizedSecret.slice(0, 5));
+  console.log('webhookSecret last5:', normalizedSecret.slice(-5));
+  console.log('=== END HMAC DEBUG ===');
+
   logger.info('[DEBUG HMAC RESULT]', {
     dataId,
     stringToSign,
