@@ -15,17 +15,6 @@ export interface MercadoPagoHmacValidationResult {
   dataId?: string;
 }
 
-/* --------------------------------------------------
- * Tipos para merchant order data
- * -------------------------------------------------- */
-export interface MerchantOrderPayment {
-  id: string | number;
-  status?: string;
-}
-
-export interface MerchantOrderData {
-  payments?: MerchantOrderPayment[];
-}
 
 /* --------------------------------------------------
  * Helper seguro para leer headers
@@ -37,6 +26,18 @@ function getHeader(headers: Headers, name: string): string | null {
     return null;
   }
 }
+
+/* --------------------------------------------------
+ * Validación oficial HMAC SHA256 v1 de Mercado Pago
+ *
+ * Requiere:
+ *   ts      → timestamp enviado
+ *   v1      → firma HMAC
+ *   x-request-id → obligatorio
+ *
+ * string_to_sign EXACTO:
+ *   id:{id};request-id:{x-request-id};ts:{ts}
+ * -------------------------------------------------- */
 export async function validateMercadoPagoHmac(
   rawBody: string,
   headers: Headers,
@@ -82,14 +83,23 @@ export async function validateMercadoPagoHmac(
   }
 
   if (!xSignature) {
+    logger.error('ERROR_PRE_VALIDATION: Missing x-signature header');
     throw new Error('Header x-signature requerido');
   }
   if (!xRequestId) {
+    logger.error('ERROR_PRE_VALIDATION: Missing x-request-id header');
     throw new Error('Header x-request-id requerido para validación HMAC');
   }
   if (!dataIdFromUrl) {
+    logger.error('ERROR_PRE_VALIDATION: Missing data.id from URL');
     throw new Error('data.id de la URL es requerido para construir el string_to_sign');
   }
+
+  logger.info('DEBUG_PRE_VALIDATION: All required headers and params are present', {
+    xSignature,
+    xRequestId,
+    dataIdFromUrl,
+  });
 
   let ts: string | undefined;
   let signature: string | undefined;
@@ -115,10 +125,30 @@ export async function validateMercadoPagoHmac(
   hmac.update(stringToSign);
   const expectedSignature = hmac.digest('hex');
 
-  const signaturesMatch = crypto.timingSafeEqual(
-    Buffer.from(signature, 'hex'),
-    Buffer.from(expectedSignature, 'hex')
-  );
+  let signaturesMatch = false;
+  try {
+    const receivedSignatureBuffer = Buffer.from(signature, 'hex');
+    const expectedSignatureBuffer = Buffer.from(expectedSignature, 'hex');
+
+    logger.info('DEBUG_TIMING_SAFE_EQUAL: Buffer lengths', {
+      received: receivedSignatureBuffer.length,
+      expected: expectedSignatureBuffer.length,
+    });
+
+    if (receivedSignatureBuffer.length === expectedSignatureBuffer.length) {
+      signaturesMatch = crypto.timingSafeEqual(
+        receivedSignatureBuffer,
+        expectedSignatureBuffer
+      );
+    }
+  } catch (error) {
+    logger.error('ERROR_TIMING_SAFE_EQUAL: Error during crypto.timingSafeEqual', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      signature,
+      expectedSignature,
+    });
+  }
+
 
   logger.info('🔍 [DEBUG HMAC] Intento de validación', {
     dataId: dataIdFromUrl,
