@@ -131,7 +131,7 @@ export async function validateMercadoPagoHmac(
     throw new Error('Formato de firma inválido: faltan ts o v1');
   }
 
-  const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+  const stringToSign = `id:${String(dataId).toLowerCase()};request-id:${xRequestId};ts:${ts};`;
 
   const hmac = crypto.createHmac('sha256', normalizedSecret);
   hmac.update(stringToSign);
