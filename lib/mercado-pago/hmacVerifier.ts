@@ -119,7 +119,7 @@ export async function validateMercadoPagoHmac(
 
   if (!ts || !signature) throw new Error('Formato x-signature inválido: falta ts o v1');
 
-  const stringToSign = `id:${String(dataId).toLowerCase()};request-id:${xRequestId};ts:${ts};`;
+  const stringToSign = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
 
   /* --------------------------------------------
    * Generar firma esperada
