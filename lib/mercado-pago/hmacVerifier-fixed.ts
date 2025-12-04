@@ -139,23 +139,19 @@ async function validateMercadoPagoHmac(
       return { ok: false, error: 'No se pudo encontrar data.id' };
     }
 
-    // PROBAR MÚLTIPLES FORMATOS DE TEMPLATE SEGÚN DOCUMENTACIÓN MP
+    // PROBAR MÚLTIPLES FORMATOS DE TEMPLATE SEGÚN DOCUMENTACIÓN MP 2024
     const requestId = xRequestId || '';
     const templateVariants = [
-      // Formato oficial documentación reciente
+      // Formato oficial documentación MP 2024 (más probable)
       `data.id=${dataId};ts=${ts};x-request-id=${requestId}`,
-      // Formato alternativo con ampersands
-      `data.id=${dataId}&ts=${ts}&x-request-id=${requestId}`,
-      // Formato legacy con id simple
-      `id=${dataId};ts=${ts};x-request-id=${requestId}`,
-      `id=${dataId}&ts=${ts}&x-request-id=${requestId}`,
-      // Formatos sin x-request-id (algunos webhooks no lo incluyen)
+      // Formato sin x-request-id (casos reportados)
       `data.id=${dataId};ts=${ts}`,
-      `data.id=${dataId}&ts=${ts}`,
+      // Formato con id simple (legacy)
+      `id=${dataId};ts=${ts};x-request-id=${requestId}`,
       `id=${dataId};ts=${ts}`,
-      `id=${dataId}&ts=${ts}`,
-      // Formato actual (posiblemente incorrecto)
-      `id:${dataId};request-id:${requestId};ts:${ts}`,
+      // Formatos con ampersands (menos común)
+      `data.id=${dataId}&ts=${ts}&x-request-id=${requestId}`,
+      `data.id=${dataId}&ts=${ts}`,
     ];
 
     let validSignature = null;
@@ -377,6 +373,21 @@ export async function verifyWebhookSignature(
         return { isValid: true, dataId: p?.data?.id ?? undefined };
       } catch {
         return { isValid: true };
+      }
+    }
+
+    // 1.5. Bypass para simulador MP en desarrollo
+    if (process.env.ALLOW_SIMULATOR_WEBHOOKS === 'true' && 
+        (rawBody.includes('test.notification') || dataIdFromUrl === '123456')) {
+      logger.warn('[HMAC] Bypass para simulador activado', {
+        reason: 'simulator_detected',
+        dataId: dataIdFromUrl,
+      });
+      try {
+        const p = JSON.parse(rawBody);
+        return { isValid: true, dataId: p?.data?.id ?? dataIdFromUrl ?? undefined, warning: 'Simulator bypass' };
+      } catch {
+        return { isValid: true, warning: 'Simulator bypass' };
       }
     }
 

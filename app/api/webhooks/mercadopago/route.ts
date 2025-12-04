@@ -26,10 +26,9 @@ export async function POST(req: Request) {
       method: req.method,
     });
 
-    // Capturar body raw sin modificaciones para HMAC
-    // Usar arrayBuffer para preservar bytes exactos que envía MP
+    // Capturar body raw SIN decodificar para preservar bytes exactos
     const rawBuffer = await req.arrayBuffer();
-    const rawBody = new TextDecoder('utf-8', { fatal: false }).decode(rawBuffer);
+    const rawBody = Buffer.from(rawBuffer);
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
     const { searchParams } = new URL(req.url);
@@ -43,6 +42,9 @@ export async function POST(req: Request) {
       xRequestId,
       dataIdFromUrl,
       bodyLength: rawBody.length,
+      // Log temporal para diagnóstico (eliminar después)
+      allHeaders: process.env.NODE_ENV === 'development' ? Object.fromEntries(req.headers.entries()) : '[REDACTED]',
+      clientIp: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
     });
 
     /* ----------------------------------------------
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
      * 3) PROCESAMIENTO ASYNC COMPLETO (incluyendo validación)
      * -------------------------------------------- */
     // Procesar en background sin bloquear la respuesta
-    processWebhookAsync(requestId, rawBody, xSignature, xRequestId, dataIdFromUrl, req.headers)
+    processWebhookAsync(requestId, rawBody.toString('utf8'), xSignature, xRequestId, dataIdFromUrl, req.headers)
       .catch((error) => {
         logger.error('[Webhook] Error crítico en procesamiento async', {
           requestId,
