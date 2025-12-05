@@ -465,6 +465,11 @@ export async function verifyWebhookSignature(
       actualClientIp: clientIp,
       ipMatchesKnown: clientIp ? MERCADO_PAGO_IPS.includes(clientIp) : false,
     });
+
+    // Console.log temporal para bypassear redactado de Vercel
+    if (clientIp && !MERCADO_PAGO_IPS.includes(clientIp)) {
+      console.log(`🔍 MERCADO_PAGO_IP_DETECTED: ${clientIp} - ADD TO WHITELIST`);
+    }
     
     return { isValid: false, error: hmacResult.error };
     
