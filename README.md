@@ -639,3 +639,7 @@ npx drizzle-kit check
 ---
 
 **Estado Final**: ✅ **Proyecto en desarrollo activo con integración funcional Mercado Libre**
+
+
+
+prototype-ten-dun.vercel.app/api/user/document

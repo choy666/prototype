@@ -461,6 +461,9 @@ export async function verifyWebhookSignature(
       // Debug: mostrar IPs disponibles para troubleshooting
       availableIPs: MERCADO_PAGO_IPS.slice(0, 5), // Primeras 5 IPs
       totalIPs: MERCADO_PAGO_IPS.length,
+      // Debug: IP exacta que llegó para actualizar whitelist
+      actualClientIp: clientIp,
+      ipMatchesKnown: clientIp ? MERCADO_PAGO_IPS.includes(clientIp) : false,
     });
     
     return { isValid: false, error: hmacResult.error };
