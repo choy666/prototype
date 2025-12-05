@@ -619,7 +619,7 @@ export const mercadopagoPreferences = pgTable("mercadopago_preferences", {
 export const mercadopagoPayments = pgTable("mercadopago_payments", {
   id: serial("id").primaryKey(),
   paymentId: text("payment_id").unique(),
-  preferenceId: text("preference_id").references(() => mercadopagoPreferences.preferenceId),
+  preferenceId: text("preference_id"),
   orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
   status: text("status"),
   paymentMethodId: text("payment_method_id"),
