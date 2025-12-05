@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { products, users, productVariants, orders, mercadopagoPreferences } from '@/lib/schema';
+import { products, users, productVariants, orders, mercadopagoPreferences, orderItems } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
@@ -243,6 +243,25 @@ export async function POST(req: NextRequest) {
 
     const orderId = newOrder.id;
 
+    // Transferir items del carrito a la tabla orderItems
+    const orderItemsData = items.map((item: CheckoutItem) => ({
+      orderId,
+      productId: item.id,
+      variantId: item.variantId || null,
+      quantity: item.quantity,
+      price: (item.discount && item.discount > 0
+        ? item.price * (1 - item.discount / 100)
+        : item.price).toString(),
+    }));
+
+    if (orderItemsData.length > 0) {
+      await db.insert(orderItems).values(orderItemsData);
+      logger.info('Items transferidos a orderItems', {
+        orderId,
+        itemsCount: orderItemsData.length,
+      });
+    }
+
     // Obtener información del usuario para el pagador
     const payerInfo = {
       email: userExists[0].email,
@@ -253,7 +272,7 @@ export async function POST(req: NextRequest) {
     const metadata = {
       user_id: userId.toString(),
       order_id: orderId.toString(),
-      shipping_address: JSON.stringify(shippingAddress),
+      shipping_address: shippingAddress, // Guardar como objeto JSONB, no string
       shipping_method_id: shippingMethod.id.toString(),
       items: JSON.stringify(items.map((item: CheckoutItem) => ({
         ...item,

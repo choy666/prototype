@@ -4,25 +4,23 @@ import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { mercadopagoPayments } from '@/lib/schema';
 import { logger } from '@/lib/utils/logger';
-import { requireAdminAuth, createAdminErrorResponse } from '@/lib/middleware/admin-auth';
-import { applyRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/middleware/rate-limit';
+import { auth } from '@/lib/actions/auth';
 import { eq, ilike, and, desc, count, or } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
   try {
-    // Aplicar rate limiting
-    const rateLimitResult = await applyRateLimit(
-      req, 
-      RATE_LIMIT_CONFIGS.READ,
-      'payments-audit-list'
-    );
-    
-    if (!rateLimitResult.success && rateLimitResult.response) {
-      return rateLimitResult.response;
+    // Verificar autenticación de administrador (mismo patrón que otros endpoints)
+    const session = await auth();
+    if (!session || session.user.role !== 'admin') {
+      logger.warn('[ADMIN] Intento de acceso no autorizado', {
+        path: req.url,
+        userAgent: req.headers.get('user-agent'),
+        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+        userId: session?.user?.id,
+        userRole: session?.user?.role,
+      });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    // Verificar autenticación de admin
-    const { user } = await requireAdminAuth(req);
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -35,8 +33,8 @@ export async function GET(req: NextRequest) {
       pageSize,
       search,
       filter,
-      adminUser: user.email,
-      userId: user.id,
+      adminUser: session.user.email,
+      userId: session.user.id,
     });
 
     // Construir condiciones de filtrado
@@ -131,16 +129,11 @@ export async function GET(req: NextRequest) {
       totalCount,
       page,
       pageSize,
-      requestedBy: user.email,
+      requestedBy: session.user.email,
       requestedAt: new Date().toISOString(),
     });
 
   } catch (error) {
-    // Error de autenticación
-    if (error instanceof Error && error.message.includes('autorización')) {
-      return createAdminErrorResponse(error.message);
-    }
-
     logger.error('[ADMIN] Error obteniendo auditoría de pagos', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
