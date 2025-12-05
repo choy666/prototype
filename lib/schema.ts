@@ -636,12 +636,20 @@ export const mercadopagoPayments = pgTable("mercadopago_payments", {
   dateApproved: timestamp("date_approved"),
   dateLastUpdated: timestamp("date_last_updated"),
   rawData: jsonb("raw_data"),
+  // Campos de auditoría HMAC
+  requiresManualVerification: boolean("requires_manual_verification").default(false).notNull(),
+  hmacValidationResult: text("hmac_validation_result"), // 'valid', 'invalid', 'fallback_used'
+  hmacFailureReason: text("hmac_failure_reason"), // razón específica del fallo HMAC
+  hmacFallbackUsed: boolean("hmac_fallback_used").default(false).notNull(),
+  verificationTimestamp: timestamp("verification_timestamp"), // cuándo se verificó
+  webhookRequestId: text("webhook_request_id"), // correlación con webhook_failures
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("mp_payments_payment_id_idx").on(table.paymentId),
   index("mp_payments_preference_id_idx").on(table.preferenceId),
   index("mp_payments_order_id_idx").on(table.orderId),
   index("mp_payments_status_idx").on(table.status),
+  index("mp_payments_requires_manual_verification_idx").on(table.requiresManualVerification),
 ]);
 
 // ======================

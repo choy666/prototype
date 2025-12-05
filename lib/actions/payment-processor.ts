@@ -88,7 +88,14 @@ setInterval(cleanupCache, 60000);
  */
 export async function processPaymentWebhook(
   paymentId: string,
-  requestId: string
+  requestId: string,
+  requiresManualVerification: boolean = false,
+  hmacAuditContext?: {
+    validationResult?: string;
+    failureReason?: string;
+    fallbackUsed?: boolean;
+    webhookRequestId?: string;
+  }
 ): Promise<{
   success: boolean;
   status?: string;
@@ -101,7 +108,10 @@ export async function processPaymentWebhook(
     logger.info('[PaymentProcessor] Iniciando procesamiento', {
       paymentId,
       requestId,
-      source: requestId?.includes('fallback') ? 'success-page-fallback' : 'webhook',
+      requiresManualVerification,
+      hmacAuditContext,
+      source: requestId?.includes('fallback') ? 'success-page-fallback' : 
+              requiresManualVerification ? 'hmac-fallback' : 'webhook',
       timestamp: new Date().toISOString()
     });
 
@@ -130,6 +140,13 @@ export async function processPaymentWebhook(
             status: paymentData.status,
             dateLastUpdated: new Date(paymentData.date_last_updated || new Date().toISOString()),
             rawData: paymentData,
+            // Mantener campos de auditoría existentes o actualizar si es necesario
+            requiresManualVerification: existingPayment.requiresManualVerification || false,
+            hmacValidationResult: existingPayment.hmacValidationResult || 'valid',
+            hmacFailureReason: existingPayment.hmacFailureReason,
+            hmacFallbackUsed: existingPayment.hmacFallbackUsed || false,
+            verificationTimestamp: existingPayment.verificationTimestamp,
+            webhookRequestId: existingPayment.webhookRequestId,
           })
           .where(eq(mercadopagoPayments.paymentId, paymentId));
 
@@ -150,7 +167,7 @@ export async function processPaymentWebhook(
       };
     }
 
-    // Insertar nuevo pago
+    // Insertar nuevo pago con campos de auditoría HMAC
     const insertData = {
       paymentId: paymentData.id?.toString() || paymentId,
       preferenceId: paymentData.order?.id?.toString() || null,
@@ -169,6 +186,13 @@ export async function processPaymentWebhook(
       dateApproved: paymentData.date_approved ? new Date(paymentData.date_approved) : null,
       dateLastUpdated: paymentData.date_last_updated ? new Date(paymentData.date_last_updated) : new Date(),
       rawData: paymentData,
+      // Campos de auditoría HMAC
+      requiresManualVerification: requiresManualVerification || false,
+      hmacValidationResult: hmacAuditContext?.validationResult || (requiresManualVerification ? 'fallback_used' : 'valid'),
+      hmacFailureReason: hmacAuditContext?.failureReason || null,
+      hmacFallbackUsed: hmacAuditContext?.fallbackUsed || false,
+      verificationTimestamp: new Date(),
+      webhookRequestId: hmacAuditContext?.webhookRequestId || requestId,
       createdAt: new Date(),
     };
 
@@ -183,6 +207,8 @@ export async function processPaymentWebhook(
     logger.info('[PaymentProcessor] Completado', {
       paymentId,
       status: paymentData.status,
+      requiresManualVerification,
+      hmacAuditContext,
       duration: `${duration}ms`,
     });
 
@@ -263,15 +289,17 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     return;
   }
 
-  // Mapear estado MP → estado orden (tipos válidos del schema: pending, paid, shipped, delivered, cancelled, rejected, processing, failed, returned)
+  // Nueva lógica de mapeo de estados - Todos los pagos van a 'pending' excepto rechazados explícitamente
   type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'rejected' | 'processing' | 'failed' | 'returned';
   const orderStatusMap: Record<string, OrderStatus> = {
-    approved: 'paid',
-    pending: 'pending',
-    rejected: 'rejected',
-    cancelled: 'cancelled',
-    refunded: 'cancelled', // No hay 'refunded' en schema, usar cancelled
-    charged_back: 'failed', // No hay 'disputed' en schema, usar failed
+    approved: 'pending',    // ← Cambio: pagos aprobados van a pending para verificación manual
+    pending: 'pending',     // ← Permanece en pending
+    rejected: 'cancelled',  // ← Cambio: rechazados van a cancelled
+    cancelled: 'cancelled', // ← Permanece en cancelled
+    refunded: 'cancelled',  // ← No hay 'refunded' en schema, usar cancelled
+    charged_back: 'failed', // ← No hay 'disputed' en schema, usar failed
+    in_process: 'pending',  // ← En proceso también va a pending
+    authorised: 'pending',  // ← Autorizado también va a pending
   };
 
   const newOrderStatus = orderStatusMap[status];
@@ -282,6 +310,14 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     });
     return;
   }
+
+  // Log específico para la nueva lógica
+  logger.info('[PaymentProcessor] Aplicando nueva lógica de estados', {
+    paymentId: paymentData.id,
+    originalStatus: status,
+    newOrderStatus,
+    requiresManualVerification: ['approved', 'pending', 'in_process', 'authorised'].includes(status),
+  });
 
   // Actualizar orden
   await db.update(orders)

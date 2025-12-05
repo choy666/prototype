@@ -7,6 +7,7 @@ import { logger } from '@/lib/utils/logger';
 import { verifyMercadoPagoWebhook } from '@/lib/mercado-pago/hmacVerifier';
 import { saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
 import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import crypto from 'crypto';
 
 /* ---------------------------------------------------------------------------
@@ -67,7 +68,9 @@ async function handlePaymentWebhook(
   dataId: string, 
   requestId: string, 
   rawBody: string, 
-  headers: Headers
+  headers: Headers,
+  requiresManualVerification: boolean = false,
+  hmacFailureReason?: string
 ) {
   try {
     // Verificar idempotencia para evitar procesamiento duplicado
@@ -82,8 +85,15 @@ async function handlePaymentWebhook(
       return;
     }
 
-    // Procesar pago
-    const result = await processPaymentWebhook(dataId, requestId);
+    // Procesar pago con indicador de verificación manual y contexto de auditoría
+    const hmacAuditContext = requiresManualVerification && hmacFailureReason ? {
+      validationResult: 'fallback_used',
+      failureReason: hmacFailureReason,
+      fallbackUsed: true,
+      webhookRequestId: requestId,
+    } : undefined;
+
+    const result = await processPaymentWebhook(dataId, requestId, requiresManualVerification, hmacAuditContext);
 
     if (!result.success) {
       logger.error('Payment processing failed', {
@@ -108,6 +118,7 @@ async function handlePaymentWebhook(
       requestId,
       paymentId: dataId,
       status: result.status,
+      requiresManualVerification,
     });
   } catch (error) {
     logger.error('Payment webhook handler error', {
@@ -115,6 +126,52 @@ async function handlePaymentWebhook(
       paymentId: dataId,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * VERIFICACIÓN VÍA API DIRECTA (fallback cuando HMAC falla)
+ * ------------------------------------------------------------------------- */
+async function verifyPaymentViaAPI(paymentId: string, requestId: string): Promise<{
+  isValid: boolean;
+  paymentData?: any;
+  error?: string;
+}> {
+  try {
+    logger.info('[HMAC-FALLBACK] Verificando pago vía API MP', {
+      paymentId,
+      requestId,
+    });
+
+    const client = new MercadoPagoConfig({
+      accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
+      options: { timeout: 5000 },
+    });
+
+    const payment = new Payment(client);
+    const paymentData = await payment.get({ id: paymentId });
+
+    logger.info('[HMAC-FALLBACK] Pago verificado vía API', {
+      paymentId,
+      status: paymentData.status,
+      requestId,
+    });
+
+    return {
+      isValid: true,
+      paymentData,
+    };
+  } catch (error) {
+    logger.error('[HMAC-FALLBACK] Error verificando pago vía API', {
+      paymentId,
+      requestId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      isValid: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -128,34 +185,91 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
   try {
     // Validar HMAC
     const hmacValidation = verifyMercadoPagoWebhook(request, rawBody);
+    let requiresManualVerification = false;
+    let paymentDataFromAPI = null;
 
     if (!hmacValidation.ok) {
-      logger.warn('HMAC validation failed - saving to dead letter', {
+      logger.warn('HMAC validation failed - intentando verificación vía API', {
         requestId,
         reason: hmacValidation.reason,
       });
 
-      await saveDeadLetterWebhook({
-        paymentId: dataIdFromUrl || 'unknown',
+      // Extraer payment_id del body para verificar vía API
+      let paymentId = dataIdFromUrl;
+      if (!paymentId) {
+        try {
+          const payload = JSON.parse(rawBody);
+          paymentId = payload?.data?.id;
+        } catch (e) {
+          logger.error('[HMAC-FALLBACK] No se pudo extraer payment_id', {
+            requestId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
+      if (paymentId) {
+        const apiVerification = await verifyPaymentViaAPI(paymentId, requestId);
+        
+        if (apiVerification.isValid) {
+          logger.info('[HMAC-FALLBACK] Verificación vía API exitosa - procesando pago', {
+            requestId,
+            paymentId,
+            status: apiVerification.paymentData.status,
+          });
+          
+          requiresManualVerification = true;
+          paymentDataFromAPI = apiVerification.paymentData;
+        } else {
+          logger.error('[HMAC-FALLBACK] Verificación vía API falló - guardando en dead letter', {
+            requestId,
+            paymentId,
+            error: apiVerification.error,
+          });
+
+          await saveDeadLetterWebhook({
+            paymentId: paymentId || 'unknown',
+            requestId,
+            rawBody,
+            headers: Object.fromEntries(headers.entries()),
+            errorMessage: `HMAC failed: ${hmacValidation.reason}. API verification failed: ${apiVerification.error}`,
+            clientIp: headers.get('x-forwarded-for') || 'unknown',
+          });
+
+          return;
+        }
+      } else {
+        logger.error('[HMAC-FALLBACK] Sin payment_id - guardando en dead letter', {
+          requestId,
+        });
+
+        await saveDeadLetterWebhook({
+          paymentId: 'unknown',
+          requestId,
+          rawBody,
+          headers: Object.fromEntries(headers.entries()),
+          errorMessage: `HMAC failed: ${hmacValidation.reason}. No payment_id found`,
+          clientIp: headers.get('x-forwarded-for') || 'unknown',
+        });
+
+        return;
+      }
+    } else {
+      logger.info('HMAC validated', {
         requestId,
-        rawBody,
-        headers: Object.fromEntries(headers.entries()),
-        errorMessage: hmacValidation.reason || 'HMAC validation failed',
-        clientIp: headers.get('x-forwarded-for') || 'unknown',
+        dataId: hmacValidation.dataId,
       });
-
-      return;
     }
-
-    logger.info('HMAC validated', {
-      requestId,
-      dataId: hmacValidation.dataId,
-    });
 
     // Parsear payload
     const payload = JSON.parse(rawBody);
     const action = payload?.action || null;
-    const dataId = payload?.data?.id || dataIdFromUrl;
+    let dataId = payload?.data?.id || dataIdFromUrl;
+
+    // Si tenemos datos de API pero no del payload, usar los de API
+    if (paymentDataFromAPI && !dataId) {
+      dataId = paymentDataFromAPI.id?.toString();
+    }
 
     if (!action || !dataId) {
       logger.error('Invalid payload - missing required fields', {
@@ -172,7 +286,7 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
                      action === 'payment.updated';
 
     if (isPayment) {
-      await handlePaymentWebhook(dataId, requestId, rawBody, headers);
+      await handlePaymentWebhook(dataId, requestId, rawBody, headers, requiresManualVerification, hmacValidation.reason);
     } else if (action === 'merchant_order') {
       logger.info('Merchant order webhook received', { requestId });
       // TODO: Implementar procesamiento de merchant orders si es necesario

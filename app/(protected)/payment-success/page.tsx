@@ -182,11 +182,12 @@ export default function PaymentSuccess() {
   const getStatusInfo = () => {
     const { collectionStatus, status } = paymentInfo;
 
+    // Nueva lógica de mensajes según requerimientos
     if (orderStatus === 'paid' || orderStatus === 'delivered') {
       return {
         icon: <CheckCircle className='w-16 h-16 text-green-500' />,
-        title: '¡Pago Aprobado!',
-        message: 'Tu pago ha sido procesado exitosamente.',
+        title: '¡Pago Verificado!',
+        message: 'Tu pago ha sido verificado y tu pedido está siendo preparado para envío.',
         bgColor: 'bg-green-50',
         borderColor: 'border-green-200',
       };
@@ -196,8 +197,8 @@ export default function PaymentSuccess() {
     ) {
       return {
         icon: <Clock className='w-16 h-16 text-yellow-500' />,
-        title: 'Pago Pendiente',
-        message: 'Tu pago está siendo procesado. Te notificaremos cuando esté completo.',
+        title: '¡Compra Realizada con Éxito!',
+        message: 'Tu compra fue realizada con éxito. Durante las próximas 24hs armaremos tu pedido y corroboraremos tu pago correspondiente para terminar de prepararlo para ser despachado o retirado.',
         bgColor: 'bg-yellow-50',
         borderColor: 'border-yellow-200',
       };
@@ -209,34 +210,35 @@ export default function PaymentSuccess() {
     ) {
       return {
         icon: <XCircle className='w-16 h-16 text-red-500' />,
-        title: 'Pago Rechazado',
-        message: 'Hubo un problema con tu pago. Por favor, intenta nuevamente.',
+        title: 'Compra Cancelada',
+        message: 'Tu compra fue cancelada. Durante las próximas 24hs informaremos el error de tu compra por mensaje.',
         bgColor: 'bg-red-50',
         borderColor: 'border-red-200',
       };
     }
 
+    // Lógica para estados directos de Mercado Pago (cuando aún no se actualizó localmente)
     if (collectionStatus === 'approved' || status === 'approved') {
       return {
-        icon: <CheckCircle className='w-16 h-16 text-green-500' />,
-        title: '¡Pago Aprobado!',
-        message: 'Tu pago ha sido procesado exitosamente.',
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200',
+        icon: <Clock className='w-16 h-16 text-yellow-500' />,
+        title: '¡Compra Realizada con Éxito!',
+        message: 'Tu compra fue realizada con éxito. Durante las próximas 24hs armaremos tu pedido y corroboraremos tu pago correspondiente para terminar de prepararlo para ser despachado o retirado.',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200',
       };
     } else if (collectionStatus === 'pending' || status === 'pending') {
       return {
         icon: <Clock className='w-16 h-16 text-yellow-500' />,
-        title: 'Pago Pendiente',
-        message: 'Tu pago está siendo procesado. Te notificaremos cuando esté completo.',
+        title: '¡Compra Realizada con Éxito!',
+        message: 'Tu compra fue realizada con éxito. Durante las próximas 24hs armaremos tu pedido y corroboraremos tu pago correspondiente para terminar de prepararlo para ser despachado o retirado.',
         bgColor: 'bg-yellow-50',
         borderColor: 'border-yellow-200',
       };
     } else {
       return {
         icon: <XCircle className='w-16 h-16 text-red-500' />,
-        title: 'Pago Rechazado',
-        message: 'Hubo un problema con tu pago. Por favor, intenta nuevamente.',
+        title: 'Compra Cancelada',
+        message: 'Tu compra fue cancelada. Durante las próximas 24hs informaremos el error de tu compra por mensaje.',
         bgColor: 'bg-red-50',
         borderColor: 'border-red-200',
       };

@@ -3,7 +3,7 @@ import { auth } from '@/lib/actions/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { count, sum, eq, gte, lte, and, desc, sql } from 'drizzle-orm'
-import { users, products, orders, notifications } from '@/lib/schema'
+import { users, products, orders, notifications, mercadopagoPayments } from '@/lib/schema'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,8 @@ import {
   TrendingDown,
   Bell,
   AlertCircle,
-  Eye
+  Eye,
+  ShieldCheck
 } from 'lucide-react'
 import { checkSystemStatus, getStatusColor } from '@/lib/actions/system-status'
 
@@ -36,6 +37,12 @@ async function getStats() {
       sql`${orders.status} NOT IN ('cancelled', 'rejected')`
     )
   )
+
+  // Pagos que requieren verificación manual (HMAC falló)
+  const [manualVerificationCount] = await db
+    .select({ count: count() })
+    .from(mercadopagoPayments)
+    .where(eq(mercadopagoPayments.requiresManualVerification, true))
 
   // Calcular ingresos totales de pedidos con status logístico
   const [revenueResult] = await db
@@ -149,6 +156,7 @@ async function getStats() {
     products: productCount.count,
     orders: orderCount.count,
     revenue,
+    manualVerificationCount: manualVerificationCount.count,
     userTrend: {
       value: parseFloat(Math.abs(userTrend).toFixed(2)),
       isPositive: userTrend >= 0
@@ -324,6 +332,42 @@ async function DashboardContent() {
         />
         <MercadoLibreStatus />
       </div>
+
+      {/* Alerta de Pagos Pendientes de Verificación Manual */}
+      {stats.manualVerificationCount > 0 && (
+        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
+              <ShieldCheck className="h-5 w-5" />
+              Pagos Requieren Verificación Manual
+              <Badge variant="secondary" className="ml-2 bg-orange-200 text-orange-800 dark:bg-orange-800 dark:text-orange-200">
+                {stats.manualVerificationCount}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
+              Hay {stats.manualVerificationCount} pago{stats.manualVerificationCount !== 1 ? 's' : ''} que fallaron la validación HMAC y requieren verificación manual antes de confirmar las órdenes.
+            </p>
+            <div className="flex gap-2">
+              <Link
+                href="/admin/payments"
+                className="inline-flex items-center gap-1 text-xs bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+              >
+                <Eye className="h-3 w-3" />
+                Ver Pagos Pendientes
+              </Link>
+              <Link
+                href="/admin/payments?filter=requires_manual_verification"
+                className="inline-flex items-center gap-1 text-xs border border-orange-300 hover:bg-orange-100 text-orange-700 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-800/20 font-medium py-2 px-4 rounded-md transition-colors"
+              >
+                <AlertCircle className="h-3 w-3" />
+                Ver Auditoría Completa
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notificaciones */}
       {stats.notifications.length > 0 && (
