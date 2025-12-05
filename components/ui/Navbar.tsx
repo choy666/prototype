@@ -83,7 +83,6 @@ const Navbar = () => {
             >
               <House className="h-6 w-6 mr-2 text-primary" />
               <span className="text-xl font-bold text-foreground transition-colors duration-300 group-hover:opacity-80">
-                MiTienda
               </span>
             </Link>
           </div>

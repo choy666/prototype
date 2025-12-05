@@ -7,6 +7,32 @@ import { mercadopagoPayments, mercadopagoPreferences, orders } from '@/lib/schem
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
 
+// Extender PaymentResponse para incluir campos no documentados
+interface ExtendedPaymentResponse {
+  id: string | number;
+  status: string;
+  status_detail?: string;
+  external_reference?: string;
+  transaction_amount?: number;
+  payment_method_id?: string;
+  payment_method?: {
+    type?: string;
+  };
+  currency_id?: string;
+  installments?: number;
+  issuer_id?: string;
+  description?: string;
+  statement_descriptor?: string;
+  date_created?: string;
+  date_approved?: string;
+  date_last_updated?: string;
+  preference_id?: string;
+  order?: {
+    id?: string | number;
+  };
+  [key: string]: unknown; // Permitir campos adicionales
+}
+
 // Configuración de Mercado Pago
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
@@ -117,7 +143,7 @@ export async function processPaymentWebhook(
 
     // Obtener información del pago desde Mercado Pago API
     const payment = new Payment(client);
-    const paymentData = await payment.get({ id: paymentId });
+    const paymentData = await payment.get({ id: paymentId }) as unknown as ExtendedPaymentResponse;
 
     logger.info('[PaymentProcessor] Datos obtenidos de MP', {
       paymentId,
@@ -125,6 +151,9 @@ export async function processPaymentWebhook(
       statusDetail: paymentData.status_detail,
       externalReference: paymentData.external_reference,
       amount: paymentData.transaction_amount,
+      // Debug: log estructura completa
+      paymentDataKeys: Object.keys(paymentData),
+      fullPaymentData: paymentData,
     });
 
     // Verificar nuevamente si ya existe (doble check después de fetch)
@@ -167,21 +196,30 @@ export async function processPaymentWebhook(
       };
     }
 
+    // Validar campos obligatorios antes de insertar
+    if (!paymentData.id) {
+      throw new Error('paymentData.id es requerido');
+    }
+    
+    if (!paymentData.status) {
+      throw new Error('paymentData.status es requerido');
+    }
+
     // Insertar nuevo pago con campos de auditoría HMAC
     const insertData = {
       paymentId: paymentData.id?.toString() || paymentId,
-      preferenceId: paymentData.order?.id?.toString() || null,
+      preferenceId: paymentData.preference_id?.toString() || null,
       status: paymentData.status,
-      paymentMethodId: paymentData.payment_method_id,
-      paymentMethodType: paymentData.payment_method?.type || null,
-      paymentMethodName: paymentData.payment_method_id,
+      paymentMethodId: paymentData.payment_method_id?.toString() || null,
+      paymentMethodType: paymentData.payment_method?.type?.toString() || null,
+      paymentMethodName: paymentData.payment_method_id?.toString() || null,
       amount: paymentData.transaction_amount?.toString() || '0',
-      currencyId: paymentData.currency_id,
-      installments: paymentData.installments,
-      issuerId: paymentData.issuer_id,
-      description: paymentData.description,
-      externalReference: paymentData.external_reference,
-      statementDescriptor: paymentData.statement_descriptor,
+      currencyId: paymentData.currency_id?.toString() || 'ARS',
+      installments: paymentData.installments || null,
+      issuerId: paymentData.issuer_id?.toString() || null,
+      description: paymentData.description?.toString() || null,
+      externalReference: paymentData.external_reference?.toString() || null,
+      statementDescriptor: paymentData.statement_descriptor?.toString() || null,
       dateCreated: paymentData.date_created ? new Date(paymentData.date_created) : new Date(),
       dateApproved: paymentData.date_approved ? new Date(paymentData.date_approved) : null,
       dateLastUpdated: paymentData.date_last_updated ? new Date(paymentData.date_last_updated) : new Date(),
@@ -196,7 +234,27 @@ export async function processPaymentWebhook(
       createdAt: new Date(),
     };
 
-    await db.insert(mercadopagoPayments).values(insertData);
+    logger.info('[PaymentProcessor] Insertando pago', {
+      paymentId,
+      preferenceId: insertData.preferenceId,
+      hasPreference: !!insertData.preferenceId,
+    });
+
+    try {
+      await db.insert(mercadopagoPayments).values(insertData);
+    } catch (dbError) {
+      logger.error('[PaymentProcessor] Error insertando en DB', {
+        paymentId,
+        error: dbError instanceof Error ? dbError.message : String(dbError),
+        stack: dbError instanceof Error ? dbError.stack : undefined,
+        insertData: {
+          paymentId: insertData.paymentId,
+          preferenceId: insertData.preferenceId,
+          status: insertData.status,
+        },
+      });
+      throw dbError;
+    }
 
     logger.info('[PaymentProcessor] Pago insertado', { paymentId });
 
