@@ -376,12 +376,13 @@ export async function verifyWebhookSignature(
       }
     }
 
-    // 1.5. Bypass para simulador MP en desarrollo
+    // 1.5. Bypass para simulador MP (solo con variable explícita)
     if (process.env.ALLOW_SIMULATOR_WEBHOOKS === 'true' && 
         (rawBody.includes('test.notification') || dataIdFromUrl === '123456')) {
       logger.warn('[HMAC] Bypass para simulador activado', {
         reason: 'simulator_detected',
         dataId: dataIdFromUrl,
+        environment: process.env.NODE_ENV,
       });
       try {
         const p = JSON.parse(rawBody);

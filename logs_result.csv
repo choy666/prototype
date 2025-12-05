@@ -1,36 +1,16 @@
-"TimeUTC","timestampInMs","requestPath","requestMethod","requestQueryString","responseStatusCode","requestId","requestUserAgent","level","environment","branch","vercelCache","type","function","host","deploymentDomain","deploymentId","durationMs","region","maxMemoryUsed","memorySize","message","projectId","traceId","sessionId","invocationId","instanceId","concurrency"
-"2025-12-04 20:58:35",1764881915686,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","error","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[ERROR] 2025-12-04T20:58:35.686Z - Enviando webhook a dead letter {
+2025-12-05 12:11:28,1764936688168,prototype-ten-dun.vercel.app/,GET,,200,g56t9-1764936688168-26ccffe1e727,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,765,gru1,130,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KBQ6S8J91YK6XB9Y9EW25GDP,YwaffXMQONqE,1
+2025-12-05 12:09:33,1764936573368,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,🚀 Inicializando cliente de base de datos en producción...,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573397,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[INFO] 2025-12-05T12:09:33.393Z - Webhook MercadoPago recibido { requestId: '[REDACTED]', url: '[REDACTED]', method: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573402,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[INFO] 2025-12-05T12:09:33.400Z - Stage: Pre-validación de firma {
   requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  errorMessage: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915686,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","error","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[ERROR] 2025-12-04T20:58:35.686Z - Firma HMAC inválida (procesamiento async) {
-  requestId: '[REDACTED]',
-  xSignature: '[REDACTED]',
-  error: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915686,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","error","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[ERROR] 2025-12-04T20:58:35.686Z - [HMAC] Validación fallida sin fallback disponible {
-  clientIp: '[REDACTED]',
-  hmacError: '[REDACTED]',
-  ipWhitelisted: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915686,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","info","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[INFO] 2025-12-04T20:58:35.685Z - [HMAC-DEBUG] Datos completos {
   xSignature: '[REDACTED]',
   xRequestId: '[REDACTED]',
   dataIdFromUrl: '[REDACTED]',
-  clientIp: '[REDACTED]',
-  webhookSecretLength: '[REDACTED]',
-  webhookSecretPreview: '[REDACTED]',
-  rawBodyPreview: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915685,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","info","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[INFO] 2025-12-04T20:58:35.685Z - [HMAC-HEX] Análisis de bytes {
-  rawBodyHex: '[REDACTED]',
-  rawBodyBase64: '[REDACTED]',
-  rawBodyLength: '[REDACTED]',
-  templateHex: '[REDACTED]',
-  templateLength: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915685,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","info","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[INFO] 2025-12-04T20:58:35.684Z - [HMAC] Validación multi-formato {
+  bodyLength: '[REDACTED]',
+  allHeaders: '[REDACTED]',
+  clientIp: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573404,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[INFO] 2025-12-05T12:09:33.403Z - [HMAC] Validación multi-formato {
   dataId: '[REDACTED]',
   xRequestId: '[REDACTED]',
   ts: '[REDACTED]',
@@ -39,13 +19,38 @@
   templatesTested: '[REDACTED]',
   isValid: '[REDACTED]',
   signatureComparison: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915683,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","info","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[INFO] 2025-12-04T20:58:35.682Z - Stage: Pre-validación de firma {
-  requestId: '[REDACTED]',
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573405,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[INFO] 2025-12-05T12:09:33.404Z - [HMAC-HEX] Análisis de bytes {
+  rawBodyHex: '[REDACTED]',
+  rawBodyBase64: '[REDACTED]',
+  rawBodyLength: '[REDACTED]',
+  templateHex: '[REDACTED]',
+  templateLength: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573405,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[INFO] 2025-12-05T12:09:33.404Z - [HMAC-DEBUG] Datos completos {
   xSignature: '[REDACTED]',
   xRequestId: '[REDACTED]',
   dataIdFromUrl: '[REDACTED]',
-  bodyLength: '[REDACTED]'
-}","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915681,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",-1,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","info","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",-1,"iad1",-1,-1,"[INFO] 2025-12-04T20:58:35.680Z - Webhook MercadoPago recibido { requestId: '[REDACTED]', url: '[REDACTED]', method: '[REDACTED]' }","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","",-1
-"2025-12-04 20:58:35",1764881915619,"prototype-ten-dun.vercel.app/api/webhooks/mercadopago","POST","data.id=123456&type=payment",200,"2f9b8-1764881915591-888777ff4ca1","restclient-node/4.17.2","info","production","main","","lambda","/api/webhooks/mercadopago","prototype-ten-dun.vercel.app","prototype-ten-dun.vercel.app","dpl_6LMuDooqKyXPspsDsVaZxQTLtxxE",88,"iad1",166,2048,"","prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p","","","01KBNJHQQ3A2J7FTE9161CH9SR","4nm0RG19MD67",1
+  clientIp: '[REDACTED]',
+  webhookSecretLength: '[REDACTED]',
+  webhookSecretPreview: '[REDACTED]',
+  rawBodyPreview: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573405,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,error,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[ERROR] 2025-12-05T12:09:33.404Z - [HMAC] Validación fallida sin fallback disponible {
+  clientIp: '[REDACTED]',
+  hmacError: '[REDACTED]',
+  ipWhitelisted: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573405,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,error,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[ERROR] 2025-12-05T12:09:33.405Z - Firma HMAC inválida (procesamiento async) {
+  requestId: '[REDACTED]',
+  xSignature: '[REDACTED]',
+  error: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:33,1764936573406,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,error,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,,,,,"[ERROR] 2025-12-05T12:09:33.405Z - Enviando webhook a dead letter {
+  requestId: '[REDACTED]',
+  paymentId: '[REDACTED]',
+  errorMessage: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-05 12:09:32,1764936572544,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=123456&type=payment,200,46t6h-1764936572544-e297bf0efe69,restclient-node/4.17.2,,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,613,iad1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KBQ6NQMGG2J70M6X4Z7WTBR8,QedwV91T5J19,1
+2025-12-05 12:00:02,1764936002088,prototype-ten-dun.vercel.app/,GET,_rsc=3lb4g,200,g7wgr-1764936002088-4b59560c04ba,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",,production,main,MISS,serverless,/index.rsc,prototype-ten-dun.vercel.app,prototype-l78cii3ro-choymingollagmailcoms-projects.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,30,iad1,147,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KBQ64ANWEZRC4HH9J3M9SZ7C,hPaoPVPwzq91,1
+2025-12-05 12:00:02,1764936002088,prototype-ten-dun.vercel.app/,GET,_rsc=3lb4g,200,g7wgr-1764936002088-4b59560c04ba,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-l78cii3ro-choymingollagmailcoms-projects.vercel.app,dpl_9LvJADEyfrgfPnFyiH8mBfjQTFx4,61,gru1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KBQ64AHMFBKDCCCEN8T59FX6,qinIQnwP7dHY,1
