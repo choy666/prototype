@@ -17,7 +17,7 @@ interface MercadoPagoHmacValidationResult {
   error?: string;
 }
 
-// Cache de IPs de Mercado Pago (actualizado 2024)
+// Cache de IPs de Mercado Pago (actualizado 2024 + IPs detectadas 2025)
 const MERCADO_PAGO_IPS = [
   // IPs originales (pueden estar obsoletas)
   '52.200.104.113', '52.200.104.114', '52.200.104.115', '52.200.104.116',
@@ -28,6 +28,8 @@ const MERCADO_PAGO_IPS = [
   '54.79.89.105', '54.79.89.106', '54.79.89.107', '54.79.89.108',
   '54.79.89.109', '54.79.89.110', '54.79.89.111', '54.79.89.112',
   '54.79.89.113', '54.79.89.114',
+  // Nuevas IPs detectadas (diciembre 2025)
+  '18.215.140.160', '18.213.114.129', '54.88.218.97',
   // Nuevas IPs reportadas 2024-2025 (rangos AWS actualizados)
   '18.231.140.205', '18.231.140.206', '18.231.140.207', '18.231.140.208',
   '18.231.140.209', '18.231.140.210', '18.231.140.211', '18.231.140.212',
