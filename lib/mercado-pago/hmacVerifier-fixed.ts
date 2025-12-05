@@ -458,6 +458,9 @@ export async function verifyWebhookSignature(
       clientIp,
       hmacError: hmacResult.error,
       ipWhitelisted: clientIp ? isMercadoPagoIp(clientIp) : false,
+      // Debug: mostrar IPs disponibles para troubleshooting
+      availableIPs: MERCADO_PAGO_IPS.slice(0, 5), // Primeras 5 IPs
+      totalIPs: MERCADO_PAGO_IPS.length,
     });
     
     return { isValid: false, error: hmacResult.error };
