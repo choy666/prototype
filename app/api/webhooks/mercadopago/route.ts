@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/webhooks/mercadopago/route.ts
+// Webhook optimizado de Mercado Pago
+
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import { verifyMercadoPagoWebhook } from '@/lib/mercado-pago/hmacVerifier';
@@ -14,35 +16,24 @@ export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
 
   try {
-    logger.info('Webhook MercadoPago recibido', {
-      requestId,
-      url: req.url,
-      method: req.method,
-    });
-
+    // Extraer datos básicos
     const rawBuffer = await req.arrayBuffer();
     const rawBody = Buffer.from(rawBuffer).toString('utf8');
     const headers = req.headers;
-    const xSignature = headers.get('x-signature');
-    const xRequestId = headers.get('x-request-id');
-
     const { searchParams } = new URL(req.url);
     const dataIdFromUrl = searchParams.get('data.id') || searchParams.get('id') || null;
 
-    logger.info('Stage: Pre-validación de firma', {
+    logger.info('Webhook received', {
       requestId,
-      xSignature: xSignature?.slice(0, 25) + '...',
-      xRequestId,
-      dataIdFromUrl,
+      signature: headers.get('x-signature')?.slice(0, 20) + '...',
       bodyLength: rawBody.length,
-      clientIp: headers.get('x-forwarded-for') || headers.get('x-real-ip') || 'unknown',
     });
 
+    // Responder inmediatamente y procesar en background
     const immediateResponse = NextResponse.json({
       success: true,
       requestId,
-      message: 'Webhook recibido, procesando en background',
-      processing: 'async',
+      message: 'Webhook received, processing asynchronously',
     });
 
     processWebhookAsync({
@@ -52,7 +43,7 @@ export async function POST(req: Request) {
       dataIdFromUrl,
       request: req,
     }).catch((error) => {
-      logger.error('[Webhook] Error crítico async', {
+      logger.error('Async webhook processing failed', {
         requestId,
         error: error.message,
       });
@@ -60,7 +51,7 @@ export async function POST(req: Request) {
 
     return immediateResponse;
   } catch (error) {
-    logger.error('Error interno procesando webhook', {
+    logger.error('Webhook handler error', {
       requestId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -72,6 +63,61 @@ export async function POST(req: Request) {
 /* ---------------------------------------------------------------------------
  * PROCESAMIENTO ASYNC COMPLETO
  * ------------------------------------------------------------------------- */
+async function handlePaymentWebhook(
+  dataId: string, 
+  requestId: string, 
+  rawBody: string, 
+  headers: Headers
+) {
+  try {
+    // Verificar idempotencia para evitar procesamiento duplicado
+    const idem = await checkPaymentIdempotency(dataId);
+
+    if (!idem.canProcess) {
+      logger.info('Duplicate payment ignored', {
+        requestId,
+        paymentId: dataId,
+        reason: idem.reason,
+      });
+      return;
+    }
+
+    // Procesar pago
+    const result = await processPaymentWebhook(dataId, requestId);
+
+    if (!result.success) {
+      logger.error('Payment processing failed', {
+        requestId,
+        paymentId: dataId,
+        error: result.error,
+      });
+
+      // Guardar en dead letter si falla el procesamiento
+      await saveDeadLetterWebhook({
+        paymentId: dataId,
+        requestId,
+        rawBody,
+        headers: Object.fromEntries(headers.entries()),
+        errorMessage: result.error || 'Payment processing failed',
+        clientIp: headers.get('x-forwarded-for') || 'unknown',
+      });
+      return;
+    }
+
+    logger.info('Payment processed successfully', {
+      requestId,
+      paymentId: dataId,
+      status: result.status,
+    });
+  } catch (error) {
+    logger.error('Payment webhook handler error', {
+      requestId,
+      paymentId: dataId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl, request }: {
   requestId: string;
   rawBody: string;
@@ -80,15 +126,13 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
   request: Request;
 }) {
   try {
-    const hmacValidation = verifyMercadoPagoWebhook(
-      request,
-      rawBody
-    );
+    // Validar HMAC
+    const hmacValidation = verifyMercadoPagoWebhook(request, rawBody);
 
     if (!hmacValidation.ok) {
-      logger.error('HMAC inválido', {
+      logger.warn('HMAC validation failed - saving to dead letter', {
         requestId,
-        error: hmacValidation.reason,
+        reason: hmacValidation.reason,
       });
 
       await saveDeadLetterWebhook({
@@ -96,25 +140,25 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
         requestId,
         rawBody,
         headers: Object.fromEntries(headers.entries()),
-        errorMessage: hmacValidation.reason || 'HMAC inválido',
+        errorMessage: hmacValidation.reason || 'HMAC validation failed',
         clientIp: headers.get('x-forwarded-for') || 'unknown',
       });
 
       return;
     }
 
-    logger.info('Firma HMAC validada (async)', {
+    logger.info('HMAC validated', {
       requestId,
       dataId: hmacValidation.dataId,
     });
 
+    // Parsear payload
     const payload = JSON.parse(rawBody);
-
     const action = payload?.action || null;
     const dataId = payload?.data?.id || dataIdFromUrl;
 
     if (!action || !dataId) {
-      logger.error('Payload inválido (faltan campos)', {
+      logger.error('Invalid payload - missing required fields', {
         requestId,
         action,
         dataId,
@@ -122,55 +166,19 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
       return;
     }
 
-    const isPayment =
-      action.startsWith('payment') ||
-      action === 'payment.created' ||
-      action === 'payment.updated';
+    // Procesar según tipo de acción
+    const isPayment = action.startsWith('payment') || 
+                     action === 'payment.created' || 
+                     action === 'payment.updated';
 
     if (isPayment) {
-      const idem = await checkPaymentIdempotency(dataId);
-
-      if (!idem.canProcess) {
-        logger.info('[Webhook] Pago duplicado ignorado', {
-          requestId,
-          paymentId: dataId,
-          reason: idem.reason,
-        });
-        return;
-      }
-
-      const result = await processPaymentWebhook(dataId, requestId);
-
-      if (!result.success) {
-        logger.error('[Webhook] Error procesando pago', {
-          requestId,
-          paymentId: dataId,
-          error: result.error,
-        });
-
-        await saveDeadLetterWebhook({
-          paymentId: dataId,
-          requestId,
-          rawBody,
-          headers: Object.fromEntries(headers.entries()),
-          errorMessage: result.error || 'Error desconocido',
-          clientIp: headers.get('x-forwarded-for') || 'unknown',
-        });
-        return;
-      }
-
-      logger.info('[Webhook] Pago procesado OK', {
-        requestId,
-        paymentId: dataId,
-        status: result.status,
-      });
-    }
-
-    if (action === 'merchant_order') {
-      logger.info('[Webhook] Merchant order recibido', { requestId });
+      await handlePaymentWebhook(dataId, requestId, rawBody, headers);
+    } else if (action === 'merchant_order') {
+      logger.info('Merchant order webhook received', { requestId });
+      // TODO: Implementar procesamiento de merchant orders si es necesario
     }
   } catch (error) {
-    logger.error('[Webhook] Error async', {
+    logger.error('Webhook processing error', {
       requestId,
       error: error instanceof Error ? error.message : String(error),
     });
