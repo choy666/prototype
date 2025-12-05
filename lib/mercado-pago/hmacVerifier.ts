@@ -34,10 +34,15 @@ export function verifyMercadoPagoWebhook(
   rawBody: string,
   requestPath: string
 ): MercadoPagoHmacValidationResult {
+  // Limpiar path de query params - MP firma solo el path sin query
+  const cleanPath = requestPath.split('?')[0];
+  
   // Logging detallado para diagnóstico
   logger.info(' [HMAC DEBUG] Iniciando validación', {
     bodyLength: rawBody.length,
     bodyStart: rawBody.substring(0, 100),
+    originalPath: requestPath,
+    cleanPath,
     headers: {
       'x-signature-version': headers['x-signature-version'],
       'x-signature-timestamp': headers['x-signature-timestamp'],
@@ -61,15 +66,21 @@ export function verifyMercadoPagoWebhook(
       logger.warn(' [HMAC DEBUG] Falló parseo de doble stringificación', { error: e instanceof Error ? e.message : 'Unknown' });
     }
   }
+  
+  // Soporte para body con whitespace adicional (MP a veces firma con/sin salto de línea)
+  if (rawBody.trim() !== rawBody) {
+    bodiesToTry.push(rawBody.trim());
+    logger.info(' [HMAC DEBUG] Detectado whitespace adicional, intentando con body trimmed');
+  }
 
   // Intentar validación con cada cuerpo
   for (let i = 0; i < bodiesToTry.length; i++) {
     const bodyToTry = bodiesToTry[i];
-    const attemptResult = validateHmacWithBody(headers, bodyToTry, requestPath, i === 0 ? 'raw' : 'parsed');
+    const attemptResult = validateHmacWithBody(headers, bodyToTry, cleanPath, i === 0 ? 'raw' : 'parsed');
     
     if (attemptResult.ok) {
       logger.info(' [HMAC DEBUG] Validación exitosa', {
-        attempt: i === 0 ? 'raw' : 'parsed',
+        attempt: i === 0 ? 'raw' : i === 1 && rawBody.trim() !== rawBody ? 'trimmed' : 'parsed',
         dataId: attemptResult.dataId
       });
       return attemptResult;
@@ -77,7 +88,7 @@ export function verifyMercadoPagoWebhook(
   }
 
   // Si todos los intentos fallaron, retornar el primer error
-  return validateHmacWithBody(headers, rawBody, requestPath, 'final');
+  return validateHmacWithBody(headers, rawBody, cleanPath, 'raw-final');
 }
 
 /* --------------------------------------------------
@@ -86,17 +97,24 @@ export function verifyMercadoPagoWebhook(
 function validateHmacWithBody(
   headers: Record<string, string | undefined>,
   body: string,
-  requestPath: string,
+  cleanPath: string,
   attemptType: string
 ): MercadoPagoHmacValidationResult {
   try {
     const version = headers['x-signature-version'];     // “1”, “v1”, “2”, “3”
     const ts = headers['x-signature-timestamp'];        // timestamp numérico
     let requestId = headers['x-request-id'];            // UUID del webhook (puede faltar)
-    const receivedSignature = headers['x-signature'];   // firma enviada
+    let receivedSignature = headers['x-signature'] || '';   // firma enviada
+    
+    // Normalizar firma: remover prefijo sha256= si existe y convertir a minúsculas
+    receivedSignature = receivedSignature.replace(/^sha256=/i, '').toLowerCase();
 
     if (!version || !ts || !receivedSignature) {
       return { ok: false, reason: 'Missing signature headers' };
+    }
+    
+    if (receivedSignature === '') {
+      return { ok: false, reason: 'Empty signature after normalization' };
     }
 
     // Validar timestamp ANTES de cualquier cosa
@@ -120,11 +138,11 @@ function validateHmacWithBody(
     if (!requestId) {
       logger.warn(' [HMAC] x-request-id faltante, intentando extraer de query/body', {
         attemptType,
-        url: requestPath
+        url: cleanPath
       });
       
       // Extraer de query params (ej: /api/webhooks/mercadopago?id=123456)
-      const urlMatch = requestPath.match(/[?&]id=([^&]+)/);
+      const urlMatch = cleanPath.match(/[?&]id=([^&]+)/);
       if (urlMatch) {
         requestId = urlMatch[1];
         logger.info(' [HMAC] x-request-id extraído de query', { requestId });
@@ -182,7 +200,13 @@ function validateHmacWithBody(
     if (normalized === '1' || normalized === 'v1') {
       const bodyHash = sha256Hex(body);
 
-      const stringToSign = `v1:${ts}:${requestId}:${requestPath}:${bodyHash}`;
+      const stringToSign = `v1:${ts}:${requestId}:${cleanPath}:${bodyHash}`;
+      
+      // Debug: loggear stringToSign truncado
+      logger.debug('[HMAC DEBUG] stringToSign', {
+        attemptType,
+        stringToSign: stringToSign.slice(0, 250) + (stringToSign.length > 250 ? '...' : '')
+      });
 
       expectedSignature = crypto
         .createHmac('sha256', MP_SECRET)
@@ -219,6 +243,12 @@ function validateHmacWithBody(
       const bodyHash = sha256Hex(body);
 
       const legacyString = `ts=${ts},v=${version},hash=${bodyHash}`;
+      
+      // Debug: loggear legacyString truncado
+      logger.debug('[HMAC DEBUG] legacyString', {
+        attemptType,
+        legacyString: legacyString.slice(0, 250) + (legacyString.length > 250 ? '...' : '')
+      });
 
       expectedSignature = crypto
         .createHmac('sha256', MP_SECRET)
