@@ -1,5 +1,6 @@
 {
   "mercado_pago": {
+    "modo": "prueba",
     "country": "Argentina",
     "credentials": {
       "public_key": "APP_USR-69258e52-a9c1-4d81-9d1e-90cf52391d49",
