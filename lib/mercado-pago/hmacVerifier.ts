@@ -27,33 +27,143 @@ function sha256Hex(input: string): string {
 }
 
 /* --------------------------------------------------
- * Validación de HMAC Mercado Pago
+ * Validación de HMAC Mercado Pago con múltiples intentos
  * -------------------------------------------------- */
 export function verifyMercadoPagoWebhook(
   headers: Record<string, string | undefined>,
   rawBody: string,
   requestPath: string
 ): MercadoPagoHmacValidationResult {
+  // Logging detallado para diagnóstico
+  logger.info(' [HMAC DEBUG] Iniciando validación', {
+    bodyLength: rawBody.length,
+    bodyStart: rawBody.substring(0, 100),
+    headers: {
+      'x-signature-version': headers['x-signature-version'],
+      'x-signature-timestamp': headers['x-signature-timestamp'],
+      'x-request-id': headers['x-request-id'],
+      'x-signature': headers['x-signature']?.substring(0, 20) + '...'
+    }
+  });
+
+  // Estrategia: intentar validación con diferentes cuerpos
+  const bodiesToTry = [rawBody];
+  
+  // Detectar posible doble stringificación
+  if (rawBody.startsWith('"') && rawBody.endsWith('"') && rawBody.includes('\\"')) {
+    try {
+      const parsedBody = JSON.parse(rawBody);
+      if (typeof parsedBody === 'string') {
+        bodiesToTry.push(parsedBody);
+        logger.info(' [HMAC DEBUG] Detectada posible doble stringificación, intentando con body parseado');
+      }
+    } catch (e) {
+      logger.warn(' [HMAC DEBUG] Falló parseo de doble stringificación', { error: e instanceof Error ? e.message : 'Unknown' });
+    }
+  }
+
+  // Intentar validación con cada cuerpo
+  for (let i = 0; i < bodiesToTry.length; i++) {
+    const bodyToTry = bodiesToTry[i];
+    const attemptResult = validateHmacWithBody(headers, bodyToTry, requestPath, i === 0 ? 'raw' : 'parsed');
+    
+    if (attemptResult.ok) {
+      logger.info(' [HMAC DEBUG] Validación exitosa', {
+        attempt: i === 0 ? 'raw' : 'parsed',
+        dataId: attemptResult.dataId
+      });
+      return attemptResult;
+    }
+  }
+
+  // Si todos los intentos fallaron, retornar el primer error
+  return validateHmacWithBody(headers, rawBody, requestPath, 'final');
+}
+
+/* --------------------------------------------------
+ * Validación HMAC con un cuerpo específico
+ * -------------------------------------------------- */
+function validateHmacWithBody(
+  headers: Record<string, string | undefined>,
+  body: string,
+  requestPath: string,
+  attemptType: string
+): MercadoPagoHmacValidationResult {
   try {
     const version = headers['x-signature-version'];     // “1”, “v1”, “2”, “3”
     const ts = headers['x-signature-timestamp'];        // timestamp numérico
-    const requestId = headers['x-request-id'];          // UUID del webhook
+    let requestId = headers['x-request-id'];            // UUID del webhook (puede faltar)
     const receivedSignature = headers['x-signature'];   // firma enviada
 
-    if (!version || !ts || !requestId || !receivedSignature) {
+    if (!version || !ts || !receivedSignature) {
       return { ok: false, reason: 'Missing signature headers' };
     }
 
-    /* ----------------------------------------------
-     * 1) Validar tolerancia de tiempo
-     * -------------------------------------------- */
+    // Validar timestamp ANTES de cualquier cosa
     const now = Date.now();
-    const diff = Math.abs(now - Number(ts));
+    const timestampNum = Number(ts);
+    if (isNaN(timestampNum)) {
+      return {
+        ok: false,
+        reason: 'Invalid timestamp format'
+      };
+    }
+    const diff = Math.abs(now - timestampNum);
     if (diff > ALLOWED_TOLERANCE_MS) {
       return {
         ok: false,
         reason: `Timestamp out of tolerance (${diff}ms)`
       };
+    }
+
+    // PROBLEMA REAL #2: Fallback para x-request-id faltante
+    if (!requestId) {
+      logger.warn(' [HMAC] x-request-id faltante, intentando extraer de query/body', {
+        attemptType,
+        url: requestPath
+      });
+      
+      // Extraer de query params (ej: /api/webhooks/mercadopago?id=123456)
+      const urlMatch = requestPath.match(/[?&]id=([^&]+)/);
+      if (urlMatch) {
+        requestId = urlMatch[1];
+        logger.info(' [HMAC] x-request-id extraído de query', { requestId });
+      } else {
+        // Intentar extraer del body si es JSON
+        try {
+          const parsed = JSON.parse(body);
+          const extractedId = parsed?.data?.id || parsed?.id || parsed?.payment_id;
+          
+          // Validar formato del ID extraído (UUID o numérico)
+          if (!extractedId || extractedId === 'unknown' || typeof extractedId !== 'string') {
+            return {
+              ok: false,
+              reason: 'Cannot extract valid x-request-id for HMAC validation - webhook unverifiable'
+            };
+          }
+          
+          // Verificar que sea UUID o ID numérico válido
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const numericIdRegex = /^\d+$/;
+          
+          if (!uuidRegex.test(extractedId) && !numericIdRegex.test(extractedId)) {
+            return {
+              ok: false,
+              reason: `Invalid x-request-id format extracted: ${extractedId}`
+            };
+          }
+          
+          requestId = extractedId;
+          logger.info(' [HMAC] x-request-id extraído del body', { requestId });
+        } catch {
+          // CRÍTICO: Si no podemos extraer x-request-id, no podemos validar HMAC
+          // porque MP firmó con el ID real que no conocemos
+          return {
+            ok: false,
+            reason: 'Cannot extract x-request-id for HMAC validation - webhook unverifiable'
+          };
+        }
+      }
     }
 
     /* ----------------------------------------------
@@ -70,7 +180,7 @@ export function verifyMercadoPagoWebhook(
      * HMAC-SHA256 con tu webhook secret
      * -------------------------------------------------- */
     if (normalized === '1' || normalized === 'v1') {
-      const bodyHash = sha256Hex(rawBody);
+      const bodyHash = sha256Hex(body);
 
       const stringToSign = `v1:${ts}:${requestId}:${requestPath}:${bodyHash}`;
 
@@ -83,9 +193,12 @@ export function verifyMercadoPagoWebhook(
 
       if (!isValid) {
         logger.warn('[HMAC v1] Firma inválida', {
+          attemptType,
           stringToSign,
           receivedSignature,
           expectedSignature,
+          bodyHash,
+          requestId,
         });
 
         return { ok: false, reason: 'Invalid v1 signature' };
@@ -103,7 +216,7 @@ export function verifyMercadoPagoWebhook(
      * HMAC-SHA256 del string raw anterior
      * -------------------------------------------------- */
     if (normalized === '2' || normalized === '3') {
-      const bodyHash = sha256Hex(rawBody);
+      const bodyHash = sha256Hex(body);
 
       const legacyString = `ts=${ts},v=${version},hash=${bodyHash}`;
 
@@ -116,9 +229,12 @@ export function verifyMercadoPagoWebhook(
 
       if (!isValid) {
         logger.warn('[HMAC legacy] Firma inválida', {
+          attemptType,
           legacyString,
           receivedSignature,
           expectedSignature,
+          bodyHash,
+          requestId,
         });
 
         return { ok: false, reason: 'Invalid legacy v2/v3 signature' };
