@@ -109,6 +109,18 @@ function validateHmacWithBody(
     // Normalizar firma: remover prefijo sha256= si existe y convertir a minúsculas
     receivedSignature = receivedSignature.replace(/^sha256=/i, '').toLowerCase();
 
+    // TEMPORAL: Logging completo para debug de webhook simulado
+    console.log('🔍 [HMAC DEBUG TEMPORAL] Headers recibidos:', {
+      version,
+      ts,
+      requestId,
+      receivedSignature: headers['x-signature'],
+      normalizedSignature: receivedSignature,
+      cleanPath,
+      bodyLength: body.length,
+      bodyStart: body.substring(0, 200)
+    });
+    
     if (!version || !ts || !receivedSignature) {
       return { ok: false, reason: 'Missing signature headers' };
     }
@@ -207,6 +219,18 @@ function validateHmacWithBody(
         attemptType,
         stringToSign: stringToSign.slice(0, 250) + (stringToSign.length > 250 ? '...' : '')
       });
+      
+      // TEMPORAL: Logging completo para debug de webhook simulado
+      console.log('🔍 [HMAC DEBUG TEMPORAL] v1 Validation:', {
+        attemptType,
+        stringToSign,
+        receivedSignature,
+        expectedSignature,
+        bodyHash,
+        requestId,
+        cleanPath,
+        ts
+      });
 
       expectedSignature = crypto
         .createHmac('sha256', MP_SECRET)
@@ -248,6 +272,17 @@ function validateHmacWithBody(
       logger.debug('[HMAC DEBUG] legacyString', {
         attemptType,
         legacyString: legacyString.slice(0, 250) + (legacyString.length > 250 ? '...' : '')
+      });
+      
+      // TEMPORAL: Logging completo para debug de webhook simulado
+      console.log('🔍 [HMAC DEBUG TEMPORAL] legacy Validation:', {
+        attemptType,
+        legacyString,
+        receivedSignature,
+        expectedSignature,
+        bodyHash,
+        requestId,
+        ts
       });
 
       expectedSignature = crypto
