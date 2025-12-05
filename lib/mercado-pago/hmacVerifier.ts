@@ -101,10 +101,28 @@ function validateHmacWithBody(
   attemptType: string
 ): MercadoPagoHmacValidationResult {
   try {
-    const version = headers['x-signature-version'];     // “1”, “v1”, “2”, “3”
-    const ts = headers['x-signature-timestamp'];        // timestamp numérico
+    let version = headers['x-signature-version'];     // “1”, “v1”, “2”, “3”
+    let ts = headers['x-signature-timestamp'];        // timestamp numérico
     let requestId = headers['x-request-id'];            // UUID del webhook (puede faltar)
     let receivedSignature = headers['x-signature'] || '';   // firma enviada
+    
+    // FALLBACK: Extraer version y ts del header x-signature si faltan los separados
+    if ((!version || !ts) && receivedSignature) {
+      const signatureParts = receivedSignature.split(',');
+      for (const part of signatureParts) {
+        if (part.startsWith('ts=') && !ts) {
+          ts = part.substring(3);
+        } else if (part.startsWith('v=') && !version) {
+          version = part.substring(2);
+        } else if (part.startsWith('v1=') && !version) {
+          version = 'v1';
+        }
+      }
+      
+      if (ts && !version) {
+        version = 'v1'; // Default si encontramos ts pero no version
+      }
+    }
     
     // Normalizar firma: remover prefijo sha256= si existe y convertir a minúsculas
     receivedSignature = receivedSignature.replace(/^sha256=/i, '').toLowerCase();
