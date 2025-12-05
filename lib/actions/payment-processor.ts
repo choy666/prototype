@@ -234,9 +234,23 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     return;
   }
 
-  // Buscar preferencia asociada
+  // Buscar preferencia asociada (convertir a string para normalizar)
+  const normalizedExternalReference = String(externalReference);
+  logger.info('[PaymentProcessor] Buscando preferencia', {
+    paymentId: paymentData.id,
+    originalExternalReference: externalReference,
+    normalizedExternalReference,
+  });
+  
   const preference = await db.query.mercadopagoPreferences.findFirst({
-    where: eq(mercadopagoPreferences.externalReference, externalReference),
+    where: eq(mercadopagoPreferences.externalReference, normalizedExternalReference),
+  });
+
+  logger.info('[PaymentProcessor] Preferencia encontrada', {
+    paymentId: paymentData.id,
+    preferenceFound: !!preference,
+    preferenceId: preference?.id,
+    orderId: preference?.orderId,
   });
 
   if (!preference || !preference.orderId) {
