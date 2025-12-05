@@ -17,57 +17,17 @@ interface MercadoPagoHmacValidationResult {
   error?: string;
 }
 
-// Cache de IPs de Mercado Pago (actualizado 2024 + IPs detectadas 2025)
-const MERCADO_PAGO_IPS = [
-  // IPs originales (pueden estar obsoletas)
-  '52.200.104.113', '52.200.104.114', '52.200.104.115', '52.200.104.116',
-  '52.200.104.117', '52.200.104.118', '52.200.104.119', '52.200.104.120',
-  '52.200.104.121', '52.200.104.122', '52.200.104.123', '52.200.104.124',
-  '52.200.104.125', '52.200.104.126', '52.200.104.127', '52.200.104.128',
-  '52.200.104.129', '52.200.104.130', '52.200.104.131', '52.200.104.132',
-  '54.79.89.105', '54.79.89.106', '54.79.89.107', '54.79.89.108',
-  '54.79.89.109', '54.79.89.110', '54.79.89.111', '54.79.89.112',
-  '54.79.89.113', '54.79.89.114',
-  // Nuevas IPs detectadas (diciembre 2025)
-  '18.215.140.160', '18.213.114.129', '54.88.218.97',
-  // Nuevas IPs reportadas 2024-2025 (rangos AWS actualizados)
-  '18.231.140.205', '18.231.140.206', '18.231.140.207', '18.231.140.208',
-  '18.231.140.209', '18.231.140.210', '18.231.140.211', '18.231.140.212',
-  '18.228.52.145', '18.228.52.146', '18.228.52.147', '18.228.52.148',
-  '18.228.52.149', '18.228.52.150', '18.228.52.151', '18.228.52.152',
-  '3.235.173.239', '3.235.173.240', '3.235.173.241', '3.235.173.242',
-  '3.235.173.243', '3.235.173.244', '3.235.173.245', '3.235.173.246',
-  '52.203.69.237', '52.203.69.238', '52.203.69.239', '52.203.69.240',
-  '52.203.69.241', '52.203.69.242', '52.203.69.243', '52.203.69.244',
-  '52.54.197.105', '52.54.197.106', '52.54.197.107', '52.54.197.108',
-  '52.54.197.109', '52.54.197.110', '52.54.197.111', '52.54.197.112',
-  '52.54.197.113', '52.54.197.114', '52.54.197.115', '52.54.197.116',
-  '54.94.254.245', '54.94.254.246', '54.94.254.247', '54.94.254.248',
-  '54.94.254.249', '54.94.254.250', '54.94.254.251', '54.94.254.252',
-  '18.209.63.245', '18.209.63.246', '18.209.63.247', '18.209.63.248',
-  '18.209.63.249', '18.209.63.250', '18.209.63.251', '18.209.63.252',
-];
 
 // Type para Redis client global
 interface RedisClient {
   exists(key: string): Promise<number>;
   setex(key: string, seconds: number, value: string): Promise<string>;
+  get(key: string): Promise<string | null>;
 }
 
 // Type para globalThis extendido
 declare global {
   var _redisClient: RedisClient | undefined;
-}
-
-/**
- * Verifica si una IP pertenece a Mercado Pago
- */
-function isMercadoPagoIp(ip: string): boolean {
-  if (!ip) return false;
-  
-  // Limpiar IP (quitar puerto si existe)
-  const cleanIp = ip.split(',')[0].trim();
-  return MERCADO_PAGO_IPS.includes(cleanIp);
 }
 
 /**
@@ -432,45 +392,18 @@ export async function verifyWebhookSignature(
       webhookSecret
     );
 
-    // 5. Fallback por IP whitelist (principal en producción)
-    if (clientIp && isMercadoPagoIp(clientIp)) {
-      logger.warn('[HMAC] HMAC falló pero IP es de Mercado Pago - ACEPTADO', {
-        clientIp,
-        hmacError: hmacResult.error,
-        reason: 'ip_whitelist_fallback',
-      });
-      
-      try {
-        const p = JSON.parse(rawBody);
-        return { 
-          isValid: true, 
-          dataId: p?.data?.id ?? dataIdFromUrl ?? undefined,
-          warning: 'Validación por IP whitelist (HMAC inconsistente)' 
-        };
-      } catch {
-        return { 
-          isValid: true, 
-          warning: 'Validación por IP whitelist (HMAC inconsistente)' 
-        };
-      }
-    }
-
-    // 6. Error final si no hay fallback válido
-    logger.error('[HMAC] Validación fallida sin fallback disponible', {
+    // 5. ERROR FINAL - Sin fallback IP (no recomendado por Mercado Pago)
+    logger.error('[HMAC] Validación fallida - Mercado Pago recomienda solo HMAC', {
       clientIp,
       hmacError: hmacResult.error,
-      ipWhitelisted: clientIp ? isMercadoPagoIp(clientIp) : false,
-      // Debug: mostrar IPs disponibles para troubleshooting
-      availableIPs: MERCADO_PAGO_IPS.slice(0, 5), // Primeras 5 IPs
-      totalIPs: MERCADO_PAGO_IPS.length,
-      // Debug: IP exacta que llegó para actualizar whitelist
-      actualClientIp: clientIp,
-      ipMatchesKnown: clientIp ? MERCADO_PAGO_IPS.includes(clientIp) : false,
+      recommendation: 'Verificar que MERCADO_PAGO_WEBHOOK_SECRET coincida con dashboard MP',
+      ipValidationDisabled: true,
+      mpGuideline: 'Usar únicamente validación HMAC, no IP whitelist'
     });
 
-    // Console.log temporal para bypassear redactado de Vercel
-    if (clientIp && !MERCADO_PAGO_IPS.includes(clientIp)) {
-      console.log(`🔍 MERCADO_PAGO_IP_DETECTED: ${clientIp} - ADD TO WHITELIST`);
+    // Console.log temporal para diagnóstico (sin agregar IPs automáticamente)
+    if (clientIp) {
+      console.log(`🔍 IP recibida: ${clientIp} - NO agregar a whitelist (arreglar HMAC)`);
     }
     
     return { isValid: false, error: hmacResult.error };

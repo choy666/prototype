@@ -1,0 +1,33 @@
+{
+  "mercado_pago": {
+    "country": "Argentina",
+    "credentials": {
+      "public_key": "APP_USR-69258e52-a9c1-4d81-9d1e-90cf52391d49",
+      "access_token": "APP_USR-3512407382157264-112123-63acaed36cb3246d2b1489bf710c4cb1-2926966384"
+    },
+    "webhooks": {
+      "mode": "test",
+      "test_url": "https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago",
+      "events_enabled": {
+        "checkout_pro_recommended": {
+          "payments": true,
+          "fraud_alerts": false,
+          "chargebacks": false,
+          "shipments": false,
+          "application_linking": false,
+          "claims": false,
+          "commercial_orders": false
+        },
+        "other_events": {
+          "plans_and_subscriptions": false,
+          "delivery": false,
+          "card_updater": false,
+          "integrations_point": false,
+          "wallet_connect": false,
+          "order": false
+        }
+      },
+      "secret_key": "6562a4c8de72b6852cebfc805622bee42c43db8973706aaa92de3d6edf23b8db"
+    }
+  }
+}
