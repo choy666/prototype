@@ -101,6 +101,8 @@ export async function processPaymentWebhook(
     logger.info('[PaymentProcessor] Iniciando procesamiento', {
       paymentId,
       requestId,
+      source: requestId?.includes('fallback') ? 'success-page-fallback' : 'webhook',
+      timestamp: new Date().toISOString()
     });
 
     // Obtener información del pago desde Mercado Pago API

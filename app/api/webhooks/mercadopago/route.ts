@@ -50,6 +50,7 @@ export async function POST(req: Request) {
       rawBody,
       headers,
       dataIdFromUrl,
+      request: req,
     }).catch((error) => {
       logger.error('[Webhook] Error crítico async', {
         requestId,
@@ -71,19 +72,17 @@ export async function POST(req: Request) {
 /* ---------------------------------------------------------------------------
  * PROCESAMIENTO ASYNC COMPLETO
  * ------------------------------------------------------------------------- */
-async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl }: {
+async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl, request }: {
   requestId: string;
   rawBody: string;
   headers: Headers;
   dataIdFromUrl: string | null;
+  request: Request;
 }) {
   try {
-    const path = '/api/webhooks/mercadopago';
-
     const hmacValidation = verifyMercadoPagoWebhook(
-      Object.fromEntries(headers.entries()),
-      rawBody,
-      path
+      request,
+      rawBody
     );
 
     if (!hmacValidation.ok) {

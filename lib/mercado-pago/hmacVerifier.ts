@@ -16,7 +16,17 @@ export interface MercadoPagoHmacValidationResult {
 /* --------------------------------------------------
  * Configuración
  * -------------------------------------------------- */
-const MP_SECRET = process.env.MP_WEBHOOK_SECRET || '';
+const MP_SECRET = (process.env.MERCADO_PAGO_WEBHOOK_SECRET || '').trim();
+
+// Log de inicio para verificar configuración del secret (solo una vez al arrancar)
+console.log('🚀 [HMAC STARTUP] Configuración inicial:');
+console.log('🔍 MERCADO_PAGO_WEBHOOK_SECRET existe:', !!MP_SECRET);
+if (MP_SECRET) {
+  console.log('🔍 MERCADO_PAGO_WEBHOOK_SECRET length:', MP_SECRET.length);
+  console.log('🔍 MERCADO_PAGO_WEBHOOK_SECRET starts with:', MP_SECRET.substring(0, 10) + '...');
+} else {
+  console.error('❌ [HMAC STARTUP] MERCADO_PAGO_WEBHOOK_SECRET NO CONFIGURADO - Los webhooks fallarán!');
+}
 const ALLOWED_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutos
 
 /* --------------------------------------------------
@@ -30,18 +40,26 @@ function sha256Hex(input: string): string {
  * Validación de HMAC Mercado Pago con múltiples intentos
  * -------------------------------------------------- */
 export function verifyMercadoPagoWebhook(
-  headers: Record<string, string | undefined>,
-  rawBody: string,
-  requestPath: string
+  request: Request,
+  rawBody: string
 ): MercadoPagoHmacValidationResult {
+  // TEMPORAL: Verificar configuración del secret solo una vez
+  if (!MP_SECRET) {
+    console.error('❌ [HMAC CONFIG] MP_WEBHOOK_SECRET no está configurado!');
+    return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
+  }
+
   // Limpiar path de query params - MP firma solo el path sin query
-  const cleanPath = requestPath.split('?')[0];
+  const cleanPath = request.url.split('?')[0];
+
+  // Extraer headers para logging y validación
+  const headers = Object.fromEntries(request.headers.entries());
   
   // Logging detallado para diagnóstico
   logger.info(' [HMAC DEBUG] Iniciando validación', {
     bodyLength: rawBody.length,
     bodyStart: rawBody.substring(0, 100),
-    originalPath: requestPath,
+    originalPath: request.url,
     cleanPath,
     headers: {
       'x-signature-version': headers['x-signature-version'],
@@ -136,7 +154,10 @@ function validateHmacWithBody(
       normalizedSignature: receivedSignature,
       cleanPath,
       bodyLength: body.length,
-      bodyStart: body.substring(0, 200)
+      bodyStart: body.substring(0, 200),
+      secretLength: MP_SECRET.length,
+      secretStart: MP_SECRET.substring(0, 10) + '...',
+      secretEmpty: !MP_SECRET
     });
     
     if (!version || !ts || !receivedSignature) {
@@ -238,6 +259,11 @@ function validateHmacWithBody(
         stringToSign: stringToSign.slice(0, 250) + (stringToSign.length > 250 ? '...' : '')
       });
       
+      expectedSignature = crypto
+        .createHmac('sha256', MP_SECRET)
+        .update(stringToSign)
+        .digest('hex');
+
       // TEMPORAL: Logging completo para debug de webhook simulado
       console.log('🔍 [HMAC DEBUG TEMPORAL] v1 Validation:', {
         attemptType,
@@ -247,13 +273,9 @@ function validateHmacWithBody(
         bodyHash,
         requestId,
         cleanPath,
-        ts
+        ts,
+        signaturesMatch: receivedSignature === expectedSignature
       });
-
-      expectedSignature = crypto
-        .createHmac('sha256', MP_SECRET)
-        .update(stringToSign)
-        .digest('hex');
 
       const isValid = timingSafeEqualSafe(receivedSignature, expectedSignature);
 
@@ -292,6 +314,11 @@ function validateHmacWithBody(
         legacyString: legacyString.slice(0, 250) + (legacyString.length > 250 ? '...' : '')
       });
       
+      expectedSignature = crypto
+        .createHmac('sha256', MP_SECRET)
+        .update(legacyString)
+        .digest('hex');
+
       // TEMPORAL: Logging completo para debug de webhook simulado
       console.log('🔍 [HMAC DEBUG TEMPORAL] legacy Validation:', {
         attemptType,
@@ -300,13 +327,9 @@ function validateHmacWithBody(
         expectedSignature,
         bodyHash,
         requestId,
-        ts
+        ts,
+        signaturesMatch: receivedSignature === expectedSignature
       });
-
-      expectedSignature = crypto
-        .createHmac('sha256', MP_SECRET)
-        .update(legacyString)
-        .digest('hex');
 
       const isValid = timingSafeEqualSafe(receivedSignature, expectedSignature);
 
