@@ -247,25 +247,14 @@ export default function PaymentSuccess() {
   const getStatusInfo = () => {
     const { collectionStatus, status } = paymentInfo;
 
-    // Nueva lógica de mensajes según requerimientos
-    if (orderStatus === 'paid' || orderStatus === 'delivered') {
+    // Siempre mostrar "Compra Realizada con Éxito" para pagos aprobados
+    if (orderStatus === 'paid' || orderStatus === 'delivered' || orderStatus === 'pending' || orderStatus === 'processing') {
       return {
         icon: <CheckCircle className='w-16 h-16 text-green-500' />,
-        title: '¡Pago Verificado!',
-        message: 'Tu pago ha sido verificado y tu pedido está siendo preparado para envío.',
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200',
-      };
-    } else if (
-      orderStatus === 'pending' ||
-      orderStatus === 'processing'
-    ) {
-      return {
-        icon: <Clock className='w-16 h-16 text-yellow-500' />,
         title: '¡Compra Realizada con Éxito!',
         message: 'Tu compra fue realizada con éxito. Durante las próximas 24hs armaremos tu pedido y corroboraremos tu pago correspondiente para terminar de prepararlo para ser despachado o retirado.',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
       };
     } else if (
       orderStatus === 'rejected' ||
