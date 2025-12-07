@@ -274,19 +274,19 @@ export default function PaymentSuccess() {
     // Lógica para estados directos de Mercado Pago (cuando aún no se actualizó localmente)
     if (collectionStatus === 'approved' || status === 'approved') {
       return {
-        icon: <Clock className='w-16 h-16 text-yellow-500' />,
+        icon: <CheckCircle className='w-16 h-16 text-green-500' />,
         title: '¡Compra Realizada con Éxito!',
         message: 'Tu compra fue realizada con éxito. Durante las próximas 24hs armaremos tu pedido y corroboraremos tu pago correspondiente para terminar de prepararlo para ser despachado o retirado.',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
       };
     } else if (collectionStatus === 'pending' || status === 'pending') {
       return {
-        icon: <Clock className='w-16 h-16 text-yellow-500' />,
+        icon: <CheckCircle className='w-16 h-16 text-green-500' />,
         title: '¡Compra Realizada con Éxito!',
         message: 'Tu compra fue realizada con éxito. Durante las próximas 24hs armaremos tu pedido y corroboraremos tu pago correspondiente para terminar de prepararlo para ser despachado o retirado.',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
       };
     } else {
       return {
