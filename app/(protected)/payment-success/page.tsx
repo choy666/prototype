@@ -207,12 +207,12 @@ export default function PaymentSuccess() {
       }
       // Validar que tenemos paymentId antes de redirigir
       if (paymentId) {
-        // Redirigir después de 2 segundos para que el usuario vea el mensaje de éxito
+        // Redirigir después de 7 segundos para que el usuario pueda leer el mensaje de éxito
         redirectTimeoutRef.current = setTimeout(() => {
           router.push(
             `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
           );
-        }, 2000);
+        }, 9000);
       }
       return;
     }
