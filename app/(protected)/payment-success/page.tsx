@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 
@@ -13,6 +13,7 @@ export default function PaymentSuccess() {
   const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Usar el hook personalizado para manejar la limpieza del carrito
   const { paymentInfo } = useCartClearOnSuccess({
@@ -77,13 +78,21 @@ export default function PaymentSuccess() {
   }, [paymentInfo]);
 
   useEffect(() => {
-    const { merchantOrderId, collectionStatus, status } = paymentInfo;
+    const { merchantOrderId, collectionStatus, status, paymentId } = paymentInfo;
 
-    // Si Mercado Pago ya indica aprobado, no hacemos polling al estado local
+    // Si Mercado Pago ya indica aprobado, establecemos el estado como aprobado localmente
     const isApproved =
       collectionStatus === 'approved' || status === 'approved';
 
     if (isApproved) {
+      console.log('[PAYMENT-SUCCESS] Mercado Pago aprobó el pago, estableciendo estado local como paid', {
+        paymentId,
+        merchantOrderId,
+        collectionStatus,
+        status
+      });
+      setOrderStatus('paid');
+      setIsProcessing(false);
       return;
     }
 
@@ -189,10 +198,22 @@ export default function PaymentSuccess() {
       return;
     }
 
-    // Si Mercado Pago indica aprobado pero aún no está confirmado localmente, esperar
+    // Si Mercado Pago indica aprobado pero aún no está confirmado localmente, esperar un momento antes de redirigir
     if (collectionStatus === 'approved' || status === 'approved') {
-      // No redirigir hasta que el webhook/confirme localmente
-      setIsProcessing(true);
+      setIsProcessing(false);
+      // Limpiar timeout anterior si existe
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      // Validar que tenemos paymentId antes de redirigir
+      if (paymentId) {
+        // Redirigir después de 2 segundos para que el usuario vea el mensaje de éxito
+        redirectTimeoutRef.current = setTimeout(() => {
+          router.push(
+            `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
+          );
+        }, 2000);
+      }
       return;
     }
 
@@ -213,6 +234,15 @@ export default function PaymentSuccess() {
     // Para cualquier otro estado, mantener en página de procesamiento
     setIsProcessing(true);
   }, [paymentInfo, orderStatus, router]);
+
+  // Cleanup de timeouts cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const getStatusInfo = () => {
     const { collectionStatus, status } = paymentInfo;
