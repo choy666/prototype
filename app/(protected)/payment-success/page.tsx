@@ -11,6 +11,8 @@ export default function PaymentSuccess() {
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [orderStatusLoading, setOrderStatusLoading] = useState(false);
   const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
+  const [pollingAttempts, setPollingAttempts] = useState(0);
+  const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
 
   // Usar el hook personalizado para manejar la limpieza del carrito
   const { paymentInfo } = useCartClearOnSuccess({
@@ -96,6 +98,20 @@ export default function PaymentSuccess() {
 
     let cancelled = false;
     let cooldownUntil = 0;
+    let attempts = 0;
+
+    // Timeout de seguridad: mostrar mensaje después de 60 segundos
+    const timeoutTimer = setTimeout(() => {
+      if (!cancelled) {
+        setShowTimeoutMessage(true);
+      }
+    }, 60000);
+
+    const getPollingInterval = () => {
+      // Primeros 30 segundos: 2 segundos
+      // Después: 5 segundos
+      return attempts < 15 ? 2000 : 5000;
+    };
 
     const fetchStatus = async () => {
       if (cancelled) return;
@@ -109,6 +125,8 @@ export default function PaymentSuccess() {
       try {
         setOrderStatusLoading(true);
         setOrderStatusError(null);
+        attempts++;
+        setPollingAttempts(attempts);
 
         const res = await fetch(`/api/order-status?order_id=${numericOrderId}`);
 
@@ -147,37 +165,54 @@ export default function PaymentSuccess() {
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
+    const interval = setInterval(() => {
+      fetchStatus();
+    }, getPollingInterval());
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearTimeout(timeoutTimer);
     };
   }, [paymentInfo]);
 
   useEffect(() => {
-    // Dar tiempo para mostrar el estado antes de redirigir
-    const timer = setTimeout(() => {
+    // Solo redirigir cuando tengamos confirmación del estado del pedido
+    const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
+
+    // Si ya tenemos estado confirmado localmente, redirigir inmediatamente
+    if (orderStatus && (orderStatus === 'paid' || orderStatus === 'delivered' || orderStatus === 'processing')) {
       setIsProcessing(false);
+      router.push(
+        `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
+      );
+      return;
+    }
 
-      const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
+    // Si Mercado Pago indica aprobado pero aún no está confirmado localmente, esperar
+    if (collectionStatus === 'approved' || status === 'approved') {
+      // No redirigir hasta que el webhook/confirme localmente
+      setIsProcessing(true);
+      return;
+    }
 
-      if (collectionStatus === 'approved' || status === 'approved') {
-        // Redirigir al dashboard con información del pago
-        router.push(
-          `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
-        );
-      } else if (collectionStatus === 'pending' || status === 'pending') {
-        // Redirigir a la página de pago pendiente
-        router.push(`/payment-pending?payment_id=${paymentId}&order_id=${merchantOrderId}`);
-      } else {
-        // Redirigir a la página de fallo de pago
-        router.push(`/payment-failure?payment_id=${paymentId}&order_id=${merchantOrderId}`);
-      }
-    }, 3000);
+    // Si está pendiente, redirigir a página de pendiente
+    if (collectionStatus === 'pending' || status === 'pending') {
+      setIsProcessing(false);
+      router.push(`/payment-pending?payment_id=${paymentId}&order_id=${merchantOrderId}`);
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [paymentInfo, router]);
+    // Si está rechazado, redirigir a página de fallo
+    if (collectionStatus === 'rejected' || status === 'rejected' || status === 'cancelled') {
+      setIsProcessing(false);
+      router.push(`/payment-failure?payment_id=${paymentId}&order_id=${merchantOrderId}`);
+      return;
+    }
+
+    // Para cualquier otro estado, mantener en página de procesamiento
+    setIsProcessing(true);
+  }, [paymentInfo, orderStatus, router]);
 
   const getStatusInfo = () => {
     const { collectionStatus, status } = paymentInfo;
@@ -284,13 +319,43 @@ export default function PaymentSuccess() {
             <div className='mb-4 text-sm text-gray-600'>
               Estado del pedido:{' '}
               {orderStatusLoading
-                ? 'Verificando...'
+                ? `Verificando... (intento ${pollingAttempts})`
                 : orderStatus || 'No disponible'}
             </div>
           )}
           {orderStatusError && (
             <div className='mb-4 text-sm text-red-500'>
               {orderStatusError}
+            </div>
+          )}
+
+          {isProcessing && (
+            <div className='space-y-4'>
+              <div className='text-sm text-gray-600'>
+                Procesando tu pago...
+              </div>
+              
+              {showTimeoutMessage && (
+                <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3'>
+                  <div className='text-sm text-yellow-800'>
+                    <strong>Está tomando más tiempo de lo esperado</strong>
+                    <br />
+                    La verificación del pago está tardando más de lo habitual. 
+                    El webhook de Mercado Pago completará tu pedido en segundo plano.
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsProcessing(false);
+                      router.push(
+                        `/dashboard?payment_id=${paymentInfo.paymentId}&order_id=${paymentInfo.merchantOrderId}&status=processing`
+                      );
+                    }}
+                    className='w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded transition-colors'
+                  >
+                    Continuar al Dashboard
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

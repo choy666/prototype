@@ -345,7 +345,7 @@ export async function POST(req: NextRequest) {
             process.env.MERCADO_PAGO_PENDING_URL
             || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-pending`,
         },
-        auto_return: "approved",
+        // auto_return: "approved", // Desactivado para evitar doble redirección
         notification_url:
           process.env.MERCADO_PAGO_NOTIFICATION_URL
           || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/mercadopago/payments/notify`,
