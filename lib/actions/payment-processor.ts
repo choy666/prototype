@@ -413,7 +413,7 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
  * Ajusta el stock para los items de una orden con protección contra race conditions
  * Usa transacción explícita y bloqueo a nivel de DB para garantizar idempotencia
  */
-async function adjustStockForOrder(orderId: number, paymentId: string): Promise<void> {
+export async function adjustStockForOrder(orderId: number, paymentId: string): Promise<void> {
   const startTime = Date.now();
   
   try {
@@ -613,19 +613,43 @@ async function adjustStockForOrder(orderId: number, paymentId: string): Promise<
     });
 
   } catch (error) {
+    // 🔥 MEJORADO: Logging completo sin redactar para debugging
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     logger.error('[PaymentProcessor] Error crítico en ajuste de stock', {
       orderId,
       paymentId,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+      error: errorMessage, // 🔥 Error real visible
+      stack: errorStack,   // 🔥 Stack trace completo
       duration: `${Date.now() - startTime}ms`,
+      // 🔥 Información de diagnóstico adicional
+      errorType: error?.constructor?.name || 'Unknown',
+      timestamp: new Date().toISOString(),
     });
+    
+    // 🔥 MEJORADO: Guardar error en tabla temporal para retry posterior
+    try {
+      await db.insert(stockLogs).values({
+        productId: 0, // Sistema
+        variantId: 0, // Sistema
+        oldStock: 0,
+        newStock: 0,
+        change: 0,
+        reason: `ERROR STOCK FALLBACK - Orden #${orderId} - Pago ${paymentId}: ${errorMessage}`,
+        userId: 1, // System user
+      });
+    } catch (logError) {
+      // Si falla el log, registrar en consola
+      console.error('[CRITICAL] No se pudo registrar error de stock:', logError);
+    }
     
     // No relanzar el error para no afectar el procesamiento del pago
     // El stock se puede ajustar manualmente si es necesario
     logger.warn('[PaymentProcessor] Error de stock no bloquea el procesamiento del pago', {
       orderId,
       paymentId,
+      errorMessage, // 🔥 Incluir mensaje real
     });
   }
 }
