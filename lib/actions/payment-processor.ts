@@ -242,10 +242,29 @@ export async function processPaymentWebhook(
 
     try {
       await db.insert(mercadopagoPayments).values(insertData);
-    } catch (dbError) {
+    } catch (dbError: unknown) {
+      // 🔥 Manejar violación de constraint de unicidad (race condition)
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+      const errorCode = (dbError as { code?: string })?.code;
+      
+      if (errorCode === '23505' || errorMessage.includes('unique constraint') || errorMessage.includes('duplicate key')) {
+        logger.info('[PaymentProcessor] Pago duplicado detectado por constraint', {
+          paymentId,
+          preferenceId: insertData.preferenceId,
+          status: insertData.status,
+        });
+        
+        // El pago ya fue insertado por otra instancia, retornar éxito
+        return {
+          success: true,
+          status: insertData.status,
+          alreadyProcessed: true,
+        };
+      }
+      
       logger.error('[PaymentProcessor] Error insertando en DB', {
         paymentId,
-        error: dbError instanceof Error ? dbError.message : String(dbError),
+        error: errorMessage,
         stack: dbError instanceof Error ? dbError.stack : undefined,
         insertData: {
           paymentId: insertData.paymentId,

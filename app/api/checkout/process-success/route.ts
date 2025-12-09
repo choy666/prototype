@@ -64,6 +64,10 @@ export async function POST(req: Request) {
       // Continuar con procesamiento normal si falla la verificación
     }
 
+    // 🔥 ESTRATEGIA: Dar prioridad al webhook original (delay de 200ms)
+    // Esto reduce race conditions y dead letter queue
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     // Procesar el pago usando el mismo processor que los webhooks
     const result = await processPaymentWebhook(String(payment_id), 'success-page-fallback');
 
