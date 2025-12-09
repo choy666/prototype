@@ -271,13 +271,14 @@ export async function POST(req: Request) {
           })
           .where(eq(mercadolibreOrdersImport.id, importRecord[0].id));
 
-        // Deducción de stock por venta ML (transaccional para evitar race conditions)
+        // Deducción de stock por venta ML (sin transacciones para Neon HTTP)
         if (orderItemsData && orderItemsData.length > 0) {
           logger.info('Deduciendo stock por venta ML', { localOrderId, itemsCount: orderItemsData.length });
-          await db.transaction(async (tx) => {
-            for (const item of orderItemsData) {
+          
+          for (const item of orderItemsData) {
+            try {
               // Buscar si corresponde a variante por productId y quantity
-              const localProduct = await tx.query.products.findFirst({
+              const localProduct = await db.query.products.findFirst({
                 where: eq(products.id, item.productId),
                 with: {
                   variants: {
@@ -292,16 +293,16 @@ export async function POST(req: Request) {
               if (localProduct.variants && Array.isArray(localProduct.variants)) {
                 for (const variant of localProduct.variants) {
                   if (variant.stock >= item.quantity) {
-                    // Actualizar stock de variante directamente en la transacción
-                    await tx.update(productVariants)
+                    // Actualizar stock de variante directamente
+                    await db.update(productVariants)
                       .set({
                         stock: sql`${productVariants.stock} - ${item.quantity}`,
                         updated_at: new Date(),
                       })
                       .where(eq(productVariants.id, variant.id));
-                    
+                  
                     // Registrar log de stock
-                    await tx.insert(stockLogs).values({
+                    await db.insert(stockLogs).values({
                       productId: item.productId,
                       variantId: variant.id,
                       oldStock: variant.stock,
@@ -311,7 +312,7 @@ export async function POST(req: Request) {
                       userId: parseInt(session.user.id),
                       created_at: new Date(),
                     });
-                    
+                  
                     logger.info('Stock de variante deducido por venta ML', {
                       variantId: variant.id,
                       quantity: item.quantity,
@@ -325,15 +326,15 @@ export async function POST(req: Request) {
 
               // Si no se dedujo de variante, deducir del producto base
               if (!deducted) {
-                await tx.update(products)
+                await db.update(products)
                   .set({
                     stock: sql`${products.stock} - ${item.quantity}`,
                     updated_at: new Date(),
                   })
                   .where(eq(products.id, item.productId));
-                
+              
                 // Registrar log de stock
-                await tx.insert(stockLogs).values({
+                await db.insert(stockLogs).values({
                   productId: item.productId,
                   oldStock: localProduct.stock,
                   newStock: Math.max(0, localProduct.stock - item.quantity),
@@ -342,15 +343,24 @@ export async function POST(req: Request) {
                   userId: parseInt(session.user.id),
                   created_at: new Date(),
                 });
-                
+              
                 logger.info('Stock de producto deducido por venta ML', {
                   productId: item.productId,
                   quantity: item.quantity,
                   mlOrderId: mlOrder.id
                 });
               }
+            } catch (stockError) {
+              logger.error('Error deduciendo stock individual en importación ML', {
+                localOrderId,
+                mlOrderId: mlOrder.id,
+                productId: item.productId,
+                error: stockError instanceof Error ? stockError.message : String(stockError),
+              });
+              // Continuar con otros items
+              continue;
             }
-          });
+          }
           logger.info('Deducción de stock completada para orden ML', { localOrderId });
         }
 

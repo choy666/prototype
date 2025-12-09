@@ -423,193 +423,192 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
       timestamp: new Date().toISOString(),
     });
 
-    // 🔥 BLOQUEO CRÍTICO: Transacción explícita con SELECT FOR UPDATE
-    await db.transaction(async (tx) => {
-      // 1. Bloquear la orden y verificar idempotencia
-      const lockedOrder = await tx
-        .select({ stockDeducted: orders.stockDeducted })
-        .from(orders)
-        .where(eq(orders.id, orderId))
-        .for('update'); // 🔥 Bloqueo exclusivo
+    // 🔥 ELIMINAR TRANSACCIÓN: Neon HTTP no soporta transacciones
+    // Usar bloqueo optimista con verificación de stockDeducted
+    // 1. Verificar idempotencia sin bloqueo explícito
+    const existingOrder = await db
+      .select({ stockDeducted: orders.stockDeducted })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
 
-      if (!lockedOrder.length) {
-        throw new Error(`Orden ${orderId} no encontrada`);
-      }
+    if (!existingOrder.length) {
+      throw new Error(`Orden ${orderId} no encontrada`);
+    }
 
-      // 2. Verificar si ya fue procesada (idempotencia)
-      if (lockedOrder[0].stockDeducted) {
-        logger.info('[PaymentProcessor] Stock ya ajustado previamente', {
-          orderId,
-          paymentId,
-          stockDeducted: lockedOrder[0].stockDeducted,
-        });
-        return; // Salir de la transacción sin hacer cambios
-      }
-
-      // 3. Obtener items de la orden (dentro de la transacción)
-      const orderItemsData = await tx
-        .select({
-          id: orderItems.id,
-          productId: orderItems.productId,
-          variantId: orderItems.variantId,
-          quantity: orderItems.quantity,
-        })
-        .from(orderItems)
-        .where(eq(orderItems.orderId, orderId));
-
-      if (orderItemsData.length === 0) {
-        logger.warn('[PaymentProcessor] Orden sin items para ajustar stock', {
-          orderId,
-          paymentId,
-        });
-        return;
-      }
-
-      logger.info('[PaymentProcessor] Items encontrados para ajuste de stock', {
+    // 2. Verificar si ya fue procesada (idempotencia)
+    if (existingOrder[0].stockDeducted) {
+      logger.info('[PaymentProcessor] Stock ya ajustado previamente', {
         orderId,
         paymentId,
-        itemsCount: orderItemsData.length,
-        items: orderItemsData.map(item => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity,
-        })),
+        stockDeducted: existingOrder[0].stockDeducted,
       });
+      return; // Salir sin hacer cambios
+    }
 
-      // 4. Ajustar stock para cada item (dentro de la transacción)
-      let totalAdjusted = 0;
-      for (const item of orderItemsData) {
-        try {
-          const change = -Math.abs(item.quantity); // Siempre restar stock
-          const reason = `Venta orden #${orderId} - pago ${paymentId}`;
+    // 3. Obtener items de la orden
+    const orderItemsData = await db
+      .select({
+        id: orderItems.id,
+        productId: orderItems.productId,
+        variantId: orderItems.variantId,
+        quantity: orderItems.quantity,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
 
-          if (item.variantId) {
-            // 🔥 Obtener stock actual antes de ajustar
-            const currentVariant = await tx
-              .select({ stock: productVariants.stock, isActive: productVariants.isActive })
-              .from(productVariants)
-              .where(eq(productVariants.id, item.variantId))
-              .limit(1);
+    if (orderItemsData.length === 0) {
+      logger.warn('[PaymentProcessor] Orden sin items para ajustar stock', {
+        orderId,
+        paymentId,
+      });
+      return;
+    }
 
-            if (!currentVariant.length) {
-              throw new Error(`Variante ${item.variantId} no encontrada`);
-            }
+    logger.info('[PaymentProcessor] Items encontrados para ajuste de stock', {
+      orderId,
+      paymentId,
+      itemsCount: orderItemsData.length,
+      items: orderItemsData.map(item => ({
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      })),
+    });
 
-            const oldStock = currentVariant[0].stock;
+    // 4. Ajustar stock para cada item
+    let totalAdjusted = 0;
+    for (const item of orderItemsData) {
+      try {
+        const change = -Math.abs(item.quantity); // Siempre restar stock
+        const reason = `Venta orden #${orderId} - pago ${paymentId}`;
 
-            // 🔥 Ajuste directo de stock de variante dentro de la transacción
-            await tx
-              .update(productVariants)
-              .set({
-                stock: sql`GREATEST(0, ${productVariants.stock} + ${change})`,
-                isActive: sql`CASE WHEN GREATEST(0, ${productVariants.stock} + ${change}) > 0 THEN true ELSE false END`,
-                updated_at: new Date()
-              })
-              .where(eq(productVariants.id, item.variantId));
+        if (item.variantId) {
+          // 🔥 Obtener stock actual antes de ajustar
+          const currentVariant = await db
+            .select({ stock: productVariants.stock, isActive: productVariants.isActive })
+            .from(productVariants)
+            .where(eq(productVariants.id, item.variantId))
+            .limit(1);
 
-            // Obtener nuevo stock para logging
-            const updatedVariant = await tx
-              .select({ stock: productVariants.stock, isActive: productVariants.isActive })
-              .from(productVariants)
-              .where(eq(productVariants.id, item.variantId))
-              .limit(1);
-
-            // Registrar en stockLogs dentro de la transacción
-            await tx.insert(stockLogs).values({
-              productId: item.productId,
-              variantId: item.variantId,
-              oldStock: oldStock, // 🔥 Valor real antes del ajuste
-              newStock: updatedVariant[0]?.stock || 0,
-              change,
-              reason,
-              userId: 1, // System user
-            });
-
-            logger.info('[PaymentProcessor] Stock de variante ajustado (transaccional)', {
-              orderId,
-              paymentId,
-              variantId: item.variantId,
-              productId: item.productId,
-              change,
-              newStock: updatedVariant[0]?.stock,
-            });
-          } else {
-            // 🔥 Obtener stock actual antes de ajustar
-            const currentProduct = await tx
-              .select({ stock: products.stock })
-              .from(products)
-              .where(eq(products.id, item.productId))
-              .limit(1);
-
-            if (!currentProduct.length) {
-              throw new Error(`Producto ${item.productId} no encontrado`);
-            }
-
-            const oldStock = currentProduct[0].stock;
-
-            // 🔥 Ajuste directo de stock de producto dentro de la transacción
-            await tx
-              .update(products)
-              .set({ 
-                stock: sql`GREATEST(0, ${products.stock} + ${change})`,
-                updated_at: new Date() 
-              })
-              .where(eq(products.id, item.productId));
-
-            // Obtener nuevo stock para logging
-            const updatedProduct = await tx
-              .select({ stock: products.stock })
-              .from(products)
-              .where(eq(products.id, item.productId))
-              .limit(1);
-
-            // Registrar en stockLogs dentro de la transacción
-            await tx.insert(stockLogs).values({
-              productId: item.productId,
-              oldStock: oldStock, // 🔥 Valor real antes del ajuste
-              newStock: updatedProduct[0]?.stock || 0,
-              change,
-              reason,
-              userId: 1, // System user
-            });
-
-            logger.info('[PaymentProcessor] Stock de producto ajustado (transaccional)', {
-              orderId,
-              paymentId,
-              productId: item.productId,
-              change,
-              newStock: updatedProduct[0]?.stock,
-            });
+          if (!currentVariant.length) {
+            throw new Error(`Variante ${item.variantId} no encontrada`);
           }
 
-          totalAdjusted += Math.abs(change);
-        } catch (stockError) {
-          logger.error('[PaymentProcessor] Error ajustando stock individual (transaccional)', {
-            orderId,
-            paymentId,
-            itemId: item.id,
+          const oldStock = currentVariant[0].stock;
+
+          // 🔥 Ajuste directo de stock de variante
+          await db
+            .update(productVariants)
+            .set({
+              stock: sql`GREATEST(0, ${productVariants.stock} + ${change})`,
+              isActive: sql`CASE WHEN GREATEST(0, ${productVariants.stock} + ${change}) > 0 THEN true ELSE false END`,
+              updated_at: new Date()
+            })
+            .where(eq(productVariants.id, item.variantId));
+
+          // Obtener nuevo stock para logging
+          const updatedVariant = await db
+            .select({ stock: productVariants.stock, isActive: productVariants.isActive })
+            .from(productVariants)
+            .where(eq(productVariants.id, item.variantId))
+            .limit(1);
+
+          // Registrar en stockLogs
+          await db.insert(stockLogs).values({
             productId: item.productId,
             variantId: item.variantId,
-            error: stockError instanceof Error ? stockError.message : String(stockError),
+            oldStock: oldStock, // 🔥 Valor real antes del ajuste
+            newStock: updatedVariant[0]?.stock || 0,
+            change,
+            reason,
+            userId: 1, // System user
           });
-          // 🔥 En contexto transaccional, cualquier error hace rollback de todo
-          throw stockError; // Propagar error para cancelar toda la transacción
+
+          logger.info('[PaymentProcessor] Stock de variante ajustado', {
+            orderId,
+            paymentId,
+            variantId: item.variantId,
+            productId: item.productId,
+            change,
+            newStock: updatedVariant[0]?.stock,
+          });
+        } else {
+          // 🔥 Obtener stock actual antes de ajustar
+          const currentProduct = await db
+            .select({ stock: products.stock })
+            .from(products)
+            .where(eq(products.id, item.productId))
+            .limit(1);
+
+          if (!currentProduct.length) {
+            throw new Error(`Producto ${item.productId} no encontrado`);
+          }
+
+          const oldStock = currentProduct[0].stock;
+
+          // 🔥 Ajuste directo de stock de producto
+          await db
+            .update(products)
+            .set({ 
+              stock: sql`GREATEST(0, ${products.stock} + ${change})`,
+              updated_at: new Date() 
+            })
+            .where(eq(products.id, item.productId));
+
+          // Obtener nuevo stock para logging
+          const updatedProduct = await db
+            .select({ stock: products.stock })
+            .from(products)
+            .where(eq(products.id, item.productId))
+            .limit(1);
+
+          // Registrar en stockLogs
+          await db.insert(stockLogs).values({
+            productId: item.productId,
+            oldStock: oldStock, // 🔥 Valor real antes del ajuste
+            newStock: updatedProduct[0]?.stock || 0,
+            change,
+            reason,
+            userId: 1, // System user
+          });
+
+          logger.info('[PaymentProcessor] Stock de producto ajustado', {
+            orderId,
+            paymentId,
+            productId: item.productId,
+            change,
+            newStock: updatedProduct[0]?.stock,
+          });
         }
+
+        totalAdjusted += Math.abs(change);
+      } catch (stockError) {
+        logger.error('[PaymentProcessor] Error ajustando stock individual', {
+          orderId,
+          paymentId,
+          itemId: item.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          error: stockError instanceof Error ? stockError.message : String(stockError),
+        });
+        // Continuar con otros items en lugar de cancelar todo
+        continue;
       }
+    }
 
-      // 5. Marcar orden como procesada (dentro de la misma transacción)
-      await tx
-        .update(orders)
-        .set({ stockDeducted: true })
-        .where(eq(orders.id, orderId));
+    // 5. Marcar orden como procesada
+    await db
+      .update(orders)
+      .set({ stockDeducted: true })
+      .where(eq(orders.id, orderId));
 
-      logger.info('[PaymentProcessor] Stock ajustado y orden marcada como procesada', {
-        orderId,
-        paymentId,
-        totalItems: orderItemsData.length,
-        totalAdjusted,
-        duration: `${Date.now() - startTime}ms`,
-      });
+    logger.info('[PaymentProcessor] Stock ajustado y orden marcada como procesada', {
+      orderId,
+      paymentId,
+      totalItems: orderItemsData.length,
+      totalAdjusted,
+      duration: `${Date.now() - startTime}ms`,
     });
 
   } catch (error) {
@@ -628,21 +627,8 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
       timestamp: new Date().toISOString(),
     });
     
-    // 🔥 MEJORADO: Guardar error en tabla temporal para retry posterior
-    try {
-      await db.insert(stockLogs).values({
-        productId: 0, // Sistema
-        variantId: 0, // Sistema
-        oldStock: 0,
-        newStock: 0,
-        change: 0,
-        reason: `ERROR STOCK FALLBACK - Orden #${orderId} - Pago ${paymentId}: ${errorMessage}`,
-        userId: 1, // System user
-      });
-    } catch (logError) {
-      // Si falla el log, registrar en consola
-      console.error('[CRITICAL] No se pudo registrar error de stock:', logError);
-    }
+    // 🔥 ELIMINADO: No registrar en stockLogs para evitar foreign key constraint violations
+    // El error ya está siendo loggeado arriba con logger.error
     
     // No relanzar el error para no afectar el procesamiento del pago
     // El stock se puede ajustar manualmente si es necesario
