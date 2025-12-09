@@ -162,18 +162,15 @@ export default function PaymentFailurePage() {
             </div>
           )}
 
-          <div className="space-y-3">
-            <Link href="/cart">
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                Volver al carrito
-              </Button>
-            </Link>
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center justify-center space-x-2 text-gray-600">
+              <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-red-600'></div>
+              <span>Estamos terminando de procesar tu compra, en breve te redirigimos al dashboard</span>
+            </div>
             
-            <Link href="/products">
-              <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-md transition-colors">
-                Seguir comprando
-              </Button>
-            </Link>
+            <div className="text-sm text-gray-500 text-center">
+              Por favor espera mientras verificamos el estado de tu pago...
+            </div>
           </div>
 
           <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
