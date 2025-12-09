@@ -22,6 +22,13 @@ const ALLOWED_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutos
 // Validar configuración al inicio
 if (!MP_SECRET) {
   logger.error('❌ MERCADO_PAGO_WEBHOOK_SECRET no configurado');
+} else {
+  // Log seguro del secret en producción (solo longitud y prefijo)
+  logger.info('✅ MERCADO_PAGO_WEBHOOK_SECRET configurado', {
+    secretLength: MP_SECRET.length,
+    secretPrefix: MP_SECRET.substring(0, 8) + '...',
+    hasWhitespace: MP_SECRET !== MP_SECRET.trim(),
+  });
 }
 
 
@@ -36,7 +43,9 @@ export function verifyMercadoPagoWebhook(
     return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
   }
 
-  const cleanPath = request.url.split('?')[0];
+  // Extraer path limpio (solo el path sin dominio ni query params)
+  const url = new URL(request.url);
+  const cleanPath = url.pathname; // Solo el path, sin protocolo, dominio ni query
   const headers = Object.fromEntries(request.headers.entries());
   
   // Intentar validación con cuerpo limpio (sin whitespace)
