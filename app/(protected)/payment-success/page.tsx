@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 
 export default function PaymentSuccess() {
@@ -14,6 +14,24 @@ export default function PaymentSuccess() {
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successShownAtRef = useRef<number | null>(null);
+  const processedPaymentRef = useRef<string | null>(null);
+
+  // Función para verificar si ya pasaron 9 segundos desde el éxito
+  const canRedirect = () => {
+    return successShownAtRef.current !== null && 
+           Date.now() >= successShownAtRef.current + 9000;
+  };
+
+  // Función para registrar cuándo se mostró el éxito (solo la primera vez)
+  const markSuccessShown = () => {
+    if (successShownAtRef.current === null) {
+      successShownAtRef.current = Date.now();
+      console.log('[TIMER] Éxito mostrado, iniciando countdown de 9 segundos');
+    } else {
+      console.log('[TIMER] Éxito ya fue marcado previamente, ignorando llamada duplicada');
+    }
+  };
 
   // Usar el hook personalizado para manejar la limpieza del carrito
   const { paymentInfo } = useCartClearOnSuccess({
@@ -26,14 +44,37 @@ export default function PaymentSuccess() {
     },
   });
 
+  // Función para redirigir con validación de tiempo
+  const performRedirect = useCallback(() => {
+    const { paymentId, merchantOrderId } = paymentInfo;
+    if (paymentId) {
+      console.log('[TIMER] Redirigiendo al dashboard');
+      router.push(
+        `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
+      );
+    }
+  }, [paymentInfo, router]);
+
   // Procesar pago vía fallback si es aprobado
   useEffect(() => {
     const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
 
     // Solo procesar si el pago está aprobado y tenemos paymentId
     if ((collectionStatus === 'approved' || status === 'approved') && paymentId) {
+      
+      // PROTECCIÓN DE IDEMPOTENCIA: Evitar procesar el mismo pago múltiples veces
+      if (processedPaymentRef.current === paymentId) {
+        console.log('[SUCCESS-FALLBACK] Pago ya procesado en este componente, ignorando llamada duplicada', {
+          paymentId,
+        });
+        return;
+      }
+
       const processPayment = async () => {
         try {
+          // Marcar como procesado ANTES de la llamada para evitar race conditions
+          processedPaymentRef.current = paymentId;
+          
           // Pequeño delay para dar prioridad al webhook
           await new Promise(resolve => setTimeout(resolve, 500));
           
@@ -63,12 +104,17 @@ export default function PaymentSuccess() {
             console.log('✅ [SUCCESS-FALLBACK] Pago procesado correctamente:', {
               paymentId,
               result: result.status,
+              alreadyProcessed: result.alreadyProcessed,
             });
           } else {
             console.error('❌ [SUCCESS-FALLBACK] Error procesando pago:', result.error);
+            // Si falla, resetear el ref para permitir reintentos
+            processedPaymentRef.current = null;
           }
         } catch (error) {
           console.error('❌ [SUCCESS-FALLBACK] Error en llamada de fallback:', error);
+          // Si falla, resetear el ref para permitir reintentos
+          processedPaymentRef.current = null;
         }
       };
 
@@ -92,6 +138,7 @@ export default function PaymentSuccess() {
         status
       });
       setOrderStatus('paid');
+      markSuccessShown(); // Marcar cuándo se mostró el éxito
       setIsProcessing(false);
       return;
     }
@@ -189,29 +236,45 @@ export default function PaymentSuccess() {
     // Solo redirigir cuando tengamos confirmación del estado del pedido
     const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
 
-    // Si ya tenemos estado confirmado localmente, redirigir inmediatamente
+    // Si ya tenemos estado confirmado localmente, redirigir SOLO si pasaron 9 segundos
     if (orderStatus && (orderStatus === 'paid' || orderStatus === 'delivered' || orderStatus === 'processing')) {
       setIsProcessing(false);
-      router.push(
-        `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
-      );
+      if (canRedirect()) {
+        performRedirect();
+      } else {
+        // Programar redirect para exactamente 9 segundos después del éxito
+        if (redirectTimeoutRef.current) {
+          clearTimeout(redirectTimeoutRef.current);
+        }
+        // Si no tenemos timestamp de éxito, no podemos calcular tiempo restante
+        if (successShownAtRef.current === null) {
+          console.log('[TIMER] Error: timestamp de éxito no disponible, esperando...');
+          return;
+        }
+        const remainingTime = Math.max(0, 9000 - (Date.now() - successShownAtRef.current));
+        console.log(`[TIMER] Tiempo restante para redirect: ${remainingTime}ms`);
+        redirectTimeoutRef.current = setTimeout(() => {
+          performRedirect();
+        }, remainingTime);
+      }
       return;
     }
 
     // Si Mercado Pago indica aprobado pero aún no está confirmado localmente, esperar un momento antes de redirigir
     if (collectionStatus === 'approved' || status === 'approved') {
       setIsProcessing(false);
+      markSuccessShown(); // Marcar cuándo se mostró el éxito
+      
       // Limpiar timeout anterior si existe
       if (redirectTimeoutRef.current) {
         clearTimeout(redirectTimeoutRef.current);
       }
+      
       // Validar que tenemos paymentId antes de redirigir
       if (paymentId) {
-        // Redirigir después de 7 segundos para que el usuario pueda leer el mensaje de éxito
+        // Redirigir después de exactamente 9 segundos
         redirectTimeoutRef.current = setTimeout(() => {
-          router.push(
-            `/dashboard?payment_id=${paymentId}&order_id=${merchantOrderId}&status=success`
-          );
+          performRedirect();
         }, 9000);
       }
       return;
@@ -233,7 +296,7 @@ export default function PaymentSuccess() {
 
     // Para cualquier otro estado, mantener en página de procesamiento
     setIsProcessing(true);
-  }, [paymentInfo, orderStatus, router]);
+  }, [paymentInfo, orderStatus, router, performRedirect]);
 
   // Cleanup de timeouts cuando el componente se desmonta
   useEffect(() => {
@@ -365,9 +428,7 @@ export default function PaymentSuccess() {
                   <button
                     onClick={() => {
                       setIsProcessing(false);
-                      router.push(
-                        `/dashboard?payment_id=${paymentInfo.paymentId}&order_id=${paymentInfo.merchantOrderId}&status=processing`
-                      );
+                      performRedirect();
                     }}
                     className='w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded transition-colors'
                   >
