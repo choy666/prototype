@@ -115,7 +115,17 @@ function validateHmacV1(
         requestId,
         ts,
         path: cleanPath,
-        bodyLength: body.length
+        bodyLength: body.length,
+        // 🔥 DEBUG: Mostrar componentes exactos para identificar el problema
+        debug: {
+          receivedSignature,
+          expectedSignature,
+          stringToSign,
+          bodyHash,
+          signatureHeader: signature,
+          secretLength: MP_SECRET?.length || 0,
+          secretPrefix: MP_SECRET?.substring(0, 8) + '...',
+        }
       });
       return { ok: false, reason: 'Invalid signature' };
     }

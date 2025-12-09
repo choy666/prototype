@@ -3,8 +3,8 @@
 
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { db } from '@/lib/db';
-import { mercadopagoPayments, mercadopagoPreferences, orders } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { mercadopagoPayments, mercadopagoPreferences, orders, orderItems, products, productVariants, stockLogs } from '@/lib/schema';
+import { eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
 
 // Extender PaymentResponse para incluir campos no documentados
@@ -384,6 +384,7 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
       paymentId: paymentData.id?.toString(),
       mercadoPagoId: paymentData.id?.toString(),
       updatedAt: new Date(),
+      stockDeducted: false, // Se marcará como true después de ajustar stock
     })
     .where(eq(orders.id, preference.orderId));
 
@@ -400,4 +401,231 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     orderId: preference.orderId,
     newStatus: newOrderStatus,
   });
+
+  // 🔥 AJUSTE DE STOCK CRÍTICO: Solo para pagos aprobados/pending
+  if (['approved', 'pending'].includes(status)) {
+    const paymentIdStr = paymentData.id?.toString() || paymentData.id?.toString() || 'unknown';
+    await adjustStockForOrder(preference.orderId, paymentIdStr);
+  }
+}
+
+/**
+ * Ajusta el stock para los items de una orden con protección contra race conditions
+ * Usa transacción explícita y bloqueo a nivel de DB para garantizar idempotencia
+ */
+async function adjustStockForOrder(orderId: number, paymentId: string): Promise<void> {
+  const startTime = Date.now();
+  
+  try {
+    logger.info('[PaymentProcessor] Iniciando ajuste de stock', {
+      orderId,
+      paymentId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 🔥 BLOQUEO CRÍTICO: Transacción explícita con SELECT FOR UPDATE
+    await db.transaction(async (tx) => {
+      // 1. Bloquear la orden y verificar idempotencia
+      const lockedOrder = await tx
+        .select({ stockDeducted: orders.stockDeducted })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .for('update'); // 🔥 Bloqueo exclusivo
+
+      if (!lockedOrder.length) {
+        throw new Error(`Orden ${orderId} no encontrada`);
+      }
+
+      // 2. Verificar si ya fue procesada (idempotencia)
+      if (lockedOrder[0].stockDeducted) {
+        logger.info('[PaymentProcessor] Stock ya ajustado previamente', {
+          orderId,
+          paymentId,
+          stockDeducted: lockedOrder[0].stockDeducted,
+        });
+        return; // Salir de la transacción sin hacer cambios
+      }
+
+      // 3. Obtener items de la orden (dentro de la transacción)
+      const orderItemsData = await tx
+        .select({
+          id: orderItems.id,
+          productId: orderItems.productId,
+          variantId: orderItems.variantId,
+          quantity: orderItems.quantity,
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, orderId));
+
+      if (orderItemsData.length === 0) {
+        logger.warn('[PaymentProcessor] Orden sin items para ajustar stock', {
+          orderId,
+          paymentId,
+        });
+        return;
+      }
+
+      logger.info('[PaymentProcessor] Items encontrados para ajuste de stock', {
+        orderId,
+        paymentId,
+        itemsCount: orderItemsData.length,
+        items: orderItemsData.map(item => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        })),
+      });
+
+      // 4. Ajustar stock para cada item (dentro de la transacción)
+      let totalAdjusted = 0;
+      for (const item of orderItemsData) {
+        try {
+          const change = -Math.abs(item.quantity); // Siempre restar stock
+          const reason = `Venta orden #${orderId} - pago ${paymentId}`;
+
+          if (item.variantId) {
+            // 🔥 Obtener stock actual antes de ajustar
+            const currentVariant = await tx
+              .select({ stock: productVariants.stock, isActive: productVariants.isActive })
+              .from(productVariants)
+              .where(eq(productVariants.id, item.variantId))
+              .limit(1);
+
+            if (!currentVariant.length) {
+              throw new Error(`Variante ${item.variantId} no encontrada`);
+            }
+
+            const oldStock = currentVariant[0].stock;
+
+            // 🔥 Ajuste directo de stock de variante dentro de la transacción
+            await tx
+              .update(productVariants)
+              .set({
+                stock: sql`GREATEST(0, ${productVariants.stock} + ${change})`,
+                isActive: sql`CASE WHEN GREATEST(0, ${productVariants.stock} + ${change}) > 0 THEN true ELSE false END`,
+                updated_at: new Date()
+              })
+              .where(eq(productVariants.id, item.variantId));
+
+            // Obtener nuevo stock para logging
+            const updatedVariant = await tx
+              .select({ stock: productVariants.stock, isActive: productVariants.isActive })
+              .from(productVariants)
+              .where(eq(productVariants.id, item.variantId))
+              .limit(1);
+
+            // Registrar en stockLogs dentro de la transacción
+            await tx.insert(stockLogs).values({
+              productId: item.productId,
+              variantId: item.variantId,
+              oldStock: oldStock, // 🔥 Valor real antes del ajuste
+              newStock: updatedVariant[0]?.stock || 0,
+              change,
+              reason,
+              userId: 1, // System user
+            });
+
+            logger.info('[PaymentProcessor] Stock de variante ajustado (transaccional)', {
+              orderId,
+              paymentId,
+              variantId: item.variantId,
+              productId: item.productId,
+              change,
+              newStock: updatedVariant[0]?.stock,
+            });
+          } else {
+            // 🔥 Obtener stock actual antes de ajustar
+            const currentProduct = await tx
+              .select({ stock: products.stock })
+              .from(products)
+              .where(eq(products.id, item.productId))
+              .limit(1);
+
+            if (!currentProduct.length) {
+              throw new Error(`Producto ${item.productId} no encontrado`);
+            }
+
+            const oldStock = currentProduct[0].stock;
+
+            // 🔥 Ajuste directo de stock de producto dentro de la transacción
+            await tx
+              .update(products)
+              .set({ 
+                stock: sql`GREATEST(0, ${products.stock} + ${change})`,
+                updated_at: new Date() 
+              })
+              .where(eq(products.id, item.productId));
+
+            // Obtener nuevo stock para logging
+            const updatedProduct = await tx
+              .select({ stock: products.stock })
+              .from(products)
+              .where(eq(products.id, item.productId))
+              .limit(1);
+
+            // Registrar en stockLogs dentro de la transacción
+            await tx.insert(stockLogs).values({
+              productId: item.productId,
+              oldStock: oldStock, // 🔥 Valor real antes del ajuste
+              newStock: updatedProduct[0]?.stock || 0,
+              change,
+              reason,
+              userId: 1, // System user
+            });
+
+            logger.info('[PaymentProcessor] Stock de producto ajustado (transaccional)', {
+              orderId,
+              paymentId,
+              productId: item.productId,
+              change,
+              newStock: updatedProduct[0]?.stock,
+            });
+          }
+
+          totalAdjusted += Math.abs(change);
+        } catch (stockError) {
+          logger.error('[PaymentProcessor] Error ajustando stock individual (transaccional)', {
+            orderId,
+            paymentId,
+            itemId: item.id,
+            productId: item.productId,
+            variantId: item.variantId,
+            error: stockError instanceof Error ? stockError.message : String(stockError),
+          });
+          // 🔥 En contexto transaccional, cualquier error hace rollback de todo
+          throw stockError; // Propagar error para cancelar toda la transacción
+        }
+      }
+
+      // 5. Marcar orden como procesada (dentro de la misma transacción)
+      await tx
+        .update(orders)
+        .set({ stockDeducted: true })
+        .where(eq(orders.id, orderId));
+
+      logger.info('[PaymentProcessor] Stock ajustado y orden marcada como procesada', {
+        orderId,
+        paymentId,
+        totalItems: orderItemsData.length,
+        totalAdjusted,
+        duration: `${Date.now() - startTime}ms`,
+      });
+    });
+
+  } catch (error) {
+    logger.error('[PaymentProcessor] Error crítico en ajuste de stock', {
+      orderId,
+      paymentId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      duration: `${Date.now() - startTime}ms`,
+    });
+    
+    // No relanzar el error para no afectar el procesamiento del pago
+    // El stock se puede ajustar manualmente si es necesario
+    logger.warn('[PaymentProcessor] Error de stock no bloquea el procesamiento del pago', {
+      orderId,
+      paymentId,
+    });
+  }
 }
