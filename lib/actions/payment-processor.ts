@@ -44,17 +44,22 @@ const processingCache = new Map<string, number>();
 const CACHE_TTL_MS = 60000; // 1 minuto
 
 /**
- * Verifica si un pago ya está siendo procesado o fue procesado recientemente
- * Retorna true si es seguro procesar, false si es duplicado
+ * Verificación simple de cache en memoria solo para optimización local
+ * La verdadera idempotencia se maneja con constraint unique en DB
  */
 export async function checkPaymentIdempotency(paymentId: string): Promise<{
   canProcess: boolean;
   reason?: string;
   existingStatus?: string;
 }> {
-  // 1. Verificar cache en memoria (mismo request duplicado)
+  // 1. Verificar cache en memoria (optimización local para mismo request duplicado)
   const cachedTime = processingCache.get(paymentId);
   if (cachedTime && Date.now() - cachedTime < CACHE_TTL_MS) {
+    logger.info('[Idempotency] Duplicado detectado en cache local', {
+      paymentId,
+      reason: 'duplicate_in_progress',
+    });
+    
     return {
       canProcess: false,
       reason: 'duplicate_in_progress',
@@ -64,34 +69,13 @@ export async function checkPaymentIdempotency(paymentId: string): Promise<{
   // 2. Marcar como en proceso
   processingCache.set(paymentId, Date.now());
 
-  // 3. Verificar en base de datos
-  try {
-    const existingPayment = await db.query.mercadopagoPayments.findFirst({
-      where: eq(mercadopagoPayments.paymentId, paymentId),
-      columns: {
-        id: true,
-        status: true,
-        dateLastUpdated: true,
-      },
-    });
-
-    if (existingPayment) {
-      return {
-        canProcess: false,
-        reason: 'already_processed',
-        existingStatus: existingPayment.status ?? undefined,
-      };
-    }
-
-    return { canProcess: true };
-  } catch (error) {
-    // En caso de error de DB, permitir procesamiento
-    logger.warn('[Idempotency] Error verificando DB, permitiendo proceso', {
-      paymentId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { canProcess: true };
-  }
+  // 🔥 SIMPLIFICACIÓN: Siempre permitir procesamiento
+  // La verdadera validación de duplicados ocurre en el insert con constraint unique
+  logger.info('[Idempotency] Permitiendo procesamiento (validación final en DB)', {
+    paymentId,
+  });
+  
+  return { canProcess: true };
 }
 
 /**
@@ -141,6 +125,24 @@ export async function processPaymentWebhook(
       timestamp: new Date().toISOString()
     });
 
+    // 🔥 SIMPLIFICACIÓN: Verificación simple de cache local
+    const idempotencyCheck = await checkPaymentIdempotency(paymentId);
+    
+    if (!idempotencyCheck.canProcess) {
+      logger.info('[PaymentProcessor] Pago rechazado por cache local', {
+        paymentId,
+        requestId,
+        reason: idempotencyCheck.reason,
+        source: requestId?.includes('fallback') ? 'success-page-fallback' : 
+                requiresManualVerification ? 'hmac-fallback' : 'webhook',
+      });
+      
+      return {
+        success: true,
+        alreadyProcessed: true,
+      };
+    }
+
     // Obtener información del pago desde Mercado Pago API
     const payment = new Payment(client);
     const paymentData = await payment.get({ id: paymentId }) as unknown as ExtendedPaymentResponse;
@@ -156,45 +158,9 @@ export async function processPaymentWebhook(
       fullPaymentData: paymentData,
     });
 
-    // Verificar nuevamente si ya existe (doble check después de fetch)
-    const existingPayment = await db.query.mercadopagoPayments.findFirst({
-      where: eq(mercadopagoPayments.paymentId, paymentId),
-    });
-
-    if (existingPayment) {
-      // Si existe pero cambió el estado, actualizar
-      if (existingPayment.status !== paymentData.status) {
-        await db.update(mercadopagoPayments)
-          .set({
-            status: paymentData.status,
-            dateLastUpdated: new Date(paymentData.date_last_updated || new Date().toISOString()),
-            rawData: paymentData,
-            // Mantener campos de auditoría existentes o actualizar si es necesario
-            requiresManualVerification: existingPayment.requiresManualVerification || false,
-            hmacValidationResult: existingPayment.hmacValidationResult || 'valid',
-            hmacFailureReason: existingPayment.hmacFailureReason,
-            hmacFallbackUsed: existingPayment.hmacFallbackUsed || false,
-            verificationTimestamp: existingPayment.verificationTimestamp,
-            webhookRequestId: existingPayment.webhookRequestId,
-          })
-          .where(eq(mercadopagoPayments.paymentId, paymentId));
-
-        logger.info('[PaymentProcessor] Estado actualizado', {
-          paymentId,
-          oldStatus: existingPayment.status,
-          newStatus: paymentData.status,
-        });
-
-        // Procesar cambio de estado
-        await processStatusChange(paymentData);
-      }
-
-      return {
-        success: true,
-        status: paymentData.status ?? undefined,
-        alreadyProcessed: true,
-      };
-    }
+    // 🔥 ELIMINADO: Doble check redundante que causa HMAC-FALLBACK errors
+    // La verdadera validación de duplicados ocurre en el insert con constraint unique
+    // Si el pago ya existe, el insert fallará con constraint violation y se manejará como éxito
 
     // Validar campos obligatorios antes de insertar
     if (!paymentData.id) {
