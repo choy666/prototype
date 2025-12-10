@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Eye, Calendar, Package, AlertCircle } from 'lucide-react';
+import { getCustomerStatusLabel, getCustomerStatusColorClass, OrderStatus } from '@/lib/utils/order-status';
 
 type Order = {
   id: number;
@@ -107,40 +108,6 @@ export default function OrdersPage() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
-      case 'paid':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400';
-      case 'shipped':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400';
-      case 'delivered':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400';
-      case 'cancelled':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400';
-      default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Pendiente';
-      case 'paid':
-        return 'Pagado';
-      case 'shipped':
-        return 'Enviado';
-      case 'delivered':
-        return 'Entregado';
-      case 'cancelled':
-        return 'Cancelado';
-      default:
-        return status;
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
@@ -185,11 +152,11 @@ export default function OrdersPage() {
                       })}
                     </div>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        order.status
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${getCustomerStatusColorClass(
+                        order.status as OrderStatus
                       )}`}
                     >
-                      {getStatusText(order.status)}
+                      {getCustomerStatusLabel(order.status as OrderStatus)}
                     </span>
                   </div>
                 </div>

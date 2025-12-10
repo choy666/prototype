@@ -9,6 +9,7 @@ import { ArrowLeft, MapPin, CreditCard, Calendar } from 'lucide-react';
 import OrderTimeline from '@/components/orders/OrderTimeline';
 import { convertAttributesToObject } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { getCustomerStatusLabel, getCustomerStatusColorClass } from '@/lib/utils/order-status';
 
 type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -224,23 +225,9 @@ export default function OrderDetailPage() {
                 Orden #{order.id}
               </h1>
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  order.status === 'delivered'
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                    : order.status === 'shipped'
-                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400'
-                    : order.status === 'paid'
-                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400'
-                    : order.status === 'cancelled'
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
-                }`}
+                className={`px-3 py-1 rounded-full text-sm font-medium ${getCustomerStatusColorClass(order.status)}`}
               >
-                {order.status === 'pending' && 'Pendiente'}
-                {order.status === 'paid' && 'Pagado'}
-                {order.status === 'shipped' && 'Enviado'}
-                {order.status === 'delivered' && 'Entregado'}
-                {order.status === 'cancelled' && 'Cancelado'}
+                {getCustomerStatusLabel(order.status)}
               </span>
             </div>
 

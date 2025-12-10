@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CheckCircle, Clock, Truck, Package, XCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { getCustomerTimelineStatus } from '@/lib/utils/order-status';
 
 type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'processing' | 'failed' | 'returned';
 
@@ -61,8 +62,10 @@ export default function OrderTimeline({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
+  // Convertir el estado para el timeline del cliente
+  const timelineStatus = getCustomerTimelineStatus(currentStatus);
   const statusOrder: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered'];
-  const currentIndex = statusOrder.indexOf(currentStatus);
+  const currentIndex = statusOrder.indexOf(timelineStatus as 'pending' | 'processing' | 'shipped' | 'delivered');
 
   const steps: TimelineStep[] = statusSteps.map((step, index) => ({
     ...step,
