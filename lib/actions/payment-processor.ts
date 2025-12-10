@@ -495,10 +495,27 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
       })),
     });
 
-    // 4. Ajustar stock para cada item
+    // 4. Ajustar stock para cada item con doble verificación de idempotencia
     let totalAdjusted = 0;
     for (const item of orderItemsData) {
       try {
+        // 🔥 VERIFICACIÓN EXTRA: Re-check stockDeducted antes de cada item
+        const currentOrder = await db
+          .select({ stockDeducted: orders.stockDeducted })
+          .from(orders)
+          .where(eq(orders.id, orderId))
+          .limit(1);
+
+        if (currentOrder.length > 0 && currentOrder[0].stockDeducted) {
+          logger.info('[PaymentProcessor] Stock ya deducido por otro proceso - deteniendo ajuste', {
+            orderId,
+            paymentId,
+            itemId: item.id,
+            stockDeducted: currentOrder[0].stockDeducted,
+          });
+          break; // Salir del loop si ya fue procesado
+        }
+
         const change = -Math.abs(item.quantity); // Siempre restar stock
         const reason = `Venta orden #${orderId} - pago ${paymentId}`;
 

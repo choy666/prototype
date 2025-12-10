@@ -271,25 +271,37 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
       dataId = paymentDataFromAPI.id?.toString();
     }
 
-    if (!action || !dataId) {
+    // 🔥 MEJORADO: Para HMAC fallback, permitir dataId sin action
+    if (requiresManualVerification && paymentDataFromAPI && dataId) {
+      logger.info('[HMAC-FALLBACK] Procesando con datos de API (sin action requerido)', {
+        requestId,
+        paymentId: dataId,
+        hasAction: !!action,
+      });
+    } else if (!action || !dataId) {
       logger.error('Invalid payload - missing required fields', {
         requestId,
         action,
         dataId,
+        requiresManualVerification,
+        hasApiData: !!paymentDataFromAPI,
       });
       return;
     }
 
     // Procesar según tipo de acción
-    const isPayment = action.startsWith('payment') || 
+    const isPayment = action?.startsWith('payment') || 
                      action === 'payment.created' || 
-                     action === 'payment.updated';
+                     action === 'payment.updated' ||
+                     (!action && requiresManualVerification && paymentDataFromAPI); // 🔥 HMAC fallback sin action
 
     if (isPayment) {
       await handlePaymentWebhook(dataId, requestId, rawBody, headers, requiresManualVerification, hmacValidation.reason);
     } else if (action === 'merchant_order') {
       logger.info('Merchant order webhook received', { requestId });
       // TODO: Implementar procesamiento de merchant orders si es necesario
+    } else {
+      logger.warn('Acción no reconocida', { requestId, action, requiresManualVerification });
     }
   } catch (error) {
     logger.error('Webhook processing error', {

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
-import { processPaymentWebhook } from '@/lib/actions/payment-processor';
-import { db } from '@/lib/db';
+import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
 
 /**
  * Endpoint de fallback para procesar pagos exitosos cuando webhooks fallan
@@ -34,39 +33,37 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // PROTECCIÓN DE IDEMPOTENCIA: Verificar si el pago ya fue procesado
+    // 🔥 MEJORADO: Usar mismo sistema de idempotencia que HMAC-FALLBACK
     try {
-      const existingPayment = await db.query.mercadopagoPayments.findFirst({
-        where: (payments, { eq }) => eq(payments.paymentId, String(payment_id)),
-      });
-
-      if (existingPayment) {
-        logger.info('[SUCCESS-FALLBACK] Pago ya procesado, retornando éxito idempotente', {
+      const idemCheck = await checkPaymentIdempotency(String(payment_id));
+      
+      if (!idemCheck.canProcess) {
+        logger.info('[SUCCESS-FALLBACK] Pago duplicado detectado por idempotency check', {
           payment_id,
-          existingStatus: existingPayment.status,
-          existingOrderId: existingPayment.orderId,
-          source: 'db_check',
+          reason: idemCheck.reason,
+          existingStatus: idemCheck.existingStatus,
+          source: 'idempotency_check',
         });
 
         return NextResponse.json({
           success: true,
           message: 'Pago ya procesado previamente',
-          status: existingPayment.status,
+          status: idemCheck.existingStatus,
           alreadyProcessed: true,
-          source: 'db_check',
+          source: 'idempotency_check',
         });
       }
-    } catch (dbError) {
-      logger.error('[SUCCESS-FALLBACK] Error verificando pago existente', {
+    } catch (idempotencyError) {
+      logger.error('[SUCCESS-FALLBACK] Error en idempotency check', {
         payment_id,
-        error: dbError instanceof Error ? dbError.message : String(dbError),
+        error: idempotencyError instanceof Error ? idempotencyError.message : String(idempotencyError),
       });
       // Continuar con procesamiento normal si falla la verificación
     }
 
-    // 🔥 ESTRATEGIA: Dar prioridad al webhook original (delay de 200ms)
-    // Esto reduce race conditions y dead letter queue
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // 🔥 ESTRATEGIA: Reducir delay a 100ms para balancear race conditions y UX
+    // Más rápido pero aún da prioridad al webhook original
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Procesar el pago usando el mismo processor que los webhooks
     const result = await processPaymentWebhook(String(payment_id), 'success-page-fallback');
