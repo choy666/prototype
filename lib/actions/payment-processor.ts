@@ -620,14 +620,34 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
 
         totalAdjusted += Math.abs(change);
       } catch (stockError) {
+        // 🔥 MEJORADO: Exponer error real para diagnóstico
+        const errorMessage = stockError instanceof Error ? stockError.message : String(stockError);
+        const errorStack = stockError instanceof Error ? stockError.stack : undefined;
+        
         logger.error('[PaymentProcessor] Error ajustando stock individual', {
           orderId,
           paymentId,
           itemId: item.id,
           productId: item.productId,
           variantId: item.variantId,
-          error: stockError instanceof Error ? stockError.message : String(stockError),
+          // 🔥 Exponer error completo temporalmente para debugging
+          error: errorMessage,
+          stack: errorStack,
+          errorType: stockError?.constructor?.name || 'Unknown',
+          timestamp: new Date().toISOString(),
         });
+        
+        // 🔥 ESTRATEGIA: Si es constraint violation, probablemente es race condition - continuar
+        if (errorMessage.includes('unique constraint') || 
+            errorMessage.includes('duplicate key') ||
+            errorMessage.includes('violates unique constraint')) {
+          logger.info('[PaymentProcessor] Constraint violation detectado - probable race condition, continuando', {
+            orderId,
+            paymentId,
+            itemId: item.id,
+          });
+        }
+        
         // Continuar con otros items en lugar de cancelar todo
         continue;
       }
