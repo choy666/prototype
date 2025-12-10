@@ -1,284 +1,414 @@
 TimeUTC,timestampInMs,requestPath,requestMethod,requestQueryString,responseStatusCode,requestId,requestUserAgent,level,environment,branch,vercelCache,type,function,host,deploymentDomain,deploymentId,durationMs,region,maxMemoryUsed,memorySize,message,projectId,traceId,sessionId,invocationId,instanceId,concurrency
-2025-12-10 04:03:37,1765339417841,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:37.833Z - [PaymentProcessor] Buscando preferencia {
-  paymentId: '[REDACTED]',
-  originalExternalReference: '[REDACTED]',
-  normalizedExternalReference: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417868,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:37.867Z - [PaymentProcessor] Preferencia encontrada {
-  paymentId: '[REDACTED]',
-  preferenceFound: true,
-  preferenceId: '[REDACTED]',
-  orderId: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417868,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:37.868Z - [PaymentProcessor] Aplicando nueva lógica de estados {
-  paymentId: '[REDACTED]',
-  originalStatus: '[REDACTED]',
-  newOrderStatus: '[REDACTED]',
-  requiresManualVerification: true
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417903,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:37.902Z - [PaymentProcessor] Orden actualizada {
-  paymentId: '[REDACTED]',
-  orderId: '[REDACTED]',
-  newStatus: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417904,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:37.903Z - [PaymentProcessor] Iniciando ajuste de stock {
-  orderId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  timestamp: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417908,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",error,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[ERROR] 2025-12-10T04:03:37.908Z - [HMAC-FALLBACK] Error verificando pago vía API {
-  paymentId: '[REDACTED]',
-  requestId: '[REDACTED]',
-  error: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417908,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",error,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[ERROR] 2025-12-10T04:03:37.908Z - [HMAC-FALLBACK] Verificación vía API falló - guardando en dead letter {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  error: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417909,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",error,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[ERROR] 2025-12-10T04:03:37.908Z - Enviando webhook a dead letter {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  errorMessage: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417914,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",warning,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[WARN] 2025-12-10T04:03:37.913Z - Webhook marcado como dead letter { requestId: '[REDACTED]', paymentId: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417915,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:37.914Z - [PaymentProcessor] Items encontrados para ajuste de stock {
-  orderId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  itemsCount: '[REDACTED]',
-  items: [
-    {
-      productId: '[REDACTED]',
-      variantId: '[REDACTED]',
-      quantity: '[REDACTED]'
-    }
-  ]
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:37,1765339417736,prototype-ten-dun.vercel.app/api/orders/316,GET,nxtPid=316,200,2mtpz-1765339417736-52177968762a,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/api/orders/[id],prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,102,iad1,314,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VK6BE3VXG4HZVZR1AEF7,Sju1pTMUh3Jk,1
-2025-12-10 04:03:37,1765339417376,prototype-ten-dun.vercel.app/orders/316,GET,_rsc=b3pwn&nxtPid=316,200,2mtpz-1765339417376-36329a6864cb,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders/[id].rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,10,iad1,314,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VJVQ7HRAZZMZ6HQ7X615,wqKYrmVdKiJI,1
-2025-12-10 04:03:37,1765339417376,prototype-ten-dun.vercel.app/orders/316,GET,_rsc=b3pwn&nxtPid=316,200,2mtpz-1765339417376-36329a6864cb,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,12,gru1,153,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VJS45TGTZCK5HTDD3ZN3,ui14ppGlOtGF,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/313,GET,_rsc=1849v,200,kxwgj-1765339414580-c9f9234107df,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,17,gru1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG1Q59VJ1Q4GR0F4MQ0Q,m2bl1cRz15di,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/313,GET,_rsc=1849v,200,kxwgj-1765339414580-c9f9234107df,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders/[id].rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,8,iad1,317,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG4MAFGVBEXXHS6FAVEH,8EJKN5ZS3rir,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/314,GET,_rsc=1849v,200,kd2sx-1765339414580-d3429fc9eba4,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,13,gru1,131,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG1VQ6F5X15AP1G7GGJ7,l1YTeh9tFlIn,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/314,GET,_rsc=1849v,200,kd2sx-1765339414580-d3429fc9eba4,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders/[id].rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,8,iad1,278,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG4TWQR6DXDBJAZ943QQ,qz46u9qzOrWr,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/316,GET,_rsc=1849v,200,8h7q2-1765339414580-beb226b0db20,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,14,gru1,153,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG229Z3N6Z19B6Y3R504,ui14ppGlOtGF,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/316,GET,_rsc=1849v,200,8h7q2-1765339414580-beb226b0db20,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders/[id].rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,14,iad1,313,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG4WSB85APP2C3X5N7AH,wqKYrmVdKiJI,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/315,GET,_rsc=1849v,200,2mtpz-1765339414580-81f5bd719fdd,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,14,gru1,136,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG1SFTV5SMKT4KY71XRF,sP1BuCisC83B,1
-2025-12-10 04:03:34,1765339414580,prototype-ten-dun.vercel.app/orders/315,GET,_rsc=1849v,200,2mtpz-1765339414580-81f5bd719fdd,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders/[id].rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,10,iad1,297,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VG4J2CEZCW7ACEXHT4TE,ZX4rHtH1uyvQ,1
-2025-12-10 04:03:33,1765339413811,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",warning,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[WARN] 2025-12-10T04:03:33.810Z - [Idempotency] Error verificando DB, permitiendo proceso { paymentId: '[REDACTED]', error: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:33,1765339413811,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:33.811Z - [PaymentProcessor] Iniciando procesamiento {
-  paymentId: '[REDACTED]',
-  requestId: '[REDACTED]',
-  requiresManualVerification: true,
-  hmacAuditContext: '[REDACTED]',
-  source: '[REDACTED]',
-  timestamp: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:33,1765339413823,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:33.823Z - Obteniendo órdenes para el usuario { userId: '[REDACTED]', parsedUserId: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:34,1765339414376,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",error,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[ERROR] 2025-12-10T04:03:34.376Z - [HMAC-FALLBACK] Error verificando pago vía API {
-  paymentId: '[REDACTED]',
-  requestId: '[REDACTED]',
-  error: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:34,1765339414376,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",error,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[ERROR] 2025-12-10T04:03:34.376Z - [HMAC-FALLBACK] Verificación vía API falló - guardando en dead letter {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  error: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:34,1765339414377,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",error,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[ERROR] 2025-12-10T04:03:34.376Z - Enviando webhook a dead letter {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  errorMessage: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:34,1765339414396,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:34.393Z - [PaymentProcessor] Datos obtenidos de MP {
-  paymentId: '[REDACTED]',
-  status: '[REDACTED]',
-  statusDetail: '[REDACTED]',
-  externalReference: '[REDACTED]',
-  amount: '[REDACTED]',
-  paymentDataKeys: '[REDACTED]',
-  fullPaymentData: {
-    accounts_info: null,
-    acquirer_reconciliation: [],
-    additional_info: {
-      ip_address: '[REDACTED]',
-      items: [Array],
-      payer: [Object],
-      tracking_id: '[REDACTED]'
-    },
-    authorization_code: '[REDACTED]',
-    binary_mode: false,
-    brand_id: '[REDACTED]',
-    build_version: '[REDACTED]',
-    call_for_authorize_id: '[REDACTED]',
-    captured: true,
-    card: {
-      bin: '[REDACTED]',
-      cardholder: [Object],
-      country: '[REDACTED]',
-      date_created: '[REDACTED]',
-      date_last_updated: '[REDACTED]',
-      expiration_month: '[REDACTED]',
-      expiration_year: '[REDACTED]',
-      first_six_digits: '[REDACTED]',
-      id: '[REDACTED]',
-      last_four_digits: '[REDACTED]',
-      tags: [Array]
-    },
-    charges_details: [ [Object] ],
-    charges_execution_info: { internal_execution: [Object] },
-    collector_id: '[REDACTED]',
-    corporation_id: '[REDACTED]',
-    counter_currency: null,
-    coupon_amount: '[REDACTED]',
-    currency_id: '[REDACTED]',
-    date_approved: '[REDACTED]',
-    date_created: '[REDACTED]',
-    date_last_updated: '[REDACTED]',
-    date_of_expiration: null,
-    deduction_schema: null,
-    description: '[REDACTED]',
-    differential_pricing_id: '[REDACTED]',
-    external_reference: '[REDACTED]',
-    fee_details: [ [Object] ],
-    financing_group: '[REDACTED]',
-    id: '[REDACTED]',
-    installments: '[REDACTED]',
-    integrator_id: '[REDACTED]',
-    issuer_id: '[REDACTED]',
-    live_mode: true,
-    marketplace_owner: null,
-    merchant_account_id: '[REDACTED]',
-    merchant_number: null,
-    metadata: {
-      me2_source: '[REDACTED]',
-      migration_applied: true,
-      shipping_method_id: '[REDACTED]',
-      shipping_cost: '[REDACTED]',
-      checkout_version: '[REDACTED]',
-      created_at: '[REDACTED]',
-      total: '[REDACTED]',
-      user_id: '[REDACTED]',
-      subtotal: '[REDACTED]',
-      shipping_address: '[REDACTED]',
-      items: '[REDACTED]',
-      me2_fallback: false,
-      order_id: '[REDACTED]'
-    },
-    money_release_date: '[REDACTED]',
-    money_release_schema: null,
-    money_release_status: '[REDACTED]',
-    notification_url: '[REDACTED]',
-    operation_type: '[REDACTED]',
-    order: { id: '[REDACTED]', type: '[REDACTED]' },
-    payer: {
-      email: '[REDACTED]',
-      entity_type: null,
-      first_name: null,
-      id: '[REDACTED]',
-      identification: '[REDACTED]',
-      last_name: null,
-      operator_id: '[REDACTED]',
-      phone: '[REDACTED]',
-      type: null
-    },
-    payment_method: {
-      data: [Object],
-      id: '[REDACTED]',
-      issuer_id: '[REDACTED]',
-      type: '[REDACTED]'
-    },
-    payment_method_id: '[REDACTED]',
-    payment_type_id: '[REDACTED]',
-    platform_id: '[REDACTED]',
-    point_of_interaction: {
-      application_data: [Object],
-      business_info: [Object],
-      location: [Object],
-      transaction_data: [Object],
-      type: '[REDACTED]'
-    },
-    pos_id: '[REDACTED]',
-    processing_mode: '[REDACTED]',
-    refunds: [],
-    release_info: null,
-    shipping_amount: '[REDACTED]',
-    sponsor_id: '[REDACTED]',
-    statement_descriptor: '[REDACTED]',
-    status: '[REDACTED]',
-    status_detail: '[REDACTED]',
-    store_id: '[REDACTED]',
-    tags: null,
-    taxes_amount: '[REDACTED]',
-    transaction_amount: '[REDACTED]',
-    transaction_amount_refunded: '[REDACTED]',
-    transaction_details: {
-      acquirer_reference: null,
-      external_resource_url: null,
-      financial_institution: null,
-      installment_amount: '[REDACTED]',
-      net_received_amount: '[REDACTED]',
-      overpaid_amount: '[REDACTED]',
-      payable_deferral_period: null,
-      payment_method_reference_id: '[REDACTED]',
-      total_paid_amount: '[REDACTED]'
-    },
-    api_response: { status: '[REDACTED]', headers: [Object] }
-  }
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:34,1765339414405,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:34.405Z - Órdenes obtenidas exitosamente { userId: '[REDACTED]', orderCount: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:34,1765339414412,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:34.411Z - [PaymentProcessor] Insertando pago {
-  paymentId: '[REDACTED]',
-  preferenceId: '[REDACTED]',
-  hasPreference: false
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:33,1765339413723,prototype-ten-dun.vercel.app/api/orders,GET,,200,tfj2v-1765339413723-9d15e453821d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/api/orders,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,620,iad1,313,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VF901E0SC497QGXJ3RB6,Sju1pTMUh3Jk,1
-2025-12-10 04:03:33,1765339413480,prototype-ten-dun.vercel.app/orders,GET,_rsc=1brka,200,kxwgj-1765339413480-7c1002da3e71,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders.rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,11,iad1,297,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VF29SKBWKRZMYCNK9C6R,ZX4rHtH1uyvQ,1
-2025-12-10 04:03:33,1765339413480,prototype-ten-dun.vercel.app/orders,GET,_rsc=1brka,200,kxwgj-1765339413480-7c1002da3e71,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,12,gru1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36VEZN1M931BA27JRS1JD5,m2bl1cRz15di,1
-2025-12-10 04:03:22,1765339402915,prototype-ten-dun.vercel.app/orders,GET,_rsc=hm6w9,200,s5ccd-1765339402915-6b05c52c1189,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,11,gru1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36V4NYSDXEGWRZ1Y1PTK8P,m2bl1cRz15di,1
-2025-12-10 04:03:22,1765339402915,prototype-ten-dun.vercel.app/orders,GET,_rsc=hm6w9,200,s5ccd-1765339402915-6b05c52c1189,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders.rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,18,iad1,297,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36V4RP6M2ATNGSX5AG849C,ZX4rHtH1uyvQ,1
-2025-12-10 04:03:22,1765339402595,prototype-ten-dun.vercel.app/dashboard,GET,payment_id=137235007112&order_id=316&status=success&_rsc=u8umf,200,qnhq4-1765339402595-387025f50945,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,13,gru1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36V4B9K4MCYR9904TE7HHQ,m2bl1cRz15di,1
-2025-12-10 04:03:22,1765339402595,prototype-ten-dun.vercel.app/dashboard,GET,payment_id=137235007112&order_id=316&status=success&_rsc=u8umf,200,qnhq4-1765339402595-387025f50945,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/dashboard.rsc,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,65,iad1,297,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36V4E5BKEY1TDTX2G7JT3C,ZX4rHtH1uyvQ,1
-2025-12-10 04:03:14,1765339394854,prototype-ten-dun.vercel.app/payment-success,HEAD,collection_id=137235007112&collection_status=approved&payment_id=137235007112&status=approved&external_reference=316&payment_type=credit_card&merchant_order_id=36263664577&preference_id=2926966384-81ed2a6c-71b9-4ab8-a447-3172cb854598&site_id=MLA&processing_mode=aggregator&merchant_account_id=null,204,5xbr4-1765339394854-036b4ef4ba00,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,,middleware,middleware,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,12,gru1,132,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36TWS9NZBVTFQM25769HTT,m2bl1cRz15di,1
-2025-12-10 04:03:14,1765339394854,prototype-ten-dun.vercel.app/payment-success,HEAD,collection_id=137235007112&collection_status=approved&payment_id=137235007112&status=approved&external_reference=316&payment_type=credit_card&merchant_order_id=36263664577&preference_id=2926966384-81ed2a6c-71b9-4ab8-a447-3172cb854598&site_id=MLA&processing_mode=aggregator&merchant_account_id=null,204,5xbr4-1765339394854-036b4ef4ba00,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,,static,/payment-success,prototype-ten-dun.vercel.app,prototype-3pk6rr06d-choymingollagmailcoms-projects.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,27,gru1,,,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394325,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:09.602Z - [HMAC-FALLBACK] Pago verificado vía API {
-  paymentId: '[REDACTED]',
-  status: '[REDACTED]',
-  requestId: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394325,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:09.602Z - [HMAC-FALLBACK] Verificación vía API exitosa - procesando pago {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  status: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394325,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:09.603Z - [HMAC-FALLBACK] Procesando con datos de API (sin action requerido) { requestId: '[REDACTED]', paymentId: '[REDACTED]', hasAction: true }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394338,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:14.332Z - [HMAC-FALLBACK] Pago verificado vía API {
-  paymentId: '[REDACTED]',
-  status: '[REDACTED]',
-  requestId: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394338,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:14.332Z - [HMAC-FALLBACK] Verificación vía API exitosa - procesando pago {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  status: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394338,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:14.332Z - [HMAC-FALLBACK] Procesando con datos de API (sin action requerido) { requestId: '[REDACTED]', paymentId: '[REDACTED]', hasAction: false }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394338,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:14.333Z - Duplicate payment ignored {
-  requestId: '[REDACTED]',
-  paymentId: '[REDACTED]',
-  reason: '[REDACTED]'
-}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394343,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:14.343Z - [SUCCESS-FALLBACK] Procesando pago vía success page {
+2025-12-10 05:33:57,1765344837292,prototype-ten-dun.vercel.app/products,GET,_rsc=bh1j1,200,z9mt9-1765344837292-40f958479270,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,12,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0ZNJPWVT94JQ27FRKMPR,mzLy7T5pTeTq,1
+2025-12-10 05:33:55,1765344835308,prototype-ten-dun.vercel.app/orders,GET,_rsc=hm6w9,200,dqt6g-1765344835308-e8664e9f3f8d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,12,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0XQG46WSQ91N907B0T3J,mzLy7T5pTeTq,1
+2025-12-10 05:33:55,1765344835308,prototype-ten-dun.vercel.app/orders,GET,_rsc=hm6w9,200,dqt6g-1765344835308-e8664e9f3f8d,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/orders.rsc,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,9,iad1,293,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0XT42KXW9D9AZJXY3DMB,Oo7JdDPLxxDG,1
+2025-12-10 05:33:55,1765344835065,prototype-ten-dun.vercel.app/dashboard,GET,payment_id=136610823821&order_id=318&status=success&_rsc=u8umf,200,crctd-1765344835065-312458387ac3,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,12,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0XG04PER8HQ1AEQYG6GY,mzLy7T5pTeTq,1
+2025-12-10 05:33:55,1765344835065,prototype-ten-dun.vercel.app/dashboard,GET,payment_id=136610823821&order_id=318&status=success&_rsc=u8umf,200,crctd-1765344835065-312458387ac3,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/dashboard.rsc,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,12,iad1,293,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0XJMV5XH22ANANTX7FHV,Oo7JdDPLxxDG,1
+2025-12-10 05:33:47,1765344827108,prototype-ten-dun.vercel.app/payment-success,HEAD,collection_id=136610823821&collection_status=approved&payment_id=136610823821&status=approved&external_reference=318&payment_type=credit_card&merchant_order_id=36289606732&preference_id=2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874&site_id=MLA&processing_mode=aggregator&merchant_account_id=null,204,ffrsh-1765344827108-b5bc97ebbb0c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,15,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0NQ77MYV7Y7KS089RCE1,mzLy7T5pTeTq,1
+2025-12-10 05:33:47,1765344827108,prototype-ten-dun.vercel.app/payment-success,HEAD,collection_id=136610823821&collection_status=approved&payment_id=136610823821&status=approved&external_reference=318&payment_type=credit_card&merchant_order_id=36289606732&preference_id=2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874&site_id=MLA&processing_mode=aggregator&merchant_account_id=null,204,ffrsh-1765344827108-b5bc97ebbb0c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,,static,/payment-success,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,30,gru1,,,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826651,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.651Z - [SUCCESS-FALLBACK] Procesando pago vía success page {
   payment_id: '[REDACTED]',
   merchant_order_id: '[REDACTED]',
   external_reference: undefined,
   status: '[REDACTED]',
   collection_status: '[REDACTED]'
 }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394344,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,,,,,"[INFO] 2025-12-10T04:03:14.343Z - [SUCCESS-FALLBACK] Pago duplicado detectado por idempotency check {
-  payment_id: '[REDACTED]',
+2025-12-10 05:33:46,1765344826651,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:46.651Z - [Idempotency] Permitiendo procesamiento (validación final en DB) { paymentId: '[REDACTED]' },prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826654,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.654Z - [HMAC-FALLBACK] Pago verificado vía API {
+  paymentId: '[REDACTED]',
+  status: '[REDACTED]',
+  requestId: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826654,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.654Z - [HMAC-FALLBACK] Verificación vía API exitosa - procesando pago {
+  requestId: '[REDACTED]',
+  paymentId: '[REDACTED]',
+  status: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826654,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.654Z - [HMAC-FALLBACK] Procesando con datos de API (sin action requerido) { requestId: '[REDACTED]', paymentId: '[REDACTED]', hasAction: true }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826655,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.654Z - [Idempotency] Duplicado detectado en cache local { paymentId: '[REDACTED]', reason: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826655,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.654Z - Duplicate payment ignored {
+  requestId: '[REDACTED]',
+  paymentId: '[REDACTED]',
+  reason: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826753,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.752Z - [PaymentProcessor] Iniciando procesamiento {
+  paymentId: '[REDACTED]',
+  requestId: '[REDACTED]',
+  requiresManualVerification: false,
+  hmacAuditContext: '[REDACTED]',
+  source: '[REDACTED]',
+  timestamp: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826753,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.752Z - [Idempotency] Duplicado detectado en cache local { paymentId: '[REDACTED]', reason: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826753,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.752Z - [PaymentProcessor] Pago rechazado por cache local {
+  paymentId: '[REDACTED]',
+  requestId: '[REDACTED]',
   reason: '[REDACTED]',
-  existingStatus: undefined,
   source: '[REDACTED]'
 }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
-2025-12-10 04:03:14,1765339394086,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,s5ccd-1765339394086-5f5d1b52c70c,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_BMXJ2FEdsaLM2UFE9uWuHGgJJHef,24,iad1,298,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC36TW863FKJGFC6VK3BXZ59,Sju1pTMUh3Jk,1
+2025-12-10 05:33:46,1765344826753,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:46.752Z - [SUCCESS-FALLBACK] Pago procesado exitosamente { payment_id: '[REDACTED]', status: undefined }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:46,1765344826561,prototype-ten-dun.vercel.app/api/checkout/process-success,POST,,200,h2zrc-1765344826561-7f76ee2c1217,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/api/checkout/process-success,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,125,iad1,270,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0N7Z6VKDZNR0ZFQRPTXH,MKZN0gUyvSSZ,1
+2025-12-10 05:33:46,1765344826100,prototype-ten-dun.vercel.app/cart,GET,_rsc=1jnly,200,ffrsh-1765344826100-3de8dff17c51,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,63,gru1,137,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0MQQ37DGPSS8E7JFR9K9,ojMEEOdLEFM3,1
+2025-12-10 05:33:46,1765344826100,prototype-ten-dun.vercel.app/cart,GET,_rsc=1jnly,200,ffrsh-1765344826100-3de8dff17c51,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/cart.rsc,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,8,iad1,293,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0MW2H8SA4DCNNC4XAVXM,Oo7JdDPLxxDG,1
+2025-12-10 05:33:46,1765344826097,prototype-ten-dun.vercel.app/,GET,_rsc=1jnly,200,g5twl-1765344826097-519f9d86e8ac,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,14,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0MQMS8ADE3HD8ENZHJGC,5FaNUFdLu7Ho,1
+2025-12-10 05:33:46,1765344826097,prototype-ten-dun.vercel.app/,GET,_rsc=1jnly,200,g5twl-1765344826097-519f9d86e8ac,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/index.rsc,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,8,iad1,294,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0MTGV1Q9RS26SGRCXGME,IqKEQ77Bqrqu,1
+2025-12-10 05:33:46,1765344826097,prototype-ten-dun.vercel.app/products,GET,_rsc=1jnly,200,58s74-1765344826097-2bdb2b014c29,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,66,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0MQPYFV9DJDW8MZK0R31,mzLy7T5pTeTq,1
+2025-12-10 05:33:46,1765344826097,prototype-ten-dun.vercel.app/products,GET,_rsc=1jnly,200,58s74-1765344826097-2bdb2b014c29,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/products.rsc,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,9,iad1,294,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0MW0KK0J9ABKEYYMHY0Z,IqKEQ77Bqrqu,1
+2025-12-10 05:33:45,1765344825341,prototype-ten-dun.vercel.app/payment-success,GET,collection_id=136610823821&collection_status=approved&payment_id=136610823821&status=approved&external_reference=318&payment_type=credit_card&merchant_order_id=36289606732&preference_id=2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874&site_id=MLA&processing_mode=aggregator&merchant_account_id=null,200,ffrsh-1765344825341-01a2912fa0c6,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,66,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0M07REJ1J1FV6BYBQ9M6,5FaNUFdLu7Ho,1
+2025-12-10 05:33:45,1765344825341,prototype-ten-dun.vercel.app/payment-success,GET,collection_id=136610823821&collection_status=approved&payment_id=136610823821&status=approved&external_reference=318&payment_type=credit_card&merchant_order_id=36289606732&preference_id=2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874&site_id=MLA&processing_mode=aggregator&merchant_account_id=null,200,ffrsh-1765344825341-01a2912fa0c6,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/payment-success,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,41,iad1,294,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0M4JMJERQP1CY1C8WSW9,IqKEQ77Bqrqu,1
+2025-12-10 05:33:42,1765344822440,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,5cmzg-1765344822404-e191f41ff626,MercadoPago Feed v2.0 merchant_order,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:42.439Z - Webhook received {
+  requestId: '[REDACTED]',
+  signature: '[REDACTED]',
+  bodyLength: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822440,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,5cmzg-1765344822404-e191f41ff626,MercadoPago Feed v2.0 merchant_order,warning,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[WARN] 2025-12-10T05:33:42.440Z - HMAC validation failed - intentando verificación vía API { requestId: '[REDACTED]', reason: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822441,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,5cmzg-1765344822404-e191f41ff626,MercadoPago Feed v2.0 merchant_order,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:42.440Z - [HMAC-FALLBACK] Verificando pago vía API MP { paymentId: '[REDACTED]', requestId: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822404,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,5cmzg-1765344822404-e191f41ff626,MercadoPago Feed v2.0 merchant_order,,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,14,iad1,269,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0H4NBYBP9HQTTMFEV1AP,MKZN0gUyvSSZ,1
+2025-12-10 05:33:42,1765344822343,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=136610823821&topic=payment,200,tflp2-1765344822316-d9909477f3a3,MercadoPago Feed v2.0 payment,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:42.341Z - Webhook received {
+  requestId: '[REDACTED]',
+  signature: '[REDACTED]',
+  bodyLength: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822343,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=136610823821&topic=payment,200,tflp2-1765344822316-d9909477f3a3,MercadoPago Feed v2.0 payment,warning,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[WARN] 2025-12-10T05:33:42.342Z - HMAC validation failed - intentando verificación vía API { requestId: '[REDACTED]', reason: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822343,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=136610823821&topic=payment,200,tflp2-1765344822316-d9909477f3a3,MercadoPago Feed v2.0 payment,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:42.342Z - [HMAC-FALLBACK] Verificando pago vía API MP { paymentId: '[REDACTED]', requestId: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822316,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=136610823821&topic=payment,200,tflp2-1765344822316-d9909477f3a3,MercadoPago Feed v2.0 payment,,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,12,iad1,336,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0H1K09FKKS49485CH665,yf3m92BCAacN,1
+2025-12-10 05:33:42,1765344822348,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=136610823821&type=payment,200,jmc8k-1765344822284-6a7cc533ced4,MercadoPago WebHook v1.0 payment,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:42.347Z - Webhook received {
+  requestId: '[REDACTED]',
+  signature: '[REDACTED]',
+  bodyLength: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822348,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=136610823821&type=payment,200,jmc8k-1765344822284-6a7cc533ced4,MercadoPago WebHook v1.0 payment,warning,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[WARN] 2025-12-10T05:33:42.347Z - HMAC validation failed - intentando verificación vía API { requestId: '[REDACTED]', reason: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822348,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=136610823821&type=payment,200,jmc8k-1765344822284-6a7cc533ced4,MercadoPago WebHook v1.0 payment,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:42.348Z - [HMAC-FALLBACK] Verificando pago vía API MP { paymentId: '[REDACTED]', requestId: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:42,1765344822284,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,data.id=136610823821&type=payment,200,jmc8k-1765344822284-6a7cc533ced4,MercadoPago WebHook v1.0 payment,,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,31,iad1,276,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0H1H7E4VNY269FEXBS81,MKZN0gUyvSSZ,1
+2025-12-10 05:33:41,1765344821499,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,dkmsr-1765344821342-0cb6fa1b2111,MercadoPago Feed v2.0 merchant_order,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:41.489Z - ✅ MERCADO_PAGO_WEBHOOK_SECRET configurado {
+  secretLength: '[REDACTED]',
+  secretPrefix: '[REDACTED]',
+  hasWhitespace: false
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:41,1765344821506,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,dkmsr-1765344821342-0cb6fa1b2111,MercadoPago Feed v2.0 merchant_order,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:41.505Z - Webhook received {
+  requestId: '[REDACTED]',
+  signature: '[REDACTED]',
+  bodyLength: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:41,1765344821507,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,dkmsr-1765344821342-0cb6fa1b2111,MercadoPago Feed v2.0 merchant_order,warning,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[WARN] 2025-12-10T05:33:41.506Z - HMAC validation failed - intentando verificación vía API { requestId: '[REDACTED]', reason: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:41,1765344821507,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,dkmsr-1765344821342-0cb6fa1b2111,MercadoPago Feed v2.0 merchant_order,info,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:41.507Z - [HMAC-FALLBACK] Verificando pago vía API MP { paymentId: '[REDACTED]', requestId: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:41,1765344821342,prototype-ten-dun.vercel.app/api/webhooks/mercadopago,POST,id=36289606732&topic=merchant_order,200,dkmsr-1765344821342-0cb6fa1b2111,MercadoPago Feed v2.0 merchant_order,,production,main,MISS,serverless,/api/webhooks/mercadopago,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,67,iad1,275,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C0G5ZHGYSAF2F5B9YGM35,MKZN0gUyvSSZ,1
+2025-12-10 05:33:32,1765344812942,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:32.942Z - Checkout: Verificando existencia de usuario { userId: '[REDACTED]' },prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812950,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:32.948Z - Checkout: Usuario verificado correctamente { userId: '[REDACTED]', userEmail: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812950,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:32.948Z - Checkout: Verificando stock de items { itemCount: '[REDACTED]' },prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812982,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:32.955Z - Checkout: Verificación de stock completada exitosamente,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812982,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:32.960Z - [ME2] API: Iniciando cálculo con validación {
+  zipcode: '[REDACTED]',
+  itemCount: '[REDACTED]',
+  allowFallback: true,
+  items: [ { id: '[REDACTED]', quantity: '[REDACTED]', price: '[REDACTED]' } ]
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812982,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:32.961Z - [ME2] Dimensiones calculadas {
+  productCount: '[REDACTED]',
+  dimensions: {
+    height: '[REDACTED]',
+    width: '[REDACTED]',
+    length: '[REDACTED]',
+    weight: '[REDACTED]'
+  },
+  usesDefaults: false
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812982,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:32.961Z - [ME2] Validación: Resultado {
+  canUseME2: true,
+  reason: '[REDACTED]',
+  missingAttributes: [],
+  warningsCount: '[REDACTED]',
+  hasDimensions: true
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812982,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:32.961Z - [ME2] Cache: Usando resultado cacheado { cacheKey: '[REDACTED]' },prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812982,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:32.961Z - Shipping cost calculated via ME2/core {
+  zipcode: '[REDACTED]',
+  cost: '[REDACTED]',
+  method: '[REDACTED]',
+  selectedMethodId: '[REDACTED]',
+  matchedSelectedMethod: true,
+  source: '[REDACTED]',
+  fallback: false
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812999,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:32.984Z - Items transferidos a orderItems { orderId: '[REDACTED]', itemsCount: '[REDACTED]' }",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:33,1765344813241,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"Respuesta completa de Mercado Pago: {
+  ""additional_info"": """",
+  ""auto_return"": """",
+  ""back_urls"": {
+    ""failure"": ""https://prototype-ten-dun.vercel.app/payment-failure"",
+    ""pending"": ""https://prototype-ten-dun.vercel.app/payment-pending"",
+    ""success"": ""https://prototype-ten-dun.vercel.app/payment-success""
+  },
+  ""binary_mode"": false,
+  ""client_id"": ""3512407382157264"",
+  ""collector_id"": 2926966384,
+  ""coupon_code"": null,
+  ""coupon_labels"": null,
+  ""date_created"": ""2025-12-10T01:33:33.201-04:00"",
+  ""date_of_expiration"": null,
+  ""expiration_date_from"": null,
+  ""expiration_date_to"": null,
+  ""expires"": false,
+  ""external_reference"": ""318"",
+  ""id"": ""2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874"",
+  ""init_point"": ""https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874"",
+  ""internal_metadata"": null,
+  ""items"": [
+    {
+      ""id"": ""34"",
+      ""category_id"": ""others"",
+      ""currency_id"": ""ARS"",
+      ""description"": ""Producto: Iphone 14 pro max - Cantidad: 1"",
+      ""title"": ""Iphone 14 pro max"",
+      ""quantity"": 1,
+      ""unit_price"": 208108.8
+    },
+    {
+      ""id"": ""shipping-504345"",
+      ""category_id"": ""others"",
+      ""currency_id"": ""ARS"",
+      ""description"": ""Costo de envío a catamarca, capital (CP: 4700)"",
+      ""title"": ""Envío - Estándar a sucursal de correo"",
+      ""quantity"": 1,
+      ""unit_price"": 10482.49
+    }
+  ],
+  ""marketplace"": ""NONE"",
+  ""marketplace_fee"": 0,
+  ""metadata"": {
+    ""checkout_version"": ""1.0"",
+    ""created_at"": ""2025-12-10T05:33:32.984Z"",
+    ""items"": ""[{\""id\"":34,\""name\"":\""Iphone 14 pro max\"",\""price\"":231232,\""quantity\"":1,\""image\"":\""https://20lpb59xfvej5gj9.public.blob.vercel-storage.com/products/1764049188093-wy7wpf-catNegro-1WIvnrMQtUl8zIk5Yo13QnZh1S7RKO.png\"",\""discount\"":10,\""variantId\"":null}]"",
+    ""me2_fallback"": false,
+    ""me2_source"": ""me2"",
+    ""migration_applied"": true,
+    ""order_id"": ""318"",
+    ""shipping_address"": {
+      ""ciudad"": ""catamarca"",
+      ""codigoPostal"": ""4700"",
+      ""departamento"": """",
+      ""direccion"": ""dr carlos a herrera c 18"",
+      ""nombre"": ""francisco mingolla"",
+      ""numero"": ""18"",
+      ""piso"": """",
+      ""provincia"": ""capital"",
+      ""telefono"": ""3834046923""
+    },
+    ""shipping_cost"": ""10482.49"",
+    ""shipping_method_id"": ""504345"",
+    ""subtotal"": ""208108.80000000002"",
+    ""total"": ""218591.29"",
+    ""user_id"": ""9""
+  },
+  ""notification_url"": ""https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago"",
+  ""operation_type"": ""regular_payment"",
+  ""payer"": {
+    ""phone"": {
+      ""area_code"": """",
+      ""number"": ""3834046923""
+    },
+    ""address"": {
+      ""zip_code"": ""4700"",
+      ""street_name"": ""dr carlos a herrera c 18"",
+      ""street_number"": ""18""
+    },
+    ""email"": ""test@gmail.com"",
+    ""identification"": {
+      ""number"": ""42843636"",
+      ""type"": ""DNI""
+    },
+    ""name"": ""test"",
+    ""surname"": """",
+    ""date_created"": null,
+    ""last_purchase"": null
+  },
+  ""payment_methods"": {
+    ""default_card_id"": null,
+    ""default_payment_method_id"": null,
+    ""excluded_payment_methods"": [
+      {
+        ""id"": """"
+      }
+    ],
+    ""excluded_payment_types"": [
+      {
+        ""id"": """"
+      }
+    ],
+    ""installments"": 12,
+    ""default_installments"": null
+  },
+  ""processing_modes"": null,
+  ""product_id"": null,
+  ""preference_expired"": false,
+  ""redirect_urls"": {
+    ""failure"": """",
+    ""pending"": """",
+    ""success"": """"
+  },
+  ""sandbox_init_point"": ""https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=2926966384-1b610e7b-bb1d-46b2-a343-626e1e0ae874"",
+  ""site_id"": ""MLA"",
+  ""shipments"": {
+    ""default_shipping_method"": null,
+    ""receiver_address"": {
+      ""zip_code"": """",
+      ""street_name"": """",
+      ""street_number"": null,
+      ""floor"": """",
+      ""apartment"": """",
+      ""city_name"": null,
+      ""state_name"": null,
+      ""country_name"": null,
+      ""neighborhood"": null
+    }
+  },
+  ""total_amount"": null,
+  ""last_updated"": null,
+  ""financing_group"": """",
+  ""api_response"": {
+    ""status"": 201,
+    ""headers"": {
+      ""date"": [
+        ""Wed, 10 Dec 2025 05:33:33 GMT""
+      ],
+      ""content-type"": [
+        ""application/json; charset=utf-8""
+      ],
+      ""content-length"": [
+        ""1393""
+      ],
+      ""connection"": [
+        ""keep-alive""
+      ],
+      ""content-encoding"": [
+        ""gzip""
+      ],
+      ""vary"": [
+        ""Accept-Encoding""
+      ],
+      ""x-content-type-options"": [
+        ""nosniff""
+      ],
+      ""x-request-id"": [
+        ""99b5ffbe-f873-4ece-91fd-f0a773dffec8""
+      ],
+      ""x-xss-protection"": [
+        ""1; mode=block""
+      ],
+      ""strict-transport-security"": [
+        ""max-age=16070400; includeSubDomains; preload, max-age=31536000; includeSubDomains""
+      ],
+      ""access-control-allow-origin"": [
+        ""*""
+      ],
+      ""access-control-allow-headers"": [
+        ""Content-Type""
+      ],
+      ""access-control-allow-methods"": [
+        ""PUT, GET, POST, DELETE, OPTIONS""
+      ],
+      ""access-control-max-age"": [
+        ""86400""
+      ],
+      ""timing-allow-origin"": [
+        ""*""
+      ]
+    }
+  }
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:33,1765344813241,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,Environment check - NODE_ENV: production,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:33,1765344813241,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,Environment check - SUCCESS_URL: https://prototype-ten-dun.vercel.app/payment-success,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:33,1765344813241,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,Environment check - VERCEL_URL: prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:33,1765344813241,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:33.240Z - Checkout: Preferencia de MercadoPago creada exitosamente {
+  preferenceId: '[REDACTED]',
+  initPoint: '[REDACTED]',
+  total: '[REDACTED]',
+  itemsCount: '[REDACTED]',
+  shippingCost: '[REDACTED]',
+  orderId: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:32,1765344812810,prototype-ten-dun.vercel.app/api/checkout,POST,,200,q5nwk-1765344812810-35e5dc0b3a52,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/api/checkout,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,360,iad1,275,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C07T9DTGHCR5P7DZ7GP4P,MKZN0gUyvSSZ,1
+2025-12-10 05:33:31,1765344811269,prototype-ten-dun.vercel.app/payment-success,GET,collection_id=136610902995&collection_status=approved&payment_id=136610902995&status=approved&external_reference=317&payment_type=credit_card&merchant_order_id=36264245355&preference_id=2926966384-5ce3fc5d-3bb9-4cb6-b3f5-af743871c579&site_id=MLA&processing_mode=aggregator&merchant_account_id=null&_rsc=1ybrp,200,z9mt9-1765344811269-c597e28c9745,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,middleware,middleware,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,14,gru1,140,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C068ASFT28ST2F2FF5FXG,5FaNUFdLu7Ho,1
+2025-12-10 05:33:31,1765344811269,prototype-ten-dun.vercel.app/payment-success,GET,collection_id=136610902995&collection_status=approved&payment_id=136610902995&status=approved&external_reference=317&payment_type=credit_card&merchant_order_id=36264245355&preference_id=2926966384-5ce3fc5d-3bb9-4cb6-b3f5-af743871c579&site_id=MLA&processing_mode=aggregator&merchant_account_id=null&_rsc=1ybrp,200,z9mt9-1765344811269-c597e28c9745,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/payment-success.rsc,prototype-ten-dun.vercel.app,prototype-27gv7u0nb-choymingollagmailcoms-projects.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,16,iad1,293,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C06FQW3ETVSYR6M91CWKX,IqKEQ77Bqrqu,1
+2025-12-10 05:33:31,1765344811362,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:31.360Z - [ME2] Cache: Cleanup interval iniciado,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811372,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.370Z - [ME2] API: Iniciando cálculo de envío {
+  method: '[REDACTED]',
+  url: '[REDACTED]',
+  requestId: '[REDACTED]',
+  userAgent: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811378,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.378Z - [ME2] Request: Datos recibidos {
+  requestId: '[REDACTED]',
+  zipcode: '[REDACTED]',
+  itemsCount: '[REDACTED]',
+  logisticType: '[REDACTED]',
+  allowFallback: true,
+  userEmail: '[REDACTED]',
+  items: [
+    {
+      id: '[REDACTED]',
+      quantity: '[REDACTED]',
+      price: '[REDACTED]',
+      hasMlItemId: '[REDACTED]',
+      hasWeight: false,
+      hasDimensions: false
+    }
+  ]
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811390,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.385Z - [ME2] API: Iniciando cálculo con validación {
+  zipcode: '[REDACTED]',
+  itemCount: '[REDACTED]',
+  allowFallback: true,
+  items: [ { id: '[REDACTED]', quantity: '[REDACTED]', price: '[REDACTED]' } ]
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811390,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.386Z - [ME2] Dimensiones calculadas {
+  productCount: '[REDACTED]',
+  dimensions: {
+    height: '[REDACTED]',
+    width: '[REDACTED]',
+    length: '[REDACTED]',
+    weight: '[REDACTED]'
+  },
+  usesDefaults: false
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811390,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.386Z - [ME2] Validación: Resultado {
+  canUseME2: true,
+  reason: '[REDACTED]',
+  missingAttributes: [],
+  warningsCount: '[REDACTED]',
+  hasDimensions: true
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811405,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.405Z - [ME2] API: Consultando Mercado Libre {
+  url: '[REDACTED]',
+  zipcode: '[REDACTED]',
+  itemId: '[REDACTED]',
+  dimensions: {
+    height: '[REDACTED]',
+    width: '[REDACTED]',
+    length: '[REDACTED]',
+    weight: '[REDACTED]'
+  },
+  quantity: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811625,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,[INFO] 2025-12-10T05:33:31.624Z - [ME2] Cache: Resultado guardado { cacheKey: '[REDACTED]' },prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811625,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.625Z - [ME2] API: Cálculo completado {
+  zipcode: '[REDACTED]',
+  success: true,
+  source: '[REDACTED]',
+  fallback: false,
+  optionsCount: '[REDACTED]',
+  totalCost: '[REDACTED]',
+  warningsCount: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811626,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",info,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,,,,,"[INFO] 2025-12-10T05:33:31.625Z - [ME2] Response: Cálculo ME2 completado {
+  requestId: '[REDACTED]',
+  zipcode: '[REDACTED]',
+  success: true,
+  optionsCount: '[REDACTED]',
+  source: '[REDACTED]',
+  fallback: false,
+  hasFreeShipping: '[REDACTED]',
+  totalCost: '[REDACTED]',
+  warningsCount: '[REDACTED]'
+}",prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,,,
+2025-12-10 05:33:31,1765344811264,prototype-ten-dun.vercel.app/api/shipments/calculate,POST,,200,q5nwk-1765344811264-33d1f0dcb7b1,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",,production,main,MISS,serverless,/api/shipments/calculate,prototype-ten-dun.vercel.app,prototype-ten-dun.vercel.app,dpl_8UZFUyDRa7WdAmE5Kp2FGDvW9Ycs,287,iad1,275,2048,,prj_FRjvNUrtyaiyRRYLyajvv7H5yA0p,,,01KC3C06A2G0D5QZF081ARS5N9,MKZN0gUyvSSZ,1

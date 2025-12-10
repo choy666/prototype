@@ -134,6 +134,9 @@ function validateHmacV1(
           signatureHeader: signature,
           secretLength: MP_SECRET?.length || 0,
           secretPrefix: MP_SECRET?.substring(0, 8) + '...',
+          rawHeaders: headers,
+          userAgent: headers['user-agent'],
+          mpVersion: headers['x-mp-version'],
         }
       });
       return { ok: false, reason: 'Invalid signature' };
