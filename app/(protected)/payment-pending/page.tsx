@@ -21,6 +21,17 @@ export default function PaymentPendingPage() {
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successShownAtRef = useRef<number | null>(null);
+
+  // Función para registrar cuándo se mostró el éxito (solo la primera vez)
+  const markSuccessShown = () => {
+    if (successShownAtRef.current === null) {
+      successShownAtRef.current = Date.now();
+      console.log('[PENDING] Pendiente mostrado, iniciando countdown de 6 segundos');
+    } else {
+      console.log('[PENDING] Pendiente ya fue marcado previamente, ignorando llamada duplicada');
+    }
+  };
 
   // Función para redirigir con validación de tiempo
   const performRedirect = useCallback(() => {
@@ -149,9 +160,20 @@ export default function PaymentPendingPage() {
       return;
     }
 
-    // Para pagos pendientes, mantener en espera hasta confirmación
+    // Para pagos pendientes, esperar 6 segundos antes de redirigir
     if (status === 'pending' && paymentId) {
-      setIsProcessing(true); // Mantener procesando hasta que se confirme
+      setIsProcessing(false);
+      markSuccessShown(); // Marcar cuándo se mostró el estado pendiente
+      
+      // Limpiar timeout anterior si existe
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      
+      // Redirigir después de exactamente 6 segundos
+      redirectTimeoutRef.current = setTimeout(() => {
+        performRedirect();
+      }, 6000);
       return;
     }
   }, [paymentDetails, orderStatus, router, performRedirect]);
@@ -254,7 +276,7 @@ export default function PaymentPendingPage() {
               
               <div className='flex items-center justify-center space-x-2 text-gray-600'>
                 <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-600'></div>
-                <span>Estamos verificando tu pago con Mercado Pago, serás redirigido automáticamente cuando se confirme</span>
+                <span>Estamos verificando tu pago con Mercado Pago, serás redirigido en 6 segundos</span>
               </div>
               
               {showTimeoutMessage && (

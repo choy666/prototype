@@ -20,6 +20,17 @@ export default function PaymentFailurePage() {
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const failureShownAtRef = useRef<number | null>(null);
+
+  // Función para registrar cuándo se mostró el fallo (solo la primera vez)
+  const markFailureShown = () => {
+    if (failureShownAtRef.current === null) {
+      failureShownAtRef.current = Date.now();
+      console.log('[FAILURE] Fallo mostrado, iniciando countdown de 6 segundos');
+    } else {
+      console.log('[FAILURE] Fallo ya fue marcado previamente, ignorando llamada duplicada');
+    }
+  };
 
   // Función para redirigir con validación de tiempo
   const performRedirect = useCallback(() => {
@@ -139,11 +150,20 @@ export default function PaymentFailurePage() {
   useEffect(() => {
     const { paymentId, status } = paymentDetails;
 
-    // Para pagos fallidos, redirigir inmediatamente (no hay nada que esperar)
+    // Para pagos fallidos, esperar 6 segundos antes de redirigir
     if ((status === 'rejected' || status === 'cancelled' || status === 'failed') && paymentId) {
-      console.log('[FAILURE] Pago fallido confirmado, redirigiendo al dashboard');
       setIsProcessing(false);
-      performRedirect();
+      markFailureShown(); // Marcar cuándo se mostró el estado de fallo
+      
+      // Limpiar timeout anterior si existe
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      
+      // Redirigir después de exactamente 6 segundos
+      redirectTimeoutRef.current = setTimeout(() => {
+        performRedirect();
+      }, 6000);
       return;
     }
   }, [paymentDetails, router, performRedirect]);
@@ -229,7 +249,7 @@ export default function PaymentFailurePage() {
               
               <div className='flex items-center justify-center space-x-2 text-gray-600'>
                 <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-red-600'></div>
-                <span>Estamos verificando el estado de tu pago con Mercado Pago...</span>
+                <span>Estamos verificando el estado de tu pago con Mercado Pago, serás redirigido en 6 segundos</span>
               </div>
               
               {showTimeoutMessage && (
@@ -258,7 +278,7 @@ export default function PaymentFailurePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-2 text-gray-600">
                 <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600'></div>
-                <span>Redirigiendo al dashboard...</span>
+                <span>Redirigiendo al dashboard en 6 segundos...</span>
               </div>
               
               <div className="text-sm text-gray-500 text-center">
