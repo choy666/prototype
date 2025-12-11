@@ -3,13 +3,9 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
-import { ThemeProvider } from '@/components/theme-provider'
-import { AuthProvider } from '@/components/auth-provider'
-import Navbar from '@/components/ui/Navbar'
-import Footer from '@/components/ui/Footer'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import ErrorFallback from '@/components/ui/ErrorFallback'
-import { SkipLink } from '@/components/ui/SkipLink'
+import { ConditionalLayout } from './ConditionalLayout'
 import { auth } from '@/lib/actions/auth'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -32,21 +28,9 @@ export default async function RootLayout({
         <ErrorBoundary
           fallback={<ErrorFallback />}
         >
-          <AuthProvider session={session}>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <SkipLink />
-              <Navbar />
-              <main id="main-content">
-                {children}
-              </main>
-              <Footer />
-            </ThemeProvider>
-          </AuthProvider>
+          <ConditionalLayout session={session}>
+            {children}
+          </ConditionalLayout>
         </ErrorBoundary>
         <Toaster />
       </body>

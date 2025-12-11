@@ -360,6 +360,7 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     originalStatus: status,
     newOrderStatus,
     requiresManualVerification: ['approved', 'pending', 'in_process', 'authorised'].includes(status),
+    willAdjustStock: ['approved', 'pending'].includes(status), // 🔥 Corregido: approved y pending ajustan stock
   });
 
   // Actualizar orden
@@ -387,7 +388,7 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     newStatus: newOrderStatus,
   });
 
-  // 🔥 AJUSTE DE STOCK CRÍTICO: Solo para pagos aprobados/pending
+  // 🔥 AJUSTE DE STOCK CRÍTICO: Para pagos aprobados y pending (reservar inventario)
   if (['approved', 'pending'].includes(status)) {
     const paymentIdStr = paymentData.id?.toString() || paymentData.id?.toString() || 'unknown';
     await adjustStockForOrder(preference.orderId, paymentIdStr);
