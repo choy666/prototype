@@ -56,3 +56,5 @@
  Vercel: configuración y variables de entorno
  CI/CD automatizado
  fin.
+
+ 
