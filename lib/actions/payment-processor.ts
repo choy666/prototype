@@ -200,6 +200,39 @@ export async function processPaymentWebhook(
               status: paymentData.status,
               existingPaymentCount: existingPayment.length,
             });
+            
+            // 🔥 NUEVO: Intentar buscar por external_reference directamente si no hay preferenceId
+            // Esto puede pasar si el primer pago no guardó preferenceId correctamente
+            if (paymentData.external_reference) {
+              logger.info('[PaymentProcessor] Buscando orden por external_reference como fallback', {
+                paymentId,
+                externalReference: paymentData.external_reference,
+              });
+              
+              const prefByExtRef = await db
+                .select({ orderId: mercadopagoPreferences.orderId })
+                .from(mercadopagoPreferences)
+                .where(eq(mercadopagoPreferences.externalReference, paymentData.external_reference))
+                .limit(1);
+                
+              if (prefByExtRef.length > 0 && prefByExtRef[0].orderId) {
+                const orderCheck = await db
+                  .select({ stockDeducted: orders.stockDeducted })
+                  .from(orders)
+                  .where(eq(orders.id, prefByExtRef[0].orderId))
+                  .limit(1);
+                  
+                if (orderCheck.length > 0 && !orderCheck[0].stockDeducted) {
+                  logger.info('[PaymentProcessor] Ajustando stock via external_reference fallback', {
+                    paymentId,
+                    orderId: prefByExtRef[0].orderId,
+                    externalReference: paymentData.external_reference,
+                  });
+                  
+                  await adjustStockForOrder(prefByExtRef[0].orderId, paymentId.toString());
+                }
+              }
+            }
           }
         }
       } catch (error) {
@@ -243,10 +276,35 @@ export async function processPaymentWebhook(
       throw new Error('paymentData.status es requerido');
     }
 
+    // 🔥 CORRECCIÓN: Buscar preferenceId en DB si no viene en paymentData
+    let preferenceId = paymentData.preference_id?.toString() || null;
+    
+    if (!preferenceId && paymentData.external_reference) {
+      logger.info('[PaymentProcessor] Buscando preferenceId en DB via external_reference', {
+        paymentId: paymentData.id?.toString() || paymentId,
+        externalReference: paymentData.external_reference,
+      });
+      
+      const prefByExtRef = await db
+        .select({ preferenceId: mercadopagoPreferences.preferenceId })
+        .from(mercadopagoPreferences)
+        .where(eq(mercadopagoPreferences.externalReference, paymentData.external_reference))
+        .limit(1);
+        
+      if (prefByExtRef.length > 0 && prefByExtRef[0].preferenceId) {
+        preferenceId = prefByExtRef[0].preferenceId;
+        logger.info('[PaymentProcessor] preferenceId encontrado en DB', {
+          paymentId: paymentData.id?.toString() || paymentId,
+          preferenceId,
+          externalReference: paymentData.external_reference,
+        });
+      }
+    }
+
     // Insertar nuevo pago con campos de auditoría HMAC
     const insertData = {
       paymentId: paymentData.id?.toString() || paymentId,
-      preferenceId: paymentData.preference_id?.toString() || null,
+      preferenceId: preferenceId, // 🔥 Usar preferenceId encontrado en DB
       status: paymentData.status,
       paymentMethodId: paymentData.payment_method_id?.toString() || null,
       paymentMethodType: paymentData.payment_method?.type?.toString() || null,

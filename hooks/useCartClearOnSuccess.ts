@@ -29,6 +29,7 @@ interface UseCartClearOnSuccessOptions {
 interface PaymentInfo {
   paymentId: string | null;
   merchantOrderId: string | null;
+  externalReference: string | null;
   status: string | null;
   collectionStatus: string | null;
   paymentType: string | null;
@@ -53,9 +54,9 @@ export function useCartClearOnSuccess(options: UseCartClearOnSuccessOptions = {}
     return {
       paymentId: searchParams.get('payment_id'),
       merchantOrderId:
-        searchParams.get('external_reference') ||
         searchParams.get('merchant_order_id') ||
         searchParams.get('order_id'),
+      externalReference: searchParams.get('external_reference'),
       status: searchParams.get('status'),
       collectionStatus: searchParams.get('collection_status'),
       paymentType: searchParams.get('payment_type'),

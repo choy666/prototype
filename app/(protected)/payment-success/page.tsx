@@ -93,6 +93,7 @@ export default function PaymentSuccess() {
             body: JSON.stringify({
               payment_id: paymentId,
               merchant_order_id: merchantOrderId,
+              external_reference: paymentInfo.externalReference,
               status: status,
               collection_status: collectionStatus,
             }),
