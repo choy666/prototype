@@ -14,23 +14,11 @@ export default function PaymentSuccess() {
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const successShownAtRef = useRef<number | null>(null);
   const processedPaymentRef = useRef<string | null>(null);
-
-  // Función para verificar si ya pasaron 9 segundos desde el éxito
-  const canRedirect = () => {
-    return successShownAtRef.current !== null && 
-           Date.now() >= successShownAtRef.current + 9000;
-  };
 
   // Función para registrar cuándo se mostró el éxito (solo la primera vez)
   const markSuccessShown = () => {
-    if (successShownAtRef.current === null) {
-      successShownAtRef.current = Date.now();
-      console.log('[TIMER] Éxito mostrado, iniciando countdown de 9 segundos');
-    } else {
-      console.log('[TIMER] Éxito ya fue marcado previamente, ignorando llamada duplicada');
-    }
+    console.log('[SUCCESS] Éxito mostrado, iniciando procesamiento');
   };
 
   // Usar el hook personalizado para manejar la limpieza del carrito
@@ -237,47 +225,18 @@ export default function PaymentSuccess() {
     // Solo redirigir cuando tengamos confirmación del estado del pedido
     const { paymentId, merchantOrderId, collectionStatus, status } = paymentInfo;
 
-    // Si ya tenemos estado confirmado localmente, redirigir SOLO si pasaron 9 segundos
+    // Si ya tenemos estado confirmado localmente, redirigir inmediatamente
     if (orderStatus && (orderStatus === 'paid' || orderStatus === 'delivered' || orderStatus === 'processing')) {
+      console.log('[SUCCESS] Pedido confirmado localmente, redirigiendo al dashboard');
       setIsProcessing(false);
-      if (canRedirect()) {
-        performRedirect();
-      } else {
-        // Programar redirect para exactamente 9 segundos después del éxito
-        if (redirectTimeoutRef.current) {
-          clearTimeout(redirectTimeoutRef.current);
-        }
-        // Si no tenemos timestamp de éxito, no podemos calcular tiempo restante
-        if (successShownAtRef.current === null) {
-          console.log('[TIMER] Error: timestamp de éxito no disponible, esperando...');
-          return;
-        }
-        const remainingTime = Math.max(0, 9000 - (Date.now() - successShownAtRef.current));
-        console.log(`[TIMER] Tiempo restante para redirect: ${remainingTime}ms`);
-        redirectTimeoutRef.current = setTimeout(() => {
-          performRedirect();
-        }, remainingTime);
-      }
+      performRedirect();
       return;
     }
 
-    // Si Mercado Pago indica aprobado pero aún no está confirmado localmente, esperar un momento antes de redirigir
+    // Si Mercado Pago indica aprobado pero aún no está confirmado localmente, esperar confirmación
     if (collectionStatus === 'approved' || status === 'approved') {
-      setIsProcessing(false);
+      setIsProcessing(true); // Mantener procesando hasta que se confirme localmente
       markSuccessShown(); // Marcar cuándo se mostró el éxito
-      
-      // Limpiar timeout anterior si existe
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-      
-      // Validar que tenemos paymentId antes de redirigir
-      if (paymentId) {
-        // Redirigir después de exactamente 9 segundos
-        redirectTimeoutRef.current = setTimeout(() => {
-          performRedirect();
-        }, 9000);
-      }
       return;
     }
 
@@ -301,9 +260,10 @@ export default function PaymentSuccess() {
 
   // Cleanup de timeouts cuando el componente se desmonta
   useEffect(() => {
+    const timeoutRef = redirectTimeoutRef.current;
     return () => {
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
+      if (timeoutRef) {
+        clearTimeout(timeoutRef);
       }
     };
   }, []);
@@ -420,7 +380,7 @@ export default function PaymentSuccess() {
               
               <div className='flex items-center justify-center space-x-2 text-gray-600'>
                 <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600'></div>
-                <span>Estamos terminando de procesar tu compra, en breve te redirigimos al dashboard</span>
+                <span>Estamos procesando tu pago con Mercado Pago, serás redirigido automáticamente cuando se confirme</span>
               </div>
               
               {showTimeoutMessage && (
@@ -450,11 +410,11 @@ export default function PaymentSuccess() {
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-2 text-gray-600">
                 <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600'></div>
-                <span>Estamos terminando de procesar tu compra, en breve te redirigimos al dashboard</span>
+                <span>Redirigiendo al dashboard...</span>
               </div>
               
               <div className="text-sm text-gray-500 text-center">
-                Por favor espera mientras completamos los últimos detalles de tu pedido...
+                Por favor espera mientras te redirigimos...
               </div>
             </div>
           )}
