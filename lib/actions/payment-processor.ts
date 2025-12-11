@@ -137,6 +137,78 @@ export async function processPaymentWebhook(
                 requiresManualVerification ? 'hmac-fallback' : 'webhook',
       });
       
+      // 🔥 IMPORTANTE: Verificar si el stock necesita ajuste incluso en pagos duplicados
+      // Esto puede ocurrir si el primer intento falló antes de ajustar stock
+      try {
+        const payment = new Payment(client);
+        const paymentData = await payment.get({ id: paymentId }) as unknown as ExtendedPaymentResponse;
+        
+        logger.info('[PaymentProcessor] Verificando stock en pago duplicado', {
+          paymentId,
+          status: paymentData.status,
+          requiresManualVerification,
+        });
+        
+        // Si el pago es approved o pending, verificar si el stock ya fue ajustado
+        if (['approved', 'pending'].includes(paymentData.status)) {
+          // 🔥 CORRECCIÓN: Buscar preferencia en tabla de pagos ya existentes
+          // Ya que external_reference y preference_id vienen undefined
+          const existingPayment = await db
+            .select({ preferenceId: mercadopagoPayments.preferenceId })
+            .from(mercadopagoPayments)
+            .where(eq(mercadopagoPayments.paymentId, paymentId.toString()))
+            .limit(1);
+            
+          if (existingPayment.length > 0 && existingPayment[0].preferenceId) {
+            // Obtener orden a partir de la preferencia encontrada
+            // 🔥 CORRECCIÓN: Convertir preferenceId a number para el where
+            const preference = await db
+              .select({ orderId: mercadopagoPreferences.orderId })
+              .from(mercadopagoPreferences)
+              .where(eq(mercadopagoPreferences.preferenceId, existingPayment[0].preferenceId))
+              .limit(1);
+              
+            if (preference.length > 0 && preference[0].orderId) {
+              // Verificar si el stock ya fue deducido
+              const orderCheck = await db
+                .select({ stockDeducted: orders.stockDeducted })
+                .from(orders)
+                .where(eq(orders.id, preference[0].orderId))
+                .limit(1);
+                
+              if (orderCheck.length > 0 && !orderCheck[0].stockDeducted) {
+                logger.info('[PaymentProcessor] Stock no deducido en pago duplicado - ajustando', {
+                  paymentId,
+                  orderId: preference[0].orderId,
+                  status: paymentData.status,
+                  preferenceId: existingPayment[0].preferenceId,
+                });
+                
+                // Ajustar stock si no fue deducido previamente
+                await adjustStockForOrder(preference[0].orderId, paymentId.toString());
+              } else {
+                logger.info('[PaymentProcessor] Stock ya deducido en pago duplicado', {
+                  paymentId,
+                  orderId: preference[0].orderId,
+                  stockDeducted: orderCheck[0]?.stockDeducted,
+                });
+              }
+            }
+          } else {
+            logger.warn('[PaymentProcessor] No se encontró preferencia para pago duplicado', {
+              paymentId,
+              status: paymentData.status,
+              existingPaymentCount: existingPayment.length,
+            });
+          }
+        }
+      } catch (error) {
+        logger.error('[PaymentProcessor] Error verificando stock en pago duplicado', {
+          paymentId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      
       return {
         success: true,
         alreadyProcessed: true,
@@ -285,15 +357,20 @@ interface PaymentStatusPayload {
   id?: string | number;
   status?: string;
   external_reference?: string;
+  preference_id?: string; // 🔥 Agregar preference_id como alternativa
 }
 
 async function processStatusChange(paymentData: PaymentStatusPayload): Promise<void> {
   const status = paymentData.status;
   const externalReference = paymentData.external_reference;
+  const preferenceId = paymentData.preference_id; // 🔥 Usar preference_id si external_reference no existe
 
-  if (!externalReference) {
-    logger.warn('[PaymentProcessor] Sin external_reference', {
+  // 🔥 CORRECCIÓN: Permitir procesamiento si tenemos preference_id
+  if (!externalReference && !preferenceId) {
+    logger.warn('[PaymentProcessor] Sin external_reference ni preference_id', {
       paymentId: paymentData.id,
+      hasExternalReference: !!externalReference,
+      hasPreferenceId: !!preferenceId,
     });
     return;
   }
@@ -305,29 +382,53 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     return;
   }
 
-  // Buscar preferencia asociada (convertir a string para normalizar)
-  const normalizedExternalReference = String(externalReference);
-  logger.info('[PaymentProcessor] Buscando preferencia', {
-    paymentId: paymentData.id,
-    originalExternalReference: externalReference,
-    normalizedExternalReference,
-  });
+  // Buscar preferencia asociada
+  let preference: {
+    id: number;
+    orderId: number | null;
+    preferenceId: string | null;
+    externalReference: string | null;
+  } | null | undefined = null;
   
-  const preference = await db.query.mercadopagoPreferences.findFirst({
-    where: eq(mercadopagoPreferences.externalReference, normalizedExternalReference),
-  });
+  if (preferenceId) {
+    // 🔥 NUEVO: Buscar por ID de preferencia si external_reference no existe
+    logger.info('[PaymentProcessor] Buscando preferencia por ID', {
+      paymentId: paymentData.id,
+      preferenceId,
+    });
+    
+    // 🔥 CORRECCIÓN: preferenceId es string pero el campo es serial (number)
+    // Necesitamos buscar por preferenceId en lugar de id
+    preference = await db.query.mercadopagoPreferences.findFirst({
+      where: eq(mercadopagoPreferences.preferenceId, preferenceId),
+    });
+  } else {
+    // ANTIGuo: Buscar por external_reference
+    const normalizedExternalReference = String(externalReference);
+    logger.info('[PaymentProcessor] Buscando preferencia por external_reference', {
+      paymentId: paymentData.id,
+      originalExternalReference: externalReference,
+      normalizedExternalReference,
+    });
+    
+    preference = await db.query.mercadopagoPreferences.findFirst({
+      where: eq(mercadopagoPreferences.externalReference, normalizedExternalReference),
+    });
+  }
 
   logger.info('[PaymentProcessor] Preferencia encontrada', {
     paymentId: paymentData.id,
     preferenceFound: !!preference,
     preferenceId: preference?.id,
     orderId: preference?.orderId,
+    searchMethod: preferenceId ? 'byId' : 'byExternalReference',
   });
 
   if (!preference || !preference.orderId) {
     logger.warn('[PaymentProcessor] Preferencia no encontrada', {
       paymentId: paymentData.id,
       externalReference,
+      preferenceId,
     });
     return;
   }
