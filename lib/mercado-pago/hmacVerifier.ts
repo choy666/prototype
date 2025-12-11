@@ -3,6 +3,7 @@
 
 import crypto from 'crypto';
 import { logger } from '@/lib/utils/logger';
+import { warningCache } from '@/lib/utils/warning-cache';
 
 /* --------------------------------------------------
  * Tipos
@@ -120,25 +121,33 @@ function validateHmacV1(
     
     // Validar firma
     if (!timingSafeEqualSafe(receivedSignature, expectedSignature)) {
-      logger.warn('HMAC validation failed', {
-        requestId,
-        ts,
-        path: cleanPath,
-        bodyLength: body.length,
-        // 🔥 DEBUG: Mostrar componentes exactos para identificar el problema
-        debug: {
-          receivedSignature,
-          expectedSignature,
-          stringToSign,
-          bodyHash,
-          signatureHeader: signature,
-          secretLength: MP_SECRET?.length || 0,
-          secretPrefix: MP_SECRET?.substring(0, 8) + '...',
-          rawHeaders: headers,
-          userAgent: headers['user-agent'],
-          mpVersion: headers['x-mp-version'],
-        }
-      });
+      // 🔥 NUEVO: Usar cache para evitar spam de logs
+      const cacheKey = `hmac_failed_${requestId}`;
+      const shouldLog = warningCache.shouldLog(cacheKey);
+      
+      if (shouldLog) {
+        const stats = warningCache.getStats(cacheKey);
+        logger.warn('HMAC validation failed - verificación vía API activada', {
+          requestId,
+          ts,
+          path: cleanPath,
+          bodyLength: body.length,
+          failureCount: stats?.count || 1,
+          // 🔥 DEBUG: Mostrar componentes exactos para identificar el problema
+          debug: {
+            receivedSignature,
+            expectedSignature,
+            stringToSign,
+            bodyHash,
+            signatureHeader: signature,
+            secretLength: MP_SECRET?.length || 0,
+            secretPrefix: MP_SECRET?.substring(0, 8) + '...',
+            userAgent: headers['user-agent'],
+            mpVersion: headers['x-mp-version'],
+          },
+          recommendation: 'Verificar configuración del webhook secret en Mercado Pago'
+        });
+      }
       return { ok: false, reason: 'Invalid signature' };
     }
     

@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { mercadopagoPayments, mercadopagoPreferences, orders, orderItems, products, productVariants, stockLogs } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
+// import { adjustStockWithRetry } from './stock-retry'; // TODO: Integrar sistema de retry
 
 // Extender PaymentResponse para incluir campos no documentados
 interface ExtendedPaymentResponse {
