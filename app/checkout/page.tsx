@@ -236,7 +236,7 @@ export default function CheckoutPage() {
         })),
         shippingAddress,
         shippingMethod: {
-          id: selectedShippingMethod.shipping_method_id.toString(),
+          id: selectedShippingMethod.shipping_method_id?.toString() ?? selectedShippingMethod.id ?? 'default',
           name: selectedShippingMethod.name,
           cost: selectedShippingMethod.cost,
         },
@@ -358,7 +358,7 @@ export default function CheckoutPage() {
         <div className="order-1 lg:order-2">
           <CheckoutSummary
             selectedShippingMethod={selectedShippingMethod ? {
-              id: selectedShippingMethod.shipping_method_id.toString(),
+              id: selectedShippingMethod.shipping_method_id?.toString() ?? selectedShippingMethod.id ?? 'default',
               name: selectedShippingMethod.name,
               cost: selectedShippingMethod.cost
             } : null}

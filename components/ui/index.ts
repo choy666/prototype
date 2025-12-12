@@ -11,6 +11,8 @@ export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 export { Checkbox } from './checkbox';
 export { Badge } from './badge';
 export { Skeleton } from './skeleton';
+export { Switch } from './switch';
+export { Separator } from './separator';
 
 // Componentes de imágenes (unificado)
 export { ImageManager } from './ImageManager';

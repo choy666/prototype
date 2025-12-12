@@ -1,19 +1,19 @@
 // Interfaces para métodos de envío de Mercado Libre API
 
 export interface MLShippingMethod {
-  shipping_method_id: number;
+  shipping_method_id?: number; // Opcional para envíos internos
   name: string;
   description: string;
-  currency_id: string;
-  list_cost: number;
+  currency_id?: string; // Opcional para envíos internos
+  list_cost?: number;
   cost: number;
-  estimated_delivery: {
+  estimated_delivery?: {
     date: string;
     time_from: string;
     time_to: string;
   };
-  shipping_mode: string;
-  speed: {
+  shipping_mode?: string;
+  speed?: {
     handling: number;
     shipping: number;
   };
@@ -32,6 +32,11 @@ export interface MLShippingMethod {
   guaranteed?: boolean;
   order_priority?: number;
   tags?: string[];
+  // Campos adicionales para envíos internos
+  id?: string; // Para envíos internos
+  estimatedTime?: string; // Formato legible para humanos
+  currency?: string; // ARS para envíos internos
+  type?: 'me2' | 'internal'; // Tipo de envío
 }
 
 export interface MLShippingResponse {

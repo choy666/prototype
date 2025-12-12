@@ -40,6 +40,8 @@ const Navbar = () => {
   ] : [
     { name: 'Inicio', href: '/' },
     { name: 'Productos', href: '/products' },
+    { name: 'Nosotros', href: '/nosotros' },
+    { name: 'Envíos', href: '/envios' },
   ];
 
   const authItems = session

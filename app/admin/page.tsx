@@ -329,6 +329,33 @@ async function DashboardContent() {
         <MercadoLibreStatus />
       </div>
 
+      {/* Enlaces Rápidos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuración Rápida</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+            <Link href="/admin/business-settings" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <Package className="h-4 w-4" />
+              <span className="text-sm font-medium">Configurar Negocio</span>
+            </Link>
+            <Link href="/admin/products" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <Package className="h-4 w-4" />
+              <span className="text-sm font-medium">Gestionar Productos</span>
+            </Link>
+            <Link href="/admin/orders" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <ShoppingCart className="h-4 w-4" />
+              <span className="text-sm font-medium">Ver Pedidos</span>
+            </Link>
+            <Link href="/admin/categories" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <UsersIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">Categorías</span>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
 
       {/* Notificaciones */}
       {stats.notifications.length > 0 && (

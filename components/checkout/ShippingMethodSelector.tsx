@@ -190,6 +190,11 @@ export function ShippingMethodSelector({
               <div className="mt-2 ml-7">
                 <div className="text-xs text-gray-500 space-y-1">
                   <p>{method.description}</p>
+                  {method.type === 'internal' && (
+                    <p className="text-green-600 font-semibold">
+                      ⚡ Entrega en 24 horas hábiles
+                    </p>
+                  )}
                   {method.estimated_delivery && (
                     <p>
                       Entrega estimada: {new Date(method.estimated_delivery.date).toLocaleDateString('es-AR')}

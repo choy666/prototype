@@ -653,6 +653,30 @@ export const mercadopagoPayments = pgTable("mercadopago_payments", {
 ]);
 
 // ======================
+// Configuración del Negocio
+// ======================
+export const businessSettings = pgTable("business_settings", {
+  id: serial("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  description: text("description"),
+  zipCode: varchar("zip_code", { length: 10 }).notNull(), // CP para envíos internos
+  address: text("address").notNull(),
+  phoneNumber: varchar("phone_number", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  whatsapp: varchar("whatsapp", { length: 20 }),
+  location: jsonb("location"), // { lat: number, lng: number }
+  schedule: jsonb("schedule"), // { dias: [{ dia: string, abierto: boolean, horarios: string[] }] }
+  socialMedia: jsonb("social_media"), // { facebook: string, instagram: string, twitter: string, etc }
+  images: jsonb("images"), // [{ url: string, alt: string }]
+  shippingConfig: jsonb("shipping_config"), // { freeShippingThreshold: number, internalShippingCost: number }
+  purchaseProtected: boolean("purchase_protected").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("business_settings_zip_code_idx").on(table.zipCode),
+]);
+
+// ======================
 // Métricas de integración
 // ======================
 export const integrationMetrics = pgTable("integration_metrics", {
@@ -704,3 +728,5 @@ export type MercadoPagoPayment = typeof mercadopagoPayments.$inferSelect;
 export type NewMercadoPagoPayment = typeof mercadopagoPayments.$inferInsert;
 export type IntegrationMetric = typeof integrationMetrics.$inferSelect;
 export type NewIntegrationMetric = typeof integrationMetrics.$inferInsert;
+export type BusinessSettings = typeof businessSettings.$inferSelect;
+export type NewBusinessSettings = typeof businessSettings.$inferInsert;

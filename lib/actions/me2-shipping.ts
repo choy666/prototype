@@ -9,6 +9,7 @@ import type { MLShippingMethod } from '@/lib/types/shipping';
 import type { MLShippingCalculateResponse } from '@/types/mercadolibre';
 import { getValidatedME2Dimensions } from '@/lib/validations/me2-products';
 import { me2ShippingCircuitBreaker } from '@/lib/utils/circuit-breaker';
+import { getBusinessShippingConfig } from './business-settings';
 
 // Configuración de Mercado Libre
 const MERCADOLIBRE_API_URL = 'https://api.mercadolibre.com';
@@ -45,6 +46,7 @@ interface ME2ShippingResult {
   input?: MLShippingCalculateResponse['input'];
   fallback?: boolean;
   message?: string;
+  warnings?: string[];
 }
 
 interface MLItemShippingOption {
@@ -182,6 +184,45 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       itemCount: options.items.length,
       items: options.items.map(i => ({ id: i.id, quantity: i.quantity, price: i.price, mlItemId: i.mlItemId }))
     });
+
+    // VERIFICAR ENVÍO INTERNO ANTES DE LLAMAR A ME2
+    const businessShippingConfig = await getBusinessShippingConfig();
+    
+    if (businessShippingConfig && options.zipcode === businessShippingConfig.zipCode) {
+      logger.info('[ME2] Envío interno detectado', { 
+        zipcode: options.zipcode, 
+        businessZipCode: businessShippingConfig.zipCode,
+        isInternal: true 
+      });
+      
+      // Calcular total del pedido para determinar si es gratis
+      const orderTotal = options.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      
+      const shippingCost = orderTotal >= businessShippingConfig.freeShippingThreshold ? 0 : businessShippingConfig.internalShippingCost;
+      
+      // Retornar opciones de envío interno
+      const internalOptions: MLShippingMethod[] = [
+        {
+          id: 'internal-standard',
+          name: shippingCost === 0 ? 'Envío Interno Gratis' : 'Envío Interno Estándar',
+          description: 'Entrega en 24 horas hábiles',
+          cost: shippingCost,
+          estimatedTime: '24 horas',
+          currency: 'ARS',
+          type: 'internal'
+        }
+      ];
+      
+      return {
+        shippingOptions: internalOptions,
+        cheapestOption: internalOptions[0],
+        estimatedDelivery: 1,
+        totalCost: shippingCost,
+        currency: 'ARS',
+        source: 'internal_shipping',
+        message: shippingCost === 0 ? 'Envío gratis por superar el monto mínimo' : 'Envío interno estándar'
+      };
+    }
 
     // Obtener dimensiones validadas de los productos con validaciones ME2
     const productIds = options.items.map(item => parseInt(item.id)).filter(id => !isNaN(id));

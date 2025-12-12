@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth/session';
-import { calculateME2Shipping } from '@/lib/mercado-envios/me2Api';
+import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
 import { logger } from '@/lib/utils/logger';
 import { z } from 'zod';
@@ -96,11 +96,20 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Llamar al nuevo servicio centralizado ME2
-    const shippingData = await calculateME2Shipping({
+    // Llamar a calculateME2ShippingCost que ya tiene la lógica de envíos internos
+    const shippingData = await calculateME2ShippingCost({
       zipcode,
-      items: enrichedItems,
-      allowFallback,
+      items: enrichedItems.map(item => ({
+        ...item,
+        id: item.id.toString(), // Convertir id a string
+        mlItemId: item.mlItemId
+      })),
+      dimensions: enrichedItems[0]?.height && enrichedItems[0]?.width && enrichedItems[0]?.length ? {
+        height: enrichedItems[0].height,
+        width: enrichedItems[0].width,
+        length: enrichedItems[0].length,
+        weight: enrichedItems[0].weight || 1000
+      } : undefined
     });
 
     // Formatear respuesta manteniendo compatibilidad
@@ -110,7 +119,44 @@ export async function POST(request: NextRequest) {
       estimated: option.estimated_delivery?.date 
         ? `${option.estimated_delivery.date}` 
         : `${shippingData.estimatedDelivery} días`,
+      type: option.type || 'me2', // Incluir tipo para detectar envíos internos
+      description: option.description,
+      estimatedTime: option.estimatedTime || '24 horas'
     }));
+
+    // Si es envío interno, devolver solo la opción interna
+    if (shippingData.source === 'internal_shipping') {
+      const response = {
+        success: true,
+        requestId: effectiveRequestId,
+        methods: shippingData.shippingOptions,
+        source: 'internal_shipping',
+        message: shippingData.message,
+        options: shippingData.shippingOptions.map(option => ({
+          name: option.name,
+          cost: option.cost || 0,
+          estimated: option.estimatedTime || '24 horas',
+          type: 'internal',
+          description: option.description
+        })),
+        fallback: false,
+        warnings: shippingData.warnings || [],
+        metadata: {
+          calculationSource: 'INTERNAL',
+          timestamp: new Date().toISOString(),
+        }
+      };
+
+      logger.info('[ME2] Response: Envío interno detectado', {
+        requestId: effectiveRequestId,
+        zipcode,
+        success: true,
+        source: response.source,
+        message: response.message
+      });
+
+      return NextResponse.json(response);
+    }
 
     // Agregar opciones específicas ME2 si aplica
     if (shippingData.source === 'me2' && !shippingData.fallback) {
@@ -194,7 +240,7 @@ export async function POST(request: NextRequest) {
       fallback: shippingData.fallback ?? false,
       message: shippingData.message || (shippingData.fallback ? 'Usando métodos de envío locales' : 'Cálculo exitoso'),
       options,
-      warnings: shippingData.warnings,
+      warnings: shippingData.warnings || [],
       metadata: {
         calculationSource: shippingData.fallback ? 'FALLBACK' : 'ME2',
         calculationHash: `${zipcode}-${items.map(i => `${i.id}:${i.quantity}`).sort().join('-')}`,
@@ -309,9 +355,13 @@ export async function GET(request: NextRequest) {
       userEmail: session.user.email 
     });
     
-    const shippingData = await calculateME2Shipping({
+    const shippingData = await calculateME2ShippingCost({
       zipcode,
-      items,
+      items: items.map(item => ({
+        ...item,
+        id: item.id.toString(), // Convertir id a string
+        mlItemId: item.mlItemId
+      }))
     });
     
     return NextResponse.json({
