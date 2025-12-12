@@ -4,7 +4,6 @@ import { getBusinessContactInfo } from "@/lib/actions/business-settings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Mail, MessageCircle, Shield, Clock, Facebook, Instagram, Twitter } from "lucide-react";
-import Image from "next/image";
 
 interface ScheduleDay {
   dia: string;
@@ -50,7 +49,8 @@ export default async function NosotrosPage() {
     schedule: businessSettings.schedule ? (businessSettings.schedule as unknown as Schedule) : undefined,
     socialMedia: businessSettings.socialMedia || {},
     images: businessSettings.images || [],
-    location: businessSettings.location || {}
+    location: businessSettings.location || {},
+    iframeUrl: businessSettings.iframeUrl || null
   };
 
   const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(settings.location?.address || settings.address)}`;
@@ -75,52 +75,21 @@ export default async function NosotrosPage() {
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <div className="grid gap-8 md:grid-cols-2">
-              {/* Descripción */}
-              <div>
-                <h2 className="text-3xl font-bold mb-6">Nuestra Historia</h2>
-                <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: settings.description || '' }} />
-                
-                {settings.purchaseProtected && (
-                  <div className="mt-8 p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-center gap-3">
-                      <Shield className="h-8 w-8 text-green-600 dark:text-green-400" />
-                      <div>
-                        <h3 className="font-semibold text-green-900 dark:text-green-100">
-                          Compra Protegida
-                        </h3>
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          Todas tus compras están protegidas. Tu seguridad es nuestra prioridad.
-                        </p>
-                      </div>
-                    </div>
+            {settings.purchaseProtected && (
+              <div className="p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  <div>
+                    <h3 className="font-semibold text-green-900 dark:text-green-100">
+                      Compra Protegida
+                    </h3>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      Todas tus compras están protegidas. Tu seguridad es nuestra prioridad.
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
-
-              {/* Galería de Imágenes */}
-              <div>
-                <h2 className="text-3xl font-bold mb-6">Nuestro Local</h2>
-                {settings.images && Array.isArray(settings.images) && settings.images.length > 0 ? (
-                  <div className="grid gap-4 grid-cols-2">
-                    {settings.images.slice(0, 4).map((image: {url: string, alt?: string}, index: number) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
-                        <Image
-                          src={image.url}
-                          alt={image.alt || `Imagen del local ${index + 1}`}
-                          fill
-                          className="object-cover hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                    <p className="text-muted-foreground">Próximamente imágenes de nuestro local</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
@@ -243,6 +212,30 @@ export default async function NosotrosPage() {
           </div>
         </div>
       </section>
+
+      {/* Iframe personalizado */}
+      {settings.iframeUrl && (
+        <section className="py-16 bg-muted/50">
+          <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
+              <h2 className="text-3xl font-bold text-center mb-12">Explora más</h2>
+              <div className="aspect-video rounded-lg overflow-hidden border shadow-lg">
+                <iframe
+                  src={settings.iframeUrl}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                  title="Contenido integrado"
+                  className="w-full h-full"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Horarios de Atención */}
       {settings.schedule && settings.schedule.dias && (

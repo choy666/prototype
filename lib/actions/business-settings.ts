@@ -172,6 +172,7 @@ export async function getBusinessContactInfo(): Promise<{
   socialMedia?: Record<string, string>;
   images?: Array<{url: string, alt?: string}>;
   location?: Record<string, string>;
+  iframeUrl?: string | null;
 } | null> {
   try {
     const settings = await db
@@ -188,6 +189,7 @@ export async function getBusinessContactInfo(): Promise<{
         socialMedia: businessSettings.socialMedia,
         images: businessSettings.images,
         location: businessSettings.location,
+        iframeUrl: businessSettings.iframeUrl,
       })
       .from(businessSettings)
       .limit(1);
@@ -207,6 +209,7 @@ export async function getBusinessContactInfo(): Promise<{
       socialMedia: (settings[0].socialMedia as Record<string, string>) || undefined,
       images: settings[0].images as Array<{url: string, alt?: string}>,
       location: settings[0].location as Record<string, string>,
+      iframeUrl: settings[0].iframeUrl,
     };
   } catch (error) {
     console.error("[BUSINESS_SETTINGS] Error getting contact info:", error);

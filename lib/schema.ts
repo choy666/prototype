@@ -670,6 +670,7 @@ export const businessSettings = pgTable("business_settings", {
   images: jsonb("images"), // [{ url: string, alt: string }]
   shippingConfig: jsonb("shipping_config"), // { freeShippingThreshold: number, internalShippingCost: number }
   purchaseProtected: boolean("purchase_protected").default(true).notNull(),
+  iframeUrl: text("iframe_url"), // URL del iframe para mostrar en página nosotros
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

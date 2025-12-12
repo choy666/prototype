@@ -40,6 +40,7 @@ interface BusinessSettingsData {
   socialMedia?: Record<string, string>;
   images?: Array<{url: string, alt?: string}>;
   location?: Record<string, string>;
+  iframeUrl?: string | null;
 }
 
 export default function BusinessSettingsPage() {
@@ -177,6 +178,7 @@ export default function BusinessSettingsPage() {
           <TabsTrigger value="envios">Envíos</TabsTrigger>
           <TabsTrigger value="horarios">Horarios</TabsTrigger>
           <TabsTrigger value="redes">Redes Sociales</TabsTrigger>
+          <TabsTrigger value="iframe">Iframe Nosotros</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -414,6 +416,46 @@ export default function BusinessSettingsPage() {
                   placeholder="https://twitter.com/tu-negocio"
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="iframe" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Iframe para página Nosotros</CardTitle>
+              <CardDescription>
+                Agrega la URL del iframe que se mostrará en la página Nosotros
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="iframeUrl">URL del Iframe</Label>
+                <Input
+                  id="iframeUrl"
+                  value={settings.iframeUrl || ""}
+                  onChange={(e) => updateField("iframeUrl", e.target.value)}
+                  placeholder="https://ejemplo.com/embed/..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Ingresa la URL completa del iframe que se mostrará en la página Nosotros.
+                  Asegúrate de que la URL permita ser incrustada en un iframe.
+                </p>
+              </div>
+
+              {settings.iframeUrl && (
+                <div className="space-y-2">
+                  <Label>Vista previa del iframe:</Label>
+                  <div className="border rounded-lg p-4">
+                    <iframe
+                      src={settings.iframeUrl}
+                      className="w-full h-96 border-0"
+                      title="Vista previa del iframe"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
