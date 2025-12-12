@@ -86,8 +86,19 @@ export default function HeroSlider() {
     async function fetchProducts() {
       const all = await getAllProducts();
       if (!mounted) return;
-      const shuffled = [...all].sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, Math.min(10, all.length));
+      
+      // Separar productos con y sin stock
+      const withStock = all.filter(p => p.stock > 0);
+      const withoutStock = all.filter(p => p.stock <= 0);
+      
+      // Ordenar aleatoriamente cada grupo
+      const shuffledWithStock = [...withStock].sort(() => Math.random() - 0.5);
+      const shuffledWithoutStock = [...withoutStock].sort(() => Math.random() - 0.5);
+      
+      // Combinar poniendo primero los productos con stock
+      const combined = [...shuffledWithStock, ...shuffledWithoutStock];
+      const selected = combined.slice(0, Math.min(10, all.length));
+      
       setProducts(selected);
       setLoading(false);
     }
@@ -215,7 +226,9 @@ export default function HeroSlider() {
               >
                 <Link
                   href={`/products/${product.id}`}
-                  className="block relative aspect-[4/3] rounded-lg overflow-hidden border"
+                  className={`block relative aspect-[4/3] rounded-lg overflow-hidden border ${
+                    product.stock <= 0 ? 'cursor-not-allowed' : ''
+                  }`}
                 >
                   <Image
                     src={product.image || "/placeholder-product.jpg"}
@@ -229,10 +242,19 @@ export default function HeroSlider() {
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     placeholder="blur"
                     blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${
+                      product.stock <= 0 ? 'blur-sm' : ''
+                    }`}
                     loading="lazy"
                   />
                   {hasDiscount && <DiscountBadge discount={product.discount} />}
+                  {product.stock <= 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm bg-background/70">
+                      <span className="rounded-full bg-destructive px-3 py-1 text-sm font-medium text-white">
+                        Sin stock
+                      </span>
+                    </div>
+                  )}
                   <div
                     className="absolute bottom-0 left-0 w-full
                                 bg-gradient-to-t from-black/80 to-transparent p-4"
