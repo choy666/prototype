@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Save } from "lucide-react";
+import { Save, Eye, EyeOff, MapPin, ExternalLink, RefreshCw } from "lucide-react";
 import { updateBusinessSettings, getBusinessSettings } from "@/lib/actions/business-settings";
 
 interface ShippingConfig {
@@ -47,6 +47,8 @@ export default function BusinessSettingsPage() {
   const [settings, setSettings] = useState<BusinessSettingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const { toast } = useToast();
 
   const loadSettings = useCallback(async () => {
@@ -423,37 +425,128 @@ export default function BusinessSettingsPage() {
         <TabsContent value="iframe" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Iframe para página Nosotros</CardTitle>
+              <CardTitle>Mapa de Google para página Nosotros</CardTitle>
               <CardDescription>
-                Agrega la URL del iframe que se mostrará en la página Nosotros
+                Incrusta el mapa de tu ubicación física que se mostrará en la página Nosotros
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="iframeUrl">URL del Iframe</Label>
-                <Input
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="iframeUrl" className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Código del Iframe de Google Maps
+                  </Label>
+                  {settings.iframeUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPreview(!showPreview)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPreview ? "Ocultar" : "Mostrar"} vista previa
+                    </Button>
+                  )}
+                </div>
+                <Textarea
                   id="iframeUrl"
                   value={settings.iframeUrl || ""}
                   onChange={(e) => updateField("iframeUrl", e.target.value)}
-                  placeholder="https://ejemplo.com/embed/..."
+                  placeholder='<iframe src="https://www.google.com/maps/embed?..." width="400" height="300" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>'
+                  rows={4}
+                  className="font-mono text-sm resize-none"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Ingresa la URL completa del iframe que se mostrará en la página Nosotros.
-                  Asegúrate de que la URL permita ser incrustada en un iframe.
-                </p>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <p>
+                    📍 Ve a Google Maps → Compartir → Incrustar mapa → Copia el código HTML
+                  </p>
+                  {settings.iframeUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPreviewLoading(true);
+                        setTimeout(() => setPreviewLoading(false), 1000);
+                      }}
+                      className="gap-2"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${previewLoading ? 'animate-spin' : ''}`} />
+                      Recargar
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {settings.iframeUrl && (
-                <div className="space-y-2">
-                  <Label>Vista previa del iframe:</Label>
-                  <div className="border rounded-lg p-4">
-                    <iframe
-                      src={settings.iframeUrl}
-                      className="w-full h-96 border-0"
-                      title="Vista previa del iframe"
-                      sandbox="allow-scripts allow-same-origin"
-                    />
+              {settings.iframeUrl && showPreview && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Vista previa del mapa
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const match = settings.iframeUrl?.match(/src="([^"]+)"/);
+                          if (match && match[1]) {
+                            window.open(match[1], '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Abrir en nueva pestaña
+                      </a>
+                    </Button>
                   </div>
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg opacity-50" />
+                    <div className="relative border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
+                      {previewLoading ? (
+                        <div className="flex items-center justify-center h-96">
+                          <div className="flex flex-col items-center gap-2">
+                            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Cargando mapa...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div 
+                          dangerouslySetInnerHTML={{ 
+                            __html: settings.iframeUrl.replace(
+                              /width="[^"]*"/, 
+                              'width="100%"'
+                            ).replace(
+                              /height="[^"]*"/, 
+                              'height="400"'
+                            ).replace(
+                              /style="([^"]*)"/, 
+                              'style="$1 width: 100%; height: 400px; border: 0;"'
+                            ) || settings.iframeUrl
+                          }}
+                          className="w-full h-96 overflow-hidden"
+                        />
+                      )}
+                    </div>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Badge variant="secondary" className="text-xs">
+                        Vista previa interactiva
+                      </Badge>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    💡 El mapa se mostrará exactamente así en la página Nosotros
+                  </p>
                 </div>
               )}
             </CardContent>

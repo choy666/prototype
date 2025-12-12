@@ -221,20 +221,43 @@ async function EnviosPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-video rounded-lg overflow-hidden border">
-                    <iframe
-                      src={mapUrl}
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      allowFullScreen
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      title="Mapa de ubicación del negocio"
-                    />
+                    {businessSettings.iframeUrl ? (
+                      <div 
+                        className="w-full h-full"
+                        dangerouslySetInnerHTML={{ 
+                          __html: businessSettings.iframeUrl.replace(
+                            /width="[^"]*"/, 
+                            'width="100%"'
+                          ).replace(
+                            /height="[^"]*"/, 
+                            'height="100%"'
+                          ).replace(
+                            /style="([^"]*)"/, 
+                            'style="$1 width: 100%; height: 100%; border: 0;"'
+                          ) || businessSettings.iframeUrl
+                        }}
+                      />
+                    ) : (
+                      <iframe
+                        src={mapUrl}
+                        width="100%"
+                        height="100%"
+                        style={{ border: 0 }}
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        title="Mapa de ubicación del negocio"
+                      />
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-4">
-                    {businessSettings.address}
-                  </p>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Dirección:</strong> {businessSettings.address}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Código Postal:</strong> {businessSettings.zipCode}
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
