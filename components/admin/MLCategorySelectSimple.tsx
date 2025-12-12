@@ -57,9 +57,9 @@ export function MLCategorySelectSimple({
           type="button"
           variant="outline"
           className={cn(
-            'w-full justify-between text-left font-normal h-auto py-2',
-            !selectedCategory && 'text-muted-foreground',
-            disabled && 'opacity-50 cursor-not-allowed'
+            'h-10 w-full justify-between text-left font-normal rounded-lg border border-gray-300 bg-white shadow-sm transition-all duration-200 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+            !selectedCategory && 'text-gray-500',
+            disabled && 'opacity-50 cursor-not-allowed bg-gray-50'
           )}
           onClick={() => !disabled && setOpen(!open)}
           disabled={disabled}
@@ -84,7 +84,7 @@ export function MLCategorySelectSimple({
         </Button>
 
         {open && !disabled && (
-          <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-80 overflow-hidden">
+          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-hidden">
             {/* Search input */}
             <div className="p-3 border-b">
               <div className="relative">
@@ -94,7 +94,7 @@ export function MLCategorySelectSimple({
                   placeholder="Buscar por nombre o ID de categoría..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   autoFocus
                 />
               </div>
@@ -132,8 +132,8 @@ export function MLCategorySelectSimple({
                         setSearchQuery('')
                       }}
                       className={cn(
-                        'w-full flex flex-col items-start px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors',
-                        value === category.mlCategoryId && 'bg-accent'
+                        'w-full flex flex-col items-start px-3 py-2 text-sm rounded-md hover:bg-blue-50 transition-colors duration-150',
+                        value === category.mlCategoryId && 'bg-blue-50 text-blue-900'
                       )}
                     >
                       <div className="flex items-center gap-2 w-full">
@@ -156,11 +156,11 @@ export function MLCategorySelectSimple({
             </div>
 
             {/* Footer */}
-            <div className="p-2 border-t bg-muted/30">
+            <div className="p-2 border-t border-gray-200 bg-gray-50">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="w-full py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="w-full py-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Cerrar
               </button>

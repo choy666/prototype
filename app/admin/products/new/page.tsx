@@ -15,8 +15,6 @@ import { ArrowLeft, Save } from 'lucide-react'
 
 import { ImageManager } from '@/components/ui/ImageManager'
 import type { Category } from '@/lib/schema'
-import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
-import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 
 
 interface ProductForm {
@@ -43,12 +41,6 @@ interface ProductForm {
   length: string
 }
 
-type RecommendedAttributeConfig = {
-  key: string
-  label: string
-  aliases: string[]
-  required?: boolean
-}
 
 interface ListingTypeConfig {
   id: string
@@ -62,8 +54,6 @@ export default function NewProductPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
-  const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
-  const [recommendedAttributes, setRecommendedAttributes] = useState<RecommendedAttributeConfig[]>([])
   const [listingTypes, setListingTypes] = useState<ListingTypeConfig[]>([])
 
   const [form, setForm] = useState<ProductForm>({
@@ -127,28 +117,6 @@ export default function NewProductPage() {
     fetchListingTypes()
   }, [])
 
-  useEffect(() => {
-    const fetchRecommendedAttributes = async () => {
-      if (!form.mlCategoryId) {
-        setRecommendedAttributes([])
-        return
-      }
-
-      try {
-        const res = await fetch(`/api/mercadolibre/categories/${form.mlCategoryId}/attributes`)
-        if (!res.ok) {
-          setRecommendedAttributes([])
-          return
-        }
-        const data = await res.json()
-        setRecommendedAttributes(data.attributes || [])
-      } catch {
-        setRecommendedAttributes([])
-      }
-    }
-
-    fetchRecommendedAttributes()
-  }, [form.mlCategoryId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -185,7 +153,6 @@ export default function NewProductPage() {
         height: form.height || undefined,
         width: form.width || undefined,
         length: form.length || undefined,
-        attributes: attributes.length > 0 ? attributes : undefined,
       }
 
       const response = await fetch('/api/admin/products', {
@@ -202,8 +169,8 @@ export default function NewProductPage() {
       }
 
       toast({
-        title: 'Éxito',
-        description: 'Producto creado correctamente'
+        title: '¡Producto creado! 🎉',
+        description: 'Para que el producto se pueda sincronizar con Mercado Libre, una vez creado deberás entrar a su edición y completar los campos correspondientes. 📝'
       })
 
       router.push('/admin/products')
@@ -536,19 +503,6 @@ export default function NewProductPage() {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Atributos del Producto</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AttributeBuilder
-            attributes={attributes}
-            onChange={setAttributes}
-            recommendedAttributes={recommendedAttributes}
-          />
         </CardContent>
       </Card>
     </div>
