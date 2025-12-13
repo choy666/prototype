@@ -134,7 +134,7 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
     status.payments = cached.status as SystemStatus['payments']
   } else {
     // Verificar si está configurado el token de MercadoPago
-    if (!process.env.MP_ACCESS_TOKEN) {
+    if (!process.env.MERCADO_PAGO_ACCESS_TOKEN) {
       status.payments = {
         status: 'inactive',
         message: 'No configurado'
@@ -147,7 +147,7 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
         
         const response = await fetch('https://api.mercadopago.com/users/me', {
           headers: {
-            'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}`
+            'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`
           },
           signal: controller.signal
         })

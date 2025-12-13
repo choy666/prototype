@@ -19,6 +19,7 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 import { getDashboardMetrics, getDashboardAlerts, getMercadoLibreStats } from '@/lib/actions/dashboard';
+import { MercadoPagoCard } from '@/components/admin/MercadoPagoCard';
 
 interface RecentOrder {
   id: number;
@@ -391,63 +392,71 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Estado Mercado Libre */}
-          <div className='bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-700'>
-            <div className='flex items-center justify-between mb-4'>
-              <h3 className='text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2'>
-                <span className='text-xl'>📦</span> Mercado Libre
-              </h3>
-              <Link href='/admin/mercadolibre' className='text-sm text-blue-600 dark:text-blue-400 hover:underline'>
-                Configurar
-              </Link>
-            </div>
-            <div className='space-y-4'>
-              {loading ? (
-                <div className='animate-pulse space-y-3'>
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className='h-8 bg-gray-100 dark:bg-gray-700 rounded'></div>
-                  ))}
+          {/* Estado de Integraciones */}
+          <div className='lg:col-span-2'>
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              {/* Estado Mercado Libre */}
+              <div className='bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-700'>
+                <div className='flex items-center justify-between mb-4'>
+                  <h3 className='text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2'>
+                    <span className='text-xl'>📦</span> Mercado Libre
+                  </h3>
+                  <Link href='/admin/mercadolibre' className='text-sm text-blue-600 dark:text-blue-400 hover:underline'>
+                    Configurar
+                  </Link>
                 </div>
-              ) : mlStats ? (
-                <>
-                  <div className='flex items-center justify-between'>
-                    <span className='text-sm text-gray-600 dark:text-gray-400'>Productos sincronizados</span>
-                    <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                      {mlStats.totalSynced}
-                    </span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='text-sm text-gray-600 dark:text-gray-400'>Publicaciones activas</span>
-                    <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                      {mlStats.activePublications}
-                    </span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='text-sm text-gray-600 dark:text-gray-400'>Total ventas ML</span>
-                    <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                      {mlStats.totalMLSales}
-                    </span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='text-sm text-gray-600 dark:text-gray-400'>Última sincronización</span>
-                    <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                      {mlStats.lastSync 
-                        ? new Date(mlStats.lastSync).toLocaleDateString('es-ES', { 
-                            day: '2-digit', 
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : 'Nunca'
-                      }
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className='text-sm text-gray-500 dark:text-gray-400 text-center py-4'>
-                  No se pudo obtener información de Mercado Libre
-                </p>
-              )}
+                <div className='space-y-4'>
+                  {loading ? (
+                    <div className='animate-pulse space-y-3'>
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className='h-8 bg-gray-100 dark:bg-gray-700 rounded'></div>
+                      ))}
+                    </div>
+                  ) : mlStats ? (
+                    <>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-sm text-gray-600 dark:text-gray-400'>Productos sincronizados</span>
+                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                          {mlStats.totalSynced}
+                        </span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-sm text-gray-600 dark:text-gray-400'>Publicaciones activas</span>
+                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                          {mlStats.activePublications}
+                        </span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-sm text-gray-600 dark:text-gray-400'>Total ventas ML</span>
+                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                          {mlStats.totalMLSales}
+                        </span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-sm text-gray-600 dark:text-gray-400'>Última sincronización</span>
+                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                          {mlStats.lastSync 
+                            ? new Date(mlStats.lastSync).toLocaleDateString('es-ES', { 
+                                day: '2-digit', 
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'Nunca'
+                          }
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className='text-sm text-gray-500 dark:text-gray-400 text-center py-4'>
+                      No se pudo obtener información de Mercado Libre
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Estado Mercado Pago */}
+              <MercadoPagoCard />
             </div>
           </div>
 
