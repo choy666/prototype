@@ -353,6 +353,21 @@ async function DashboardContent() {
               <span className="text-sm font-medium">Categorías</span>
             </Link>
           </div>
+          
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-4">
+            <Link href="/admin/mercadolibre" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <UsersIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">MercadoLibre</span>
+            </Link>
+            <Link href="/admin/mercadopago" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <DollarSign className="h-4 w-4" />
+              <span className="text-sm font-medium">MercadoPago</span>
+            </Link>
+            <Link href="/admin/shipments" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
+              <Package className="h-4 w-4" />
+              <span className="text-sm font-medium">Envíos</span>
+            </Link>
+          </div>
         </CardContent>
       </Card>
 
