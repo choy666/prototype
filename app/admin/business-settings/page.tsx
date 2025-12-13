@@ -19,6 +19,21 @@ interface ShippingConfig {
   internalShippingCost: number;
 }
 
+interface ScheduleDayLegacy {
+  dia: string;
+  abierto: boolean;
+  horarios: string[];
+}
+
+interface ScheduleDayNew {
+  dia: string;
+  abierto: boolean;
+  horarios: {
+    maniana: string;
+    tarde: string;
+  };
+}
+
 interface BusinessSettingsData {
   id: number;
   businessName: string;
@@ -31,11 +46,7 @@ interface BusinessSettingsData {
   purchaseProtected: boolean;
   shippingConfig: ShippingConfig;
   schedule?: {
-    dias: Array<{
-      dia: string;
-      abierto: boolean;
-      horarios: string[];
-    }>;
+    dias: Array<ScheduleDayNew>;
   };
   socialMedia?: Record<string, string>;
   images?: Array<{url: string, alt?: string}>;
@@ -55,6 +66,23 @@ export default function BusinessSettingsPage() {
     try {
       const data = await getBusinessSettings();
       if (data) {
+        // Migración de datos de horarios si es necesario
+        if (data.schedule && typeof data.schedule === 'object' && 'dias' in data.schedule && Array.isArray(data.schedule.dias)) {
+          data.schedule.dias = data.schedule.dias.map((dia: ScheduleDayLegacy | ScheduleDayNew): ScheduleDayNew => {
+            // Si horarios es un array (formato antiguo), convertir al nuevo formato
+            if (Array.isArray((dia as ScheduleDayLegacy).horarios)) {
+              return {
+                ...dia,
+                horarios: {
+                  maniana: (dia as ScheduleDayLegacy).horarios[0] || "",
+                  tarde: ""
+                }
+              };
+            }
+            // Si ya tiene el nuevo formato, mantenerlo
+            return dia as ScheduleDayNew;
+          });
+        }
         setSettings(data as BusinessSettingsData);
       }
     } catch (error) {
@@ -132,14 +160,18 @@ export default function BusinessSettingsPage() {
     });
   };
 
-  const updateScheduleDay = (index: number, field: "abierto" | "horarios", value: boolean | string[]) => {
+  const updateScheduleDay = (index: number, field: "abierto" | "horarios", value: boolean | { maniana: string; tarde: string }) => {
     if (!settings || !settings.schedule) return;
     
     const newDias = [...settings.schedule.dias];
     if (field === "abierto") {
-      newDias[index] = { ...newDias[index], [field]: value as boolean, horarios: value ? newDias[index].horarios : [] };
+      newDias[index] = { 
+        ...newDias[index], 
+        [field]: value as boolean, 
+        horarios: value ? newDias[index].horarios : { maniana: "", tarde: "" }
+      };
     } else {
-      newDias[index] = { ...newDias[index], [field]: value as string[] };
+      newDias[index] = { ...newDias[index], [field]: value as { maniana: string; tarde: string } };
     }
     
     setSettings({
@@ -356,22 +388,48 @@ export default function BusinessSettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {settings.schedule?.dias.map((dia, index) => (
-                <div key={dia.dia} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <Switch
-                      checked={dia.abierto}
-                      onCheckedChange={(checked: boolean) => updateScheduleDay(index, "abierto", checked)}
-                    />
-                    <Label className="font-medium">{dia.dia}</Label>
-                  </div>
-                  {dia.abierto && (
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        value={dia.horarios[0] || ""}
-                        onChange={(e) => updateScheduleDay(index, "horarios", [e.target.value])}
-                        placeholder="Ej: 09:00 - 18:00"
-                        className="w-40"
+                <div key={dia.dia} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4">
+                      <Switch
+                        checked={dia.abierto}
+                        onCheckedChange={(checked: boolean) => updateScheduleDay(index, "abierto", checked)}
                       />
+                      <Label className="font-medium text-base">{dia.dia}</Label>
+                    </div>
+                  </div>
+                  
+                  {dia.abierto && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Label className="text-sm font-medium text-muted-foreground w-20">Mañana:</Label>
+                        <Input
+                          value={dia.horarios.maniana || ""}
+                          onChange={(e) => updateScheduleDay(index, "horarios", { 
+                            ...dia.horarios, 
+                            maniana: e.target.value 
+                          })}
+                          placeholder="Ej: 08:00 - 12:00"
+                          className="flex-1"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <Label className="text-sm font-medium text-muted-foreground w-20">Tarde:</Label>
+                        <Input
+                          value={dia.horarios.tarde || ""}
+                          onChange={(e) => updateScheduleDay(index, "horarios", { 
+                            ...dia.horarios, 
+                            tarde: e.target.value 
+                          })}
+                          placeholder="Ej: 16:00 - 20:00"
+                          className="flex-1"
+                        />
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground mt-2">
+                        💡 Puedes dejar uno de los turnos vacío si solo trabajas en un horario
+                      </p>
                     </div>
                   )}
                 </div>

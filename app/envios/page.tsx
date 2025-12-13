@@ -182,7 +182,7 @@ async function EnviosPage() {
                       </div>
                       <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                         <p className="text-sm text-green-700 dark:text-green-300">
-                          Si estás en esta zona, tu pedido llega al día siguiente de haberlo comprado (en días hábiles).
+                          Si estás en esta zona, tu pedido llegara durante las 24 horas hábiles posteriores a la compra.
                         </p>
                       </div>
                     </div>
@@ -295,15 +295,6 @@ async function EnviosPage() {
                   <h3 className="font-semibold mb-2">¿Puedo seguir mi pedido?</h3>
                   <p className="text-muted-foreground">
                     Sí, todos los envíos (internos y externos) incluyen número de seguimiento para que puedas ver dónde está tu paquete en todo momento.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-2">¿Qué pasa si no estoy en el domicilio?</h3>
-                  <p className="text-muted-foreground">
-                    El transportista dejará un aviso y podrás coordinar una nueva entrega o retirar tu pedido en el centro de distribución más cercano.
                   </p>
                 </CardContent>
               </Card>

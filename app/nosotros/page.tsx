@@ -5,10 +5,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Mail, MessageCircle, Shield, Clock, Facebook, Instagram, Twitter } from "lucide-react";
 
-interface ScheduleDay {
+interface ScheduleDayLegacy {
   dia: string;
   abierto: boolean;
   horarios: string[];
+}
+
+interface ScheduleDay {
+  dia: string;
+  abierto: boolean;
+  horarios: {
+    maniana: string;
+    tarde: string;
+  };
 }
 
 interface Schedule {
@@ -36,7 +45,33 @@ export default async function NosotrosPage() {
     );
   }
 
-  // Cast to proper types after null check
+  // Migración de datos de horarios si es necesario
+  const migrateSchedule = (schedule: unknown): Schedule | undefined => {
+    if (!schedule || typeof schedule !== 'object') return undefined;
+    
+    const scheduleObj = schedule as { dias?: unknown };
+    if (!Array.isArray(scheduleObj.dias)) return undefined;
+    
+    return {
+      dias: scheduleObj.dias.map((dia: unknown): ScheduleDay => {
+        const diaObj = dia as ScheduleDayLegacy | ScheduleDay;
+        // Si horarios es un array (formato antiguo), convertir al nuevo formato
+        if (Array.isArray((diaObj as ScheduleDayLegacy).horarios)) {
+          return {
+            ...diaObj,
+            horarios: {
+              maniana: (diaObj as ScheduleDayLegacy).horarios[0] || "",
+              tarde: ""
+            }
+          };
+        }
+        // Si ya tiene el nuevo formato, mantenerlo
+        return diaObj as ScheduleDay;
+      })
+    };
+  };
+
+  // Cast to proper types after null check and migration
   const settings = {
     businessName: businessSettings.businessName,
     description: businessSettings.description,
@@ -46,7 +81,7 @@ export default async function NosotrosPage() {
     email: businessSettings.email,
     whatsapp: businessSettings.whatsapp,
     purchaseProtected: businessSettings.purchaseProtected,
-    schedule: businessSettings.schedule ? (businessSettings.schedule as unknown as Schedule) : undefined,
+    schedule: migrateSchedule(businessSettings.schedule),
     socialMedia: businessSettings.socialMedia || {},
     images: businessSettings.images || [],
     location: businessSettings.location || {},
@@ -281,16 +316,30 @@ export default async function NosotrosPage() {
                 <CardContent className="p-8">
                   <div className="grid gap-4 md:grid-cols-2">
                     {settings.schedule.dias.map((dia: ScheduleDay) => (
-                      <div key={dia.dia} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={dia.dia} className="flex items-start justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
-                          <Clock className="h-5 w-5 text-muted-foreground" />
+                          <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <span className="font-medium">{dia.dia}</span>
                         </div>
-                        <div>
+                        <div className="text-right">
                           {dia.abierto ? (
-                            <Badge variant="default">
-                              {(dia.horarios[0]) || "Abierto"}
-                            </Badge>
+                            <div className="space-y-1">
+                              {dia.horarios.maniana && (
+                                <Badge variant="default" className="text-xs">
+                                  🌅 {dia.horarios.maniana}
+                                </Badge>
+                              )}
+                              {dia.horarios.tarde && (
+                                <Badge variant="default" className="text-xs ml-2">
+                                  🌆 {dia.horarios.tarde}
+                                </Badge>
+                              )}
+                              {!dia.horarios.maniana && !dia.horarios.tarde && (
+                                <Badge variant="default">
+                                  Abierto
+                                </Badge>
+                              )}
+                            </div>
                           ) : (
                             <Badge variant="secondary">Cerrado</Badge>
                           )}
