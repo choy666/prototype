@@ -404,9 +404,9 @@ async function DashboardContent() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm">Servidor</span>
-              <span className={`text-sm ${getStatusColor(systemStatus.server.status)}`}>
-                {systemStatus.server.message}
+              <span className="text-sm">MercadoLibre API</span>
+              <span className={`text-sm ${getStatusColor(systemStatus.mercadolibre.status)}`}>
+                {systemStatus.mercadolibre.message}
               </span>
             </div>
             <div className="flex justify-between">

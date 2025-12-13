@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, ExternalLink, Unlink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface ProductSyncButtonProps {
@@ -26,6 +26,39 @@ export function ProductSyncButton({
   onSyncComplete
 }: ProductSyncButtonProps) {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isUnsyncing, setIsUnsyncing] = useState(false);
+
+  const handleUnsync = async () => {
+    setIsUnsyncing(true);
+    try {
+      const response = await fetch(`/api/mercadolibre/products/unsync`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ productId: productId.toString() }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error al desincronizar producto');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success('Producto desincronizado correctamente');
+        onSyncComplete?.();
+      } else {
+        toast.error(result.error || 'Error al desincronizar producto');
+      }
+    } catch (error) {
+      console.error('Error desincronizando producto:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al desincronizar producto');
+    } finally {
+      setIsUnsyncing(false);
+    }
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -125,14 +158,35 @@ export function ProductSyncButton({
           )}
         </Button>
       ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => window.open(`https://articulo.mercadolibre.com.ar/${mlItemId}`, '_blank')}
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Ver en ML
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.open(`https://articulo.mercadolibre.com.ar/${mlItemId}`, '_blank')}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Ver en ML
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleUnsync}
+            disabled={isUnsyncing}
+            title="Desincronizar producto de Mercado Libre"
+          >
+            {isUnsyncing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Desincronizando...
+              </>
+            ) : (
+              <>
+                <Unlink className="h-4 w-4 mr-2" />
+                Desincronizar
+              </>
+            )}
+          </Button>
+        </div>
       )}
     </div>
   );
