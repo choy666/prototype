@@ -1,9 +1,7 @@
 import { Suspense } from 'react'
 import { auth } from '@/lib/actions/auth'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
-import { count, sum, eq, gte, lte, and, desc, sql } from 'drizzle-orm'
-import { users, products, orders, notifications } from '@/lib/schema'
+import { getDashboardStats } from '@/lib/actions/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -12,172 +10,15 @@ import { MercadoLibreStatus } from '@/components/admin/MercadoLibreStatus'
 import { MercadoPagoStatus } from '@/components/admin/MercadoPagoStatus'
 import {
   Users as UsersIcon,
-  Package,
   ShoppingCart,
+  Package,
   DollarSign,
   TrendingUp,
   TrendingDown,
-  Bell,
-  AlertCircle,
-  Eye
+  Bell
 } from 'lucide-react'
 import { checkSystemStatus, getStatusColor } from '@/lib/actions/system-status'
 
-async function getStats() {
-  // Total usuarios
-  const [userCount] = await db.select({ count: count() }).from(users)
-
-  // Total productos activos (stock > 0)
-  const [productCount] = await db.select({ count: count() }).from(products).where(gte(products.stock, 1))
-
-  // Total pedidos
-  const [orderCount] = await db.select({ count: count() }).from(orders).where(
-    and(
-      sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
-      sql`${orders.status} NOT IN ('cancelled', 'rejected')`
-    )
-  )
-
-  // Pagos que requieren verificación manual (HMAC falló) - SECCIÓN ELIMINADA
-  const manualVerificationCount = 0
-
-  // Calcular ingresos totales de pedidos con status logístico
-  const [revenueResult] = await db
-    .select({ total: sum(orders.total) })
-    .from(orders)
-    .where(
-      and(
-        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
-        sql`${orders.status} NOT IN ('cancelled', 'rejected')`
-      )
-    )
-
-  const revenue = Number(revenueResult?.total ?? 0)
-
-  // Calcular tendencias para usuarios (total hasta fin del mes pasado vs total hasta ahora)
-  const now = new Date()
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-
-  const [lastMonthUsers] = await db
-    .select({ count: count() })
-    .from(users)
-    .where(lte(users.createdAt, lastMonthEnd))
-
-  const lastMonthUserCount = lastMonthUsers.count
-  const currentUserCount = userCount.count
-  const userTrend = lastMonthUserCount > 0 ? ((currentUserCount - lastMonthUserCount) / lastMonthUserCount) * 100 : (currentUserCount > 0 ? 100 : 0)
-
-  // Tendencias para productos (último mes vs mes anterior)
-  const [lastMonthProducts] = await db
-    .select({ count: count() })
-    .from(products)
-    .where(
-      and(
-        gte(products.created_at, lastMonthStart),
-        lte(products.created_at, lastMonthEnd),
-        gte(products.stock, 1)
-      )
-    )
-
-  const [currentMonthProducts] = await db
-    .select({ count: count() })
-    .from(products)
-    .where(
-      and(
-        gte(products.created_at, currentMonthStart),
-        gte(products.stock, 1)
-      )
-    )
-
-  const lastMonthProductCount = lastMonthProducts.count
-  const currentMonthProductCount = currentMonthProducts.count
-  const productTrend = lastMonthProductCount > 0 ? ((currentMonthProductCount - lastMonthProductCount) / lastMonthProductCount) * 100 : (currentMonthProductCount > 0 ? 100 : 0)
-
-  // Tendencias para pedidos (total hasta fin del mes pasado vs total hasta ahora)
-  const [lastMonthOrders] = await db
-    .select({ count: count() })
-    .from(orders)
-    .where(
-      and(
-        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
-        sql`${orders.status} NOT IN ('cancelled', 'rejected')`,
-        lte(orders.createdAt, lastMonthEnd)
-      )
-    )
-
-  const lastMonthOrderCount = lastMonthOrders.count
-  const currentOrderCount = orderCount.count
-  const orderTrend = lastMonthOrderCount > 0 ? ((currentOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100 : (currentOrderCount > 0 ? 100 : 0)
-
-  // Tendencias para ingresos (total hasta fin del mes pasado vs total hasta ahora)
-  const [lastMonthRevenue] = await db
-    .select({ total: sum(orders.total) })
-    .from(orders)
-    .where(
-      and(
-        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
-        sql`${orders.status} NOT IN ('cancelled', 'rejected')`,
-        lte(orders.createdAt, lastMonthEnd)
-      )
-    )
-
-  const lastMonthRevenueTotal = Number(lastMonthRevenue?.total ?? 0)
-  const currentRevenueTotal = revenue
-  const revenueTrend = lastMonthRevenueTotal > 0 ? ((currentRevenueTotal - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : (currentRevenueTotal > 0 ? 100 : 0)
-
-  // Obtener notificaciones recientes (últimas 5 no leídas)
-  const recentNotifications = await db
-    .select({
-      id: notifications.id,
-      type: notifications.type,
-      title: notifications.title,
-      message: notifications.message,
-      data: notifications.data,
-      createdAt: notifications.createdAt,
-    })
-    .from(notifications)
-    .where(eq(notifications.isRead, false))
-    .orderBy(desc(notifications.createdAt))
-    .limit(5)
-
-  // Contar notificaciones no leídas
-  const [unreadCount] = await db
-    .select({ count: count() })
-    .from(notifications)
-    .where(eq(notifications.isRead, false))
-
-  return {
-    users: userCount.count,
-    products: productCount.count,
-    orders: orderCount.count,
-    revenue,
-    manualVerificationCount: manualVerificationCount,
-    userTrend: {
-      value: parseFloat(Math.abs(userTrend).toFixed(2)),
-      isPositive: userTrend >= 0
-    },
-    productTrend: {
-      value: parseFloat(Math.abs(productTrend).toFixed(2)),
-      isPositive: productTrend >= 0
-    },
-    orderTrend: {
-      value: parseFloat(Math.abs(orderTrend).toFixed(2)),
-      isPositive: orderTrend >= 0
-    },
-    revenueTrend: {
-      value: parseFloat(Math.abs(revenueTrend).toFixed(2)),
-      isPositive: revenueTrend >= 0
-    },
-    notifications: recentNotifications.map(notification => ({
-      ...notification,
-      data: (typeof notification.data === 'object' && notification.data !== null ? notification.data : {}) as Record<string, unknown>,
-      createdAt: notification.createdAt.toISOString(),
-    })),
-    unreadNotificationsCount: unreadCount.count,
-  }
-}
 
 function StatCard({ title, value, icon: Icon, trend }: {
   title: string
@@ -208,71 +49,9 @@ function StatCard({ title, value, icon: Icon, trend }: {
   )
 }
 
-function NotificationCard({ notification }: {
-  notification: {
-    id: number
-    type: string
-    title: string
-    message: string
-    data: Record<string, unknown>
-    createdAt: string
-  }
-}) {
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'order_cancelled':
-        return <AlertCircle className="h-4 w-4 text-red-500" />
-      default:
-        return <Bell className="h-4 w-4 text-blue-500" />
-    }
-  }
-
-  const getOrderLink = (data: Record<string, unknown>) => {
-    if (data?.orderId) {
-      return `/admin/orders/${data.orderId}`
-    }
-    return null
-  }
-
-  const orderLink = getOrderLink(notification.data)
-
-  return (
-    <div className="flex items-start gap-3 p-3 border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 rounded-lg">
-      {getNotificationIcon(notification.type)}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-            {notification.title}
-          </h4>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {new Date(notification.createdAt).toLocaleDateString('es-ES', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </span>
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-          {notification.message}
-        </p>
-        {orderLink && (
-          <Link
-            href={orderLink}
-            className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mt-2"
-          >
-            <Eye className="h-3 w-3" />
-            Ver detalles del pedido
-          </Link>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function StatsSkeleton() {
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <Card key={i}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -290,7 +69,7 @@ function StatsSkeleton() {
 }
 
 async function DashboardContent() {
-  const stats = await getStats()
+  const dashboardData = await getDashboardStats()
   const systemStatus = await checkSystemStatus()
 
   return (
@@ -302,33 +81,45 @@ async function DashboardContent() {
         </p>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard
           title="Total Usuarios"
-          value={stats.users}
+          value={dashboardData.stats.totalUsers}
           icon={UsersIcon}
-          trend={stats.userTrend}
+          trend={{
+            value: Math.abs(dashboardData.stats.ordersTrend),
+            isPositive: dashboardData.stats.ordersTrend >= 0
+          }}
         />
         <StatCard
           title="Total Productos"
-          value={stats.products}
+          value={dashboardData.stats.totalProducts}
           icon={Package}
-          trend={stats.productTrend}
         />
         <StatCard
           title="Total Pedidos"
-          value={stats.orders}
+          value={dashboardData.stats.totalOrders}
           icon={ShoppingCart}
-          trend={stats.orderTrend}
+          trend={{
+            value: Math.abs(dashboardData.stats.ordersTrend),
+            isPositive: dashboardData.stats.ordersTrend >= 0
+          }}
         />
         <StatCard
           title="Ingresos Totales"
-          value={`$${stats.revenue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={`$${dashboardData.stats.totalRevenue.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={DollarSign}
-          trend={stats.revenueTrend}
+          trend={{
+            value: Math.abs(dashboardData.stats.revenueTrend),
+            isPositive: dashboardData.stats.revenueTrend >= 0
+          }}
         />
-        <MercadoLibreStatus />
-        <MercadoPagoStatus />
+        <div className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
+          <MercadoLibreStatus />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
+          <MercadoPagoStatus />
+        </div>
       </div>
 
       {/* Enlaces Rápidos */}
@@ -337,7 +128,7 @@ async function DashboardContent() {
           <CardTitle>Configuración Rápida</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <Link href="/admin/business-settings" className="flex items-center gap-2 p-3 border rounded-lg hover:bg-accent transition-colors">
               <Package className="h-4 w-4" />
               <span className="text-sm font-medium">Configurar Negocio</span>
@@ -375,32 +166,36 @@ async function DashboardContent() {
 
 
       {/* Notificaciones */}
-      {stats.notifications.length > 0 && (
+      {dashboardData.stats.unreadNotifications > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
               Notificaciones Recientes
-              {stats.unreadNotificationsCount > 0 && (
+              {dashboardData.stats.unreadNotifications > 0 && (
                 <Badge variant="destructive" className="ml-2">
-                  {stats.unreadNotificationsCount}
+                  {dashboardData.stats.unreadNotifications}
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats.notifications.map((notification) => (
-                <NotificationCard key={notification.id} notification={notification} />
+              {dashboardData.recentOrders.map((order) => (
+                <div key={order.id} className="p-3 border rounded-lg">
+                  <p className="font-medium">Pedido #{order.id}</p>
+                  <p className="text-sm text-muted-foreground">Total: ${order.total}</p>
+                  <p className="text-sm">Estado: {order.status}</p>
+                </div>
               ))}
             </div>
-            {stats.unreadNotificationsCount > 5 && (
+            {dashboardData.stats.unreadNotifications > 5 && (
               <div className="mt-4 text-center">
                 <Link
                   href="/admin/notifications"
                   className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                 >
-                  Ver todas las notificaciones ({stats.unreadNotificationsCount})
+                  Ver todas las notificaciones ({dashboardData.stats.unreadNotifications})
                 </Link>
               </div>
             )}

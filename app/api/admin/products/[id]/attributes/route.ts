@@ -5,6 +5,55 @@ import { products } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/utils/logger'
 
+// GET: Obtener atributos actuales del producto
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const resolvedParams = await params
+  const id = resolvedParams.id
+  const productId = parseInt(id)
+
+  try {
+    const session = await auth()
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    if (isNaN(productId)) {
+      return NextResponse.json({ error: 'ID de producto inválido' }, { status: 400 })
+    }
+
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      columns: {
+        id: true,
+        name: true,
+        mlCategoryId: true,
+        attributes: true,
+      }
+    })
+
+    if (!product) {
+      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json({
+      id: product.id,
+      name: product.name,
+      mlCategoryId: product.mlCategoryId,
+      attributes: product.attributes || {},
+    })
+  } catch (error) {
+    logger.error('Error getting product attributes', {
+      productId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
+
+// PUT: Actualizar atributos del producto
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

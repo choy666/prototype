@@ -11,6 +11,7 @@ interface ProductSyncButtonProps {
   mlItemId?: string | null;
   syncStatus?: string;
   onSyncComplete?: () => void;
+  mlPermalink?: string | null;
 }
 
 interface ProductSyncResult {
@@ -23,7 +24,8 @@ export function ProductSyncButton({
   productId,
   mlItemId,
   syncStatus,
-  onSyncComplete
+  onSyncComplete,
+  mlPermalink
 }: ProductSyncButtonProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isUnsyncing, setIsUnsyncing] = useState(false);
@@ -162,7 +164,7 @@ export function ProductSyncButton({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => window.open(`https://articulo.mercadolibre.com.ar/${mlItemId}`, '_blank')}
+            onClick={() => window.open(mlPermalink || `https://articulo.mercadolibre.com.ar/${mlItemId}`, '_blank')}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             Ver en ML

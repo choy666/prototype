@@ -13,6 +13,85 @@ import { validateProductForMercadoLibre } from '@/lib/validations/mercadolibre';
 import { validateProductME2Attributes } from '@/lib/validations/me2-products';
 import { calculateAvailableQuantityFromProduct } from '@/lib/domain/ml-stock';
 
+/**
+ * Mapea los nombres de atributos a los IDs correctos de Mercado Libre
+ */
+export async function mapAttributesToMLIds(
+  attributes: Array<{ name: string; values: string[] }>,
+  mlCategoryId: string
+): Promise<Array<{ id: string; name: string; values: string[] }>> {
+  try {
+    // Obtener los atributos reales de la categoría desde ML
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/mercadolibre/categories/${mlCategoryId}/attributes`
+    );
+    
+    if (!response.ok) {
+      logger.warn('Error obteniendo atributos de categoría para mapeo', {
+        mlCategoryId,
+        status: response.status,
+      });
+      // Retornar atributos sin modificar si falla la petición
+      return attributes.map(attr => ({ ...attr, id: attr.name }));
+    }
+
+    const data = await response.json();
+    const mlAttributes = data.rawAttributes || [];
+    
+    // Crear mapa de nombre -> ID
+    const nameToIdMap = new Map<string, string>();
+    mlAttributes.forEach((attr: { id: string; name: string }) => {
+      if (attr.id && attr.name) {
+        nameToIdMap.set(attr.name.toLowerCase(), attr.id);
+        // También agregar alias comunes
+        if (attr.name.toLowerCase() === 'marca') {
+          nameToIdMap.set('brand', attr.id);
+        }
+        if (attr.name.toLowerCase() === 'modelo') {
+          nameToIdMap.set('model', attr.id);
+        }
+        if (attr.name.toLowerCase() === 'color') {
+          nameToIdMap.set('colour', attr.id);
+        }
+      }
+    });
+
+    // Mapear atributos del producto a IDs correctos
+    const mappedAttributes = attributes.map(attr => {
+      const mlId = nameToIdMap.get(attr.name.toLowerCase());
+      if (mlId) {
+        return {
+          id: mlId,
+          name: attr.name,
+          values: attr.values
+        };
+      }
+      
+      // Si no se encuentra el ID, usar el nombre como ID (fallback)
+      logger.warn(`Atributo no encontrado en categoría ML: ${attr.name}`, {
+        mlCategoryId,
+        attributeName: attr.name
+      });
+      
+      return {
+        id: attr.name,
+        name: attr.name,
+        values: attr.values
+      };
+    });
+
+    return mappedAttributes;
+  } catch (error) {
+    logger.error('Error mapeando atributos a IDs de ML', {
+      mlCategoryId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
+    // Retornar atributos sin modificar en caso de error
+    return attributes.map(attr => ({ ...attr, id: attr.name }));
+  }
+}
+
 // ✅ Esquema de validación para los filtros de productos
 const productFiltersSchema = z.object({
   category: z
@@ -287,10 +366,23 @@ export async function createProduct(
       throw new Error('Categoría de Mercado Libre no encontrada')
     }
 
+    // Mapear atributos a IDs correctos de ML si existen
+    let mappedAttributes: unknown = productData.attributes;
+    const attributesArray = productData.attributes as Array<{ name: string; values: string[] }> | undefined;
+    if (attributesArray && attributesArray.length > 0 && productData.mlCategoryId) {
+      mappedAttributes = await mapAttributesToMLIds(attributesArray, productData.mlCategoryId);
+      logger.info('Products: Atributos mapeados a IDs de ML', {
+        originalCount: attributesArray.length,
+        mappedCount: (mappedAttributes as Array<{ id: string; name: string; values: string[] }>).length,
+        mlCategoryId: productData.mlCategoryId
+      });
+    }
+
     const [newProduct] = await db
       .insert(products)
       .values({
         ...productData,
+        attributes: mappedAttributes,
         categoryId: category.id,
         category: category.name,
         created_at: new Date(),

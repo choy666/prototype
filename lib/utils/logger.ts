@@ -63,7 +63,7 @@ function sanitizeMessage(message: string, data?: unknown): { message: string; da
 const config = loggerConfigSchema.parse({
   level: process.env.LOG_LEVEL || 'info',
   enableConsole: process.env.NODE_ENV !== 'test',
-  sanitizeSensitiveData: true,
+  sanitizeSensitiveData: false, // TEMPORAL: Desactivado para debugging de atributos ML
   development: process.env.NODE_ENV === 'development',
 });
 

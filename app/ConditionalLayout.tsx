@@ -16,6 +16,7 @@ interface ConditionalLayoutProps {
 export function ConditionalLayout({ children, session }: ConditionalLayoutProps) {
   const pathname = usePathname()
   const isPaymentSuccess = pathname === '/payment-success'
+  const isAdminRoute = pathname.startsWith('/admin')
   
   return (
     <AuthProvider session={session}>
@@ -26,8 +27,8 @@ export function ConditionalLayout({ children, session }: ConditionalLayoutProps)
         disableTransitionOnChange
       >
         <SkipLink />
-        {/* Ocultar navbar en payment-success para evitar navegación durante redirect */}
-        {!isPaymentSuccess && <Navbar />}
+        {/* Ocultar navbar en payment-success y rutas de admin */}
+        {!isPaymentSuccess && !isAdminRoute && <Navbar />}
         <main id="main-content">
           {children}
         </main>

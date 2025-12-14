@@ -12,13 +12,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { MLCategorySelectSimple } from '@/components/admin/MLCategorySelectSimple'
 import { useToast } from '@/components/ui/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Truck, AlertCircle, CheckCircle, CheckSquare, Square, Camera } from 'lucide-react'
+import { ArrowLeft, FileText, Tag, Package, Eye, Truck, AlertCircle, CheckCircle, CheckSquare, Square, Camera } from 'lucide-react'
 import { ImageManager } from '@/components/ui/ImageManager'
 import { ME2Guidelines } from '@/components/admin/ME2Guidelines'
 import { MLAttributesGuide } from '@/components/admin/MLAttributesGuide'
 import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
-import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import { getValidations, calculateReadinessScore, getReadinessColor, getReadinessIcon, type ProductForm, type ValidationItem } from '@/lib/validations/product-validations'
+import { validateProductForMercadoLibre } from '@/lib/actions/product-validation'
 import type { Category } from '@/lib/schema'
 import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 import type { ProductVariant } from '@/components/admin/ProductVariantsNew'
@@ -86,7 +86,7 @@ export default function EditProductPage() {
     weight: '',
     stock: '0',
     destacado: false,
-    dynamicAttributes: [],
+    attributes: [],
     mlCondition: 'new',
     mlBuyingMode: 'buy_it_now',
     mlListingTypeId: 'free',
@@ -102,7 +102,6 @@ export default function EditProductPage() {
     me2Compatible: false,
   })
   const [attributes, setAttributes] = useState<DynamicAttribute[]>([])
-  const [attributesSaving, setAttributesSaving] = useState(false)
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [recommendedAttributes, setRecommendedAttributes] = useState<RecommendedAttributeConfig[]>([])
   const [me2Status, setMe2Status] = useState<ProductMe2Status>({
@@ -199,11 +198,11 @@ export default function EditProductPage() {
           price: product.price,
           image: product.image || '',
           images: product.images || [],
-          discount: product.discount.toString(),
+          discount: String(product.discount || '0'),
           weight: product.weight || '',
           stock: product.stock.toString(),
           destacado: product.destacado,
-          dynamicAttributes: (product as unknown as { attributes?: DynamicAttribute[] }).attributes || [],
+          attributes: (product as unknown as { attributes?: DynamicAttribute[] }).attributes || [],
           mlCondition: product.mlCondition || 'new',
           mlBuyingMode: product.mlBuyingMode || 'buy_it_now',
           mlListingTypeId: product.mlListingTypeId || 'free',
@@ -271,6 +270,67 @@ export default function EditProductPage() {
         throw new Error('Debes seleccionar una categoría de Mercado Libre')
       }
 
+      // Validar readiness score básico
+      if (calculateReadinessScore(form) < 100) {
+        throw new Error('Completa todos los campos obligatorios antes de guardar')
+      }
+
+      // Validación completa para Mercado Libre
+      const productForValidation = {
+        id: parseInt(id),
+        name: form.name,
+        description: form.description,
+        price: form.price,
+        image: form.image,
+        images: form.images,
+        stock: String(form.stock || '0'),
+        mlCategoryId: form.mlCategoryId,
+        mlCondition: form.mlCondition,
+        mlBuyingMode: form.mlBuyingMode,
+        mlListingTypeId: form.mlListingTypeId,
+        mlCurrencyId: form.mlCurrencyId,
+        weight: form.weight,
+        height: form.height,
+        width: form.width,
+        length: form.length,
+        shippingMode: form.shippingMode || undefined,
+        me2Compatible: form.me2Compatible ?? false,
+        attributes: attributes,
+        shippingAttributes: null, // Campo requerido por el tipo Product
+        // Campos necesarios pero no usados en validación
+        category: '',
+        categoryId: 0,
+        discount: String(form.discount || '0'),
+        destacado: false,
+        isActive: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+        mlItemId: form.mlItemId || undefined,
+        mlSyncStatus: 'pending',
+        mlLastSync: null,
+        mlPermalink: null,
+        mlThumbnail: null,
+        mlVideoId: form.videoId || null,
+        videoId: form.videoId || '',
+        warranty: form.warranty || ''
+      }
+
+      const mlValidationResult = await validateProductForMercadoLibre(productForValidation)
+      
+      if (!mlValidationResult.success || !mlValidationResult.validation?.isValid) {
+        const errorMessage = `El producto no cumple los requisitos de Mercado Libre:\n\n• ${mlValidationResult.validation?.errors?.join('\n• ') || 'Error de validación'}`
+        throw new Error(errorMessage)
+      }
+
+      if (!mlValidationResult.validation?.isReadyForSync) {
+        const warningMessage = `Advertencias para sincronización:\n\n• ${mlValidationResult.validation?.warnings?.join('\n• ') || ''}`
+        toast({
+          title: 'Advertencias de Mercado Libre',
+          description: warningMessage,
+          variant: 'default'
+        })
+      }
+
       const productData = {
         name: form.name,
         description: form.description || undefined,
@@ -293,7 +353,7 @@ export default function EditProductPage() {
         length: form.length || undefined,
         mlItemId: form.mlItemId || undefined,
         shippingMode: form.shippingMode || undefined,
-        me2Compatible: form.me2Compatible,
+        me2Compatible: mlValidationResult.validation?.isReadyForSync || false,
       }
 
       const response = await fetch(`/api/admin/products/${id}`, {
@@ -306,14 +366,21 @@ export default function EditProductPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to update product')
+        throw new Error(error.error || 'No se pudo actualizar el producto')
       }
 
-      toast({
-        title: 'Éxito',
-        description: 'Producto actualizado correctamente'
-      })
-
+      if (mlValidationResult.validation?.isReadyForSync) {
+        toast({
+          title: '✅ Producto actualizado y listo para sincronizar',
+          description: 'El producto cumple todos los requisitos de Mercado Libre',
+        })
+      } else {
+        toast({
+          title: 'Producto actualizado',
+          description: 'El producto se ha actualizado correctamente',
+        })
+      }
+      
       router.push('/admin/products')
     } catch (error) {
       toast({
@@ -323,38 +390,6 @@ export default function EditProductPage() {
       })
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleUpdateAttributes = async () => {
-    setAttributesSaving(true)
-
-    try {
-      const response = await fetch(`/api/admin/products/${id}/attributes`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ attributes })
-      })
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
-        throw new Error(data?.error || 'No se pudieron actualizar los atributos')
-      }
-
-      toast({
-        title: 'Éxito',
-        description: 'Atributos actualizados correctamente'
-      })
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudieron actualizar los atributos',
-        variant: 'destructive'
-      })
-    } finally {
-      setAttributesSaving(false)
     }
   }
 
@@ -939,34 +974,53 @@ export default function EditProductPage() {
                     </p>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-6">
-                      <MLAttributesGuide
-                        categoryId={form.mlCategoryId}
-                        attributes={attributes}
-                        onAttributesChange={setAttributes}
-                        showValidationErrors={hasMissingRequiredAttributes()}
-                      />
-                      
-                      <div className="border-t border-dark-lighter pt-6">
-                        <h4 className="text-sm font-medium text-dark-text-primary mb-3">Atributos Adicionales</h4>
-                        <AttributeBuilder
-                          attributes={attributes}
-                          onChange={setAttributes}
-                          recommendedAttributes={recommendedAttributes}
-                        />
-                      </div>
+                    <MLAttributesGuide
+                      categoryId={form.mlCategoryId}
+                      attributes={attributes}
+                      onAttributesChange={setAttributes}
+                      showValidationErrors={hasMissingRequiredAttributes()}
+                    />
+                    
+                    {/* Botón para guardar atributos */}
+                    <div className="mt-6 flex justify-end">
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`/api/admin/products/${id}/attributes`, {
+                              method: 'PUT',
+                              headers: {
+                                'Content-Type': 'application/json'
+                              },
+                              body: JSON.stringify({
+                                attributes: attributes.length > 0 ? attributes : {}
+                              })
+                            })
 
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          onClick={handleUpdateAttributes}
-                          disabled={attributesSaving || fetchLoading}
-                          className="min-h-[40px]"
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          {attributesSaving ? 'Guardando atributos...' : 'Actualizar Atributos'}
-                        </Button>
-                      </div>
+                            if (!response.ok) {
+                              const error = await response.json()
+                              throw new Error(error.error || 'No se pudieron guardar los atributos')
+                            }
+
+                            // Actualizar el estado local con los atributos guardados
+                            setForm(prev => ({ ...prev, attributes: attributes }))
+
+                            toast({
+                              title: 'Atributos guardados',
+                              description: 'Los atributos se han guardado correctamente'
+                            })
+                          } catch (error) {
+                            toast({
+                              title: 'Error',
+                              description: error instanceof Error ? error.message : 'No se pudieron guardar los atributos',
+                              variant: 'destructive'
+                            })
+                          }
+                        }}
+                        className="min-h-[32px]"
+                      >
+                        Guardar Atributos
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

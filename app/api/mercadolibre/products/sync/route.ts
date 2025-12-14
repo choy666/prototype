@@ -1,529 +1,195 @@
-import { NextResponse } from 'next/server';
-import { db, checkDatabaseConnection } from '@/lib/db';
-import { products, mercadolibreProductsSync, productVariants, productAttributes } from '@/lib/schema';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { 
+  products, 
+  mercadolibreProductsSync,
+  categories,
+  ProductVariant
+} from '@/lib/schema';
 import { eq, and, sql } from 'drizzle-orm';
-import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { logger } from '@/lib/utils/logger';
-import { getOptimalListingType, getAvailableListingTypes } from '@/lib/actions/mercadolibre-listing-types';
-import { auth } from '@/lib/actions/auth';
-import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
-import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category';
-import { validateMLRequiredAttributes, prepareMLAttributes } from '@/lib/validations/ml-attributes';
-import type { ProductVariant, ProductAttribute } from '@/lib/schema';
-import { resolveStockPolicy, calculateAvailableQuantityForML } from '@/lib/domain/ml-stock';
+import { 
+  makeAuthenticatedRequest
+} from '@/lib/auth/mercadolibre';
+import { 
+  getAvailableListingTypes 
+} from '@/lib/actions/mercadolibre-listing-types';
+import { 
+  validatePrice, 
+  validateImageAccessibility,
+  sanitizeTitle
+} from '@/lib/validations/mercadolibre';
+import { 
+  validateProductForMLSync
+} from '@/lib/validations/ml-sync-validation';
+import { 
+  resolveStockPolicy, 
+  calculateAvailableQuantityForML
+} from '@/lib/domain/ml-stock';
 
-type DynamicAttributeForML = {
-  id?: string;
-  name?: string;
-  value_name?: string;
-  value?: string;
-  values?: unknown;
-};
-
-type MLAttributeForRequest = {
-  id?: string;
-  name: string;
-  value_name: string;
-  value_id?: string;
-};
-
-function mapProductAttributesToMercadoLibreAttributes(
-  rawAttributes: unknown,
-  catalogAttributes: ProductAttribute[],
-): MLAttributeForRequest[] {
-  if (!Array.isArray(rawAttributes)) return [];
-
-  const normalize = (value: string) => value.trim().toLowerCase();
-
-  // Índice rápido por nombre de atributo de catálogo (ej: "Color", "Talla")
-  const catalogByName = new Map<string, ProductAttribute>();
-  for (const catAttr of catalogAttributes) {
-    if (typeof catAttr.name === 'string') {
-      catalogByName.set(normalize(catAttr.name), catAttr);
-    }
-  }
-
-  const mapped = (rawAttributes as DynamicAttributeForML[])
-    .map((attr) => {
-      if (!attr) return null;
-
-      const name = typeof attr.name === 'string' ? attr.name.trim() : undefined;
-      let valueName: string | undefined;
-
-      if (typeof attr.value_name === 'string') {
-        valueName = attr.value_name.trim();
-      } else if (typeof attr.value === 'string') {
-        valueName = attr.value.trim();
-      } else if (Array.isArray(attr.values) && typeof (attr.values as unknown[])[0] === 'string') {
-        valueName = ((attr.values as unknown[])[0] as string).trim();
-      }
-
-      if (!name || !valueName) {
-        return null;
-      }
-
-      let id = attr.id;
-      const normalizedName = normalize(name);
-
-      // Mapeo básico por nombre (compatibilidad con implementación previa)
-      if (!id) {
-        if (normalizedName === 'marca' || normalizedName === 'brand') {
-          id = 'BRAND';
-        } else if (normalizedName === 'modelo' || normalizedName === 'model') {
-          id = 'MODEL';
-        } else if (
-          normalizedName === 'color' ||
-          normalizedName === 'colour' ||
-          normalizedName === 'color principal'
-        ) {
-          id = 'COLOR';
-        }
-      }
-
-      let valueId: string | undefined;
-
-      // Enriquecer con datos de catálogo si existen en product_attributes
-      const catalogAttr = catalogByName.get(normalizedName);
-      if (catalogAttr) {
-        // Si no hay id aún, usar el mlAttributeId guardado en catálogo
-        if (!id && typeof catalogAttr.mlAttributeId === 'string') {
-          id = catalogAttr.mlAttributeId;
-        }
-
-        const rawValues = (catalogAttr as unknown as { values?: unknown }).values;
-        if (Array.isArray(rawValues)) {
-          const catalogValues = rawValues as Array<{ name?: string; mlValueId?: string }>;
-          const normalizedValue = normalize(valueName);
-
-          const matchedValue = catalogValues.find(
-            (v) => typeof v.name === 'string' && normalize(v.name) === normalizedValue,
-          );
-
-          if (matchedValue?.mlValueId && typeof matchedValue.mlValueId === 'string') {
-            valueId = matchedValue.mlValueId;
-          }
-        }
-      }
-
-      const result: MLAttributeForRequest = {
-        id,
-        name,
-        value_name: valueName,
-      };
-
-      if (valueId) {
-        result.value_id = valueId;
-      }
-
-      return result;
-    })
-    .filter(Boolean) as MLAttributeForRequest[];
-
-  return mapped;
-}
-
-interface MLItemDetailsForMe2Validation {
-  id: string;
-  shipping?: {
-    mode?: string;
-    local_pick_up?: boolean;
-    free_shipping?: boolean;
-    logistic_type?: string;
-    store_pick_up?: boolean;
-    dimensions?: string | null;
-    methods?: unknown[];
-    tags?: string[];
-  };
-  [key: string]: unknown;
-}
-
-async function validateMe2ReadyForItem(
-  userId: number,
-  mlItemId: string,
-): Promise<{ isMe2Ready: boolean; reason?: string }> {
-  try {
-    const response = await makeAuthenticatedRequest(userId, `/items/${mlItemId}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Error desconocido');
-      logger.error('Error obteniendo tem de ML para validacin ME2', {
-        mlItemId,
-        status: response.status,
-        error: errorText,
-      });
-      return {
-        isMe2Ready: false,
-        reason:
-          'La publicación se creó en Mercado Libre pero no se pudo verificar la configuración de envíos ME2. Por favor, revisa la publicación directamente en Mercado Libre y verifica que tenga habilitado Mercado Envíos 2.',
-      };
-    }
-
-    const item = (await response.json()) as MLItemDetailsForMe2Validation;
-    const shipping = item.shipping;
-
-    if (!shipping) {
-      return {
-        isMe2Ready: false,
-        reason:
-          'La publicación en Mercado Libre no tiene configuración de envío. Para solucionar: 1) Ve a tu publicación en Mercado Libre, 2) Haz clic en "Editar", 3) Ve a la sección "Envío", 4) Activa "Mercado Envíos 2" y guarda los cambios.',
-      };
-    }
-
-    if (shipping.mode !== 'me2') {
-      return {
-        isMe2Ready: false,
-        reason:
-          'La publicación en Mercado Libre no está configurada con Mercado Envíos 2. Para solucionar: 1) Edita la publicación en Mercado Libre, 2) En la sección de envío, selecciona "Mercado Envíos 2" como modo de envío, 3) Configura las dimensiones del paquete, 4) Guarda los cambios.',
-      };
-    }
-
-    if (!shipping.dimensions || typeof shipping.dimensions !== 'string') {
-      return {
-        isMe2Ready: false,
-        reason:
-          'La publicación en Mercado Libre no tiene las dimensiones de envío configuradas. Para solucionar: 1) Edita tu publicación en Mercado Libre, 2) Ve a la sección "Envío", 3) Ingresa el peso (en gramos), alto, ancho y largo del paquete en centímetros, 4) Guarda los cambios. Sin estas dimensiones, ME2 no funcionará.',
-      };
-    }
-
-    return { isMe2Ready: true };
-  } catch (error) {
-    logger.error('Error inesperado validando configuracin ME2 del tem de ML', {
-      mlItemId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return {
-      isMe2Ready: false,
-      reason:
-        'Ocurri un error al verificar la configuracin de ME2 en Mercado Libre. Intenta nuevamente o revisa la publicacin en ML.',
-    };
-  }
-}
-
-export async function POST(req: Request) {
-  let productId: number | null = null;
-  let productIdNum: number | null = null;
-  let abortController: AbortController | null = null;
+export async function POST(req: NextRequest) {
   let timeoutId: NodeJS.Timeout | null = null;
-  
+  let abortController: AbortController | null = null;
+  let productId: string | null = null;
+  let productIdNum: number | null = null;
+
   try {
-    // Verificar conexión a base de datos primero
-    try {
-      const dbCheck = await checkDatabaseConnection();
-      if (!dbCheck.success) {
-        console.error('ERROR CRUDO CONEXIÓN DB:', dbCheck);
-        return NextResponse.json({ 
-          error: 'Error de conexión a base de datos' 
-        }, { status: 500 });
-      }
-    } catch (dbConnError) {
-      console.error('ERROR CRUDO VERIFICACIÓN DB:', dbConnError);
-      console.error('STACK VERIFICACIÓN DB:', dbConnError instanceof Error ? dbConnError.stack : 'No stack');
-      throw dbConnError;
-    }
-    
-    // Validaciones tempranas antes de crear timeout
-    let session;
-    try {
-      session = await auth();
-    } catch (authError) {
-      console.error('ERROR CRUDO AUTH:', authError);
-      console.error('STACK AUTH:', authError instanceof Error ? authError.stack : 'No stack');
-      throw authError;
-    }
-    
+    const session = await auth();
     if (!session?.user?.id) {
-      console.error('ERROR CRUDO: Sesión inválida', { session });
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const requestData = await req.json();
-    productId = requestData.productId;
+    const body = await req.json();
+    productId = body.productId;
     
     if (!productId) {
-      return NextResponse.json({ error: 'productId es requerido' }, { status: 400 });
+      return NextResponse.json({ error: 'Se requiere el ID del producto' }, { status: 400 });
     }
 
-    productIdNum = typeof productId === 'string' ? parseInt(productId) : productId;
+    productIdNum = parseInt(productId);
+    if (isNaN(productIdNum)) {
+      return NextResponse.json({ error: 'ID de producto inválido' }, { status: 400 });
+    }
 
-    // Crear timeout después de validaciones básicas
+    // Configurar timeout de 5 minutos
     abortController = new AbortController();
-    timeoutId = setTimeout(() => abortController!.abort(), 30000); // 30 segundos timeout
+    timeoutId = setTimeout(() => {
+      abortController?.abort();
+    }, 5 * 60 * 1000);
 
-    // Verificar conexión con Mercado Libre
-    try {
-      const connected = await isConnected(parseInt(session.user.id));
-      if (!connected) {
-        if (timeoutId) clearTimeout(timeoutId);
-        return NextResponse.json({ 
-          error: 'Usuario no conectado a Mercado Libre' 
-        }, { status: 400 });
+    // Verificar si hay un producto atascado en syncing por más de 5 minutos
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingSync = await db.query.mercadolibreProductsSync.findFirst({
+      where: and(
+        eq(mercadolibreProductsSync.productId, productIdNum!),
+        eq(mercadolibreProductsSync.syncStatus, 'syncing')
+      ),
+    });
+
+    if (existingSync) {
+      if (existingSync.lastSyncAt && existingSync.lastSyncAt < fiveMinutesAgo) {
+        // Liberar producto atascado
+        await db.update(mercadolibreProductsSync)
+          .set({ 
+            syncStatus: 'error',
+            syncError: 'Timeout: sincronización expirada después de 5 minutos'
+          })
+          .where(eq(mercadolibreProductsSync.productId, productIdNum!));
+      } else {
+        return NextResponse.json({ error: 'El producto ya está siendo sincronizado' }, { status: 409 });
       }
-
-      // Verificar si el usuario tiene ME2 habilitado
-      const shippingPrefs = await makeAuthenticatedRequest(
-        parseInt(session.user.id),
-        `/users/${session.user.id}/shipping_preferences`,
-        { method: 'GET' }
-      );
-
-      if (shippingPrefs.ok) {
-        const prefs = await shippingPrefs.json();
-        if (!prefs.modes?.includes('me2')) {
-          if (timeoutId) clearTimeout(timeoutId);
-          return NextResponse.json({
-            error: 'El usuario no tiene Mercado Envíos 2 habilitado en su cuenta',
-            details: 'Para vender en esta categoría, debes activar ME2 en tu configuración de vendedor de Mercado Libre',
-            solution: '1) Ingresa a Mercado Libre > Mi cuenta > Vender > Configuración > Envíos > Activa Mercado Envíos 2. Una vez activado, intenta sincronizar nuevamente.'
-          }, { status: 400 });
-        }
-      }
-    } catch (connectionError) {
-      console.error('ERROR CRUDO CONEXIÓN ML:', connectionError);
-      console.error('STACK CONEXIÓN:', connectionError instanceof Error ? connectionError.stack : 'No stack');
-      throw connectionError;
     }
 
-    // Obtener producto local con variantes
-    let localProduct;
-    try {
-      localProduct = await db.query.products.findFirst({
-        where: eq(products.id, productIdNum!),
-        with: {
-          variants: {
-            where: eq(productVariants.isActive, true),
-          },
-        },
-      });
-    } catch (dbError) {
-      console.error('ERROR CRUDO DB QUERY PRODUCTO:', dbError);
-      console.error('STACK DB QUERY:', dbError instanceof Error ? dbError.stack : 'No stack');
-      throw dbError;
+    // Verificar límite de intentos
+    const currentRecord = await db.query.mercadolibreProductsSync.findFirst({
+      where: eq(mercadolibreProductsSync.productId, productIdNum!),
+    });
+
+    if (currentRecord && currentRecord.syncAttempts >= 3) {
+      await db.update(mercadolibreProductsSync)
+        .set({ 
+          syncStatus: 'error',
+          syncError: 'Límite de intentos alcanzado (3). Por favor revise la configuración del producto.'
+        })
+        .where(eq(mercadolibreProductsSync.productId, productIdNum!));
+      return NextResponse.json({ error: 'Límite de intentos de sincronización alcanzado' }, { status: 429 });
     }
 
-    if (!localProduct) {
-      if (timeoutId) clearTimeout(timeoutId);
-      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
-    }
-
-    // Verificar y crear registro de sincronización (sin transacciones)
-    let syncRecord: typeof mercadolibreProductsSync.$inferSelect[];
-    try {
-      // Check si ya existe sincronización en curso
-      const existingSync = await db.query.mercadolibreProductsSync.findFirst({
-        where: and(
-          eq(mercadolibreProductsSync.productId, productIdNum!),
-          eq(mercadolibreProductsSync.syncStatus, 'syncing')
-        ),
-      });
-
-      if (existingSync) {
-        throw new Error('PRODUCT_ALREADY_SYNCING');
-      }
-
-      // Crear o actualizar registro de sincronización
-      syncRecord = await db.insert(mercadolibreProductsSync).values({
-        productId: productIdNum!,
+    // Crear o actualizar registro de sincronización
+    await db.insert(mercadolibreProductsSync).values({
+      productId: productIdNum!,
+      syncStatus: 'syncing',
+      lastSyncAt: new Date(),
+      syncAttempts: currentRecord ? currentRecord.syncAttempts + 1 : 1,
+    }).onConflictDoUpdate({
+      target: mercadolibreProductsSync.productId,
+      set: {
         syncStatus: 'syncing',
         lastSyncAt: new Date(),
-        syncAttempts: 1,
-      }).onConflictDoUpdate({
-        target: mercadolibreProductsSync.productId,
-        set: {
-          syncStatus: 'syncing',
-          lastSyncAt: new Date(),
-          syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
-        },
-      }).returning();
-    } catch (txError) {
-      console.error('ERROR CRUDO TRANSACCIÓN SYNC:', txError);
-      console.error('STACK TRANSACCIÓN:', txError instanceof Error ? txError.stack : 'No stack');
-      
-      if (txError instanceof Error && txError.message === 'PRODUCT_ALREADY_SYNCING') {
-        if (timeoutId) clearTimeout(timeoutId);
-        return NextResponse.json({ 
-          error: 'El producto ya está siendo sincronizado' 
-        }, { status: 409 });
-      }
-      throw txError; // Re-lanzar otros errores
-    }
+        syncAttempts: sql`${mercadolibreProductsSync.syncAttempts} + 1`,
+        syncError: null,
+      },
+    });
 
-    if (!syncRecord || syncRecord.length === 0) {
-      if (timeoutId) clearTimeout(timeoutId);
-      logger.error('No se pudo crear/actualizar registro de sincronización', { productId: productIdNum });
-      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
-    }
+    // Obtener producto local con variantes
+    const localProduct = await db.query.products.findFirst({
+      where: eq(products.id, productIdNum!),
+      with: {
+        variants: true,
+      },
+    });
 
-    // Validar datos antes de sincronizar
-    const hasVariants = localProduct.variants && Array.isArray(localProduct.variants) && (localProduct.variants as ProductVariant[]).length > 0;
-    
-    // Validar que la categoría ML sea una categoría hoja válida
-    if (localProduct.mlCategoryId) {
-      try {
-        const isValidCategory = await validateMLCategory(localProduct.mlCategoryId);
-        
-        if (!isValidCategory) {
-          if (timeoutId) clearTimeout(timeoutId);
-          logger.error('Producto intenta sincronizar con categoría ML no válida', {
-            productId: productIdNum,
-            mlCategoryId: localProduct.mlCategoryId,
-          });
-          return NextResponse.json({
-            ...createMLCategoryErrorResponse(localProduct.mlCategoryId),
-            error: createMLCategoryErrorResponse(localProduct.mlCategoryId).error + ' Por favor, seleccione una categoría oficial y vuelva a intentar.',
-          }, { status: 400 });
-        }
-      } catch (categoryError) {
-        console.error('ERROR CRUDO VALIDACIÓN CATEGORÍA:', categoryError);
-        if (timeoutId) clearTimeout(timeoutId);
-        throw categoryError;
-      }
-    }
-    
-    if (hasVariants) {
-      // Validar límite de 60 variantes de Mercado Libre
-      if ((localProduct.variants as ProductVariant[]).length > 60) {
-        if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Producto excede límite de variantes de ML', {
-          productId: productIdNum,
-          variantsCount: (localProduct.variants as ProductVariant[]).length
-        });
-        return NextResponse.json({
-          error: 'Mercado Libre permite máximo 60 variantes por publicación',
-          variantsCount: (localProduct.variants as ProductVariant[]).length,
-          maxAllowed: 60
-        }, { status: 400 });
-      }
-      
-      // Validar unicidad de attribute_combinations entre variantes
-      const attributeCombinations = (localProduct.variants as ProductVariant[]).map((variant: ProductVariant) => {
-        if (!variant.mlAttributeCombinations || !Array.isArray(variant.mlAttributeCombinations)) {
-          return null;
-        }
-        // Crear clave única basada en los atributos combinados
-        return variant.mlAttributeCombinations
-          .map((attr: { id: string; value_id: string }) => `${attr.id}:${attr.value_id}`)
-          .sort() // Ordenar para asegurar consistencia
-          .join('|');
-      });
-      
-      const duplicateCombinations = attributeCombinations.filter((combo: string | null, index: number) => 
-        combo && attributeCombinations.indexOf(combo) !== index
+    if (!localProduct) {
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.CATEGORY_NOT_FOUND,
+        'Producto no encontrado'
       );
-      
-      if (duplicateCombinations.length > 0) {
-        if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Variantes con combinaciones de atributos duplicadas', {
-          productId: productIdNum,
-          duplicateCombinations: [...new Set(duplicateCombinations)]
-        });
-        return NextResponse.json({
-          error: 'Las variantes no pueden tener combinaciones de atributos duplicadas',
-          duplicateCombinations: [...new Set(duplicateCombinations)]
-        }, { status: 400 });
-      }
-      
-      const invalidVariants = (localProduct.variants as ProductVariant[]).filter((variant: ProductVariant) => 
-        !variant.mlAttributeCombinations || 
-        (Array.isArray(variant.mlAttributeCombinations) && variant.mlAttributeCombinations.length === 0)
-      );
-      
-      if (invalidVariants.length > 0) {
-        if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Variantes sin atributos ML válidos', {
-          productId: productIdNum,
-          invalidVariantsCount: invalidVariants.length,
-          invalidVariantIds: invalidVariants.map((v: ProductVariant) => v.id)
-        });
-        return NextResponse.json({
-          error: 'Las variantes deben tener atributos de Mercado Libre configurados',
-          invalidVariants: invalidVariants.map((v: ProductVariant) => ({ id: v.id, name: v.name }))
-        }, { status: 400 });
-      }
     }
 
-    // Preparar datos para Mercado Libre
-    
-    // Obtener el listing_type óptimo con fallback automático
-    const optimalListingType = await getOptimalListingType(
-      parseInt(session.user.id),
-      localProduct.mlCategoryId || 'MLA3530',
-      localProduct.mlListingTypeId || undefined
-    );
-    
-    logger.info('Listing type seleccionado para sincronización', {
-      productId: productIdNum,
-      categoryId: localProduct.mlCategoryId || 'MLA3530',
-      preferredType: localProduct.mlListingTypeId,
-      selectedType: optimalListingType,
+    // Obtener atributos de la categoría
+    const catalogAttributes = await db.query.categories.findFirst({
+      where: eq(categories.mlCategoryId, localProduct.mlCategoryId || 'MLA3530'),
     });
     
-    // Cargar atributos de catálogo locales (product_attributes) para enriquecer el mapeo a ML
-    const catalogAttributes = await db.select().from(productAttributes);
+    // Debug: Verificar datos de la categoría
+    console.log('[ML-Sync-Debug] Categoría encontrada:', {
+      categoryId: localProduct.mlCategoryId,
+      catalogFound: !!catalogAttributes,
+      catalogName: catalogAttributes?.name,
+      catalogMlId: catalogAttributes?.mlCategoryId,
+      hasAttributes: !!(catalogAttributes?.attributes as unknown[] && (catalogAttributes?.attributes as unknown[]).length > 0),
+      attributeCount: (catalogAttributes?.attributes as unknown[] || []).length,
+      attributes: catalogAttributes?.attributes
+    });
     
-    // Variables para atributos adicionales (GTIN_TYPE, etc)
-    const additionalMLAttributes: Array<{ id: string; value_name: string }> = [];
+    // Debug: Verificar atributos del producto
+    console.log('[ML-Sync-Debug] Atributos del producto:', {
+      productId: localProduct.id,
+      hasAttributes: !!(localProduct.attributes as unknown[] && (localProduct.attributes as unknown[]).length > 0),
+      attributeCount: (localProduct.attributes as unknown[] || []).length,
+      attributes: localProduct.attributes
+    });
 
-    // Validar atributos requeridos por la categoría antes de sincronizar
-    if (localProduct.mlCategoryId && localProduct.attributes) {
-      logger.info('[ML Sync] Validando atributos requeridos por categoría', {
-        productId: productIdNum,
-        categoryId: localProduct.mlCategoryId
-      });
-
-      const attributeValidation = await validateMLRequiredAttributes(
-        localProduct.mlCategoryId,
-        localProduct.attributes as Record<string, unknown>
-      );
-
-      if (!attributeValidation.isValid) {
-        if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Atributos requeridos faltantes', {
-          productId: productIdNum,
-          missingAttributes: attributeValidation.missingAttributes,
-          conditionalAttributes: attributeValidation.conditionalAttributes
-        });
-
-        return NextResponse.json({
-          error: 'El producto carece de atributos requeridos para esta categoría de Mercado Libre',
-          missingAttributes: attributeValidation.missingAttributes,
-          conditionalAttributes: attributeValidation.conditionalAttributes,
-          warnings: attributeValidation.warnings,
-          solution: 'Agregue los atributos faltantes en la edición del producto. Para GTIN, si el producto no tiene código de barras, use GTIN_TYPE=NO_GTIN.'
-        }, { status: 400 });
+    // Preparar atributos adicionales para variantes
+    const hasVariants = localProduct.variants && localProduct.variants.length > 0;
+    const additionalMLAttributes: unknown[] = [];
+    
+    if (hasVariants) {
+      for (const variant of localProduct.variants) {
+        if (variant.additionalAttributes && typeof variant.additionalAttributes === 'object') {
+          const preparedMLAttributes = prepareVariantMLAttributes(
+            variant.additionalAttributes as Record<string, unknown>,
+            catalogAttributes?.attributes as unknown[] || []
+          );
+          additionalMLAttributes.push(...preparedMLAttributes);
+        }
       }
-
-      if (attributeValidation.warnings.length > 0) {
-        logger.warn('Advertencias de atributos', {
-          productId: productIdNum,
-          warnings: attributeValidation.warnings
-        });
-      }
-
-      // Preparar atributos con defaults necesarios (ej: GTIN_TYPE=NO_GTIN)
-      const preparedMLAttributes = prepareMLAttributes(
-        localProduct.attributes as Record<string, unknown>,
-        attributeValidation
-      );
-      
-      // Agregar atributos preparados al array
-      additionalMLAttributes.push(...preparedMLAttributes);
     }
 
+    // Obtener listing types óptimos
+    const listingTypes = await getAvailableListingTypes(
+      parseInt(session.user.id),
+      localProduct.mlCategoryId || 'MLA3530'
+    );
+    const optimalListingType = listingTypes[0]?.id || 'bronze';
+
+    // Preparar datos para ML
     const mlProductData: {
       title: string;
       category_id: string;
+      price: number;
       currency_id: string;
+      available_quantity: number;
       buying_mode: string;
-      condition: string;
       listing_type_id: string;
+      condition: string;
       description: string;
       pictures: Array<{ source: string }>;
-      attributes: unknown[];
-      price?: number;
-      available_quantity?: number;
+      video_id?: string;
+      attributes: Array<Record<string, unknown>>;
+      shipping: Record<string, unknown>;
       variations?: Array<{
         price: number;
         available_quantity: number;
@@ -531,29 +197,19 @@ export async function POST(req: Request) {
         picture_ids: unknown[];
         seller_custom_field: string;
       }>;
-      shipping?: {
-        mode: 'me1' | 'me2' | 'custom';
-        local_pick_up: boolean;
-        free_shipping: boolean;
-        logistic_type?: string;
-        store_pick_up: boolean;
-        dimensions?: string;
-        methods?: unknown[];
-        tags?: string[];
-      };
     } = {
       title: (() => {
         try {
-          return sanitizeTitle(localProduct.name); // Sanitizar HTML del título
+          return sanitizeTitle(localProduct.name);
         } catch (sanitizeError) {
           logger.warn('Error sanitizando título, usando original', {
             productId: productIdNum,
             error: sanitizeError instanceof Error ? sanitizeError.message : String(sanitizeError)
           });
-          return localProduct.name; // Fallback al título original
+          return localProduct.name;
         }
       })(),
-      category_id: localProduct.mlCategoryId || 'MLA3530', // Categoría por defecto
+      category_id: localProduct.mlCategoryId || 'MLA3530',
       currency_id: localProduct.mlCurrencyId || 'ARS',
       buying_mode: localProduct.mlBuyingMode || 'buy_it_now',
       condition: localProduct.mlCondition || 'new',
@@ -563,193 +219,133 @@ export async function POST(req: Request) {
         source: localProduct.image,
       }] : [],
       attributes: [
-        ...mapProductAttributesToMercadoLibreAttributes(
+        ...mapProductAttributesToML(
           localProduct.attributes as unknown,
-          catalogAttributes,
+          catalogAttributes?.attributes as unknown[] || [],
         ),
-        ...(additionalMLAttributes || [])
-      ],
+        ...additionalMLAttributes
+      ] as Array<Record<string, unknown>>,
+      shipping: {}, // Se inicializará después
+      price: 0, // Se asignará después
+      available_quantity: 0, // Se asignará después
     };
 
-    const categoryId = mlProductData.category_id;
-    const condition = mlProductData.condition;
-    const listingTypeId = mlProductData.listing_type_id;
+    // Validación completa usando la función dinámica
+    const mlValidation = await validateProductForMLSync(
+      localProduct,
+      catalogAttributes,
+      parseInt(session.user.id)
+    );
 
-    // Validar atributos obligatorios (ej: BRAND y MODEL) para ciertas categorías
-    if (categoryId === 'MLA3530') {
-      const mlAttributes = (mlProductData.attributes as Array<{ id?: string; name?: string; value_name?: string }>) || [];
-
-      const hasBrand = mlAttributes.some((attr) =>
-        (attr.id === 'BRAND' || attr.name?.toUpperCase() === 'BRAND' || attr.name?.toUpperCase() === 'MARCA') &&
-        !!attr.value_name
+    if (!mlValidation.isValid) {
+      if (timeoutId) clearTimeout(timeoutId);
+      return NextResponse.json(
+        {
+          error: 'El producto no cumple los requisitos de Mercado Libre',
+          details: mlValidation.errors,
+          missingAttributes: mlValidation.missingRequired.map(attr => ({
+            id: attr.id,
+            name: attr.name,
+            required: attr.tags?.required || false
+          }))
+        },
+        { status: 400 }
       );
-
-      const hasModel = mlAttributes.some((attr) =>
-        (attr.id === 'MODEL' || attr.name?.toUpperCase() === 'MODEL' || attr.name?.toUpperCase() === 'MODELO') &&
-        !!attr.value_name
-      );
-
-      if (!hasBrand || !hasModel) {
-        if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Faltan atributos obligatorios BRAND/MODEL para categoría MLA3530', {
-          productId: productIdNum,
-          categoryId,
-          hasBrand,
-          hasModel,
-        });
-
-        return NextResponse.json(
-          {
-            error: 'Faltan atributos obligatorios para Mercado Libre',
-            details: [
-              !hasBrand ? '• Debes indicar la MARCA del producto. Para agregar: edita el producto → sección "Atributos" → agregar "Marca" con el valor correspondiente.' : null,
-              !hasModel ? '• Debes indicar el MODELO del producto. Para agregar: edita el producto → sección "Atributos" → agregar "Modelo" con el valor correspondiente.' : null,
-            ].filter(Boolean),
-            solution: 'Estos atributos son obligatorios para esta categoría de Mercado Libre. Una vez agregados, intenta sincronizar nuevamente.'
-          },
-          { status: 400 }
-        );
-      }
     }
 
-    // Determinar política de stock según categoría/condición/listing type
-    const stockPolicy = resolveStockPolicy({
-      categoryId,
-      condition,
-      listingTypeId,
-    });
+    // Log de advertencias si existen
+    if (mlValidation.warnings.length > 0) {
+      logger.warn('Advertencias de sincronización ML', {
+        productId: productIdNum,
+        warnings: mlValidation.warnings
+      });
+    }
 
-    // Validar precio con categoría dinámica antes de asignar
+    // Validar precio
     const priceValidation = validatePrice(
       localProduct.price, 
       localProduct.mlCategoryId || 'MLA3530'
     );
     if (!priceValidation.valid) {
       if (timeoutId) clearTimeout(timeoutId);
-      logger.error('Validación de precio fallida', {
-        productId: productIdNum,
-        errors: priceValidation.errors,
-        price: localProduct.price,
-        categoryId: localProduct.mlCategoryId
-      });
       return NextResponse.json({
         error: 'El precio del producto no cumple los requisitos de Mercado Libre',
         details: priceValidation.errors,
-        solution: 'Verifica el precio mínimo requerido para esta categoría en Mercado Libre y ajusta el precio del producto accordingly.'
       }, { status: 400 });
     }
 
-    // Validar imágenes con accesibilidad (no bloqueante)
+    // Validar imágenes
     const images = localProduct.images ? 
       (Array.isArray(localProduct.images) ? localProduct.images : [localProduct.image]) : 
       [localProduct.image].filter(Boolean);
     
-    let imageWarnings: string[] = [];
     try {
       const imageValidation = await validateImageAccessibility(images);
       if (!imageValidation.valid) {
         if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Validación de imágenes fallida', {
-          productId: productIdNum,
-          errors: imageValidation.errors
-        });
         return NextResponse.json({
           error: 'Hay problemas con las imágenes del producto',
           details: imageValidation.errors,
-          solution: 'Asegúrate de que las imágenes estén accesibles públicamente y cumplan los requisitos de Mercado Libre (formato JPG/PNG, tamaño adecuado, etc.)'
         }, { status: 400 });
       }
-      imageWarnings = imageValidation.warnings;
     } catch (imageError) {
-      logger.warn('Error en validación de accesibilidad de imágenes (continuando)', {
+      logger.warn('Error en validación de imágenes (continuando)', {
         productId: productIdNum,
         error: imageError instanceof Error ? imageError.message : String(imageError)
       });
-      // Continuar con la sincronización incluso si falla la verificación de accesibilidad
     }
 
+    // Configurar stock y variantes
+    const stockPolicy = resolveStockPolicy({
+      categoryId: mlProductData.category_id,
+      condition: mlProductData.condition,
+      listingTypeId: mlProductData.listing_type_id,
+    });
+
     if (hasVariants) {
-      // Producto con variantes: usar precio base del producto padre y variaciones
       mlProductData.price = parseFloat(localProduct.price);
       mlProductData.available_quantity = calculateAvailableQuantityForML(localProduct.stock, stockPolicy);
       
-      // Agregar variaciones
       mlProductData.variations = (localProduct.variants as ProductVariant[]).map((variant: ProductVariant) => ({
         price: variant.price ? parseFloat(variant.price) : parseFloat(localProduct.price),
         available_quantity: calculateAvailableQuantityForML(variant.stock, stockPolicy),
         attribute_combinations: (variant.mlAttributeCombinations as unknown[]) || [],
         picture_ids: (variant.images as unknown[]) || [],
-        seller_custom_field: variant.id.toString(), // Referencia local
+        seller_custom_field: variant.id.toString(),
       }));
-      
-      logger.info('Producto con variantes preparado para ML', {
-        productId: productIdNum,
-        variantsCount: (localProduct.variants as ProductVariant[]).length,
-        hasVariations: true,
-        stockPolicy,
-      });
     } else {
-      // Producto simple sin variantes
       mlProductData.price = parseFloat(localProduct.price);
       mlProductData.available_quantity = calculateAvailableQuantityForML(localProduct.stock, stockPolicy);
-      
-      logger.info('Producto simple preparado para ML', {
-        productId: productIdNum,
-        hasVariations: false,
-        stockPolicy,
-      });
     }
 
-    // Configurar envío (Mercado Envíos 2 por defecto)
-    const height = Number(localProduct.height) || 10;
-    const width = Number(localProduct.width) || 10;
-    const length = Number(localProduct.length) || 10;
-    const weight = Number(localProduct.weight) || 0.5;
-
-    // Determinar si es CREATE o UPDATE
-    const isUpdate = !!localProduct.mlItemId;
-
-    // Para productos nuevos, incluir shipping básico en CREATE
-    if (!isUpdate) {
-      mlProductData.shipping = {
+    // Configurar envío para productos nuevos
+    if (!localProduct.mlItemId) {
+      const shipping: Record<string, unknown> = {
         mode: 'me2',
         local_pick_up: false,
-        free_shipping: false,
-        logistic_type: 'drop_off',
-        store_pick_up: false,
-        dimensions: `${height}x${width}x${length},${weight}`,
-        tags: ['local_pick_up_not_allowed'],
-        methods: [],
+        free_shipping: mlProductData.price >= 5000,
+        free_methods: mlProductData.price >= 5000 ? [{
+          id: '100009',
+          rule: {
+            free_mode: 'country',
+            value: null
+          }
+        }] : [],
+        dimensions: `${Math.ceil(Number(localProduct.height) || 0)}x${Math.ceil(Number(localProduct.width) || 0)}x${Math.ceil(Number(localProduct.length) || 0)},${Math.ceil(Number(localProduct.weight) || 0)}`,
+        tags: mlProductData.price >= 5000 ? ['self_service_inmediate'] : undefined
       };
+
+      mlProductData.shipping = shipping;
     }
 
-    const mlEndpoint = isUpdate ? `/items/${localProduct.mlItemId}` : '/items';
-    const mlMethod = isUpdate ? 'PUT' : 'POST';
+    // Validar y sincronizar con ML
+    const mlEndpoint = localProduct.mlItemId ? `/items/${localProduct.mlItemId}` : '/items';
+    // ...
+    const mlMethod = localProduct.mlItemId ? 'PUT' : 'POST';
     
-    logger.info(isUpdate ? 'Actualizando producto existente en ML' : 'Creando nuevo producto en ML', {
-      productId: productIdNum,
-      mlItemId: localProduct.mlItemId,
-      method: mlMethod,
-      endpoint: mlEndpoint
-    });
-
-    // Enviar a Mercado Libre con timeout y retry logic
     let response: Response;
     let retryCount = 0;
     const maxRetries = 2;
-    
-    // Log para debuggear qué se envía a ML
-    logger.info('[ML Sync] Enviando producto a Mercado Libre', {
-      productId: productIdNum,
-      endpoint: mlEndpoint,
-      method: mlMethod,
-      shippingData: mlProductData.shipping,
-      fullData: mlProductData
-    });
-    
-    if (!abortController) {
-      throw new Error('AbortController no inicializado');
-    }
     
     while (retryCount <= maxRetries) {
       try {
@@ -762,578 +358,131 @@ export async function POST(req: Request) {
             signal: abortController.signal,
           }
         );
-        break; // Si tiene éxito, salir del loop
+        break;
       } catch (fetchError) {
         retryCount++;
         if (retryCount > maxRetries || abortController.signal.aborted) {
-          if (timeoutId) clearTimeout(timeoutId);
-          logger.error('Error de red con Mercado Libre después de reintentos', { 
-            error: fetchError instanceof Error ? fetchError.message : String(fetchError),
-            retryCount,
-            productId: productIdNum
-          });
           throw new MercadoLibreError(
             MercadoLibreErrorCode.CONNECTION_ERROR,
             'Error de conexión con Mercado Libre',
             { originalError: fetchError }
           );
         }
-        // Esperar exponential backoff antes de reintentar
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
       }
     }
 
     if (!response!.ok) {
-      let errorData: string;
-      let parsedError: {
-        cause?: string;
-        message?: string;
-        [key: string]: unknown;
-      } | null = null;
+      const errorData = await response!.text();
+      
+      // Intentar parsear el error para detectar atributos condicionalmente requeridos
+      let errorMessage = `Error de Mercado Libre: ${errorData}`;
+      let missingConditionalAttrs: string[] = [];
+      
       try {
-        errorData = await response!.text();
-        // Intentar parsear error específico de ML
-        try {
-          parsedError = JSON.parse(errorData);
-        } catch {
-          // No es JSON, usar texto plano
-        }
-      } catch {
-        errorData = 'Error desconocido al leer respuesta de ML';
-      }
-      
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      // Manejo específico de errores de ML para validaciones conocidas
-      let errorMessage = `Error creando producto en ML: ${errorData}`;
-      if (parsedError?.cause === 'attribute_combinations_not_allowed' || 
-          parsedError?.cause === 'invalid_attribute_combinations' ||
-          parsedError?.cause === 'duplicate_attribute_combinations') {
-        errorMessage = `Error en atributos de variantes: ${parsedError.message || errorData}`;
-        logger.error('Error específico de ML en atributos de variantes', { 
-          cause: parsedError.cause,
-          error: parsedError.message || errorData,
-          productId: productIdNum 
-        });
-      } else if (parsedError?.cause && Array.isArray(parsedError.cause)) {
-        const causes = parsedError.cause as Array<{ code?: string; message?: string; [key: string]: unknown }>;
-
-        // Buscar errores de cantidad máxima (available_quantity)
-        const quantityError = causes.find((cause) =>
-          cause.code === 'item.available_quantity.invalid' &&
-          typeof cause.message === 'string' &&
-          cause.message.includes('max. value is 1')
-        );
-
-        if (quantityError) {
-          errorMessage =
-            'Mercado Libre solo permite publicar cantidad 1 para esta combinación de categoría, condición y tipo de publicación. ' +
-            'Ajusta el stock de la publicación a 1 o modifica la condición o el tipo de publicación del producto.';
-          logger.error('Error de cantidad máxima de Mercado Libre', {
-            categoryId: mlProductData.category_id,
-            condition: mlProductData.condition,
-            listingTypeId: mlProductData.listing_type_id,
-            message: quantityError.message,
-            productId: productIdNum,
-          });
-        }
-
-        // Buscar errores de categoría inválida (no hoja o no permitida)
-        const categoryError = causes.find((cause) =>
-          cause.code === 'item.category_id.invalid'
-        );
-
-        if (categoryError) {
-          errorMessage =
-            'La categoría de Mercado Libre seleccionada no permite publicar directamente. ' +
-            'Para solucionar: 1) Edita el producto, 2) Busca y selecciona una categoría más específica (categoría hoja), 3) Asegúrate que no sea una categoría general, 4) Guarda y sincroniza nuevamente.';
-
-          logger.error('Error de categoría inválida de Mercado Libre', {
-            categoryId: mlProductData.category_id,
-            message: categoryError.message,
-            productId: productIdNum,
-          });
-        }
-
-        // Buscar errores de atributos requeridos (por ejemplo BRAND/MODEL)
-        const missingAttrsError = causes.find((cause) =>
-          cause.code === 'item.attributes.missing_required'
-        );
-
-        if (missingAttrsError) {
-          errorMessage =
-            'Faltan atributos obligatorios para esta categoría en Mercado Libre. ' +
-            'Para solucionar: 1) Edita el producto, 2) Ve a la sección "Atributos", 3) Agrega todos los atributos requeridos (ej: Marca, Modelo, Color, etc.), 4) Guarda los cambios y sincroniza nuevamente.';
-          logger.error('Error de atributos requeridos de Mercado Libre', {
-            categoryId: mlProductData.category_id,
-            message: missingAttrsError.message,
-            productId: productIdNum,
-          });
-        }
-
-        // Buscar errores de precio mínimo
-        const priceError = causes.find((cause: { code?: string; message?: string }) => 
-          cause.code === 'item.price.invalid' && cause.message?.includes('minimum of price')
-        );
-        
-        if (priceError) {
-          const minimumPrice = priceError.message?.match(/minimum of price (\d+)/)?.[1];
-          const currentPrice = hasVariants 
-            ? (localProduct.variants as ProductVariant[])[0]?.price || localProduct.price
-            : localProduct.price;
+        const parsedError = JSON.parse(errorData);
+        if (parsedError.cause && Array.isArray(parsedError.cause)) {
+          const conditionalError = parsedError.cause.find((cause: {
+            code?: string;
+            message?: string;
+          }) => 
+            cause.code === 'item.attribute.missing_conditional_required'
+          );
           
-          errorMessage = `Precio mínimo requerido: La categoría ${localProduct.mlCategoryId || 'MLA3530'} requiere un precio mínimo de $${minimumPrice || '1000'}. Precio actual: $${currentPrice}. Para solucionar: aumenta el precio del producto a al menos $${minimumPrice || '1000'} y sincroniza nuevamente.`;
-          logger.error('Error de precio mínimo de Mercado Libre', { 
-            categoryId: localProduct.mlCategoryId,
-            minimumPrice,
-            currentPrice,
-            productId: productIdNum,
-          });
-        }
-      }
-      
-      // Manejo específico para listing_type temporalmente no disponible
-      let shouldSkipError = false;
-      
-      if (parsedError?.error === 'listing_type.temporarily_unavailable' || 
-          parsedError?.message?.includes('Listing type is temporarily unavailable')) {
-        logger.warn('Listing type no disponible, intentando con fallback', {
-          currentListingType: mlProductData.listing_type_id,
-          productId: productIdNum,
-        });
-        
-        // Obtener listing types disponibles excluyendo el que falló
-        const availableTypes = await getAvailableListingTypes(
-          parseInt(session.user.id),
-          localProduct.mlCategoryId || 'MLA3530'
-        );
-        
-        // Filtrar el tipo que falló y buscar el siguiente mejor
-        const fallbackTypes = availableTypes.filter(t => t.id !== mlProductData.listing_type_id);
-        
-        if (fallbackTypes.length > 0) {
-          // Usar el primer tipo disponible como fallback
-          const fallbackListingType = fallbackTypes[0].id;
-          
-          logger.info('Reintentando sincronización con listing type de fallback', {
-            originalType: mlProductData.listing_type_id,
-            fallbackType: fallbackListingType,
-            productId: productIdNum,
-          });
-          
-          // Actualizar el listing type y reintentar
-          mlProductData.listing_type_id = fallbackListingType;
-          
-          // Reintentar la llamada a ML con el nuevo listing type
-          try {
-            response = await makeAuthenticatedRequest(
-              parseInt(session.user.id),
-              mlEndpoint,
-              {
-                method: mlMethod,
-                body: JSON.stringify(mlProductData),
-                signal: abortController?.signal,
-              }
-            );
-            
-            if (response.ok) {
-              logger.info('Sincronización exitosa con listing type de fallback', {
-                fallbackType: fallbackListingType,
-                productId: productIdNum,
-              });
-              // Marcar para omitir el error
-              shouldSkipError = true;
+          if (conditionalError) {
+            // Extraer atributos del mensaje usando regex
+            const matches = conditionalError.message.match(/\[([A-Z_]+)\]/g);
+            if (matches) {
+              missingConditionalAttrs = matches.map((match: string) => 
+                match.replace(/[\[\]]/g, '')
+              );
+              
+              errorMessage = `Faltan atributos condicionalmente requeridos: ${missingConditionalAttrs.join(', ')}. ` +
+                `Puedes agregar los valores o especificar una razón por la que no aplican (ej: EMPTY_GTIN_REASON).`;
             }
-          } catch (retryError) {
-            logger.error('Error al reintentar con listing type de fallback', {
-              error: retryError instanceof Error ? retryError.message : String(retryError),
-              productId: productIdNum,
-            });
-            // Continuar con el error original si el fallback también falla
           }
         }
+      } catch (parseError) {
+        // Si no se puede parsear, usar el error original
+        console.error('Error parseando respuesta de ML:', parseError);
       }
       
-      // Solo lanzar error si el reintento con fallback no fue exitoso
-      if (!shouldSkipError) {
-        logger.error('Error en respuesta de Mercado Libre', { 
-          status: response!.status, 
-          errorData, 
-          parsedError,
-          productId: productIdNum 
-        });
-        
-        throw new MercadoLibreError(
-          MercadoLibreErrorCode.INVALID_REQUEST,
-          errorMessage,
-          { status: response!.status, error: errorData, parsedError }
-        );
-      }
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.VALIDATION_ERROR,
+        errorMessage,
+        { status: response!.status, errorData, missingConditionalAttrs }
+      );
     }
 
-    interface MercadoLibreItemResponse {
-      id: string;
-      permalink?: string;
-      thumbnail?: string;
-      variations?: Array<{ id: string | number; seller_custom_field?: string | null }>;
-      [key: string]: unknown;
-    }
+    const responseData = await response!.json();
     
-    let mlItem: MercadoLibreItemResponse;
-    try {
-      mlItem = await response!.json();
-    } catch (parseError) {
-      if (timeoutId) clearTimeout(timeoutId);
-      logger.error('Error parseando respuesta JSON de Mercado Libre', { 
-        error: parseError instanceof Error ? parseError.message : String(parseError),
-        productId: productIdNum, 
-      });
-      throw new MercadoLibreError(
-        MercadoLibreErrorCode.INVALID_REQUEST,
-        'Respuesta inválida de Mercado Libre',
-        { originalError: parseError },
-      );
-    }
-
-    const mlItemId = mlItem.id;
-    if (!mlItemId) {
-      if (timeoutId) clearTimeout(timeoutId);
-      logger.error('Respuesta de ML no contiene ID válido', { mlItem, productId: productIdNum });
-      throw new MercadoLibreError(
-        MercadoLibreErrorCode.INVALID_REQUEST,
-        'La respuesta de Mercado Libre no contiene un ID válido',
-        { mlItem },
-      );
-    }
-
-    // Guardar el listing_type_id exitoso en el producto para futuras sincronizaciones
+    // Actualizar producto con datos de ML
     await db.update(products)
-      .set({ 
-        mlListingTypeId: mlProductData.listing_type_id,
-        updated_at: new Date()
+      .set({
+        mlItemId: responseData.id,
+        mlSyncStatus: 'synced',
+        mlLastSync: new Date(),
+        mlPermalink: responseData.permalink,
+        mlThumbnail: responseData.thumbnail_id,
+        me2Compatible: mlValidation.isReadyForSync,
+        updated_at: new Date(),
       })
       .where(eq(products.id, productIdNum!));
 
-    logger.info('Listing type guardado exitosamente', {
-      productId: productIdNum,
-      listingTypeId: mlProductData.listing_type_id,
-    });
-
-    // Configurar ME2 para productos nuevos (ML ignora shipping en CREATE)
-    if (!isUpdate) {
-      try {
-        // Preparar datos de envío para el endpoint específico
-        const shippingData = {
-          mode: 'me2',
-          local_pick_up: false,
-          free_shipping: false,
-          logistic_type: 'drop_off',
-          store_pick_up: false,
-          dimensions: `${height}x${width}x${length},${weight}`,
-          tags: ['local_pick_up_not_allowed'],
-          methods: [],
-        };
-
-        logger.info('Configurando ME2 para producto nuevo', {
-          productId: productIdNum,
-          mlItemId,
-          shippingData
-        });
-
-        // Hacer llamada específica al endpoint de shipping
-        const shippingResponse = await makeAuthenticatedRequest(
-          parseInt(session.user.id),
-          `/items/${mlItemId}/shipping`,
-          {
-            method: 'PUT',
-            body: JSON.stringify(shippingData),
-            signal: abortController?.signal,
-          }
-        );
-
-        if (!shippingResponse.ok) {
-          const shippingError = await shippingResponse.text();
-          let parsedShippingError = null;
-          try {
-            parsedShippingError = JSON.parse(shippingError);
-          } catch {
-            // No es JSON
-          }
-          logger.error('Error configurando ME2 para producto nuevo', {
-            mlItemId,
-            error: shippingError,
-            parsedError: parsedShippingError,
-            status: shippingResponse.status,
-            shippingSent: shippingData
-          });
-          // No lanzar error, solo registrar - el producto se creó pero sin ME2
-        } else {
-          logger.info('ME2 configurado exitosamente para producto nuevo', {
-            productId: productIdNum,
-            mlItemId
-          });
-        }
-      } catch (shippingError) {
-        logger.error('Error en configuración de ME2 (continuando)', {
-          productId: productIdNum,
-          mlItemId,
-          error: shippingError instanceof Error ? shippingError.message : String(shippingError)
-        });
-        // Continuar aunque falle la configuración de ME2
-      }
-    }
-
-    // Para productos existentes, actualizar el modo de envío por separado si es necesario
-    if (isUpdate) {
-      try {
-        // Preparar datos de envío para el endpoint específico
-        const shippingData = {
-          mode: 'me2',
-          local_pick_up: false,
-          free_shipping: false,
-          logistic_type: 'drop_off',
-          store_pick_up: false,
-          dimensions: `${height}x${width}x${length},${weight}`,
-          tags: ['local_pick_up_not_allowed'],
-          methods: [],
-        };
-
-        logger.info('Actualizando configuración de envío ME2 para producto existente', {
-          productId: productIdNum,
-          mlItemId,
-          shippingData
-        });
-
-        // Hacer llamada específica al endpoint de shipping
-        const shippingResponse = await makeAuthenticatedRequest(
-          parseInt(session.user.id),
-          `/items/${mlItemId}/shipping`,
-          {
-            method: 'PUT',
-            body: JSON.stringify(shippingData),
-            signal: abortController?.signal,
-          }
-        );
-
-        if (!shippingResponse.ok) {
-          const shippingError = await shippingResponse.text();
-          logger.warn('No se pudo actualizar el modo de envío ME2 (continuando)', {
-            mlItemId,
-            error: shippingError,
-            status: shippingResponse.status
-          });
-          // Continuar aunque falle la actualización de shipping
-        } else {
-          logger.info('Configuración de envío ME2 actualizada exitosamente', {
-            mlItemId,
-            productId: productIdNum
-          });
-        }
-      } catch (shippingError) {
-        logger.warn('Error actualizando shipping (continuando)', {
-          mlItemId,
-          error: shippingError instanceof Error ? shippingError.message : String(shippingError)
-        });
-        // Continuar aunque falle la actualización de shipping
-      }
-    }
-
-    const me2Validation = await validateMe2ReadyForItem(parseInt(session.user.id), mlItemId);
-
-    if (!me2Validation.isMe2Ready) {
-      try {
-        await db.update(products)
-          .set({
-            mlItemId,
-            mlSyncStatus: 'error',
-            mlLastSync: new Date(),
-            mlPermalink: mlItem.permalink || null,
-            mlThumbnail: mlItem.thumbnail || null,
-            updated_at: new Date(),
-          })
-          .where(eq(products.id, productIdNum!));
-
-        await db.update(mercadolibreProductsSync)
-          .set({
-            mlItemId,
-            syncStatus: 'error',
-            lastSyncAt: new Date(),
-            mlData: mlItem,
-            syncError: me2Validation.reason ?? 'Error validando configuración de ME2',
-            updatedAt: new Date(),
-          })
-          .where(eq(mercadolibreProductsSync.id, syncRecord[0].id));
-      } catch (dbError) {
-        if (timeoutId) clearTimeout(timeoutId);
-        logger.error('Error actualizando estado de sincronización tras validación ME2', {
-          error: dbError instanceof Error ? dbError.message : String(dbError),
-          productId: productIdNum,
-          mlItemId,
-        });
-        throw new MercadoLibreError(
-          MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
-          'Error actualizando base de datos local después de validar ME2',
-          { originalError: dbError },
-        );
-      }
-
-      if (timeoutId) clearTimeout(timeoutId);
-
-      return NextResponse.json(
-        {
-          success: false,
-          productId: productIdNum!,
-          mlItemId,
-          mlPermalink: mlItem.permalink,
-          syncStatus: 'error',
-          error: me2Validation.reason,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Actualizar producto local con ID de ML (operaciones individuales)
-    try {
-      // Actualizar producto padre
-      await db.update(products)
-        .set({
-          mlItemId,
-          mlSyncStatus: 'synced',
-          mlLastSync: new Date(),
-          mlPermalink: mlItem.permalink || null,
-          mlThumbnail: mlItem.thumbnail || null,
-          updated_at: new Date(),
-        })
-        .where(eq(products.id, productIdNum!));
-
-      // Actualizar IDs de variación si el producto tiene variantes
-      if (hasVariants && mlItem.variations && Array.isArray(mlItem.variations)) {
-        for (const mlVariation of mlItem.variations) {
-          const sellerCustomField = (mlVariation as { seller_custom_field?: string | null }).seller_custom_field;
-          const localVariantId = sellerCustomField ? parseInt(sellerCustomField) : NaN;
-          if (!Number.isNaN(localVariantId)) {
-            await db.update(productVariants)
-              .set({
-                mlVariationId: String((mlVariation as { id?: string | number }).id ?? ''),
-                mlSyncStatus: 'synced',
-                updated_at: new Date(),
-              })
-              .where(eq(productVariants.id, localVariantId));
-            
-            logger.info('Variante actualizada con ID de ML', {
-              localVariantId,
-              mlVariationId: (mlVariation as { id?: string | number }).id,
-              productId: productIdNum,
-            });
-          }
-        }
-      }
-    } catch (dbError) {
-      if (timeoutId) clearTimeout(timeoutId);
-      logger.error('Error actualizando producto local con datos de ML', { 
-        error: dbError instanceof Error ? dbError.message : String(dbError),
-        productId: productIdNum,
-        mlItemId, 
-      });
-      throw new MercadoLibreError(
-        MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
-        'Error actualizando base de datos local',
-        { originalError: dbError },
-      );
-    }
-
     // Actualizar registro de sincronización
-    try {
-      await db.update(mercadolibreProductsSync)
-        .set({
-          mlItemId,
-          syncStatus: 'synced',
-          lastSyncAt: new Date(),
-          mlData: mlItem,
-          updatedAt: new Date(),
-        })
-        .where(eq(mercadolibreProductsSync.id, syncRecord[0].id));
-    } catch (dbError) {
-      if (timeoutId) clearTimeout(timeoutId);
-      logger.error('Error actualizando registro de sincronización', { 
-        error: dbError instanceof Error ? dbError.message : String(dbError),
-        productId: productIdNum,
-        syncRecordId: syncRecord[0]?.id, 
-      });
-      throw new MercadoLibreError(
-        MercadoLibreErrorCode.INTERNAL_SERVER_ERROR,
-        'Error actualizando registro de sincronización',
-        { originalError: dbError },
-      );
-    }
-
+    await db.update(mercadolibreProductsSync)
+      .set({
+        syncStatus: 'synced',
+        mlItemId: responseData.id,
+        lastSyncAt: new Date(),
+        syncError: null,
+        mlData: responseData,
+      })
+      .where(eq(mercadolibreProductsSync.productId, productIdNum!));
+    
     if (timeoutId) clearTimeout(timeoutId);
-    logger.info('Producto sincronizado exitosamente', {
-      productId: productIdNum!,
-      mlItemId,
-      userId: session.user.id,
-      mlPermalink: mlItem.permalink,
+    
+    logger.info('Producto sincronizado exitosamente con Mercado Libre', {
+      productId: productIdNum,
+      mlItemId: responseData.id,
+      permalink: responseData.permalink
     });
 
     return NextResponse.json({
       success: true,
-      productId: productIdNum!,
-      mlItemId,
-      mlPermalink: mlItem.permalink,
-      syncStatus: 'synced',
-      warnings: imageWarnings.length > 0 ? imageWarnings : undefined,
+      message: localProduct.mlItemId ? 'Producto actualizado en Mercado Libre' : 'Producto creado en Mercado Libre',
+      data: {
+        id: responseData.id,
+        permalink: responseData.permalink,
+        status: responseData.status,
+      },
     });
 
   } catch (error) {
-    if (timeoutId) clearTimeout(timeoutId);
-    
-    // LOGGING CRUDO ANTES DEL LOGGER - CAPTURA EL ERROR REAL
-    console.error('=== ERROR CRUDO SINCRONIZACIÓN PRODUCTO ===');
-    console.error('ERROR:', error);
-    console.error('TIPO:', error?.constructor?.name);
-    console.error('MENSAJE:', error instanceof Error ? error.message : String(error));
-    console.error('STACK:', error instanceof Error ? error.stack : 'No stack disponible');
-    console.error('PRODUCT ID:', productIdNum);
-    console.error('=== FIN ERROR CRUDO ===');
-    
-    const errorContext = {
-      productId: productIdNum,
-      userId: 'unknown', // No podemos depender de session aquí
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      errorType: error?.constructor?.name || 'Unknown',
-    };
-    
-    logger.error('Error sincronizando producto - Contexto completo', errorContext);
-
-    // Actualizar estado de sincronización a error (sin afectar el error original)
+    // Actualizar estado a error
     if (productId && productIdNum) {
       try {
-        // Primero actualizar el registro de sincronización
         await db.update(mercadolibreProductsSync)
           .set({
             syncStatus: 'error',
             syncError: error instanceof Error ? error.message : String(error),
             updatedAt: new Date(),
           })
-          .where(eq(mercadolibreProductsSync.productId, productIdNum!));
+          .where(eq(mercadolibreProductsSync.productId, productIdNum));
 
-        // Luego actualizar el producto
         await db.update(products)
           .set({
             mlSyncStatus: 'error',
             updated_at: new Date(),
           })
-          .where(eq(products.id, productIdNum!));
+          .where(eq(products.id, productIdNum));
           
         logger.info('Estado de sincronización actualizado a error', { productId: productIdNum });
       } catch (updateError) {
-        logger.error('Error actualizando estado de sincronización (no crítico)', { 
+        logger.error('Error actualizando estado de sincronización', { 
           updateError: updateError instanceof Error ? updateError.message : String(updateError),
           productId: productIdNum 
         });
-        // No relanzar este error para no ocultar el error original
       }
     }
 
@@ -1349,7 +498,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Error genérico con más contexto para debugging
     return NextResponse.json(
       { 
         error: 'Error interno del servidor',
@@ -1360,7 +508,6 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   } finally {
-    // Garantizar que el timeout siempre se limpie
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
@@ -1378,7 +525,6 @@ export async function GET(req: Request) {
     const productId = searchParams.get('productId');
 
     if (productId) {
-      // Obtener estado de sincronización de un producto específico
       const syncRecord = await db.query.mercadolibreProductsSync.findFirst({
         where: eq(mercadolibreProductsSync.productId, parseInt(productId)),
         with: {
@@ -1392,7 +538,6 @@ export async function GET(req: Request) {
 
       return NextResponse.json(syncRecord);
     } else {
-      // Obtener todos los registros de sincronización del usuario
       const syncRecords = await db.query.mercadolibreProductsSync.findMany({
         with: {
           product: true,
@@ -1412,4 +557,108 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
+}
+
+// Función auxiliar para preparar atributos de variantes
+function prepareVariantMLAttributes(
+  additionalAttributes: Record<string, unknown>,
+  catalogAttributes: unknown[]
+): unknown[] {
+  const prepared: unknown[] = [];
+  
+  // Mapear atributos adicionales al formato de ML
+  for (const [key, value] of Object.entries(additionalAttributes)) {
+    if (value !== null && value !== undefined) {
+      const catalogAttr = (catalogAttributes as Array<{
+        id: string;
+        name: string;
+      }>).find(
+        (attr: { id: string; name: string }) => attr.id === key || attr.name === key
+      );
+      
+      if (catalogAttr) {
+        prepared.push({
+          id: catalogAttr.id,
+          value_name: String(value),
+        });
+      }
+    }
+  }
+  
+  return prepared;
+}
+
+// Función auxiliar para mapear atributos de producto a formato ML
+function mapProductAttributesToML(
+  productAttributes: unknown,
+  catalogAttributes: unknown[]
+): unknown[] {
+  const mapped: unknown[] = [];
+  
+  if (!productAttributes || typeof productAttributes !== 'object') {
+    return mapped;
+  }
+  
+  // Si es un array de atributos con formato {id, name, values}
+  if (Array.isArray(productAttributes)) {
+    productAttributes.forEach((attr: { id?: string; name?: string; values?: string[] }) => {
+      if (attr && attr.id && attr.values && attr.values.length > 0 && attr.name) {
+        // Buscar el atributo en el catálogo para validar
+        const catalogAttr = (catalogAttributes as Array<{
+          id: string;
+          name: string;
+          value_type?: string;
+        }>).find(
+          (catalogItem: { id: string; name: string }) => 
+            catalogItem.id === attr.id || (attr.name && catalogItem.name && catalogItem.name.toLowerCase() === attr.name.toLowerCase())
+        );
+        
+        if (catalogAttr) {
+          // Para atributos de tipo lista, usar value_id si el valor parece un ID numérico
+          const attributeValue = attr.values[0];
+          const isListType = catalogAttr.value_type === 'list';
+          const isNumericId = /^\d+$/.test(attributeValue);
+          
+          mapped.push({
+            id: catalogAttr.id, // Usar el ID del catálogo
+            ...(isListType && isNumericId 
+              ? { value_id: attributeValue } 
+              : { value_name: attributeValue }
+            )
+          });
+        } else {
+          // No agregar atributos personalizados - ML no los permite
+          console.warn(`[ML-Sync] Atributo no encontrado en catálogo, omitiendo:`, attr.name);
+        }
+      }
+    });
+    return mapped;
+  }
+  
+  const attrs = productAttributes as Record<string, unknown>;
+  
+  // Mapear atributos conocidos (formato antiguo)
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value !== null && value !== undefined && value !== '') {
+      // Buscar el atributo en el catálogo para obtener el ID correcto
+      const catalogAttr = (catalogAttributes as Array<{
+        id: string;
+        name: string;
+      }>).find(
+        (attr: { id: string; name: string }) => attr.name === key || attr.id === key
+      );
+      
+      if (catalogAttr) {
+        mapped.push({
+          id: catalogAttr.id,
+          value_name: String(value),
+        });
+      } else {
+        // Si no está en el catálogo, NO agregar como atributo personalizado
+        console.warn(`[ML-Sync] Atributo no encontrado en catálogo, omitiendo:`, key);
+      }
+    }
+  }
+  
+  return mapped;
 }

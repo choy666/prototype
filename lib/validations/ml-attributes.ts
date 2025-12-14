@@ -50,13 +50,17 @@ export async function validateMLRequiredAttributes(
     const mlAttributes: MLAttribute[] = category.attributes as Array<{ id: string; tags: string[]; valueType?: string }> || [];
     
     // Buscar atributos requeridos y condicionalmente requeridos
-    const requiredAttributes = mlAttributes.filter(attr => 
-      attr.tags?.includes('required')
-    );
+    const requiredAttributes = mlAttributes.filter(attr => {
+      // Asegurarse de que tags sea un array
+      const tags = Array.isArray(attr.tags) ? attr.tags : [];
+      return tags.includes('required');
+    });
     
-    const conditionalRequired = mlAttributes.filter(attr => 
-      attr.tags?.includes('conditional_required')
-    );
+    const conditionalRequired = mlAttributes.filter(attr => {
+      // Asegurarse de que tags sea un array
+      const tags = Array.isArray(attr.tags) ? attr.tags : [];
+      return tags.includes('conditional_required');
+    });
 
     logger.info('[ML Attributes] Validando producto', {
       categoryId,

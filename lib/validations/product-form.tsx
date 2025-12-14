@@ -38,7 +38,7 @@ export interface ProductForm {
   mlItemId?: string
   shippingMode?: string
   me2Compatible?: boolean
-  dynamicAttributes?: DynamicAttribute[]
+  attributes?: DynamicAttribute[]
 }
 
 export const getValidations = (form: ProductForm): ValidationItem[] => {

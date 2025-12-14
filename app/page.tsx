@@ -4,7 +4,6 @@ import logo from '@/assets/logo.svg';
 import logoDark from '@/assets/logo-dark.svg';
 import Link from 'next/link';
 import arrow from '@/assets/arrow.svg';
-import { checkDatabaseConnection } from '@/lib/db';
 import FeaturedGrid from '@/components/products/FeaturedGrid';
 import { getFeaturedProducts } from '@/lib/actions/products';
 import HeroSlider from '@/components/ui/HeroSlider';
@@ -17,9 +16,6 @@ export default async function Home() {
   if (session && session.user.role === 'admin') {
     redirect('/admin');
   }
-  const dbStatus = await checkDatabaseConnection();
-  const isConnected = dbStatus.success;
-  const statusMessage = dbStatus.message;
   const featured = await getFeaturedProducts(5);
   return (
     <div className='flex min-h-screen flex-col'>
@@ -74,15 +70,6 @@ export default async function Home() {
               />
             </Link>
           </div>
-          <span
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold mt-9 text-center ${
-              isConnected
-                ? 'border-[#00E599]/20 bg-[#00E599]/10 text-[#1a8c66] dark:bg-[#00E599]/10 dark:text-[#00E599]'
-                : 'border-red-500/20 bg-red-500/10 text-red-500 dark:text-red-500'
-            }`}
-          >
-            {statusMessage}
-          </span>
         </main>
       </div>
       <div className='flex min-h-screen flex-col'>

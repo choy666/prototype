@@ -29,8 +29,8 @@ import {
 import { ImageManager } from '@/components/ui/ImageManager'
 import { ME2Guidelines } from '@/components/admin/ME2Guidelines'
 import { MLAttributesGuide } from '@/components/admin/MLAttributesGuide'
-import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import { getValidations, isME2Ready, type ProductForm, type DynamicAttribute } from '@/lib/validations/product-validations'
+import { validateProductForMercadoLibre } from '@/lib/actions/product-validation'
 import type { Category } from '@/lib/schema'
 
 
@@ -75,8 +75,7 @@ export default function NewProductPage() {
     length: '',
     // Nuevos campos ME2
     me2Compatible: false,
-    shippingMode: 'me2',
-    dynamicAttributes: attributes
+    shippingMode: 'me2'
   })
 
   const mlCategories = categories.filter(
@@ -141,7 +140,9 @@ export default function NewProductPage() {
       }
 
       try {
-        const res = await fetch(`/api/mercadolibre/categories/${form.mlCategoryId}/attributes`)
+        // Forzar recarga limpiando posible cache stale
+        const url = `/api/mercadolibre/categories/${form.mlCategoryId}/attributes?t=${Date.now()}`
+        const res = await fetch(url)
         if (!res.ok) {
           setRecommendedAttributes([])
           return
@@ -175,13 +176,80 @@ export default function NewProductPage() {
         throw new Error('Completa todos los campos obligatorios antes de crear el producto')
       }
 
+      // Validación completa para Mercado Libre
+      const productForValidation = {
+        id: 0, // Temporal para validación
+        name: form.name,
+        description: form.description,
+        price: form.price,
+        image: form.image,
+        images: form.images,
+        stock: String(form.stock || '0'),
+        mlCategoryId: form.mlCategoryId,
+        mlCondition: form.mlCondition,
+        mlBuyingMode: form.mlBuyingMode,
+        mlListingTypeId: form.mlListingTypeId,
+        mlCurrencyId: form.mlCurrencyId,
+        weight: form.weight,
+        height: form.height,
+        width: form.width,
+        length: form.length,
+        shippingMode: form.shippingMode || undefined,
+        me2Compatible: isME2Ready(form),
+        attributes: attributes,
+        shippingAttributes: null, // Campo requerido por el tipo Product
+        // Campos necesarios pero no usados en validación
+        category: '',
+        categoryId: 0,
+        discount: String(form.discount || '0'),
+        destacado: false,
+        isActive: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+        mlItemId: undefined,
+        mlSyncStatus: 'pending',
+        mlLastSync: null,
+        mlPermalink: null,
+        mlThumbnail: null,
+        mlVideoId: form.videoId || null,
+        videoId: form.videoId || '',
+        warranty: form.warranty || ''
+      }
+
+      const mlValidationResult = await validateProductForMercadoLibre(productForValidation)
+      
+      // Agregar logs para debugging
+      console.log('Resultado de validación ML:', mlValidationResult)
+      
+      if (!mlValidationResult.success) {
+        // Mostrar el error específico devuelto por la validación
+        const errorMessage = mlValidationResult.error || 'Error de validación desconocido'
+        console.error('Error de validación ML:', errorMessage)
+        throw new Error(`El producto no cumple los requisitos de Mercado Libre:\n\n• ${errorMessage}`)
+      }
+      
+      if (!mlValidationResult.validation?.isValid) {
+        const errorMessage = `El producto no cumple los requisitos de Mercado Libre:\n\n• ${mlValidationResult.validation?.errors?.join('\n• ') || 'Error de validación'}`
+        console.error('Errores de validación:', mlValidationResult.validation?.errors)
+        throw new Error(errorMessage)
+      }
+
+      if (!mlValidationResult.validation?.isReadyForSync) {
+        const warningMessage = `Advertencias para sincronización:\n\n• ${mlValidationResult.validation?.warnings?.join('\n• ') || ''}`
+        toast({
+          title: 'Advertencias de Mercado Libre',
+          description: warningMessage,
+          variant: 'default'
+        })
+      }
+
       const productData = {
         name: form.name,
         description: form.description || undefined,
         price: form.price,
         image: form.image || undefined,
         images: form.images,
-        discount: parseInt(form.discount),
+        discount: String(form.discount || '0'),
         weight: form.weight || undefined,
         stock: parseInt(form.stock) || 0,
         destacado: form.destacado,
@@ -199,7 +267,7 @@ export default function NewProductPage() {
         width: form.width || undefined,
         length: form.length || undefined,
         // Campos ME2
-        me2Compatible: isME2Ready(form),
+        me2Compatible: mlValidationResult.validation?.isReadyForSync || false,
         shippingMode: form.shippingMode,
       }
 
@@ -216,10 +284,17 @@ export default function NewProductPage() {
         throw new Error(error.error || 'Failed to create product')
       }
 
-      toast({
-        title: '¡Producto creado! 🎉',
-        description: 'El producto está listo para sincronizarse con Mercado Libre. Todos los requisitos han sido cumplidos.'
-      })
+      if (mlValidationResult.validation?.isReadyForSync) {
+        toast({
+          title: '✅ ¡Producto creado y listo para sincronizar! 🎉',
+          description: 'El producto cumple todos los requisitos de Mercado Libre y puede sincronizarse inmediatamente.',
+        })
+      } else {
+        toast({
+          title: '¡Producto creado! 🎉',
+          description: 'El producto está listo para sincronizarse con Mercado Libre. Todos los requisitos han sido cumplidos.'
+        })
+      }
 
       router.push('/admin/products')
     } catch (error) {
@@ -799,22 +874,13 @@ export default function NewProductPage() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <MLAttributesGuide
                   categoryId={form.mlCategoryId}
                   attributes={attributes}
                   onAttributesChange={setAttributes}
                   showValidationErrors={readinessScore < 100}
                 />
-                
-                <div className="border-t border-dark-lighter pt-4">
-                  <h4 className="text-sm font-medium text-dark-text-primary mb-3">Atributos Adicionales</h4>
-                  <AttributeBuilder
-                    attributes={attributes}
-                    onChange={setAttributes}
-                    recommendedAttributes={recommendedAttributes}
-                  />
-                </div>
               </CardContent>
             </Card>
 

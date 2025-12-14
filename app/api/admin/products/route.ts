@@ -17,7 +17,12 @@ const createProductSchema = z.object({
   }),
   destacado: z.boolean().default(false),
   stock: z.number().int().min(0).default(0),
-  discount: z.number().int().min(0).max(100).default(0),
+  discount: z.union([z.string().regex(/^\d+$/), z.number().int().min(0).max(100)]).transform((val) => {
+    if (typeof val === 'string') {
+      return parseInt(val, 10);
+    }
+    return val;
+  }),
   weight: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
   // Campos de Mercado Libre
   mlCondition: z.string().min(1),
@@ -110,7 +115,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const validatedData = createProductSchema.parse(body)
+    console.log('[POST /api/admin/products] Datos recibidos:', JSON.stringify(body, null, 2))
+
+    const parsed = createProductSchema.safeParse(body)
+    if (!parsed.success) {
+      console.error('[POST /api/admin/products] Error de validación Zod:', parsed.error)
+      console.error('[POST /api/admin/products] Issues:', parsed.error.issues)
+      return NextResponse.json({ error: 'Validation error', issues: parsed.error.issues }, { status: 400 })
+    }
+
+    console.log('[POST /api/admin/products] Datos validados correctamente')
+    const validatedData = parsed.data
 
     // Validar que la categoría ML sea una categoría hoja válida
     if (validatedData.mlCategoryId) {

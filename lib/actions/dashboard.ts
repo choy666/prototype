@@ -6,7 +6,8 @@ import {
   products, 
   users,
   mercadolibreProductsSync,
-  categories 
+  categories,
+  notifications
 } from '@/lib/schema';
 import { 
   count, 
@@ -19,6 +20,104 @@ import {
   desc,
   lt 
 } from 'drizzle-orm';
+
+export async function getDashboardStats() {
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+
+  // Estadísticas generales
+  const [
+    totalUsers,
+    totalProducts,
+    totalOrders,
+    totalRevenue,
+    currentMonthOrders,
+    currentMonthRevenue,
+    lastMonthOrders,
+    lastMonthRevenue,
+    unreadNotifications
+  ] = await Promise.all([
+    db.select({ count: count() }).from(users).then(r => r[0].count),
+    db.select({ count: count() }).from(products).then(r => r[0].count),
+    db.select({ count: count() }).from(orders).then(r => r[0].count),
+    db.select({ total: sum(orders.total) }).from(orders).then(r => r[0].total || 0),
+    db.select({ count: count() }).from(orders)
+      .where(and(
+        gte(orders.createdAt, startOfMonth),
+        lte(orders.createdAt, now)
+      )).then(r => r[0].count),
+    db.select({ total: sum(orders.total) }).from(orders)
+      .where(and(
+        gte(orders.createdAt, startOfMonth),
+        lte(orders.createdAt, now)
+      )).then(r => r[0].total || 0),
+    db.select({ count: count() }).from(orders)
+      .where(and(
+        gte(orders.createdAt, startOfLastMonth),
+        lte(orders.createdAt, endOfLastMonth)
+      )).then(r => r[0].count),
+    db.select({ total: sum(orders.total) }).from(orders)
+      .where(and(
+        gte(orders.createdAt, startOfLastMonth),
+        lte(orders.createdAt, endOfLastMonth)
+      )).then(r => r[0].total || 0),
+    db.select({ count: count() }).from(notifications)
+      .where(eq(notifications.isRead, false))
+      .then(r => r[0].count)
+  ])
+
+  // Calcular tendencias
+  const ordersTrend = typeof lastMonthOrders === 'number' && lastMonthOrders > 0 
+    ? ((currentMonthOrders - lastMonthOrders) / lastMonthOrders) * 100 
+    : 0
+  const revenueTrend = typeof lastMonthRevenue === 'number' && lastMonthRevenue > 0 
+    ? ((Number(currentMonthRevenue) - Number(lastMonthRevenue)) / Number(lastMonthRevenue)) * 100 
+    : 0
+
+  // Productos recientes
+  const recentProducts = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      price: products.price,
+      created_at: products.created_at,
+      mlSyncStatus: products.mlSyncStatus
+    })
+    .from(products)
+    .orderBy(desc(products.created_at))
+    .limit(5)
+
+  // Órdenes recientes
+  const recentOrders = await db
+    .select({
+      id: orders.id,
+      total: orders.total,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      email: orders.email
+    })
+    .from(orders)
+    .orderBy(desc(orders.createdAt))
+    .limit(5)
+
+  return {
+    stats: {
+      totalUsers,
+      totalProducts,
+      totalOrders,
+      totalRevenue,
+      currentMonthOrders,
+      currentMonthRevenue,
+      ordersTrend,
+      revenueTrend,
+      unreadNotifications
+    },
+    recentProducts,
+    recentOrders
+  }
+}
 import { auth } from '@/lib/auth';
 
 // Obtener métricas principales para el dashboard

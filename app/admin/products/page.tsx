@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 
-import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { debounce } from '@/lib/utils'
@@ -43,6 +43,7 @@ interface Product {
   mlSyncStatus?: string
   syncError?: string | null
   me2CanUse?: boolean
+  mlPermalink?: string | null
 }
 
 interface ApiResponse {
@@ -273,21 +274,16 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[{ label: 'Productos' }]} />
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Productos</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Gestiona el catálogo de productos de tu tienda
-          </p>
-        </div>
-        <Link href="/admin/products/new">
-          <Button className="w-full sm:w-auto min-h-[44px] border">
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Producto
-          </Button>
-        </Link>
-      </div>
+      <AdminPageHeader
+        title="Productos"
+        description="Gestiona el catálogo de productos de tu tienda"
+        breadcrumbItems={[{ label: 'Productos' }]}
+        actionButton={{
+          label: 'Nuevo Producto',
+          href: '/admin/products/new',
+          icon: Plus
+        }}
+      />
 
       <Card>
         <CardHeader>
@@ -622,6 +618,7 @@ export default function AdminProductsPage() {
                         mlItemId={product.mlItemId}
                         syncStatus={product.mlSyncStatus}
                         onSyncComplete={() => fetchProducts(search, page)}
+                        mlPermalink={product.mlPermalink}
                       />
                       
                       {/* Acciones Rápidas */}
