@@ -92,7 +92,7 @@ export function AdminSidebar({ className, isMobile = false, onClose }: AdminSide
           className="flex items-center text-sm text-gray-400 hover:text-white transition-colors"
         >
           <span className="mr-2">←</span>
-          Volver a la tienda
+          Cerrar Sesión
         </button>
       </div>
     </div>

@@ -101,6 +101,274 @@ interface MLItemShippingOptionsApiResponse {
   } | null;
 }
 
+async function calculateShippingCostsWithDimensions(
+  options: ME2ShippingOptions, 
+  dimensions: ShippingDimensions
+): Promise<ME2ShippingResult> {
+  try {
+    logger.info('[ME2] Request: Calculando envío con /shipments/costs', {
+      zipcode: options.zipcode,
+      dimensions,
+      itemCount: options.items.length
+    });
+
+    // Hacer request a la API de Mercado Libre con reintentos
+    const auth = await MercadoLibreAuth.getInstance();
+    const accessToken = await auth.getAccessToken();
+    
+    if (!accessToken) {
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.AUTH_FAILED,
+        'No se encontró token de acceso a Mercado Libre'
+      );
+    }
+
+    const firstItem = options.items[0];
+    
+    // Obtener seller_id de las variables de entorno
+    const sellerId = process.env.ML_SELLER_ID;
+    
+    if (!sellerId) {
+      throw new MercadoLibreError(
+        MercadoLibreErrorCode.SHIPPING_CALCULATION_FAILED,
+        'No se encontró ML_SELLER_ID en las variables de entorno'
+      );
+    }
+    
+    const requestBody = {
+      seller_id: parseInt(sellerId),
+      zip_code_from: process.env.BUSINESS_ZIP_CODE || '1001', // Código postal del negocio
+      zip_code_to: options.zipcode,
+      dimensions: {
+        height: dimensions.height,
+        width: dimensions.width,
+        length: dimensions.length,
+        weight: dimensions.weight
+      },
+      item_price: firstItem.price,
+      local_pickup: false,
+      logistic_type: 'me2'
+    };
+
+    logger.info('[ME2] Request: Consultando API /shipments/costs', {
+      url: `${MERCADOLIBRE_API_URL}/shipments/costs`,
+      zipcode: options.zipcode,
+      dimensions,
+      requestBody
+    });
+
+    const response = await me2ShippingCircuitBreaker.execute(async () => {
+      return await retryWithBackoff(async () => {
+        const url = `${MERCADOLIBRE_API_URL}/shipments/costs`;
+        
+        // Timeout handling con Promise.race() - 8 segundos máximo para API calls
+        const timeoutPromise = new Promise<Response>((_, reject) => {
+          setTimeout(() => {
+            reject(new MercadoLibreError(
+              MercadoLibreErrorCode.TIMEOUT_ERROR,
+              'Timeout en llamada a API de Mercado Libre (8s)',
+              { url, zipcode: options.zipcode, timeout: 8000 }
+            ));
+          }, 8000);
+        });
+
+        const apiCall = fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const res = await Promise.race([apiCall, timeoutPromise]) as Response;
+        
+        if (!res.ok) {
+          const errorBody = await res.text();
+
+          if (process.env.NODE_ENV === 'development') {
+            // Log de depuración SIN sanitizar para entorno de desarrollo
+            // eslint-disable-next-line no-console
+            console.error('ME2 DEV - Error response from ML /shipments/costs', {
+              status: res.status,
+              zipcode: options.zipcode,
+              url,
+              requestBody,
+              responseBody: errorBody,
+            });
+          }
+
+          // Rate limit handling específico
+          if (res.status === 429) {
+            throw new MercadoLibreError(
+              MercadoLibreErrorCode.RATE_LIMIT_EXCEEDED,
+              `Rate limit excedido en API de Mercado Libre: ${errorBody}`,
+              { status: res.status, zipcode: options.zipcode, retryAfter: res.headers.get('Retry-After') }
+            );
+          }
+
+          // Authentication errors - excluir del circuit breaker
+          if (res.status === 401 || res.status === 403) {
+            logger.warn('[ME2] Error: Problema de autenticación con Mercado Libre', {
+              status: res.status,
+              zipcode: options.zipcode,
+              errorBody: errorBody.substring(0, 200) // Limitar longitud
+            });
+            
+            // Forzar refresh de token
+            const auth = await MercadoLibreAuth.getInstance();
+            await auth.refreshAccessToken();
+            
+            // Lanzar error especial que no afecta al circuit breaker
+            const authError = new MercadoLibreError(
+              MercadoLibreErrorCode.AUTH_FAILED,
+              `Error de autenticación con Mercado Libre: ${errorBody}`,
+              { status: res.status, zipcode: options.zipcode }
+            );
+            // Marcar para que circuit breaker no cuente este fallo
+            (authError as MercadoLibreError & { skipCircuitBreaker?: boolean }).skipCircuitBreaker = true;
+            throw authError;
+          }
+
+          throw new MercadoLibreError(
+            MercadoLibreErrorCode.SHIPPING_CALCULATION_FAILED,
+            `Error calculando envío ME2: ${errorBody}`,
+            { status: res.status, zipcode: options.zipcode, dimensions }
+          );
+        }
+        
+        return res;
+      }, {
+        maxRetries: 3,
+        shouldRetry: (error) => {
+          if (error instanceof MercadoLibreError) {
+            // No reintentar en errores de autenticación (se refresh el token)
+            if (error.code === MercadoLibreErrorCode.AUTH_FAILED) return false;
+            
+            // Reintentar con más backoff para rate limits
+            if (error.code === MercadoLibreErrorCode.RATE_LIMIT_EXCEEDED) return true;
+            
+            // Reintentar errores de conexión y timeout
+            return error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
+                   error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
+                   error.code === MercadoLibreErrorCode.API_UNAVAILABLE;
+          }
+          return false;
+        },
+        initialDelay: 1000, // 1 segundo base delay
+        maxDelay: 10000  // 10 segundos máximo delay
+      });
+    });
+
+    const rawData = await response.json();
+    
+    logger.info('[ME2] Response: Opciones obtenidas de /shipments/costs', {
+      optionsCount: rawData.options?.length || 0,
+      zipcode: options.zipcode
+    });
+
+    // Procesar respuesta de /shipments/costs
+    const shippingOptions: MLShippingMethod[] = (rawData.options ?? []).map((option: {
+      shipping_method_id?: number;
+      id?: number;
+      name?: string;
+      description?: string;
+      currency_id?: string;
+      list_cost?: number;
+      cost?: number;
+      estimated_delivery_time?: {
+        date?: string;
+        time_frame?: {
+          from?: string;
+          to?: string;
+        };
+        type?: string;
+        unit?: string;
+        shipping?: number;
+        handling?: number;
+      };
+      logistic_type?: string;
+      treatment?: string;
+      order_priority?: number;
+    }): MLShippingMethod => ({
+      shipping_method_id: option.shipping_method_id || option.id,
+      name: option.name || 'Envío Estándar',
+      description: option.description || 'Envío a domicilio',
+      currency_id: option.currency_id || 'ARS',
+      list_cost: option.list_cost || option.cost,
+      cost: option.cost || 0,
+      estimated_delivery: {
+        date: option.estimated_delivery_time?.date ?? '',
+        time_from: option.estimated_delivery_time?.time_frame?.from ?? '',
+        time_to: option.estimated_delivery_time?.time_frame?.to ?? '',
+      },
+      estimated_delivery_time: option.estimated_delivery_time
+        ? {
+            type: option.estimated_delivery_time.type ?? 'known_frame',
+            unit: option.estimated_delivery_time.unit ?? 'days',
+            value: option.estimated_delivery_time.shipping ?? 5,
+          }
+        : undefined,
+      shipping_mode: 'me2',
+      logistic_type: option.logistic_type || 'drop_off',
+      treatment: option.treatment || 'standard',
+      guaranteed: false,
+      order_priority: option.order_priority || 1,
+      tags: ['me2'],
+      speed: {
+        handling: option.estimated_delivery_time?.handling ?? 1,
+        shipping: option.estimated_delivery_time?.shipping ?? 4,
+      },
+    }));
+
+    const cheapestOption = shippingOptions.length > 0 
+      ? shippingOptions.reduce((min, option) => 
+          (option.cost || 0) < (min.cost || 0) ? option : min
+        )
+      : null;
+
+    const result: ME2ShippingResult = {
+      shippingOptions,
+      cheapestOption,
+      estimatedDelivery: cheapestOption?.estimated_delivery_time?.value ?? 5,
+      totalCost: cheapestOption?.cost || 0,
+      currency: cheapestOption?.currency_id || 'ARS',
+      source: 'me2',
+      fallback: false,
+      message: 'Cálculo ME2 exitoso usando /shipments/costs',
+    };
+
+    logger.info('[ME2] Response: Cálculo completado con /shipments/costs', {
+      zipcode: options.zipcode,
+      totalCost: result.totalCost,
+      optionsCount: shippingOptions.length,
+      deliveryDays: result.estimatedDelivery,
+      cheapestOption: cheapestOption?.name || 'N/A',
+      source: result.source,
+      fallback: result.fallback
+    });
+
+    return result;
+
+  } catch (error) {
+    logger.error('[ME2] Error: Error en cálculo de envío con /shipments/costs', {
+      zipcode: options.zipcode,
+      error: error instanceof Error ? error.message : String(error),
+      errorType: error instanceof MercadoLibreError ? error.code : 'UNKNOWN',
+    });
+
+    logger.warn('[ME2] Fallback: Activando envío local por error de /shipments/costs', {
+      zipcode: options.zipcode,
+      originalError: error instanceof Error ? error.message : String(error),
+      itemCount: options.items.length
+    });
+
+    // En caso de error, usar métodos locales configurados en BD como fallback
+    return await calculateLocalShippingFallback(options.zipcode, options.items);
+  }
+}
+
 async function calculateLocalShippingFallback(zipcode: string, items: ShippingItem[]): Promise<ME2ShippingResult> {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -110,8 +378,58 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
       .from(shippingMethods)
       .where(eq(shippingMethods.isActive, true));
 
+    // Si no hay métodos configurados, usar uno por defecto
     if (!methods.length) {
-      throw new Error('No hay métodos de envío locales activos configurados');
+      logger.warn('[ME2] Fallback: No hay métodos locales configurados, usando envío por defecto', {
+        zipcode,
+        itemCount: items.length
+      });
+
+      const defaultCost = 500; // $500 por defecto
+      const now = new Date();
+      const estimatedDate = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+      const estimatedDateString = estimatedDate.toISOString().split('T')[0];
+
+      const defaultOption: MLShippingMethod = {
+        shipping_method_id: -1,
+        name: 'Envío Estándar',
+        description: 'Envío estándar a todo el país',
+        list_cost: defaultCost,
+        cost: defaultCost,
+        currency_id: 'ARS',
+        estimated_delivery: {
+          date: estimatedDateString,
+          time_from: '09:00',
+          time_to: '18:00',
+        },
+        estimated_delivery_time: {
+          type: 'known_frame',
+          unit: 'days',
+          value: 5,
+        },
+        shipping_mode: 'custom',
+        logistic_type: 'custom',
+        treatment: 'custom',
+        guaranteed: false,
+        order_priority: 1,
+        tags: ['fallback'],
+        speed: {
+          handling: 1,
+          shipping: 4,
+        },
+      };
+
+      return {
+        shippingOptions: [defaultOption],
+        cheapestOption: defaultOption,
+        estimatedDelivery: 5,
+        totalCost: defaultCost,
+        currency: 'ARS',
+        source: 'local',
+        fallback: true,
+        message: 'Usando envío estándar por defecto (no hay métodos locales configurados)',
+        warnings: ['No hay métodos de envío locales configurados en la base de datos'],
+      };
     }
 
     const now = new Date();
@@ -172,7 +490,58 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
       zipcode,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw error;
+    
+    // Último recurso: retornar un envío básico para no bloquear el checkout
+    logger.warn('[ME2] Fallback último recurso: usando envío básico de emergencia', {
+      zipcode,
+      itemCount: items.length
+    });
+
+    const emergencyCost = 800; // Costo de emergencia más alto
+    const now = new Date();
+    const estimatedDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días
+    const estimatedDateString = estimatedDate.toISOString().split('T')[0];
+
+    const emergencyOption: MLShippingMethod = {
+      shipping_method_id: -999,
+      name: 'Envío Nacional',
+      description: 'Envío a todo el país',
+      list_cost: emergencyCost,
+      cost: emergencyCost,
+      currency_id: 'ARS',
+      estimated_delivery: {
+        date: estimatedDateString,
+        time_from: '09:00',
+        time_to: '18:00',
+      },
+      estimated_delivery_time: {
+        type: 'known_frame',
+        unit: 'days',
+        value: 7,
+      },
+      shipping_mode: 'custom',
+      logistic_type: 'custom',
+      treatment: 'custom',
+      guaranteed: false,
+      order_priority: 999,
+      tags: ['emergency'],
+      speed: {
+        handling: 2,
+        shipping: 5,
+      },
+    };
+
+    return {
+      shippingOptions: [emergencyOption],
+      cheapestOption: emergencyOption,
+      estimatedDelivery: 7,
+      totalCost: emergencyCost,
+      currency: 'ARS',
+      source: 'local',
+      fallback: true,
+      message: 'Usando envío de emergencia (error en sistema de envíos)',
+      warnings: ['Hubo un error al calcular el envío, se aplicó un costo estándar'],
+    };
   }
 }
 
@@ -271,13 +640,14 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     });
 
     if (!mlItemId) {
-        logger.error('[ME2] Error: Falta mlItemId para el item', {
+        logger.warn('[ME2] Warning: Falta mlItemId para el item, usando /shipments/costs', {
           zipcode: options.zipcode,
           localProductId: firstItem.id,
         });
 
-      return calculateLocalShippingFallback(options.zipcode, options.items);
-    }
+        // Usar /shipments/costs cuando no hay mlItemId
+        return await calculateShippingCostsWithDimensions(options, dimensions);
+      }
 
     const requestBody = {
       zipcode: options.zipcode,

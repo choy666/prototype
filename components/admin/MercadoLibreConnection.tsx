@@ -185,10 +185,13 @@ export function MercadoLibreConnection() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-lg border bg-card p-4">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                ID de usuario
+                Seller ID (ID de vendedor)
               </h3>
               <p className="mt-2 text-sm font-mono break-all">
                 {connectionStatus?.userId || 'No disponible'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Usa este valor para ML_SELLER_ID en .env.local
               </p>
             </div>
 
