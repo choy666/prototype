@@ -305,27 +305,101 @@ export async function makeAuthenticatedRequest(
       },
     });
 
-    // Si recibimos 401 o 403, puede ser que el token fue revocado
+    // Si recibimos 401 o 403, puede ser que el token fue revocado O un error temporal
     if (response.status === 401 || response.status === 403) {
+      // Leer el body ANTES de intentar refrescar el token
+      const errorBody = await response.text().catch(() => '');
+      
       logger.warn('MercadoLibre: Token rechazado por la API', {
         userId,
         status: response.status,
-        endpoint
+        endpoint,
+        errorBody: errorBody.substring(0, 200) // Primeros 200 caracteres para debug
       });
       
-      // Limpiar tokens inválidos
-      await db.update(users)
-        .set({
-          mercadoLibreAccessToken: null,
-          mercadoLibreRefreshToken: null,
-          mercadoLibreAccessTokenExpiresAt: null,
-          mercadoLibreRefreshTokenExpiresAt: null,
-          mercadoLibreScopes: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
-      
-      throw new Error('Token invalidado por la API. Se requiere重新autenticación');
+      // Intentar refrescar el token antes de limpiar todo
+      if (tokens.refresh_token && !isTokenExpired(tokens.refreshTokenExpiresAt)) {
+        try {
+          logger.info('MercadoLibre: Intentando refrescar token después de 401/403', { userId });
+          const newTokens = await refreshAccessToken(tokens.refresh_token);
+          
+          // Actualizar tokens en la base de datos
+          const now = new Date();
+          const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
+          
+          await db.update(users)
+            .set({
+              mercadoLibreAccessToken: newTokens.access_token,
+              mercadoLibreRefreshToken: newTokens.refresh_token,
+              mercadoLibreAccessTokenExpiresAt: newAccessTokenExpiresAt,
+              mercadoLibreScopes: newTokens.scope || '',
+              updatedAt: now,
+            })
+            .where(eq(users.id, userId));
+          
+          logger.info('MercadoLibre: Token refrescado exitosamente después de 401/403', { userId });
+          
+          // Reintentar la request original con el nuevo token
+          return fetch(url, {
+            ...options,
+            headers: {
+              'Authorization': `Bearer ${newTokens.access_token}`,
+              'Content-Type': 'application/json',
+              ...options.headers,
+            },
+          });
+          
+        } catch (refreshError) {
+          logger.error('MercadoLibre: Error refrescando token después de 401/403', {
+            userId,
+            error: refreshError instanceof Error ? refreshError.message : String(refreshError)
+          });
+          
+          // Verificar el tipo de error original
+          const isTokenRevoked = errorBody.includes('invalid_token') || 
+                               errorBody.includes('token_revoked') ||
+                               errorBody.includes('expired_token');
+          const isScopeError = errorBody.includes('forbidden') ||
+                              errorBody.includes('insufficient_scope') ||
+                              errorBody.includes('permission denied');
+          
+          if (isTokenRevoked) {
+            // Limpiar tokens solo si están realmente revocados
+            await db.update(users)
+              .set({
+                mercadoLibreAccessToken: null,
+                mercadoLibreRefreshToken: null,
+                mercadoLibreAccessTokenExpiresAt: null,
+                mercadoLibreRefreshTokenExpiresAt: null,
+                mercadoLibreScopes: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(users.id, userId));
+            
+            throw new Error('Token invalidado por la API. Se requiere重新autenticación');
+          } else if (isScopeError || response.status === 403) {
+            // Para errores de scopes, no limpiar tokens pero notificar
+            throw new Error(`Error de permisos: ${errorBody || response.statusText}. Es posible que necesites re-autorizar con permisos adicionales.`);
+          } else {
+            // Para otros errores 401, mantener los tokens y lanzar error específico
+            throw new Error(`Error de autenticación temporal: ${errorBody || response.statusText}`);
+          }
+        }
+      } else {
+        // No hay refresh token válido, limpiar todo
+        await db.update(users)
+          .set({
+            mercadoLibreAccessToken: null,
+            mercadoLibreRefreshToken: null,
+            mercadoLibreAccessTokenExpiresAt: null,
+            mercadoLibreRefreshTokenExpiresAt: null,
+            mercadoLibreScopes: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+        
+        throw new Error('Tokens expirados. Se requiere重新autenticación');
+      }
     }
 
     return response;

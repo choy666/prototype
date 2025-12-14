@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { ArrowLeft, Save, FileText, Tag, Package, Eye, Truck, AlertCircle, CheckCircle, CheckSquare, Square, Camera } from 'lucide-react'
 import { ImageManager } from '@/components/ui/ImageManager'
 import { ME2Guidelines } from '@/components/admin/ME2Guidelines'
+import { MLAttributesGuide } from '@/components/admin/MLAttributesGuide'
 import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import { getValidations, calculateReadinessScore, getReadinessColor, getReadinessIcon, type ProductForm, type ValidationItem } from '@/lib/validations/product-validations'
@@ -365,11 +366,16 @@ export default function EditProductPage() {
     setForm((prev: ProductForm) => ({ ...prev, images }))
   }
 
-  const handleMlCategoryChange = (mlCategoryId: string) => {
-    setForm((prev: ProductForm) => ({
-      ...prev,
-      mlCategoryId,
-    }))
+  const handleMlCategoryChange = (categoryId: string) => {
+    const category = categories.find((category) => category.id.toString() === categoryId)
+    if (category) {
+      setForm((prev: ProductForm) => ({
+        ...prev,
+        mlCategoryId: category.mlCategoryId || categoryId, // Usar mlCategoryId si existe, sino el categoryId
+      }))
+    } else {
+      setForm((prev: ProductForm) => ({ ...prev, mlCategoryId: categoryId }))
+    }
   }
 
   if (fetchLoading) {
@@ -934,11 +940,21 @@ export default function EditProductPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-6">
-                      <AttributeBuilder
+                      <MLAttributesGuide
+                        categoryId={form.mlCategoryId}
                         attributes={attributes}
-                        onChange={setAttributes}
-                        recommendedAttributes={recommendedAttributes}
+                        onAttributesChange={setAttributes}
+                        showValidationErrors={hasMissingRequiredAttributes()}
                       />
+                      
+                      <div className="border-t border-dark-lighter pt-6">
+                        <h4 className="text-sm font-medium text-dark-text-primary mb-3">Atributos Adicionales</h4>
+                        <AttributeBuilder
+                          attributes={attributes}
+                          onChange={setAttributes}
+                          recommendedAttributes={recommendedAttributes}
+                        />
+                      </div>
 
                       <div className="flex justify-end">
                         <Button

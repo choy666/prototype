@@ -709,7 +709,7 @@ export async function POST(req: Request) {
     // Determinar si es CREATE o UPDATE
     const isUpdate = !!localProduct.mlItemId;
 
-    // Para productos nuevos, incluir shipping en el cuerpo principal
+    // Para productos nuevos, incluir shipping básico en CREATE
     if (!isUpdate) {
       mlProductData.shipping = {
         mode: 'me2',
@@ -737,6 +737,15 @@ export async function POST(req: Request) {
     let response: Response;
     let retryCount = 0;
     const maxRetries = 2;
+    
+    // Log para debuggear qué se envía a ML
+    logger.info('[ML Sync] Enviando producto a Mercado Libre', {
+      productId: productIdNum,
+      endpoint: mlEndpoint,
+      method: mlMethod,
+      shippingData: mlProductData.shipping,
+      fullData: mlProductData
+    });
     
     if (!abortController) {
       throw new Error('AbortController no inicializado');
@@ -1009,6 +1018,70 @@ export async function POST(req: Request) {
       productId: productIdNum,
       listingTypeId: mlProductData.listing_type_id,
     });
+
+    // Configurar ME2 para productos nuevos (ML ignora shipping en CREATE)
+    if (!isUpdate) {
+      try {
+        // Preparar datos de envío para el endpoint específico
+        const shippingData = {
+          mode: 'me2',
+          local_pick_up: false,
+          free_shipping: false,
+          logistic_type: 'drop_off',
+          store_pick_up: false,
+          dimensions: `${height}x${width}x${length},${weight}`,
+          tags: ['local_pick_up_not_allowed'],
+          methods: [],
+        };
+
+        logger.info('Configurando ME2 para producto nuevo', {
+          productId: productIdNum,
+          mlItemId,
+          shippingData
+        });
+
+        // Hacer llamada específica al endpoint de shipping
+        const shippingResponse = await makeAuthenticatedRequest(
+          parseInt(session.user.id),
+          `/items/${mlItemId}/shipping`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(shippingData),
+            signal: abortController?.signal,
+          }
+        );
+
+        if (!shippingResponse.ok) {
+          const shippingError = await shippingResponse.text();
+          let parsedShippingError = null;
+          try {
+            parsedShippingError = JSON.parse(shippingError);
+          } catch {
+            // No es JSON
+          }
+          logger.error('Error configurando ME2 para producto nuevo', {
+            mlItemId,
+            error: shippingError,
+            parsedError: parsedShippingError,
+            status: shippingResponse.status,
+            shippingSent: shippingData
+          });
+          // No lanzar error, solo registrar - el producto se creó pero sin ME2
+        } else {
+          logger.info('ME2 configurado exitosamente para producto nuevo', {
+            productId: productIdNum,
+            mlItemId
+          });
+        }
+      } catch (shippingError) {
+        logger.error('Error en configuración de ME2 (continuando)', {
+          productId: productIdNum,
+          mlItemId,
+          error: shippingError instanceof Error ? shippingError.message : String(shippingError)
+        });
+        // Continuar aunque falle la configuración de ME2
+      }
+    }
 
     // Para productos existentes, actualizar el modo de envío por separado si es necesario
     if (isUpdate) {

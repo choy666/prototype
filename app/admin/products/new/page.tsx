@@ -28,6 +28,7 @@ import {
 
 import { ImageManager } from '@/components/ui/ImageManager'
 import { ME2Guidelines } from '@/components/admin/ME2Guidelines'
+import { MLAttributesGuide } from '@/components/admin/MLAttributesGuide'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
 import { getValidations, isME2Ready, type ProductForm, type DynamicAttribute } from '@/lib/validations/product-validations'
 import type { Category } from '@/lib/schema'
@@ -245,7 +246,7 @@ export default function NewProductPage() {
     if (category) {
       setForm((prev: ProductForm) => ({
         ...prev,
-        mlCategoryId: category.id.toString(),
+        mlCategoryId: category.mlCategoryId || categoryId, // Usar mlCategoryId si existe, sino el categoryId
         mlCondition: 'new', // Valores por defecto ya que no existen en el tipo Category
         mlBuyingMode: 'buy_it_now',
         mlListingTypeId: 'free',
@@ -798,20 +799,22 @@ export default function NewProductPage() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <AttributeBuilder
+              <CardContent className="space-y-6">
+                <MLAttributesGuide
+                  categoryId={form.mlCategoryId}
                   attributes={attributes}
-                  onChange={setAttributes}
-                  recommendedAttributes={recommendedAttributes}
+                  onAttributesChange={setAttributes}
+                  showValidationErrors={readinessScore < 100}
                 />
-                {recommendedAttributes.filter(attr => attr.required).length > 0 && (
-                  <div className="mt-4 p-3 rounded-lg bg-amber-950/30 border border-amber-800/30">
-                    <p className="text-sm text-amber-300">
-                      <AlertTriangle className="h-4 w-4 inline mr-2" />
-                      Los atributos requeridos son obligatorios para sincronizar con Mercado Libre
-                    </p>
-                  </div>
-                )}
+                
+                <div className="border-t border-dark-lighter pt-4">
+                  <h4 className="text-sm font-medium text-dark-text-primary mb-3">Atributos Adicionales</h4>
+                  <AttributeBuilder
+                    attributes={attributes}
+                    onChange={setAttributes}
+                    recommendedAttributes={recommendedAttributes}
+                  />
+                </div>
               </CardContent>
             </Card>
 
