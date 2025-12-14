@@ -19,7 +19,7 @@ interface CheckoutSummaryProps {
   } | null;
 }
 
-export function CheckoutSummary({ selectedShippingMethod }: CheckoutSummaryProps) {
+export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: CheckoutSummaryProps) {
   const { items } = useCartStore();
 
   // Calcular total con descuentos
@@ -41,7 +41,12 @@ export function CheckoutSummary({ selectedShippingMethod }: CheckoutSummaryProps
 
       {/* Lista de productos */}
       <div className="space-y-4 mb-6">
-        {items.map((item, index) => {
+        {items.length === 0 ? (
+          <div className="text-center py-8" data-testid="empty-cart">
+            <p className="text-gray-500">Tu carrito está vacío</p>
+          </div>
+        ) : (
+          items.map((item, index) => {
           const basePrice = item.price;
           const hasDiscount = item.discount && item.discount > 0;
           const finalPrice = hasDiscount ? basePrice * (1 - item.discount / 100) : basePrice;
@@ -81,8 +86,30 @@ export function CheckoutSummary({ selectedShippingMethod }: CheckoutSummaryProps
               </div>
             </div>
           );
-        })}
+        })
+      )}
       </div>
+
+      {/* Dirección de envío */}
+      <div className="border-t pt-4 space-y-3">
+        <h3 className="font-medium text-sm">Dirección de envío</h3>
+        {shippingAddress ? (
+          <div className="text-sm text-gray-600">
+            <p>{shippingAddress.codigoPostal}</p>
+            <p>{shippingAddress.provincia}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No seleccionada</p>
+        )}
+      </div>
+
+      {/* Método de envío */}
+      {selectedShippingMethod && (
+        <div className="border-t pt-3 space-y-3">
+          <h3 className="font-medium text-sm">Método de envío</h3>
+          <p className="text-sm text-gray-600">{selectedShippingMethod.name}</p>
+        </div>
+      )}
 
       {/* Resumen de precios */}
       <div className="border-t pt-4 space-y-3">

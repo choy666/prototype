@@ -33,6 +33,14 @@
   "**/*.js",
   "**/*.jsx",
   "next-env.d.ts",
-  ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  ".next/types/**/*.ts"
+],
+"exclude": [
+  "node_modules",
+  "tests/**/*",
+  "**/*.test.ts",
+  "**/*.test.tsx",
+  "**/*.spec.ts",
+  "**/*.spec.tsx"
+]
 }

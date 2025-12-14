@@ -8,13 +8,13 @@ import { verifyMercadoPagoWebhook } from '@/lib/mercado-pago/hmacVerifier';
 import { saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
 import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
-import crypto from 'crypto';
+import { randomUUID } from 'crypto';
 
 /* ---------------------------------------------------------------------------
  * POST Handler — Webhook Mercado Pago sincronizado con hmacVerifier.ts
  * ------------------------------------------------------------------------- */
 export async function POST(req: Request) {
-  const requestId = crypto.randomUUID();
+  const requestId = randomUUID();
 
   try {
     // Extraer datos básicos
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
 
     return immediateResponse;
   } catch (error) {
+    console.error('WEBHOOK ERROR:', error); // Debug temporal
     logger.error('Webhook handler error', {
       requestId,
       error: error instanceof Error ? error.message : String(error),

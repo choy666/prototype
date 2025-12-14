@@ -97,6 +97,12 @@ export const addressSchema = z.object({
     )
     .trim(),
 
+  numero: z
+    .string()
+    .min(1, 'El número de calle es requerido')
+    .regex(/^\d+[A-Za-z0-9]*$/, 'Número de calle inválido (ej: 123, 123A)')
+    .trim(),
+
   isDefault: z.boolean().optional(),
 });
 

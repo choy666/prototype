@@ -21,4 +21,12 @@ module.exports = {
     'lib/**/*.{js,jsx,ts,tsx}',
     '!**/*.d.ts',
   ],
+  globals: {
+    'ts-jest': {
+      tsconfig: 'tsconfig.test.json'
+    }
+  },
+  // Suppress console warnings
+  logHeapUsage: false,
+  verbose: false
 };

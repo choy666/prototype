@@ -294,6 +294,7 @@ export const addresses = pgTable("addresses", {
     .notNull(),
   nombre: varchar("nombre", { length: 256 }).notNull(),
   direccion: text("direccion").notNull(),
+  numero: varchar("numero", { length: 20 }).notNull(),
   ciudad: varchar("ciudad", { length: 256 }).notNull(),
   provincia: varchar("provincia", { length: 256 }).notNull(),
   codigoPostal: varchar("codigo_postal", { length: 10 }).notNull(),

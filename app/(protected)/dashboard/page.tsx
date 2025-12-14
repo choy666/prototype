@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { useCartClearOnSuccess } from '@/hooks/useCartClearOnSuccess';
 import { getDashboardMetrics, getDashboardAlerts, getMercadoLibreStats } from '@/lib/actions/dashboard';
 import { MercadoPagoCard } from '@/components/admin/MercadoPagoCard';
+import CustomerDashboard from '@/components/CustomerDashboard';
 
 interface RecentOrder {
   id: number;
@@ -161,6 +162,12 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Si es cliente, mostrar el dashboard de cliente
+  if (session.user.role === 'user') {
+    return <CustomerDashboard />;
+  }
+
+  // Si es administrador, continuar con el dashboard de admin
   return (
     <div className='container mx-auto px-4 py-8'>
       <div className='bg-white dark:bg-gray-800 rounded-lg shadow-md p-6'>
