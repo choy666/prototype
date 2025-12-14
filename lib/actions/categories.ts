@@ -15,7 +15,7 @@ interface MLCategoryCache {
   data: Map<string, {
     id: string;
     name: string;
-    attributes: string[];
+    attributes: Array<{ id: string; tags: string[]; valueType?: string }>;
     isLeaf: boolean;
     children_categories?: Array<{ id: string; name: string }>;
   }>;
@@ -52,7 +52,7 @@ function isCacheValid(cache: MLCategoryCache): boolean {
 async function getMLCategoryWithAttributes(categoryId: string, accessToken: string): Promise<{
   id: string;
   name: string;
-  attributes: string[];
+  attributes: Array<{ id: string; tags: string[]; valueType?: string }>;
   isLeaf: boolean;
   children_categories?: Array<{ id: string; name: string }>;
 }> {
@@ -141,13 +141,17 @@ async function getMLCategoryWithAttributes(categoryId: string, accessToken: stri
 
   const attributesData = await attributesResponse.json();
   const attributes = Array.isArray(attributesData) 
-    ? attributesData.map((attr: { id: string }) => attr.id).filter(Boolean)
+    ? attributesData.map((attr: { id: string; tags?: string[]; value_type?: string }) => ({
+        id: attr.id,
+        tags: attr.tags || [],
+        valueType: attr.value_type
+      }))
     : [];
 
   // Validar que tenga al menos 3 atributos obligatorios para ME2
   const requiredAttributes = ['weight', 'height', 'width', 'length'];
   const hasRequiredAttributes = requiredAttributes.some(req => 
-    attributes.some(attr => attr.toLowerCase().includes(req))
+    attributes.some(attr => attr.id.toLowerCase().includes(req))
   );
 
   if (!hasRequiredAttributes) {
@@ -297,7 +301,7 @@ export async function syncMLCategories(): Promise<{
         // Validar atributos ME2
         const requiredAttributes = ['weight', 'height', 'width', 'length'];
         const hasRequiredAttributes = requiredAttributes.some(req => 
-          categoryData.attributes.some(attr => attr.toLowerCase().includes(req))
+          categoryData.attributes.some(attr => attr.id.toLowerCase().includes(req))
         );
         
         if (!hasRequiredAttributes && categoryData.isLeaf) {

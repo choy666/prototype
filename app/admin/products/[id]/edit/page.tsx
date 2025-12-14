@@ -11,13 +11,13 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MLCategorySelectSimple } from '@/components/admin/MLCategorySelectSimple'
 import { useToast } from '@/components/ui/use-toast'
-import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
-import { Tooltip } from '@/components/ui/Tooltip'
-import { ArrowLeft, Save, FileText, Tag, Package, Eye, Truck, AlertCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, FileText, Tag, Package, Eye, Truck, AlertCircle, CheckCircle, CheckSquare, Square, Camera } from 'lucide-react'
 import { ImageManager } from '@/components/ui/ImageManager'
+import { ME2Guidelines } from '@/components/admin/ME2Guidelines'
 import { ProductVariantsNew } from '@/components/admin/ProductVariantsNew'
 import { AttributeBuilder } from '@/components/admin/AttributeBuilder'
+import { getValidations, calculateReadinessScore, getReadinessColor, getReadinessIcon, type ProductForm, type ValidationItem } from '@/lib/validations/product-validations'
 import type { Category } from '@/lib/schema'
 import type { DynamicAttribute } from '@/components/admin/AttributeBuilder'
 import type { ProductVariant } from '@/components/admin/ProductVariantsNew'
@@ -50,31 +50,6 @@ interface Product {
   me2Compatible?: boolean | null
 }
 
-interface ProductForm {
-  name: string
-  description: string
-  price: string
-  image: string
-  images: string[]
-  discount: string
-  weight: string
-  stock: string
-  destacado: boolean
-  dynamicAttributes: DynamicAttribute[]
-  mlCondition: string
-  mlBuyingMode: string
-  mlListingTypeId: string
-  mlCurrencyId: string
-  mlCategoryId: string
-  warranty: string
-  videoId: string
-  height: string
-  width: string
-  length: string
-  mlItemId: string
-  shippingMode: string
-  me2Compatible: boolean
-}
 
 type RecommendedAttributeConfig = {
   key: string
@@ -135,7 +110,19 @@ export default function EditProductPage() {
     warnings: [],
   })
 
-  const [showPreview, setShowPreview] = useState(false)
+  // Función para verificar si faltan atributos requeridos
+  const hasMissingRequiredAttributes = () => {
+    const requiredAttributes = recommendedAttributes.filter(attr => attr.required)
+    return requiredAttributes.length > 0 && 
+      !requiredAttributes.every(req => 
+        attributes.some(attr => 
+          attr.name.toLowerCase() === req.key.toLowerCase() || 
+          req.aliases.some((alias: string) => attr.name.toLowerCase() === alias.toLowerCase())
+        )
+      )
+  }
+
+  const [focusedSection, setFocusedSection] = useState<string>('')
 
   const id = params.id as string
 
@@ -371,15 +358,15 @@ export default function EditProductPage() {
   }
 
   const handleChange = (field: keyof ProductForm, value: string | boolean) => {
-    setForm(prev => ({ ...prev, [field]: value }))
+    setForm((prev: ProductForm) => ({ ...prev, [field]: value }))
   }
 
   const handleImagesReorder = (images: string[]) => {
-    setForm(prev => ({ ...prev, images }))
+    setForm((prev: ProductForm) => ({ ...prev, images }))
   }
 
   const handleMlCategoryChange = (mlCategoryId: string) => {
-    setForm(prev => ({
+    setForm((prev: ProductForm) => ({
       ...prev,
       mlCategoryId,
     }))
@@ -387,482 +374,648 @@ export default function EditProductPage() {
 
   if (fetchLoading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Skeleton className="h-10 w-24" />
-          <div>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-        </div>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-4 w-24 mb-2" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ))}
+      <div className="min-h-screen bg-dark dark:bg-dark">
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-10 w-24" />
+            <div>
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-64" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <Card className="bg-dark-lighter border-dark-lighter">
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i}>
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <Breadcrumb items={[
-        { label: 'Productos', href: '/admin/products' },
-        { label: 'Editar Producto' }
-      ]} />
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link href="/admin/products">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Editar Producto</h1>
-            <p className="text-muted-foreground">
-              Modifica la información del producto
-            </p>
+    <div className="min-h-screen bg-dark dark:bg-dark">
+      {/* Header con indicador de progreso */}
+      <div className="sticky top-0 z-40 bg-dark/95 backdrop-blur supports-[backdrop-filter]:bg-dark/60 border-b border-dark-lighter">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <Link href="/admin/products">
+                <Button variant="ghost" size="sm" className="lg:hidden">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-xl font-semibold text-dark-text-primary">Editar Producto</h1>
+                <p className="text-sm text-dark-text-secondary">Modifica la información del producto</p>
+              </div>
+            </div>
+            
+            {/* Indicator de progreso */}
+            <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${getReadinessColor(calculateReadinessScore(form))}`}>
+              {getReadinessIcon(calculateReadinessScore(form))}
+              <div className="text-right">
+                <div className="text-sm font-medium">{calculateReadinessScore(form)}% Completo</div>
+                <div className="text-xs opacity-75">ML Ready</div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Tooltip content="Vista previa">
-            <Button
-              variant={showPreview ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowPreview(!showPreview)}
-              className="min-h-[36px]"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-        </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Estado de compatibilidad para Mercado Envíos (ME2)
-          </p>
-          {me2Status.loading ? (
-            <p className="text-xs text-muted-foreground">Validando atributos ME2 del producto…</p>
-          ) : me2Status.error ? (
-            <p className="text-xs text-red-600 dark:text-red-400">
-              {me2Status.error}
-            </p>
-          ) : (
-            <>
-              {me2Status.canUseME2 ? (
-                <p className="text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                  <CheckCircle className="h-4 w-4" />
-                  Este producto cumple todos los requisitos para usar ME2 sin fallback.
-                </p>
-              ) : me2Status.isValid ? (
-                <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  El producto está casi listo para ME2, pero aún falta vincular o confirmar la
-                  publicación en Mercado Libre.
-                </p>
-              ) : (
-                <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  Faltan datos obligatorios para usar ME2 sin fallback.
-                </p>
-              )}
-              {me2Status.missingAttributes.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Faltan: {me2Status.missingAttributes.join(', ')}
-                </p>
-              )}
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const numericId = parseInt(id, 10)
-              if (!Number.isNaN(numericId)) {
-                void loadMe2Status(numericId)
-              }
-            }}
-            className="min-h-[32px]"
-          >
-            Revalidar ME2
-          </Button>
-        </div>
-      </div>
-
-      <Tabs defaultValue="basic" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="basic" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
-            <FileText className="h-4 w-4" />
-            Información
-          </TabsTrigger>
-          <TabsTrigger value="attributes" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
-            <Tag className="h-4 w-4" />
-            Atributos
-          </TabsTrigger>
-          <TabsTrigger value="variants" className="flex items-center gap-2 transition-all duration-200 hover:scale-105">
-            <Package className="h-4 w-4" />
-            Variantes
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="basic" className="animate-in fade-in slide-in-from-right-2 duration-300">
-          <Card className="transition-all duration-300 hover:shadow-lg">
-            <CardHeader>
-              <CardTitle>Información del Producto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="name">Nombre *</Label>
-                    <Input
-                      id="name"
-                      value={form.name}
-                      onChange={(e) => handleChange('name', e.target.value)}
-                      placeholder="Nombre del producto"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="price">Precio *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={form.price}
-                      onChange={(e) => handleChange('price', e.target.value)}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mlCategoryId">Categoría Mercado Libre *</Label>
-                    <MLCategorySelectSimple
-                      value={form.mlCategoryId}
-                      onValueChange={handleMlCategoryChange}
-                      categories={categories}
-                      placeholder="Seleccionar categoría ML"
-                      disabled={categoriesLoading || mlCategories.length === 0}
-                    />
-                    {mlCategories.length === 0 && (
-                      <p className="mt-2 text-sm text-orange-600">
-                        No hay categorías oficiales de Mercado Libre configuradas. Ve a la sección Categorías y usa el botón Actualizar desde Mercado Libre antes de editar productos.
-                      </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar con checklist */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-24 bg-dark-lighter border-dark-lighter">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2 text-dark-text-primary">
+                  <CheckSquare className="h-5 w-5" />
+                  Checklist ML
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {getValidations(form, attributes, recommendedAttributes).map((validation: ValidationItem) => (
+                  <div
+                    key={validation.field}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer
+                      ${validation.isValid ? 'bg-emerald-950/30 text-emerald-300 border border-emerald-800/30' : 'bg-dark-lightest text-dark-text-secondary border border-dark-lighter'}
+                      ${focusedSection === validation.field ? 'ring-2 ring-blue-500' : ''}
+                    `}
+                    onClick={() => setFocusedSection(validation.field)}
+                  >
+                    {validation.isValid ? (
+                      <CheckSquare className="h-4 w-4 flex-shrink-0" />
+                    ) : (
+                      <Square className="h-4 w-4 flex-shrink-0" />
+                    )}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {validation.icon}
+                      <span className="text-sm font-medium truncate">
+                        {validation.label}
+                      </span>
+                    </div>
+                    {validation.isRequired && (
+                      <span className="text-xs bg-red-950/50 text-red-400 px-2 py-0.5 rounded border border-red-800/30">
+                        Req
+                      </span>
                     )}
                   </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
 
-                  <div>
-                    <Label htmlFor="image">Imagen Principal</Label>
-                    <Input
-                      id="image"
-                      type="url"
-                      value={form.image || ''}
-                      onChange={(e) => handleChange('image', e.target.value)}
-                      placeholder="https://ejemplo.com/imagen.jpg"
-                    />
-                    {form.image && (
-                      <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border">
-                          <Image
-                            src={form.image}
-                            alt="Vista previa de imagen principal"
-                            fill
-                            sizes="64px"
-                            className="object-cover"
-                            placeholder="blur"
-                            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+          {/* Contenido principal */}
+          <div className="lg:col-span-3">
+            <div className="flex flex-col gap-3 rounded-lg border bg-dark-lighter border-dark-lighter p-3 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium flex items-center gap-2 text-dark-text-primary">
+                  <Truck className="h-4 w-4" />
+                  Estado de compatibilidad para Mercado Envíos (ME2)
+                </p>
+                {me2Status.loading ? (
+                  <p className="text-xs text-dark-text-secondary">Validando atributos ME2 del producto…</p>
+                ) : me2Status.error ? (
+                  <p className="text-xs text-red-400">
+                    {me2Status.error}
+                  </p>
+                ) : (
+                  <>
+                    {me2Status.canUseME2 ? (
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-950/30 text-emerald-300">
+                          <CheckCircle className="h-3 w-3" />
+                          Compatible ME2
+                        </div>
+                        <span className="text-xs text-dark-text-secondary">Sin fallback necesario</span>
+                      </div>
+                    ) : me2Status.isValid ? (
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-950/30 text-amber-300">
+                          <AlertCircle className="h-3 w-3" />
+                          Parcialmente compatible
+                        </div>
+                        <span className="text-xs text-dark-text-secondary">Falta vincular publicación ML</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-950/30 text-red-300">
+                          <AlertCircle className="h-3 w-3" />
+                          No compatible ME2
+                        </div>
+                        <span className="text-xs text-dark-text-secondary">Faltan datos obligatorios</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const numericId = parseInt(id, 10)
+                    if (!Number.isNaN(numericId)) {
+                      void loadMe2Status(numericId)
+                    }
+                  }}
+                  className="min-h-[32px]"
+                >
+                  Revalidar ME2
+                </Button>
+              </div>
+            </div>
+
+            <Tabs defaultValue="basic" className="w-full mt-6">
+              <div className="overflow-x-auto pb-2">
+                <TabsList className="grid w-full min-w-max grid-cols-3 bg-dark-lighter border-dark-lighter">
+                  <TabsTrigger value="basic" className="flex items-center gap-2 transition-all duration-200 whitespace-nowrap data-[state=active]:bg-dark data-[state=active]:text-dark-text-primary">
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline">Información</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="attributes" className="flex items-center gap-2 transition-all duration-200 whitespace-nowrap data-[state=active]:bg-dark data-[state=active]:text-dark-text-primary relative">
+                    <Tag className="h-4 w-4" />
+                    <span className="hidden sm:inline">Atributos</span>
+                    {hasMissingRequiredAttributes() && (
+                      <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse"></span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="variants" className="flex items-center gap-2 transition-all duration-200 whitespace-nowrap data-[state=active]:bg-dark data-[state=active]:text-dark-text-primary">
+                    <Package className="h-4 w-4" />
+                    <span className="hidden sm:inline">Variantes</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="basic" className="animate-in fade-in slide-in-from-right-2 duration-300">
+                <Card className="transition-all duration-300 hover:shadow-lg bg-dark-lighter border-dark-lighter">
+                  <CardHeader>
+                    <CardTitle className="text-dark-text-primary">Información del Producto</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-8 pb-24">
+{/* Sección Información Básica */}
+                      <div className="space-y-6">
+                        <div className="border-b border-dark-lighter pb-2">
+                          <h3 className="text-lg font-medium flex items-center gap-2 text-dark-text-primary">
+                            <FileText className="h-5 w-5" />
+                            Información Básica
+                          </h3>
+                          <p className="text-sm text-dark-text-secondary mt-1">
+                            Los datos principales del producto que se mostrarán en la tienda
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                          <div className="sm:col-span-2 lg:col-span-3">
+                            <Label htmlFor="name" className="text-dark-text-primary">Nombre *</Label>
+                            <Input
+                              id="name"
+                              value={form.name}
+                              onChange={(e) => handleChange('name', e.target.value)}
+                              placeholder="Nombre del producto"
+                              required
+                              style={{ touchAction: 'manipulation' }}
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="price" className="text-dark-text-primary">Precio *</Label>
+                            <Input
+                              id="price"
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={form.price}
+                              onChange={(e) => handleChange('price', e.target.value)}
+                              placeholder="0.00"
+                              required
+                              style={{ touchAction: 'manipulation' }}
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="stock" className="text-dark-text-primary">Stock</Label>
+                            <Input
+                              id="stock"
+                              type="number"
+                              min="0"
+                              value={form.stock}
+                              onChange={(e) => handleChange('stock', e.target.value)}
+                              placeholder="0"
+                              style={{ touchAction: 'manipulation' }}
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="discount" className="text-dark-text-primary">Descuento (%)</Label>
+                            <Input
+                              id="discount"
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={form.discount}
+                              onChange={(e) => handleChange('discount', e.target.value)}
+                              placeholder="0"
+                              style={{ touchAction: 'manipulation' }}
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 lg:col-span-3">
+                            <Label htmlFor="mlCategoryId" className="text-dark-text-primary">Categoría Mercado Libre *</Label>
+                            <MLCategorySelectSimple
+                              value={form.mlCategoryId}
+                              onValueChange={handleMlCategoryChange}
+                              categories={categories}
+                              placeholder="Seleccionar categoría ML"
+                              disabled={categoriesLoading || mlCategories.length === 0}
+                            />
+                            {mlCategories.length === 0 && (
+                              <p className="mt-2 text-sm text-amber-400">
+                                No hay categorías oficiales de Mercado Libre configuradas. Ve a la sección Categorías y usa el botón Actualizar desde Mercado Libre antes de editar productos.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sección Descripción */}
+                      <div className="space-y-6">
+                        <div className="border-b border-dark-lighter pb-2">
+                          <h3 className="text-lg font-medium flex items-center gap-2 text-dark-text-primary">
+                            <FileText className="h-5 w-5" />
+                            Descripción del Producto
+                          </h3>
+                          <p className="text-sm text-dark-text-secondary mt-1">
+                            Describe tu producto con detalles: características principales, materiales, beneficios, usos recomendados...
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="description" className="text-dark-text-primary">Descripción *</Label>
+                          <textarea
+                            id="description"
+                            value={form.description}
+                            onChange={(e) => handleChange('description', e.target.value)}
+                            placeholder="Describe tu producto con detalles: características principales, materiales, beneficios, usos recomendados..."
+                            rows={6}
+                            className={`mt-1 resize-y block w-full rounded-md border border-dark-lighter bg-dark-lighter px-3 py-2 text-sm text-dark-text-primary placeholder:text-dark-text-disabled ${form.description.trim().length >= 50 ? 'border-emerald-500' : ''}`}
+                          />
+                          <p className="text-xs text-dark-text-secondary mt-1">
+                            Mínimo 50 caracteres. Incluye características técnicas y beneficios.
+                          </p>
+                        </div>
+                      </div>
+
+{/* Sección Imágenes */}
+                      <div className="space-y-6">
+                        <div className="border-b border-dark-lighter pb-2">
+                          <h3 className="text-lg font-medium flex items-center gap-2 text-dark-text-primary">
+                            <Camera className="h-5 w-5" />
+                            Imágenes del Producto
+                          </h3>
+                          <p className="text-sm text-dark-text-secondary mt-1">
+                            Imágenes principal y adicionales para mostrar en la tienda
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div>
+                            <Label htmlFor="image" className="text-dark-text-primary">Imagen Principal</Label>
+                            <Input
+                              id="image"
+                              type="url"
+                              value={form.image || ''}
+                              onChange={(e) => handleChange('image', e.target.value)}
+                              placeholder="https://ejemplo.com/imagen.jpg"
+                              style={{ touchAction: 'manipulation' }}
+                            />
+                            {form.image && (
+                              <div className="flex items-center gap-3 p-3 border rounded-lg bg-dark-lightest border-dark-lighter mt-2">
+                                <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-dark-lighter">
+                                  <Image
+                                    src={form.image}
+                                    alt="Vista previa de imagen principal"
+                                    fill
+                                    sizes="64px"
+                                    className="object-cover"
+                                    placeholder="blur"
+                                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-dark-text-primary">Imagen Principal</p>
+                                  <p className="text-xs text-dark-text-secondary truncate max-w-xs">{form.image}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(form.image, '_blank')}
+                                  className="min-h-[32px]"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Ver
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="images" className="text-dark-text-primary">Imágenes Adicionales</Label>
+                          <ImageManager
+                            mode="reorder"
+                            images={form.images}
+                            onImagesChange={handleImagesReorder}
+                            maxImages={10}
                           />
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">Imagen Principal</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-xs">{form.image}</p>
+                      </div>
+
+                      {/* Sección Dimensiones y Envío */}
+                      <div className="space-y-6">
+                        <div className="border-b border-dark-lighter pb-2">
+                          <h3 className="text-lg font-medium flex items-center gap-2 text-dark-text-primary">
+                            <Truck className="h-5 w-5" />
+                            Dimensiones y Configuración de Envío
+                          </h3>
+                          <p className="text-sm text-dark-text-secondary mt-1">
+                            Datos necesarios para el cálculo de envíos y logística
+                          </p>
                         </div>
+                        
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div>
+                              <Label htmlFor="height" className="text-dark-text-primary">Alto (cm)</Label>
+                              <Input
+                                id="height"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={form.height}
+                                onChange={(e) => handleChange('height', e.target.value)}
+                                placeholder="0.0"
+                                style={{ touchAction: 'manipulation' }}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="width" className="text-dark-text-primary">Ancho (cm)</Label>
+                              <Input
+                                id="width"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={form.width}
+                                onChange={(e) => handleChange('width', e.target.value)}
+                                placeholder="0.0"
+                                style={{ touchAction: 'manipulation' }}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="length" className="text-dark-text-primary">Largo (cm)</Label>
+                              <Input
+                                id="length"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={form.length}
+                                onChange={(e) => handleChange('length', e.target.value)}
+                                placeholder="0.0"
+                                style={{ touchAction: 'manipulation' }}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="weight" className="text-dark-text-primary">Peso (kg)</Label>
+                              <Input
+                                id="weight"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={form.weight}
+                                onChange={(e) => handleChange('weight', e.target.value)}
+                                placeholder="0.00"
+                                style={{ touchAction: 'manipulation' }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Guías ME2 */}
+                          <div className="bg-dark-lightest rounded-lg p-4">
+                            <ME2Guidelines 
+                              dimensions={{
+                                height: parseFloat(form.height) || undefined,
+                                width: parseFloat(form.width) || undefined,
+                                length: parseFloat(form.length) || undefined,
+                                weight: parseFloat(form.weight) || undefined,
+                              }}
+                              showWarnings={true}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sección Configuración Mercado Libre */}
+                      <div className="space-y-6">
+                        <div className="border-b border-dark-lighter pb-2">
+                          <h3 className="text-lg font-medium flex items-center gap-2 text-dark-text-primary">
+                            <Tag className="h-5 w-5" />
+                            Configuración Mercado Libre
+                          </h3>
+                          <p className="text-sm text-dark-text-secondary mt-1">
+                            Opciones específicas para la integración con Mercado Libre
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
+                          <div>
+                            <Label htmlFor="mlItemId" className="text-dark-text-primary">ML Item ID (opcional)</Label>
+                            <Input
+                              id="mlItemId"
+                              value={form.mlItemId}
+                              onChange={(e) => handleChange('mlItemId', e.target.value)}
+                              placeholder="MLA123456789"
+                              style={{ touchAction: 'manipulation' }}
+                            />
+                            <p className="mt-1 text-xs text-dark-text-secondary">
+                              Se completa automáticamente al sincronizar con Mercado Libre, pero puedes ajustarlo si ya existe una publicación.
+                            </p>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="shippingMode" className="text-dark-text-primary">Modo de envío ML</Label>
+                            <select
+                              id="shippingMode"
+                              value={form.shippingMode}
+                              onChange={(e) => handleChange('shippingMode', e.target.value)}
+                              className="mt-1 block w-full rounded-md border border-dark-lighter bg-dark-lighter px-3 py-2 text-sm text-dark-text-primary"
+                            >
+                              <option value="me2">Mercado Envíos (ME2)</option>
+                              <option value="custom">Envío personalizado / local</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sección Opciones Adicionales */}
+                      <div className="space-y-6">
+                        <div className="border-b border-dark-lighter pb-2">
+                          <h3 className="text-lg font-medium text-dark-text-primary">Opciones Adicionales</h3>
+                          <p className="text-sm text-dark-text-secondary mt-1">
+                            Configuraciones extras para el producto
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="flex items-center space-x-3 p-4 rounded-lg border bg-dark-lightest border-dark-lighter">
+                            <input
+                              type="checkbox"
+                              id="destacado"
+                              checked={form.destacado}
+                              onChange={(e) => handleChange('destacado', e.target.checked)}
+                              className="h-4 w-4 rounded border-dark-lighter text-blue-500 focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                              <Label htmlFor="destacado" className="text-sm font-medium cursor-pointer text-dark-text-primary">
+                                Producto destacado
+                              </Label>
+                              <p className="text-xs text-dark-text-secondary mt-1">
+                                Los productos destacados aparecen primero en la tienda
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-dark-lighter bg-dark-lighter sticky bottom-0">
+                        <Link href="/admin/products">
+                          <Button type="button" variant="outline" className="w-full sm:w-auto">
+                            Cancelar
+                          </Button>
+                        </Link>
+                        <Button 
+                          type="submit" 
+                          disabled={loading} 
+                          className="w-full sm:w-auto"
+                        >
+                          {loading ? 'Guardando...' : 'Guardar Cambios'}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="attributes" className="animate-in fade-in slide-in-from-right-2 duration-300">
+                <Card className="transition-all duration-300 hover:shadow-lg bg-dark-lighter border-dark-lighter">
+                  <CardHeader>
+                    <CardTitle className="text-dark-text-primary">Atributos del Producto</CardTitle>
+                    <p className="text-sm text-dark-text-secondary">
+                      Define atributos adicionales como talla, color, material, etc. Estos atributos pueden ser usados
+                      para mapear variaciones en Mercado Libre.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <AttributeBuilder
+                        attributes={attributes}
+                        onChange={setAttributes}
+                        recommendedAttributes={recommendedAttributes}
+                      />
+
+                      <div className="flex justify-end">
                         <Button
                           type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(form.image, '_blank')}
-                          className="min-h-[32px]"
+                          onClick={handleUpdateAttributes}
+                          disabled={attributesSaving || fetchLoading}
+                          className="min-h-[40px]"
                         >
-                          <Eye className="h-3 w-3 mr-1" />
-                          Ver
+                          <Save className="mr-2 h-4 w-4" />
+                          {attributesSaving ? 'Guardando atributos...' : 'Actualizar Atributos'}
                         </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="variants" className="animate-in fade-in slide-in-from-right-2 duration-300">
+                <Card className="transition-all duration-300 hover:shadow-lg bg-dark-lighter border-dark-lighter">
+                  <CardHeader>
+                    <CardTitle className="text-dark-text-primary">Variantes del Producto</CardTitle>
+                    <p className="text-sm text-dark-text-secondary">
+                      Gestiona las diferentes combinaciones de atributos y sus configuraciones
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <ProductVariantsNew
+                      productId={parseInt(id)}
+                      variants={variants}
+                      onChange={setVariants}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+
+            {/* Preview Section - Comentado temporalmente */}
+            {/* {showPreview && (
+              <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 transition-all duration-300 hover:shadow-lg bg-dark-lighter border-dark-lighter">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-dark-text-primary">
+                    <Eye className="h-5 w-5" />
+                    Vista Previa del Producto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-dark-text-primary">{form.name || 'Nombre del producto'}</h3>
+                      <p className="text-dark-text-secondary">{form.description || 'Descripción del producto'}</p>
+                      <p className="text-2xl font-bold text-emerald-400">
+                        ${form.price ? parseFloat(form.price).toFixed(2) : '0.00'}
+                      </p>
+                    </div>
+
+                    {attributes.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2 text-dark-text-primary">Caracteristicas:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {attributes.map((attr, index) => (
+                            <div key={index} className="text-sm">
+                              <span className="font-medium text-dark-text-primary">{attr.name}:</span>
+                              <span className="ml-1 px-2 py-1 bg-blue-950/30 text-blue-300 rounded">
+                                {attr.values.join(', ')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  <div className="md:col-span-2">
-                    <Label htmlFor="images">Imágenes Adicionales</Label>
-                    <ImageManager
-                      mode="reorder"
-                      images={form.images}
-                      onImagesChange={handleImagesReorder}
-                      maxImages={10}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="stock">Stock</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      min="0"
-                      value={form.stock}
-                      onChange={(e) => handleChange('stock', e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="discount">Descuento (%)</Label>
-                    <Input
-                      id="discount"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={form.discount}
-                      onChange={(e) => handleChange('discount', e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="height">Alto (cm)</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.height}
-                      onChange={(e) => handleChange('height', e.target.value)}
-                      placeholder="0.0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="width">Ancho (cm)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.width}
-                      onChange={(e) => handleChange('width', e.target.value)}
-                      placeholder="0.0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="length">Largo (cm)</Label>
-                    <Input
-                      id="length"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.length}
-                      onChange={(e) => handleChange('length', e.target.value)}
-                      placeholder="0.0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weight">Peso (kg)</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.weight}
-                      onChange={(e) => handleChange('weight', e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Label htmlFor="mlItemId">ML Item ID (opcional)</Label>
-                    <Input
-                      id="mlItemId"
-                      value={form.mlItemId}
-                      onChange={(e) => handleChange('mlItemId', e.target.value)}
-                      placeholder="MLA123456789"
-                    />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Se completa automáticamente al sincronizar con Mercado Libre, pero puedes ajustarlo si ya existe una publicación.
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="shippingMode">Modo de envío ML</Label>
-                    <select
-                      id="shippingMode"
-                      value={form.shippingMode}
-                      onChange={(e) => handleChange('shippingMode', e.target.value)}
-                      className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
-                    >
-                      <option value="me2">Mercado Envíos (ME2)</option>
-                      <option value="custom">Envío personalizado / local</option>
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2 flex items-center">
-                    <input
-                      type="checkbox"
-                      id="me2Compatible"
-                      checked={form.me2Compatible}
-                      onChange={(e) => handleChange('me2Compatible', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <Label htmlFor="me2Compatible" className="ml-2 block text-sm font-medium">
-                      Producto compatible con Mercado Envíos (ME2)
-                    </Label>
-                  </div>
-
-                  <div className="md:col-span-2 flex items-center">
-                    <input
-                      type="checkbox"
-                      id="destacado"
-                      checked={form.destacado}
-                      onChange={(e) => handleChange('destacado', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <Label htmlFor="destacado" className="ml-2 block text-sm font-medium">
-                      Producto destacado
-                    </Label>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
-                  <Link href="/admin/products">
-                    <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[44px]">
-                      Cancelar
-                    </Button>
-                  </Link>
-                  <Button type="submit" disabled={loading} className="w-full sm:w-auto min-h-[44px]">
-                    <Save className="mr-2 h-4 w-4" />
-                    {loading ? 'Actualizando...' : 'Actualizar Producto'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="attributes" className="animate-in fade-in slide-in-from-right-2 duration-300">
-          <Card className="transition-all duration-300 hover:shadow-lg">
-            <CardHeader>
-              <CardTitle>Atributos del Producto</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Define atributos adicionales como talla, color, material, etc. Estos atributos pueden ser usados
-                para mapear variaciones en Mercado Libre.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <AttributeBuilder
-                  attributes={attributes}
-                  onChange={setAttributes}
-                  recommendedAttributes={recommendedAttributes}
-                />
-
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    onClick={handleUpdateAttributes}
-                    disabled={attributesSaving || fetchLoading}
-                    className="min-h-[40px]"
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {attributesSaving ? 'Guardando atributos...' : 'Actualizar Atributos'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-          <TabsContent value="variants" className="animate-in fade-in slide-in-from-right-2 duration-300">
-            <Card className="transition-all duration-300 hover:shadow-lg">
-              <CardHeader>
-                <CardTitle>Variantes del Producto</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Gestiona las diferentes combinaciones de atributos y sus configuraciones
-                </p>
-              </CardHeader>
-              <CardContent>
-                <ProductVariantsNew
-                  productId={parseInt(id)}
-                  variants={variants}
-                  onChange={setVariants}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-
-        </Tabs>
-
-        {/* Preview Section */}
-        {showPreview && (
-          <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 transition-all duration-300 hover:shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="h-5 w-5" />
-                Vista Previa del Producto
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold">{form.name || 'Nombre del producto'}</h3>
-                  <p className="text-muted-foreground">{form.description || 'Descripción del producto'}</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    ${form.price ? parseFloat(form.price).toFixed(2) : '0.00'}
-                  </p>
-                </div>
-
-                {attributes.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2">Caracteristicas:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {attributes.map((attr, index) => (
-                        <div key={index} className="text-sm">
-                          <span className="font-medium">{attr.name}:</span>
-                          <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                            {attr.values.join(', ')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            )} */}
+          </div>
+        </div>
       </div>
-    )
-  }
+    </div>
+  )
+}

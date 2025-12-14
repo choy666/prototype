@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { MercadoLibreStatus } from '@/components/admin/MercadoLibreStatus'
+import { MercadoPagoStatus } from '@/components/admin/MercadoPagoStatus'
 import {
   Users as UsersIcon,
   Package,
@@ -327,6 +328,7 @@ async function DashboardContent() {
           trend={stats.revenueTrend}
         />
         <MercadoLibreStatus />
+        <MercadoPagoStatus />
       </div>
 
       {/* Enlaces Rápidos */}

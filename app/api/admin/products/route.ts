@@ -31,6 +31,9 @@ const createProductSchema = z.object({
   height: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
   width: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
   length: z.string().regex(/^\d+(\.\d{1})?$/).optional(),
+  // Campos ME2
+  me2Compatible: z.boolean().default(false),
+  shippingMode: z.string().default('me2'),
   // Atributos dinámicos del producto
   attributes: z
     .array(
@@ -127,6 +130,8 @@ export async function POST(request: NextRequest) {
       weight: validatedData.weight ? validatedData.weight : null,
       images: validatedData.images || [],
       attributes: validatedData.attributes || undefined,
+      me2Compatible: validatedData.me2Compatible,
+      shippingMode: validatedData.shippingMode,
     })
 
     return NextResponse.json(product, { status: 201 })

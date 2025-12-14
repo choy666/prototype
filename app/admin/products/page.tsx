@@ -18,11 +18,13 @@ import {
   Edit,
   Search,
   Package,
-  Settings,
   X,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  CheckCircle,
+  AlertCircle,
+  Clock
 } from 'lucide-react'
 import { ProductSyncButton } from '@/components/admin/ProductSyncButton';
 
@@ -425,7 +427,50 @@ export default function AdminProductsPage() {
         </CardContent>
       </Card>
 
-
+      {/* Banner de Resumen ME2 */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100">Estado General ME2</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  {products.filter(p => p.mlSyncStatus === 'synced' && p.me2CanUse).length} productos ME2 ready • 
+                  {products.filter(p => p.mlSyncStatus === 'pending' || p.mlSyncStatus === 'syncing').length} pendientes • 
+                  {products.filter(p => p.mlSyncStatus === 'error').length} con error
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters(prev => ({ ...prev, mlSyncStatus: 'synced' }))}
+                className="text-xs"
+              >
+                ME2 Ready
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters(prev => ({ ...prev, mlSyncStatus: 'error' }))}
+                className="text-xs"
+              >
+                Con Error
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters(prev => ({ ...prev, mlSyncStatus: '' }))}
+                className="text-xs"
+              >
+                Todos
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -453,79 +498,125 @@ export default function AdminProductsPage() {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            <div className="flex flex-col gap-4">
               {products.map((product) => (
-                <div key={product.id} className="p-4 grid grid-cols-1 md:grid-cols-3 items-center gap-4">
-                  {/* Product Info */}
-                  <div className="md:col-span-2 flex items-center space-x-4">
-                    {product.image ? (
-                      <Image
-                        src={product.image}
-                        alt={`Producto: ${product.name}`}
-                        width={64}
-                        height={64}
-                        sizes="(max-width: 768px) 64px, 64px"
-                        placeholder="blur"
-                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
-                        className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="h-16 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                        <Package className="h-8 w-8 text-gray-400" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold truncate text-base">{product.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {product.category}
-                      </p>
-                      {product.mlSyncStatus === 'error' && product.syncError && (
-                        <p className="mt-1 text-xs text-red-600 dark:text-red-400 truncate" title={product.syncError}>
-                          Motivo ME2: {product.syncError}
-                        </p>
+                <div key={product.id} className="p-4 border rounded-lg hover:bg-muted/30 transition-colors">
+                  {/* Header del Producto */}
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    {/* Columna 1: Info del Producto */}
+                    <div className="flex items-start gap-3 flex-1">
+                      {product.image ? (
+                        <Image
+                          src={product.image}
+                          alt={`Producto: ${product.name}`}
+                          width={64}
+                          height={64}
+                          sizes="(max-width: 768px) 64px, 64px"
+                          placeholder="blur"
+                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+                          className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                          <Package className="h-8 w-8 text-gray-400" />
+                        </div>
                       )}
-                      <div className="flex items-center text-sm mt-1">
-                        Stock: {product.stock}
-                        {product.stock === 0 ? (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                            Sin stock
-                          </span>
-                        ) : product.stock <= 10 && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-                            Stock bajo
-                          </span>
-                        )}
-                        {product.isActive ? (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                            Activo
-                          </span>
-                        ) : (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
-                            Inactivo
-                          </span>
-                        )}
-                        {product.mlSyncStatus === 'synced' && product.mlItemId && product.me2CanUse && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
-                            ME2 ready
-                          </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-base truncate">{product.name}</h3>
+                        <p className="text-sm text-muted-foreground">{product.category}</p>
+                        
+                        {/* Badges de Estado */}
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {/* Estado ME2 */}
+                          {product.mlSyncStatus === 'synced' && product.mlItemId && product.me2CanUse ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              <CheckCircle className="h-3 w-3" />
+                              ME2 Ready
+                            </div>
+                          ) : product.mlSyncStatus === 'syncing' ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                              <Package className="h-3 w-3 animate-pulse" />
+                              Sincronizando
+                            </div>
+                          ) : product.mlSyncStatus === 'error' ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                              <AlertCircle className="h-3 w-3" />
+                              Error ME2
+                            </div>
+                          ) : product.mlSyncStatus === 'pending' ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                              <Clock className="h-3 w-3" />
+                              Pendiente
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300">
+                              <X className="h-3 w-3" />
+                              No sincronizado
+                            </div>
+                          )}
+                          
+                          {/* Estado Stock */}
+                          {product.stock === 0 ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                              Sin stock
+                            </span>
+                          ) : product.stock <= 10 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                              Stock: {product.stock}
+                            </span>
+                          )}
+                          
+                          {/* Estado Activo */}
+                          {product.isActive ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                              Activo
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                              Inactivo
+                            </span>
+                          )}
+                          
+                          {/* Destacado */}
+                          {product.destacado && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                              ⭐ Destacado
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Error de ME2 */}
+                        {product.mlSyncStatus === 'error' && product.syncError && (
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-1" title={product.syncError}>
+                            {product.syncError.length > 60 ? `${product.syncError.substring(0, 60)}...` : product.syncError}
+                          </p>
                         )}
                       </div>
                     </div>
-                  </div>
-                  {/* Price and Actions */}
-                  <div className="flex flex-row md:flex-col items-center md:items-end justify-between">
-                    <div className="text-left md:text-right mb-4 md:mb-2">
-                      <p className="font-bold text-lg">
-                        ${parseFloat(product.price).toFixed(2)}
-                      </p>
-                      {product.discount > 0 && (
-                        <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded-full">
-                          {product.discount}% OFF
-                        </span>
+                    
+                    {/* Columna 2: Métricas */}
+                    <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-start gap-4 lg:min-w-[150px]">
+                      <div className="text-center sm:text-left lg:text-center">
+                        <p className="font-bold text-lg">${parseFloat(product.price).toFixed(2)}</p>
+                        {product.discount > 0 && (
+                          <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded-full">
+                            {product.discount}% OFF
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* ID de ML */}
+                      {product.mlItemId && (
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">ML Item ID</p>
+                          <p className="text-xs font-mono">{product.mlItemId}</p>
+                        </div>
                       )}
                     </div>
-                    <div className="flex flex-col items-center gap-2">
-                      {/* Mercado Libre Sync Button */}
+                    
+                    {/* Columna 3: Acciones */}
+                    <div className="flex flex-row lg:flex-col items-center gap-2 lg:min-w-[200px]">
+                      {/* Botón de Sincronización ML */}
                       <ProductSyncButton
                         productId={product.id}
                         mlItemId={product.mlItemId}
@@ -533,35 +624,37 @@ export default function AdminProductsPage() {
                         onSyncComplete={() => fetchProducts(search, page)}
                       />
                       
-                      {/* Action Buttons */}
-                      <div className="flex items-center space-x-2">
+                      {/* Acciones Rápidas */}
+                      <div className="flex items-center gap-1">
                         <Link href={`/admin/products/${product.id}/edit`}>
-                          <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Editar ${product.name}`}>
-                            <Edit className="h-4 w-4" />
+                          <Button variant="outline" size="sm" className="h-8 px-3" aria-label={`Editar ${product.name}`}>
+                            <Edit className="h-3 w-3" />
+                            <span className="hidden sm:inline ml-1">Editar</span>
                           </Button>
                         </Link>
                         <Link href={`/admin/products/${product.id}/stock`}>
-                          <Button variant="outline" size="icon" className="h-9 w-9" aria-label={`Gestionar stock de ${product.name}`}>
-                            <Settings className="h-4 w-4" />
+                          <Button variant="outline" size="sm" className="h-8 px-3" aria-label={`Gestionar stock de ${product.name}`}>
+                            <Package className="h-3 w-3" />
+                            <span className="hidden sm:inline ml-1">Stock</span>
                           </Button>
                         </Link>
                         <Button
                           variant={product.isActive ? "outline" : "secondary"}
-                          size="icon"
+                          size="sm"
                           onClick={() => handleToggleActive(product.id, !product.isActive)}
-                          className="h-9 w-9"
+                          className="h-8 px-3"
                           aria-label={product.isActive ? `Desactivar ${product.name}` : `Reactivar ${product.name}`}
                         >
-                          {product.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {product.isActive ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                         </Button>
                         <Button
                           variant="destructive"
-                          size="icon"
+                          size="sm"
                           onClick={() => handleDeleteClick(product.id)}
-                          className="h-9 w-9"
+                          className="h-8 px-3"
                           aria-label={`Eliminar ${product.name}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>

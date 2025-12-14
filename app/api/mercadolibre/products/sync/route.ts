@@ -5,9 +5,11 @@ import { eq, and, sql } from 'drizzle-orm';
 import { makeAuthenticatedRequest, isConnected } from '@/lib/auth/mercadolibre';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { logger } from '@/lib/utils/logger';
+import { getOptimalListingType, getAvailableListingTypes } from '@/lib/actions/mercadolibre-listing-types';
 import { auth } from '@/lib/actions/auth';
 import { sanitizeTitle, validatePrice, validateImageAccessibility } from '@/lib/validations/mercadolibre';
 import { validateMLCategory, createMLCategoryErrorResponse } from '@/lib/validations/ml-category';
+import { validateMLRequiredAttributes, prepareMLAttributes } from '@/lib/validations/ml-attributes';
 import type { ProductVariant, ProductAttribute } from '@/lib/schema';
 import { resolveStockPolicy, calculateAvailableQuantityForML } from '@/lib/domain/ml-stock';
 
@@ -155,7 +157,7 @@ async function validateMe2ReadyForItem(
       return {
         isMe2Ready: false,
         reason:
-          'La publicacin se cre en Mercado Libre pero no se pudo verificar la configuracin de envos ME2. Revisa el tem en Mercado Libre.',
+          'La publicación se creó en Mercado Libre pero no se pudo verificar la configuración de envíos ME2. Por favor, revisa la publicación directamente en Mercado Libre y verifica que tenga habilitado Mercado Envíos 2.',
       };
     }
 
@@ -166,7 +168,7 @@ async function validateMe2ReadyForItem(
       return {
         isMe2Ready: false,
         reason:
-          'La publicacin en Mercado Libre no tiene configuracin de envo. Configura Mercado Envos 2 (ME2) en la publicacin.',
+          'La publicación en Mercado Libre no tiene configuración de envío. Para solucionar: 1) Ve a tu publicación en Mercado Libre, 2) Haz clic en "Editar", 3) Ve a la sección "Envío", 4) Activa "Mercado Envíos 2" y guarda los cambios.',
       };
     }
 
@@ -174,7 +176,7 @@ async function validateMe2ReadyForItem(
       return {
         isMe2Ready: false,
         reason:
-          'La publicacin en Mercado Libre no est configurada con Mercado Envos 2 (shipping.mode != "me2"). Ajusta el modo de envo en ML.',
+          'La publicación en Mercado Libre no está configurada con Mercado Envíos 2. Para solucionar: 1) Edita la publicación en Mercado Libre, 2) En la sección de envío, selecciona "Mercado Envíos 2" como modo de envío, 3) Configura las dimensiones del paquete, 4) Guarda los cambios.',
       };
     }
 
@@ -182,7 +184,7 @@ async function validateMe2ReadyForItem(
       return {
         isMe2Ready: false,
         reason:
-          'La publicacin en Mercado Libre no tiene dimensiones de envo configuradas. Debes informar peso, alto, ancho y largo para ME2.',
+          'La publicación en Mercado Libre no tiene las dimensiones de envío configuradas. Para solucionar: 1) Edita tu publicación en Mercado Libre, 2) Ve a la sección "Envío", 3) Ingresa el peso (en gramos), alto, ancho y largo del paquete en centímetros, 4) Guarda los cambios. Sin estas dimensiones, ME2 no funcionará.',
       };
     }
 
@@ -258,6 +260,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ 
           error: 'Usuario no conectado a Mercado Libre' 
         }, { status: 400 });
+      }
+
+      // Verificar si el usuario tiene ME2 habilitado
+      const shippingPrefs = await makeAuthenticatedRequest(
+        parseInt(session.user.id),
+        `/users/${session.user.id}/shipping_preferences`,
+        { method: 'GET' }
+      );
+
+      if (shippingPrefs.ok) {
+        const prefs = await shippingPrefs.json();
+        if (!prefs.modes?.includes('me2')) {
+          if (timeoutId) clearTimeout(timeoutId);
+          return NextResponse.json({
+            error: 'El usuario no tiene Mercado Envíos 2 habilitado en su cuenta',
+            details: 'Para vender en esta categoría, debes activar ME2 en tu configuración de vendedor de Mercado Libre',
+            solution: '1) Ingresa a Mercado Libre > Mi cuenta > Vender > Configuración > Envíos > Activa Mercado Envíos 2. Una vez activado, intenta sincronizar nuevamente.'
+          }, { status: 400 });
+        }
       }
     } catch (connectionError) {
       console.error('ERROR CRUDO CONEXIÓN ML:', connectionError);
@@ -425,8 +446,71 @@ export async function POST(req: Request) {
 
     // Preparar datos para Mercado Libre
     
+    // Obtener el listing_type óptimo con fallback automático
+    const optimalListingType = await getOptimalListingType(
+      parseInt(session.user.id),
+      localProduct.mlCategoryId || 'MLA3530',
+      localProduct.mlListingTypeId || undefined
+    );
+    
+    logger.info('Listing type seleccionado para sincronización', {
+      productId: productIdNum,
+      categoryId: localProduct.mlCategoryId || 'MLA3530',
+      preferredType: localProduct.mlListingTypeId,
+      selectedType: optimalListingType,
+    });
+    
     // Cargar atributos de catálogo locales (product_attributes) para enriquecer el mapeo a ML
     const catalogAttributes = await db.select().from(productAttributes);
+    
+    // Variables para atributos adicionales (GTIN_TYPE, etc)
+    const additionalMLAttributes: Array<{ id: string; value_name: string }> = [];
+
+    // Validar atributos requeridos por la categoría antes de sincronizar
+    if (localProduct.mlCategoryId && localProduct.attributes) {
+      logger.info('[ML Sync] Validando atributos requeridos por categoría', {
+        productId: productIdNum,
+        categoryId: localProduct.mlCategoryId
+      });
+
+      const attributeValidation = await validateMLRequiredAttributes(
+        localProduct.mlCategoryId,
+        localProduct.attributes as Record<string, unknown>
+      );
+
+      if (!attributeValidation.isValid) {
+        if (timeoutId) clearTimeout(timeoutId);
+        logger.error('Atributos requeridos faltantes', {
+          productId: productIdNum,
+          missingAttributes: attributeValidation.missingAttributes,
+          conditionalAttributes: attributeValidation.conditionalAttributes
+        });
+
+        return NextResponse.json({
+          error: 'El producto carece de atributos requeridos para esta categoría de Mercado Libre',
+          missingAttributes: attributeValidation.missingAttributes,
+          conditionalAttributes: attributeValidation.conditionalAttributes,
+          warnings: attributeValidation.warnings,
+          solution: 'Agregue los atributos faltantes en la edición del producto. Para GTIN, si el producto no tiene código de barras, use GTIN_TYPE=NO_GTIN.'
+        }, { status: 400 });
+      }
+
+      if (attributeValidation.warnings.length > 0) {
+        logger.warn('Advertencias de atributos', {
+          productId: productIdNum,
+          warnings: attributeValidation.warnings
+        });
+      }
+
+      // Preparar atributos con defaults necesarios (ej: GTIN_TYPE=NO_GTIN)
+      const preparedMLAttributes = prepareMLAttributes(
+        localProduct.attributes as Record<string, unknown>,
+        attributeValidation
+      );
+      
+      // Agregar atributos preparados al array
+      additionalMLAttributes.push(...preparedMLAttributes);
+    }
 
     const mlProductData: {
       title: string;
@@ -473,15 +557,18 @@ export async function POST(req: Request) {
       currency_id: localProduct.mlCurrencyId || 'ARS',
       buying_mode: localProduct.mlBuyingMode || 'buy_it_now',
       condition: localProduct.mlCondition || 'new',
-      listing_type_id: localProduct.mlListingTypeId || 'free',
+      listing_type_id: optimalListingType,
       description: localProduct.description || '',
       pictures: localProduct.image ? [{
         source: localProduct.image,
       }] : [],
-      attributes: mapProductAttributesToMercadoLibreAttributes(
-        localProduct.attributes as unknown,
-        catalogAttributes,
-      ),
+      attributes: [
+        ...mapProductAttributesToMercadoLibreAttributes(
+          localProduct.attributes as unknown,
+          catalogAttributes,
+        ),
+        ...(additionalMLAttributes || [])
+      ],
     };
 
     const categoryId = mlProductData.category_id;
@@ -515,9 +602,10 @@ export async function POST(req: Request) {
           {
             error: 'Faltan atributos obligatorios para Mercado Libre',
             details: [
-              !hasBrand ? 'Debes indicar la marca (atributo BRAND) para esta categoría.' : null,
-              !hasModel ? 'Debes indicar el modelo (atributo MODEL) para esta categoría.' : null,
+              !hasBrand ? '• Debes indicar la MARCA del producto. Para agregar: edita el producto → sección "Atributos" → agregar "Marca" con el valor correspondiente.' : null,
+              !hasModel ? '• Debes indicar el MODELO del producto. Para agregar: edita el producto → sección "Atributos" → agregar "Modelo" con el valor correspondiente.' : null,
             ].filter(Boolean),
+            solution: 'Estos atributos son obligatorios para esta categoría de Mercado Libre. Una vez agregados, intenta sincronizar nuevamente.'
           },
           { status: 400 }
         );
@@ -545,8 +633,9 @@ export async function POST(req: Request) {
         categoryId: localProduct.mlCategoryId
       });
       return NextResponse.json({
-        error: 'Validación de precio fallida',
-        details: priceValidation.errors
+        error: 'El precio del producto no cumple los requisitos de Mercado Libre',
+        details: priceValidation.errors,
+        solution: 'Verifica el precio mínimo requerido para esta categoría en Mercado Libre y ajusta el precio del producto accordingly.'
       }, { status: 400 });
     }
 
@@ -565,8 +654,9 @@ export async function POST(req: Request) {
           errors: imageValidation.errors
         });
         return NextResponse.json({
-          error: 'Validación de imágenes fallida',
-          details: imageValidation.errors
+          error: 'Hay problemas con las imágenes del producto',
+          details: imageValidation.errors,
+          solution: 'Asegúrate de que las imágenes estén accesibles públicamente y cumplan los requisitos de Mercado Libre (formato JPG/PNG, tamaño adecuado, etc.)'
         }, { status: 400 });
       }
       imageWarnings = imageValidation.warnings;
@@ -616,19 +706,23 @@ export async function POST(req: Request) {
     const length = Number(localProduct.length) || 10;
     const weight = Number(localProduct.weight) || 0.5;
 
-    mlProductData.shipping = {
-      mode: 'me2',
-      local_pick_up: false,
-      free_shipping: false,
-      logistic_type: 'drop_off',
-      store_pick_up: false,
-      dimensions: `${height}x${width}x${length},${weight}`,
-      tags: ['local_pick_up_not_allowed'],
-      methods: [],
-    };
-
     // Determinar si es CREATE o UPDATE
     const isUpdate = !!localProduct.mlItemId;
+
+    // Para productos nuevos, incluir shipping en el cuerpo principal
+    if (!isUpdate) {
+      mlProductData.shipping = {
+        mode: 'me2',
+        local_pick_up: false,
+        free_shipping: false,
+        logistic_type: 'drop_off',
+        store_pick_up: false,
+        dimensions: `${height}x${width}x${length},${weight}`,
+        tags: ['local_pick_up_not_allowed'],
+        methods: [],
+      };
+    }
+
     const mlEndpoint = isUpdate ? `/items/${localProduct.mlItemId}` : '/items';
     const mlMethod = isUpdate ? 'PUT' : 'POST';
     
@@ -743,7 +837,7 @@ export async function POST(req: Request) {
         if (categoryError) {
           errorMessage =
             'La categoría de Mercado Libre seleccionada no permite publicar directamente. ' +
-            'Debes seleccionar una categoría más específica (categoría hoja) en el campo "Categoría Mercado Libre" del producto.';
+            'Para solucionar: 1) Edita el producto, 2) Busca y selecciona una categoría más específica (categoría hoja), 3) Asegúrate que no sea una categoría general, 4) Guarda y sincroniza nuevamente.';
 
           logger.error('Error de categoría inválida de Mercado Libre', {
             categoryId: mlProductData.category_id,
@@ -759,8 +853,8 @@ export async function POST(req: Request) {
 
         if (missingAttrsError) {
           errorMessage =
-            'Faltan atributos obligatorios para Mercado Libre (por ejemplo, Marca y Modelo). ' +
-            'Completa los atributos requeridos en la ficha del producto antes de sincronizar.';
+            'Faltan atributos obligatorios para esta categoría en Mercado Libre. ' +
+            'Para solucionar: 1) Edita el producto, 2) Ve a la sección "Atributos", 3) Agrega todos los atributos requeridos (ej: Marca, Modelo, Color, etc.), 4) Guarda los cambios y sincroniza nuevamente.';
           logger.error('Error de atributos requeridos de Mercado Libre', {
             categoryId: mlProductData.category_id,
             message: missingAttrsError.message,
@@ -779,28 +873,93 @@ export async function POST(req: Request) {
             ? (localProduct.variants as ProductVariant[])[0]?.price || localProduct.price
             : localProduct.price;
           
-          errorMessage = `Precio mínimo requerido: La categoría ${localProduct.mlCategoryId || 'MLA3530'} requiere un precio mínimo de $${minimumPrice || '1000'}. Precio actual: $${currentPrice}.`;
+          errorMessage = `Precio mínimo requerido: La categoría ${localProduct.mlCategoryId || 'MLA3530'} requiere un precio mínimo de $${minimumPrice || '1000'}. Precio actual: $${currentPrice}. Para solucionar: aumenta el precio del producto a al menos $${minimumPrice || '1000'} y sincroniza nuevamente.`;
           logger.error('Error de precio mínimo de Mercado Libre', { 
             categoryId: localProduct.mlCategoryId,
-            minimumPrice: minimumPrice || '1000',
+            minimumPrice,
             currentPrice,
-            productId: productIdNum 
+            productId: productIdNum,
           });
         }
       }
       
-      logger.error('Error en respuesta de Mercado Libre', { 
-        status: response!.status, 
-        errorData, 
-        parsedError,
-        productId: productIdNum 
-      });
+      // Manejo específico para listing_type temporalmente no disponible
+      let shouldSkipError = false;
       
-      throw new MercadoLibreError(
-        MercadoLibreErrorCode.INVALID_REQUEST,
-        errorMessage,
-        { status: response!.status, error: errorData, parsedError }
-      );
+      if (parsedError?.error === 'listing_type.temporarily_unavailable' || 
+          parsedError?.message?.includes('Listing type is temporarily unavailable')) {
+        logger.warn('Listing type no disponible, intentando con fallback', {
+          currentListingType: mlProductData.listing_type_id,
+          productId: productIdNum,
+        });
+        
+        // Obtener listing types disponibles excluyendo el que falló
+        const availableTypes = await getAvailableListingTypes(
+          parseInt(session.user.id),
+          localProduct.mlCategoryId || 'MLA3530'
+        );
+        
+        // Filtrar el tipo que falló y buscar el siguiente mejor
+        const fallbackTypes = availableTypes.filter(t => t.id !== mlProductData.listing_type_id);
+        
+        if (fallbackTypes.length > 0) {
+          // Usar el primer tipo disponible como fallback
+          const fallbackListingType = fallbackTypes[0].id;
+          
+          logger.info('Reintentando sincronización con listing type de fallback', {
+            originalType: mlProductData.listing_type_id,
+            fallbackType: fallbackListingType,
+            productId: productIdNum,
+          });
+          
+          // Actualizar el listing type y reintentar
+          mlProductData.listing_type_id = fallbackListingType;
+          
+          // Reintentar la llamada a ML con el nuevo listing type
+          try {
+            response = await makeAuthenticatedRequest(
+              parseInt(session.user.id),
+              mlEndpoint,
+              {
+                method: mlMethod,
+                body: JSON.stringify(mlProductData),
+                signal: abortController?.signal,
+              }
+            );
+            
+            if (response.ok) {
+              logger.info('Sincronización exitosa con listing type de fallback', {
+                fallbackType: fallbackListingType,
+                productId: productIdNum,
+              });
+              // Marcar para omitir el error
+              shouldSkipError = true;
+            }
+          } catch (retryError) {
+            logger.error('Error al reintentar con listing type de fallback', {
+              error: retryError instanceof Error ? retryError.message : String(retryError),
+              productId: productIdNum,
+            });
+            // Continuar con el error original si el fallback también falla
+          }
+        }
+      }
+      
+      // Solo lanzar error si el reintento con fallback no fue exitoso
+      if (!shouldSkipError) {
+        logger.error('Error en respuesta de Mercado Libre', { 
+          status: response!.status, 
+          errorData, 
+          parsedError,
+          productId: productIdNum 
+        });
+        
+        throw new MercadoLibreError(
+          MercadoLibreErrorCode.INVALID_REQUEST,
+          errorMessage,
+          { status: response!.status, error: errorData, parsedError }
+        );
+      }
     }
 
     interface MercadoLibreItemResponse {
@@ -836,6 +995,74 @@ export async function POST(req: Request) {
         'La respuesta de Mercado Libre no contiene un ID válido',
         { mlItem },
       );
+    }
+
+    // Guardar el listing_type_id exitoso en el producto para futuras sincronizaciones
+    await db.update(products)
+      .set({ 
+        mlListingTypeId: mlProductData.listing_type_id,
+        updated_at: new Date()
+      })
+      .where(eq(products.id, productIdNum!));
+
+    logger.info('Listing type guardado exitosamente', {
+      productId: productIdNum,
+      listingTypeId: mlProductData.listing_type_id,
+    });
+
+    // Para productos existentes, actualizar el modo de envío por separado si es necesario
+    if (isUpdate) {
+      try {
+        // Preparar datos de envío para el endpoint específico
+        const shippingData = {
+          mode: 'me2',
+          local_pick_up: false,
+          free_shipping: false,
+          logistic_type: 'drop_off',
+          store_pick_up: false,
+          dimensions: `${height}x${width}x${length},${weight}`,
+          tags: ['local_pick_up_not_allowed'],
+          methods: [],
+        };
+
+        logger.info('Actualizando configuración de envío ME2 para producto existente', {
+          productId: productIdNum,
+          mlItemId,
+          shippingData
+        });
+
+        // Hacer llamada específica al endpoint de shipping
+        const shippingResponse = await makeAuthenticatedRequest(
+          parseInt(session.user.id),
+          `/items/${mlItemId}/shipping`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(shippingData),
+            signal: abortController?.signal,
+          }
+        );
+
+        if (!shippingResponse.ok) {
+          const shippingError = await shippingResponse.text();
+          logger.warn('No se pudo actualizar el modo de envío ME2 (continuando)', {
+            mlItemId,
+            error: shippingError,
+            status: shippingResponse.status
+          });
+          // Continuar aunque falle la actualización de shipping
+        } else {
+          logger.info('Configuración de envío ME2 actualizada exitosamente', {
+            mlItemId,
+            productId: productIdNum
+          });
+        }
+      } catch (shippingError) {
+        logger.warn('Error actualizando shipping (continuando)', {
+          mlItemId,
+          error: shippingError instanceof Error ? shippingError.message : String(shippingError)
+        });
+        // Continuar aunque falle la actualización de shipping
+      }
     }
 
     const me2Validation = await validateMe2ReadyForItem(parseInt(session.user.id), mlItemId);
