@@ -525,10 +525,52 @@ export async function syncProductToMercadoLibre(
       listing_type_id: product.mlListingTypeId || 'bronze',
       condition: product.mlCondition || 'new',
       description: product.description || '',
+      // Modo de envío ME2 (obligatorio según error)
+      shipping_mode: 'me2',
+      shipping: {
+        mode: 'me2',
+        local_pick_up: false,
+        free_shipping: false,
+        methods: [],
+        tags: ['me2_shipping'],
+        dimensions: undefined as string | undefined
+      },
       pictures: product.images ? 
         (Array.isArray(product.images) ? product.images.map(img => ({ source: img })) : [{ source: product.image }]) :
         [{ source: product.image }].filter(img => img.source),
     };
+
+    // Agregar dimensiones si existen los atributos ME2
+    if (product.weight && product.height && product.width && product.length) {
+      // Formato requerido por ML: "LxWxH,weight" - todos enteros
+      const length = Math.round(Number(product.length));
+      const width = Math.round(Number(product.width));
+      const height = Math.round(Number(product.height));
+      let weight = Number(product.weight);
+      
+      // Convertir a gramos si está en kg (asumir kg si es < 100)
+      if (weight < 100) {
+        weight = Math.round(weight * 1000);
+      } else {
+        weight = Math.round(weight);
+      }
+      
+      if (!isNaN(length) && !isNaN(width) && !isNaN(height) && !isNaN(weight)) {
+        // ML espera: largo×ancho×alto,peso (todos enteros)
+        mlProductData.shipping.dimensions = `${length}x${width}x${height},${weight}`;
+        
+        logger.info('Products: Dimensiones ME2 agregadas', {
+          productId,
+          dimensions: mlProductData.shipping.dimensions,
+          original: {
+            length: product.length,
+            width: product.width,
+            height: product.height,
+            weight: product.weight
+          }
+        });
+      }
+    }
 
     // Enviar a Mercado Libre
     const response = await makeAuthenticatedRequest(

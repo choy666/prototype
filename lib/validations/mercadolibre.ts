@@ -610,6 +610,28 @@ export function validateProductForMercadoLibre(product: Product): {
     errors.push(...descriptionValidation.errors);
   }
 
+  // Validaciones ME2 (obligatorias según error de ML)
+  if (!product.weight || Number(product.weight) <= 0) {
+    errors.push('El peso es obligatorio para Mercado Envíos 2 (ME2)');
+  }
+  
+  if (!product.height || Number(product.height) <= 0) {
+    errors.push('La altura es obligatoria para Mercado Envíos 2 (ME2)');
+  }
+  
+  if (!product.width || Number(product.width) <= 0) {
+    errors.push('El ancho es obligatorio para Mercado Envíos 2 (ME2)');
+  }
+  
+  if (!product.length || Number(product.length) <= 0) {
+    errors.push('El largo es obligatorio para Mercado Envíos 2 (ME2)');
+  }
+
+  // Validar que el modo de envío sea compatible con ME2
+  if (product.shippingMode && product.shippingMode !== 'me2') {
+    warnings.push(`El modo de envío configurado es "${product.shippingMode}" pero ME2 es obligatorio`);
+  }
+
   // Validaciones adicionales (warnings)
   if (product.stock && product.stock > 100) {
     warnings.push('Stock mayor a 100 unidades puede requerir verificación adicional');
