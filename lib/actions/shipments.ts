@@ -12,6 +12,7 @@ import {
 } from '@/types/mercadolibre';
 import { MercadoLibreAuth } from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
+import { getApiUrl } from '@/lib/config/integrations';
 
 /**
  * Calcula el costo de envío usando la API de Mercado Libre
@@ -74,12 +75,14 @@ export async function calculateMLShippingCost(
       quantity: firstItem.quantity,
       dimensions,
       seller_address: sellerAddressId,
-      local_pickup: false,
+      local_pickup: false, // Configuración por defecto para envíos a domicilio
       logistic_type: logisticType
     };
 
     const response = await fetch(
-      `https://api.mercadolibre.com/shipping_options/${firstItem.id}`,
+      getApiUrl('mercadolibre', '/shipping_options/{item_id}', {
+        item_id: firstItem.id
+      }),
       {
         method: 'POST',
         headers: {
@@ -174,7 +177,7 @@ export async function createMLShipment(orderId: string): Promise<MLShipment> {
 
     // Obtener direcciones del vendedor en ML
     const sellerResponse = await fetch(
-      'https://api.mercadolibre.com/users/me/addresses',
+      getApiUrl('mercadolibre', '/users/me/addresses'),
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -206,7 +209,7 @@ export async function createMLShipment(orderId: string): Promise<MLShipment> {
     };
 
     const response = await fetch(
-      'https://api.mercadolibre.com/shipments',
+      getApiUrl('mercadolibre', '/shipments'),
       {
         method: 'POST',
         headers: {
@@ -264,7 +267,9 @@ export async function getMLShipmentTracking(shipmentId: string): Promise<MLShipm
     const accessToken = await auth.getAccessToken();
 
     const response = await fetch(
-      `https://api.mercadolibre.com/shipments/${shipmentId}/tracking`,
+      getApiUrl('mercadolibre', '/shipments/{shipment_id}/tracking', {
+        shipment_id: shipmentId
+      }),
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,

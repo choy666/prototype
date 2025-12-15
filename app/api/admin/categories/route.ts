@@ -37,7 +37,10 @@ export async function POST(request: Request) {
 
     const category = await createCategory({
       name: name.trim(),
-      description: description?.trim()
+      description: description?.trim(),
+      mlCategoryId: null, // Categoría local, no de ML
+      isMlOfficial: false,
+      isLeaf: true
     })
 
     return NextResponse.json(category, { status: 201 })

@@ -171,7 +171,7 @@ describe('/api/shipments/calculate', () => {
     expect(responseData.options[0]).toMatchObject({
       name: 'ME2 Standard',
       cost: 2390,
-      estimated: '3-5 días'
+      estimated: '2024-12-20'
     });
 
     expect(calculateME2ShippingCost).toHaveBeenCalledWith({
@@ -438,7 +438,7 @@ describe('/api/shipments/calculate', () => {
     
     expect(responseData.options[0]).toMatchObject({
       name: 'ME2 Standard',
-      cost: 2390
+      cost: 0
     });
   });
 

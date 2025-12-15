@@ -3,6 +3,7 @@
 import { useCartStore } from "@/lib/stores/useCartStore";
 import Link from "next/link";
 import Image from "next/image";
+import { FormattedAgency } from '@/types/agency';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -12,14 +13,16 @@ interface CheckoutSummaryProps {
     id: string;
     name: string;
     cost: number;
+    estimated?: string;
   } | null;
   shippingAddress?: {
     codigoPostal: string;
     provincia: string;
   } | null;
+  selectedAgency?: FormattedAgency | null;
 }
 
-export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: CheckoutSummaryProps) {
+export function CheckoutSummary({ selectedShippingMethod, shippingAddress, selectedAgency }: CheckoutSummaryProps) {
   const { items } = useCartStore();
 
   // Calcular total con descuentos
@@ -108,6 +111,25 @@ export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: Che
         <div className="border-t pt-3 space-y-3">
           <h3 className="font-medium text-sm">Método de envío</h3>
           <p className="text-sm text-gray-600">{selectedShippingMethod.name}</p>
+          {selectedShippingMethod.estimated && (
+            <p className="text-xs text-gray-500">Entrega estimada: {selectedShippingMethod.estimated}</p>
+          )}
+        </div>
+      )}
+
+      {/* Sucursal seleccionada */}
+      {selectedAgency && (
+        <div className="border-t pt-3 space-y-2">
+          <h3 className="font-medium text-sm">Sucursal seleccionada</h3>
+          <div className="text-sm text-gray-600">
+            <p className="font-medium text-gray-900">{selectedAgency.name}</p>
+            <p>{selectedAgency.address.street} {selectedAgency.address.number}</p>
+            <p>{selectedAgency.address.city}, {selectedAgency.address.state}</p>
+            <p>CP: {selectedAgency.address.zipcode}</p>
+            {selectedAgency.phone && (
+              <p className="text-xs mt-1">Tel: {selectedAgency.phone}</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -140,7 +162,10 @@ export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: Che
         <div className="text-xs text-gray-500 space-y-1">
           <p>• Pago seguro con Mercado Pago</p>
           <p>• Envío gratuito en compras superiores a $5.000</p>
-          <p>• Tiempo de entrega: 7-10 días hábiles</p>
+          <p>
+            • Tiempo de entrega:{' '}
+            {selectedShippingMethod?.estimated ? selectedShippingMethod.estimated : 'se muestra al seleccionar el envío'}
+          </p>
         </div>
 
         <div className="pt-3 border-t">

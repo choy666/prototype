@@ -47,34 +47,39 @@ interface ME2ShippingResult {
   fallback?: boolean;
   message?: string;
   warnings?: string[];
+  pickup?: {
+    available: boolean;
+    types: ('agency' | 'place')[];
+  };
 }
 
 interface MLItemShippingOption {
   id: number;
   name: string;
   currency_id: string;
-  base_cost: number;
-  cost: number;
   list_cost: number;
+  cost: number;
   shipping_method_id: number;
   shipping_method_type: string;
   shipping_option_type: string;
+  option_type?: string; // Agregado para evitar type assertion
+  carrier_id?: number; // Agregado para verificar si ML devuelve carrier_id directo
   estimated_delivery_time?: {
     type?: string;
     date?: string;
-    unit?: string;
-    offset?: {
-      date?: string | null;
-      shipping?: number | null;
-    };
     time_frame?: {
-      from?: string | null;
+      from?: string;
       to?: string | null;
     };
-    pay_before?: string;
+    offset?: {
+      date?: string;
+    };
     shipping?: number;
     handling?: number;
-    schedule?: string | null;
+    unit?: string; // Agregado para compatibilidad
+    value?: number; // Agregado para compatibilidad
+    schedule?: unknown; // Mantener como unknown si no tenemos la estructura exacta
+    pay_before?: string;
   };
 }
 
@@ -320,6 +325,9 @@ async function calculateShippingCostsWithDimensions(
         handling: option.estimated_delivery_time?.handling ?? 1,
         shipping: option.estimated_delivery_time?.shipping ?? 4,
       },
+      // Campos adicionales para envíos a agencia
+      deliver_to: option.name?.toLowerCase().includes('sucursal') || option.name?.toLowerCase().includes('agencia') || option.name?.toLowerCase().includes('correo') ? 'agency' : 'address',
+      carrier_id: option.shipping_method_id || option.id || 154 // Default a 154 para envíos a sucursal
     }));
 
     const cheapestOption = shippingOptions.length > 0 
@@ -337,6 +345,7 @@ async function calculateShippingCostsWithDimensions(
       source: 'me2',
       fallback: false,
       message: 'Cálculo ME2 exitoso usando /shipments/costs',
+      pickup: { available: false, types: [] }, // /shipments/costs no devuelve info de pickup
     };
 
     logger.info('[ME2] Response: Cálculo completado con /shipments/costs', {
@@ -419,7 +428,7 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
         },
       };
 
-      return {
+      const result: ME2ShippingResult = {
         shippingOptions: [defaultOption],
         cheapestOption: defaultOption,
         estimatedDelivery: 5,
@@ -429,7 +438,10 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
         fallback: true,
         message: 'Usando envío estándar por defecto (no hay métodos locales configurados)',
         warnings: ['No hay métodos de envío locales configurados en la base de datos'],
+        pickup: { available: false, types: [] },
       };
+
+      return result;
     }
 
     const now = new Date();
@@ -484,6 +496,7 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
       source: 'local',
       fallback: true,
       message: 'Usando métodos de envío locales configurados en la tienda',
+      pickup: { available: false, types: [] },
     };
   } catch (error) {
     logger.error('Error calculando envío local de fallback', {
@@ -541,25 +554,36 @@ async function calculateLocalShippingFallback(zipcode: string, items: ShippingIt
       fallback: true,
       message: 'Usando envío de emergencia (error en sistema de envíos)',
       warnings: ['Hubo un error al calcular el envío, se aplicó un costo estándar'],
+      pickup: { available: false, types: [] },
     };
   }
 }
 
 // Calcular costo de envío usando API de Mercado Libre ME2
 export async function calculateME2ShippingCost(options: ME2ShippingOptions): Promise<ME2ShippingResult> {
-  try {
-    logger.info('[ME2] Request: Iniciando cálculo de envío', { 
-      zipcode: options.zipcode, 
-      itemCount: options.items.length,
-      items: options.items.map(i => ({ id: i.id, quantity: i.quantity, price: i.price, mlItemId: i.mlItemId }))
-    });
+  // Para Argentina, extraer solo los números del zipcode
+  // La API de ML espera solo números (ej: "5500", no "M5500")
+  const cleanZipcode = options.zipcode.replace(/[^\d]/g, '');
+  
+  logger.info('[ME2] Request: Iniciando cálculo de envío', {
+    zipcode: options.zipcode,
+    cleanZipcode: cleanZipcode,
+    itemCount: options.items.length,
+    items: options.items.map(item => ({
+      id: item.id,
+      quantity: item.quantity,
+      price: item.price,
+      mlItemId: item.mlItemId
+    }))
+  });
 
+  try {
     // VERIFICAR ENVÍO INTERNO ANTES DE LLAMAR A ME2
     const businessShippingConfig = await getBusinessShippingConfig();
     
-    if (businessShippingConfig && options.zipcode === businessShippingConfig.zipCode) {
+    if (businessShippingConfig && cleanZipcode === businessShippingConfig.zipCode) {
       logger.info('[ME2] Envío interno detectado', { 
-        zipcode: options.zipcode, 
+        zipcode: cleanZipcode, 
         businessZipCode: businessShippingConfig.zipCode,
         isInternal: true 
       });
@@ -589,7 +613,8 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
         totalCost: shippingCost,
         currency: 'ARS',
         source: 'internal_shipping',
-        message: shippingCost === 0 ? 'Envío gratis por superar el monto mínimo' : 'Envío interno estándar'
+        message: shippingCost === 0 ? 'Envío gratis por superar el monto mínimo' : 'Envío interno estándar',
+        pickup: { available: false, types: [] }, // Envíos internos no tienen retiro en sucursal
       };
     }
 
@@ -633,24 +658,24 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
 
     logger.info('[ME2] Request: Consultando API de Mercado Libre', {
       url: `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options`,
-      zipcode: options.zipcode,
+      zipcode: cleanZipcode,
       itemId: mlItemId,
       dimensions,
       logisticType: 'me2'
     });
 
     if (!mlItemId) {
-        logger.warn('[ME2] Warning: Falta mlItemId para el item, usando /shipments/costs', {
-          zipcode: options.zipcode,
-          localProductId: firstItem.id,
-        });
+      logger.warn('[ME2] Warning: Falta mlItemId para el item, usando /shipments/costs', {
+        zipcode: cleanZipcode,
+        localProductId: firstItem.id,
+      });
 
-        // Usar /shipments/costs cuando no hay mlItemId
-        return await calculateShippingCostsWithDimensions(options, dimensions);
-      }
+      // Usar /shipments/costs cuando no hay mlItemId
+      return await calculateShippingCostsWithDimensions({ ...options, zipcode: cleanZipcode }, dimensions);
+    }
 
     const requestBody = {
-      zipcode: options.zipcode,
+      zipcode: cleanZipcode,
       item_id: mlItemId,
       quantity: firstItem.quantity,
       dimensions: {
@@ -665,7 +690,7 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
 
     const response = await me2ShippingCircuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const url = `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options?zip_code=${encodeURIComponent(options.zipcode)}`;
+        const url = `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options?zip_code=${encodeURIComponent(cleanZipcode)}`;
         
         // Timeout handling con Promise.race() - 8 segundos máximo para API calls
         const timeoutPromise = new Promise<Response>((_, reject) => {
@@ -771,52 +796,85 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     
     logger.info('[ME2] Response: Opciones obtenidas de Mercado Libre', {
       optionsCount: rawData.options?.length || 0,
-      zipcode: options.zipcode,
-      destination: rawData.destination
+      zipcode: cleanZipcode,
+      destination: rawData.destination,
+      allOptions: rawData.options?.map((opt) => ({
+        shipping_method_id: opt.shipping_method_id,
+        name: opt.name,
+        carrier_id: opt.carrier_id,
+        option_type: opt.option_type || opt.shipping_option_type,
+      })),
+      agencyOption: rawData.options?.find((opt) => 
+        (opt.option_type === 'agency' || opt.shipping_option_type === 'agency')
+      ),
     });
     
     // Procesar resultados según la estructura real de la API de ML
-    const shippingOptions: MLShippingMethod[] = (rawData.options ?? []).map((option): MLShippingMethod => ({
-      shipping_method_id: option.shipping_method_id,
-      name: option.name,
-      description: option.shipping_option_type === 'address'
-        ? 'Envío a domicilio'
-        : option.shipping_option_type === 'agency'
-          ? 'Retiro en sucursal de correo'
-          : 'Opción de envío',
-      currency_id: option.currency_id,
-      list_cost: option.list_cost,
-      cost: option.cost,
-      estimated_delivery: {
-        date: option.estimated_delivery_time?.date ?? '',
-        time_from: option.estimated_delivery_time?.time_frame?.from ?? '',
-        time_to: option.estimated_delivery_time?.time_frame?.to ?? '',
-      },
-      estimated_delivery_time: option.estimated_delivery_time
-        ? {
-            type: option.estimated_delivery_time.type ?? 'unknown_frame',
-            unit: option.estimated_delivery_time.unit ?? 'hour',
-            value: option.estimated_delivery_time.shipping ?? 0,
-          }
-        : undefined,
-      estimated_delivery_final: option.estimated_delivery_time?.date
-        ? {
-            date: option.estimated_delivery_time.date,
-            time_from: option.estimated_delivery_time.time_frame?.from ?? '',
-            time_to: option.estimated_delivery_time.time_frame?.to ?? '',
-          }
-        : undefined,
-      shipping_mode: 'me2',
-      logistic_type: option.shipping_option_type,
-      treatment: option.shipping_method_type,
-      guaranteed: false,
-      order_priority: option.id,
-      tags: [],
-      speed: {
-        handling: option.estimated_delivery_time?.handling ?? 0,
-        shipping: option.estimated_delivery_time?.shipping ?? 0,
-      },
-    }));
+    // Detectar opciones de retiro (agency/place) para habilitar selector
+    const pickupTypes: ('agency' | 'place')[] = [];
+    const shippingOptions: MLShippingMethod[] = (rawData.options ?? []).map((option): MLShippingMethod => {
+      const optionType = option.option_type ?? option.shipping_option_type;
+
+      // Recolectar tipos de retiro disponibles
+      if (optionType === 'agency' || optionType === 'place') {
+        pickupTypes.push(optionType);
+      }
+
+      console.log('[ME2] Procesando opción:', {
+        name: option.name,
+        shipping_method_id: option.shipping_method_id,
+        option_type: optionType,
+        carrier_id: option.carrier_id,
+      });
+
+      return {
+        shipping_method_id: option.shipping_method_id,
+        option_id: option.id, // Agregar option_id para obtener sucursales
+        state_id: rawData.destination?.state?.id, // Agregar state_id para endpoints geográficos
+        name: option.name,
+        description: optionType === 'address'
+          ? 'Envío a domicilio'
+          : optionType === 'agency'
+            ? 'Retiro en sucursal de correo'
+            : optionType === 'place'
+              ? 'Retiro en punto de retiro'
+              : 'Opción de envío',
+        currency_id: option.currency_id,
+        list_cost: option.list_cost,
+        cost: option.cost,
+        deliver_to: optionType === 'agency' || optionType === 'place' ? 'agency' : 'address',
+        carrier_id: option.carrier_id, // Usar carrier_id directo si ML lo devuelve
+        estimated_delivery: {
+          date: option.estimated_delivery_time?.date ?? '',
+          time_from: option.estimated_delivery_time?.time_frame?.from ?? '',
+          time_to: option.estimated_delivery_time?.time_frame?.to ?? '',
+        },
+        estimated_delivery_time: option.estimated_delivery_time
+          ? {
+              type: option.estimated_delivery_time.type ?? 'unknown_frame',
+              unit: option.estimated_delivery_time.unit ?? 'hour',
+              value: option.estimated_delivery_time.shipping ?? 0,
+            }
+          : undefined,
+        estimated_delivery_final: option.estimated_delivery_time?.date
+          ? {
+              date: option.estimated_delivery_time.date,
+              time_from: option.estimated_delivery_time.time_frame?.from ?? '',
+              time_to: option.estimated_delivery_time.time_frame?.to ?? '',
+            }
+          : undefined,
+        shipping_mode: 'me2',
+        logistic_type: optionType,
+        treatment: option.shipping_method_type,
+        guaranteed: false,
+        order_priority: option.id,
+        tags: [],
+        speed: {
+          handling: option.estimated_delivery_time?.handling ?? 0,
+          shipping: option.estimated_delivery_time?.shipping ?? 0,
+        },
+      };
+    });
 
     const cheapestOption = shippingOptions.length > 0 
       ? shippingOptions.reduce((min, option) => 
@@ -869,23 +927,28 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       source: 'me2',
       input,
       fallback: false,
+      pickup: {
+        available: pickupTypes.length > 0,
+        types: Array.from(new Set(pickupTypes)), // Eliminar duplicados
+      },
     };
 
     logger.info('[ME2] Response: Cálculo completado', {
-      zipcode: options.zipcode,
+      zipcode: cleanZipcode,
       totalCost: result.totalCost,
       optionsCount: shippingOptions.length,
       deliveryDays: result.estimatedDelivery,
       cheapestOption: cheapestOption?.name || 'N/A',
       source: result.source,
-      fallback: result.fallback
+      fallback: result.fallback,
+      pickup: result.pickup // Log de disponibilidad de retiro
     });
 
     return result;
 
   } catch (error) {
     logger.error('[ME2] Error: Error en cálculo de envío', {
-      zipcode: options.zipcode,
+      zipcode: cleanZipcode,
       error: error instanceof Error ? error.message : String(error),
       errorType: error instanceof MercadoLibreError ? error.code : 'UNKNOWN',
       statusCode: error instanceof MercadoLibreError && error.details ? (error.details as { status?: number }).status : 'N/A'
@@ -895,7 +958,7 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       // Log adicional de depuración en desarrollo con el error completo
       // eslint-disable-next-line no-console
       console.error('[ME2] DEV - Error detallado', {
-        zipcode: options.zipcode,
+        zipcode: cleanZipcode,
         error,
         errorStack: error instanceof Error ? error.stack : 'N/A',
         details: error instanceof MercadoLibreError ? error.details : 'N/A'
@@ -903,13 +966,13 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     }
 
     logger.warn('[ME2] Fallback: Activando envío local por error de ML', {
-      zipcode: options.zipcode,
+      zipcode: cleanZipcode,
       originalError: error instanceof Error ? error.message : String(error),
       itemCount: options.items.length
     });
 
     // En caso de error, usar métodos locales configurados en BD como fallback
-    const fallbackResult = await calculateLocalShippingFallback(options.zipcode, options.items);
+    const fallbackResult = await calculateLocalShippingFallback(cleanZipcode, options.items);
     return fallbackResult;
   }
 }

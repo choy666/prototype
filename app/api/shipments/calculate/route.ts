@@ -121,7 +121,11 @@ export async function POST(request: NextRequest) {
         : `${shippingData.estimatedDelivery} días`,
       type: option.type || 'me2', // Incluir tipo para detectar envíos internos
       description: option.description,
-      estimatedTime: option.estimatedTime || '24 horas'
+      estimatedTime: option.estimatedTime || '24 horas',
+      // Campos adicionales para envíos a agencia
+      deliver_to: option.deliver_to,
+      carrier_id: option.carrier_id,
+      shipping_method_id: option.shipping_method_id
     }));
 
     // Si es envío interno, devolver solo la opción interna
@@ -158,68 +162,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(response);
     }
 
-    // Agregar opciones específicas ME2 si aplica
-    if (shippingData.source === 'me2' && !shippingData.fallback) {
-      const me2Options = [
-        { name: 'ME2 Standard', cost: options[0]?.cost || 2390, estimated: '3-5 días' },
-        { name: 'ME2 Prioritario', cost: options[1]?.cost || 3120, estimated: '1-2 días' },
-      ];
-      
-      // Buscar opción de retiro en correo
-      const agencyOption = shippingData.shippingOptions.find(opt => 
-        opt.logistic_type === 'agency' || opt.description?.includes('correo')
-      );
-      
-      if (agencyOption) {
-        me2Options.push({
-          name: 'Retiro en correo',
-          cost: agencyOption.cost || 0,
-          estimated: agencyOption.estimated_delivery?.date || '2-3 días'
-        });
-      }
-
-      const response = {
-        success: true,
-        requestId: effectiveRequestId,
-        coverage: shippingData.coverage,
-        destination: shippingData.destination,
-        methods: shippingData.shippingOptions,
-        source: shippingData.source,
-        input: shippingData.input && {
-          zipcodeTarget: shippingData.input.zipcode_target,
-          dimensions: shippingData.input.dimensions,
-          itemPrice: shippingData.input.item_price,
-          freeShipping: shippingData.input.free_shipping,
-          listCost: shippingData.input.list_cost,
-          cost: shippingData.input.cost,
-          sellerId: shippingData.input.seller_id,
-        },
-        fallback: shippingData.fallback ?? false,
-        message: shippingData.message || 'Cálculo ME2 exitoso',
-        options: me2Options,
-        warnings: shippingData.warnings,
-        metadata: {
-          calculationSource: shippingData.fallback ? 'FALLBACK' : 'ME2',
-          calculationHash: `${zipcode}-${items.map(i => `${i.id}:${i.quantity}`).sort().join('-')}`,
-          timestamp: new Date().toISOString(),
-        }
-      };
-
-      logger.info('[ME2] Response: Cálculo ME2 completado', {
-        requestId: effectiveRequestId,
-        zipcode,
-        success: true,
-        optionsCount: me2Options.length,
-        source: response.source,
-        fallback: response.fallback,
-        hasFreeShipping: me2Options.some(opt => opt.cost === 0),
-        totalCost: Math.min(...me2Options.map(opt => opt.cost)),
-        warningsCount: response.warnings?.length || 0
-      });
-
-      return NextResponse.json(response);
-    }
-
     // Respuesta fallback local
     const response = {
       success: true,
@@ -241,6 +183,7 @@ export async function POST(request: NextRequest) {
       message: shippingData.message || (shippingData.fallback ? 'Usando métodos de envío locales' : 'Cálculo exitoso'),
       options,
       warnings: shippingData.warnings || [],
+      pickup: shippingData.pickup, // Exponer disponibilidad de retiro (agency/place)
       metadata: {
         calculationSource: shippingData.fallback ? 'FALLBACK' : 'ME2',
         calculationHash: `${zipcode}-${items.map(i => `${i.id}:${i.quantity}`).sort().join('-')}`,

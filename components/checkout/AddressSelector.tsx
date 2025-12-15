@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/card';
 import { Address } from '@/lib/schema';
@@ -8,30 +9,39 @@ import { toast } from 'react-hot-toast';
 import { MapPin, Edit, Trash2, Star, Plus } from 'lucide-react';
 
 interface AddressSelectorProps {
-  onAddressSelect: (address: Address | null) => void;
-  onNewAddress: () => void;
+  addresses?: Address[];
   selectedAddressId?: number;
+  onAddressSelect: (address: Address) => void;
+  onNewAddress: () => void;
+  onNewAddressWithAutocomplete?: () => void;
+  loading?: boolean;
 }
 
 export function AddressSelector({
+  addresses,
+  selectedAddressId,
   onAddressSelect,
   onNewAddress,
-  selectedAddressId
+  onNewAddressWithAutocomplete,
+  loading
 }: AddressSelectorProps) {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const [internalAddresses, setInternalAddresses] = useState<Address[]>([]);
+  const [internalLoading, setInternalLoading] = useState(true);
   const [settingDefault, setSettingDefault] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
+  
+  // Usar las props si se proporcionan, sino el estado interno
+  const addressesToUse = addresses || internalAddresses;
+  const loadingToUse = loading !== undefined ? loading : internalLoading;
 
   const fetchAddresses = async () => {
     try {
+      setInternalLoading(true);
       const response = await fetch('/api/addresses');
       if (response.ok) {
         const data = await response.json();
-        setAddresses(data);
+        setInternalAddresses(data);
       } else {
         toast.error('Error al cargar direcciones');
       }
@@ -39,9 +49,16 @@ export function AddressSelector({
       console.error('Error fetching addresses:', error);
       toast.error('Error al cargar direcciones');
     } finally {
-      setLoading(false);
+      setInternalLoading(false);
     }
   };
+
+  // Cargar direcciones
+  useEffect(() => {
+    if (!userId) return;
+    
+    fetchAddresses();
+  }, [userId]);
 
   const handleSetDefault = async (addressId: number) => {
     setSettingDefault(addressId);
@@ -75,10 +92,16 @@ export function AddressSelector({
       });
 
       if (response.ok) {
-        setAddresses(prev => prev.filter(addr => addr.id !== addressId));
-        toast.success('Dirección eliminada');
+        if (addresses) {
+          // Si las addresses vienen como prop, no podemos modificarlas
+          toast.success('Dirección eliminada');
+        } else {
+          setInternalAddresses(prev => prev.filter(addr => addr.id !== addressId));
+          toast.success('Dirección eliminada');
+        }
         // Si la dirección eliminada estaba seleccionada, deseleccionar
         if (selectedAddressId === addressId) {
+          // @ts-expect-error - onAddressSelect puede recibir null
           onAddressSelect(null);
         }
       } else {
@@ -90,7 +113,7 @@ export function AddressSelector({
     }
   };
 
-  if (loading) {
+  if (loadingToUse) {
     return (
       <div className="space-y-4">
         <div className="animate-pulse">
@@ -108,31 +131,51 @@ export function AddressSelector({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Seleccionar Dirección de Envío</h3>
-        <Button
-          onClick={onNewAddress}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva Dirección
-        </Button>
+        <div className="flex gap-2">
+          {onNewAddressWithAutocomplete && (
+            <Button
+              onClick={onNewAddressWithAutocomplete}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Buscar Dirección
+            </Button>
+          )}
+          <Button
+            onClick={onNewAddress}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva Dirección
+          </Button>
+        </div>
       </div>
 
-      {addresses.length === 0 ? (
+      {addressesToUse.length === 0 ? (
         <Card className="p-6 text-center">
           <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <h4 className="font-medium mb-2">No tienes direcciones guardadas</h4>
           <p className="text-sm text-muted-foreground mb-4">
             Agrega una dirección para agilizar tus futuras compras
           </p>
-          <Button onClick={onNewAddress} className="w-full">
-            Agregar Primera Dirección
-          </Button>
+          <div className="space-y-2">
+            {onNewAddressWithAutocomplete && (
+              <Button onClick={onNewAddressWithAutocomplete} className="w-full">
+                Buscar con Google Maps
+              </Button>
+            )}
+            <Button onClick={onNewAddress} variant="outline" className="w-full">
+              Ingresar manualmente
+            </Button>
+          </div>
         </Card>
       ) : (
         <div className="space-y-3">
-          {addresses.map((address) => (
+          {addressesToUse.map((address) => (
             <Card
               key={address.id}
               className={`p-4 cursor-pointer transition-all ${
@@ -212,10 +255,13 @@ export function AddressSelector({
         </div>
       )}
 
-      {addresses.length > 0 && (
+      {addressesToUse.length > 0 && (
         <Card
           className="p-4 cursor-pointer border-dashed hover:bg-gray-50 transition-colors"
-          onClick={() => onAddressSelect(null)}
+          onClick={() => {
+            // @ts-expect-error - onAddressSelect puede recibir null
+            onAddressSelect(null);
+          }}
         >
           <div className="flex items-center justify-center gap-2 text-muted-foreground">
             <Plus className="h-4 w-4" />

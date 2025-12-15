@@ -7,6 +7,7 @@ import { logger } from '@/lib/utils/logger';
 import { calculateME2Shipping } from '@/lib/mercado-envios/me2Api';
 import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { formatAddressForMercadoLibre } from '@/lib/utils/address-formatter';
 
 // Tipo para items del checkout (sin stock requerido)
 type CheckoutItem = {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { items, shippingAddress, shippingMethod, userId } = validationResult.data;
+    const { items, shippingAddress, shippingMethod, userId, shippingAgency } = validationResult.data;
 
     // Verificar que el usuario existe
     logger.info('Checkout: Verificando existencia de usuario', { userId });
@@ -188,8 +189,11 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    // Formatear dirección para Mercado Libre antes de calcular envío
+    const formattedAddress = formatAddressForMercadoLibre(shippingAddress);
+    
     const me2Response = await calculateME2Shipping({
-      zipcode: shippingAddress.codigoPostal,
+      zipcode: formattedAddress.zip_code, // Usar código postal limpio
       items: me2Items,
       allowFallback: true,
     });
@@ -237,6 +241,7 @@ export async function POST(req: NextRequest) {
         shippingCost: shippingCost.toString(),
         shippingMode: 'me2',
         source: 'local',
+        shippingAgency: shippingAgency ?? null, // Guardar datos de la sucursal si aplica
         metadata: {},
       })
       .returning({ id: orders.id });
@@ -274,6 +279,7 @@ export async function POST(req: NextRequest) {
       order_id: orderId.toString(),
       shipping_address: shippingAddress, // Guardar como objeto JSONB, no string
       shipping_method_id: shippingMethod.id.toString(),
+      shipping_agency: shippingAgency ?? null,
       items: JSON.stringify(items.map((item: CheckoutItem) => ({
         ...item,
         variantId: item.variantId || null

@@ -1,14 +1,38 @@
 'use server';
 
-import { db } from '../db';
-import { categories } from '../schema';
-import { eq, desc, like, and, notInArray } from 'drizzle-orm';
-import type { NewCategory, Category } from '../schema';
+import { db } from '@/lib/db';
+import { categories } from '@/lib/schema';
+import { eq, and, notInArray, like, desc } from 'drizzle-orm';
+import { MercadoLibreAuth } from '@/lib/auth/mercadolibre';
+import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
+import { logger } from '@/lib/utils/logger';
+import { getConfiguredCategories } from './categories-dynamic';
+import { retryWithBackoff } from '@/lib/utils/retry';
 import { revalidatePath } from 'next/cache';
-import { MercadoLibreAuth } from '../auth/mercadolibre';
-import { retryWithBackoff } from '../utils/retry';
-import { MercadoLibreError, MercadoLibreErrorCode } from '../errors/mercadolibre-errors';
-import { logger } from '../utils/logger';
+
+// Tipos para categorías
+interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+  mlCategoryId: string | null;
+  isMlOfficial: boolean;
+  isLeaf: boolean;
+  attributes?: unknown;
+  me2Compatible?: boolean | null;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+interface NewCategory {
+  name: string;
+  description?: string | null;
+  mlCategoryId: string | null;
+  isMlOfficial: boolean;
+  isLeaf: boolean;
+  attributes?: unknown;
+  me2Compatible?: boolean | null;
+}
 
 // Interfaz para caché de categorías ML
 interface MLCategoryCache {
@@ -100,7 +124,7 @@ async function getMLCategoryWithAttributes(categoryId: string, accessToken: stri
     return response;
   }, {
     maxRetries: 3,
-    shouldRetry: (error) => {
+    shouldRetry: (error: unknown) => {
       return error instanceof MercadoLibreError && 
              (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
               error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
@@ -132,7 +156,7 @@ async function getMLCategoryWithAttributes(categoryId: string, accessToken: stri
     return response;
   }, {
     maxRetries: 2,
-    shouldRetry: (error) => {
+    shouldRetry: (error: unknown) => {
       return error instanceof MercadoLibreError && 
              (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
               error.code === MercadoLibreErrorCode.TIMEOUT_ERROR);
@@ -268,15 +292,8 @@ export async function syncMLCategories(): Promise<{
       );
     }
     
-    // Lista fija de categorías a sincronizar (máx. 30)
-    const ML_CATEGORY_IDS = [
-      'MLA1055', 'MLA1652', 'MLA1002', 'MLA438566', 'MLA398582',
-      'MLA1577', 'MLA431202', 'MLA1644', 'MLA109027', 'MLA373770',
-      'MLA109042', 'MLA1271', 'MLA43686', 'MLA414007', 'MLA31045',
-      'MLA1611', 'MLA447782', 'MLA433672', 'MLA6143', 'MLA1763',
-      'MLA22195', 'MLA61177', 'MLA1161', 'MLA1386', 'MLA127684',
-      'MLA1087', 'MLA8830', 'MLA409415', 'MLA8618', 'MLA3697',
-    ];
+    // Obtener categorías dinámicamente (configuradas o populares)
+    const categoryIds = await getConfiguredCategories(accessToken);
     
     const syncResults = { 
       created: 0, 
@@ -286,7 +303,7 @@ export async function syncMLCategories(): Promise<{
       warnings: [] as string[]
     };
     
-    for (const categoryId of ML_CATEGORY_IDS) {
+    for (const categoryId of categoryIds) {
       try {
         // Obtener categoría con atributos (usando caché)
         const categoryData = await getMLCategoryWithAttributes(categoryId, accessToken);
@@ -323,9 +340,10 @@ export async function syncMLCategories(): Promise<{
             mlCategoryId: categoryId,
             isMlOfficial: true,
             isLeaf: categoryData.isLeaf,
-            // Guardar atributos como JSON para referencia
             attributes: categoryData.attributes,
             me2Compatible: hasRequiredAttributes,
+            created_at: new Date(),
+            updated_at: new Date(),
           });
           syncResults.created++;
           logger.info('[ML Categories] ✅ Categoría creada', {
@@ -409,7 +427,7 @@ export async function syncMLCategories(): Promise<{
       .where(
         and(
           eq(categories.isMlOfficial, true),
-          notInArray(categories.mlCategoryId, ML_CATEGORY_IDS)
+          notInArray(categories.mlCategoryId, categoryIds)
         )
       );
     
@@ -426,7 +444,7 @@ export async function syncMLCategories(): Promise<{
     
     const result = {
       ...syncResults,
-      totalCategories: ML_CATEGORY_IDS.length
+      totalCategories: categoryIds.length
     };
     
     logger.info('[ML Categories] ✅ Sincronización completada', {

@@ -2,6 +2,8 @@
 
 export interface MLShippingMethod {
   shipping_method_id?: number; // Opcional para envíos internos
+  option_id?: number; // ID de opción para obtener sucursales (ME2)
+  state_id?: string; // ID de estado para endpoints geográficos (ej: AR-M)
   name: string;
   description: string;
   currency_id?: string; // Opcional para envíos internos
@@ -32,6 +34,9 @@ export interface MLShippingMethod {
   guaranteed?: boolean;
   order_priority?: number;
   tags?: string[];
+  // Campos adicionales para envíos a sucursal
+  deliver_to?: 'address' | 'agency'; // Indica si es a domicilio o a sucursal
+  carrier_id?: number; // ID del transportista para obtener sucursales
   // Campos adicionales para envíos internos
   id?: string; // Para envíos internos
   estimatedTime?: string; // Formato legible para humanos

@@ -347,6 +347,8 @@ export const orders = pgTable("orders", {
   mercadoLibreShipmentSubstatus: varchar("mercado_libre_shipment_substatus", { length: 50 }), // Subestado ML
   mlOrderId: text("ml_order_id").unique(),
   source: text("source").default("local"),
+  // Información de sucursal para envíos a agencia
+  shippingAgency: jsonb("shipping_agency"), // Datos de la sucursal seleccionada
   mlStatus: text("ml_status"),
   mlBuyerInfo: jsonb("ml_buyer_info"),
   mlShippingInfo: jsonb("ml_shipping_info"),

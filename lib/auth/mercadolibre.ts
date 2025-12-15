@@ -4,14 +4,14 @@ import { eq } from 'drizzle-orm';
 import { retryWithBackoff } from '@/lib/utils/retry';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { logger } from '@/lib/utils/logger';
+import { getApiUrl } from '@/lib/config/integrations';
 
 // Configuración de Mercado Libre
 export const MERCADOLIBRE_CONFIG = {
   clientId: process.env.MERCADOLIBRE_CLIENT_ID!,
   clientSecret: process.env.MERCADOLIBRE_CLIENT_SECRET!,
   redirectUri: process.env.MERCADOLIBRE_REDIRECT_URI || 'https://prototype-ten-dun.vercel.app/api/auth/mercadolibre/callback',
-  baseUrl: 'https://api.mercadolibre.com',
-  apiUrl: 'https://api.mercadolibre.com',
+  baseUrl: getApiUrl('mercadolibre', ''),
 };
 
 // Generar code_verifier para PKCE
@@ -69,7 +69,7 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
       },
       body: params.toString(),
     });
-    
+
     if (!res.ok) {
       const error = await res.text();
       throw new MercadoLibreError(
@@ -78,11 +78,11 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
         { status: res.status, error }
       );
     }
-    
+
     return res;
   }, {
     maxRetries: 3,
-    shouldRetry: (error) => {
+    shouldRetry: (error: unknown) => {
       // Reintentar solo en errores de red o del servidor
       return error instanceof MercadoLibreError && 
              (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
@@ -150,7 +150,7 @@ export async function getUserInfo(accessToken: string): Promise<{
   first_name: string;
   last_name: string;
 }> {
-  const response = await fetch(`${MERCADOLIBRE_CONFIG.apiUrl}/users/me`, {
+  const response = await fetch(getApiUrl('mercadolibre', '/users/me'), {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Accept': 'application/json',
@@ -294,7 +294,7 @@ export async function makeAuthenticatedRequest(
       }
     }
 
-    const url = endpoint.startsWith('http') ? endpoint : `${MERCADOLIBRE_CONFIG.apiUrl}${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : `${MERCADOLIBRE_CONFIG.baseUrl}${endpoint}`;
 
     const response = await fetch(url, {
       ...options,

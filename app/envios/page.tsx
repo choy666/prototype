@@ -27,7 +27,8 @@ async function EnviosPage() {
     );
   }
 
-  const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent((businessSettings.location as Record<string, string>)?.address || businessSettings.address)}`;
+  // Mapa de ubicación (comentado - requiere API key de Google Maps)
+  // const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent((businessSettings.location as Record<string, string>)?.address || businessSettings.address)}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -238,15 +239,26 @@ async function EnviosPage() {
                         }}
                       />
                     ) : (
+                      // Mapa de OpenStreetMap gratuito
+                      // Si no hay coordenadas, usar un mapa basado en la dirección
                       <iframe
-                        src={mapUrl}
+                        src={businessSettings.location 
+                          ? `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(
+                              `${((businessSettings.location as unknown) as { lng: number; lat: number }).lng - 0.01},${((businessSettings.location as unknown) as { lng: number; lat: number }).lat - 0.01},${((businessSettings.location as unknown) as { lng: number; lat: number }).lng + 0.01},${((businessSettings.location as unknown) as { lng: number; lat: number }).lat + 0.01}`
+                            )}&layer=mapnik&marker=${encodeURIComponent(
+                              `${((businessSettings.location as unknown) as { lng: number; lat: number }).lat},${((businessSettings.location as unknown) as { lng: number; lat: number }).lng}`
+                            )}`
+                          : `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(
+                              `-58.5,-34.7,-58.3,-34.5`
+                            )}&layer=mapnik&marker=${encodeURIComponent(
+                              `-34.6037,-58.3816`
+                            )}`
+                        }
                         width="100%"
                         height="100%"
                         style={{ border: 0 }}
                         allowFullScreen
                         loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        title="Mapa de ubicación del negocio"
                       />
                     )}
                   </div>

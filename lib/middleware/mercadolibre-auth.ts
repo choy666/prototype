@@ -1,4 +1,5 @@
 import { getTokens, refreshAccessToken, saveTokens } from '@/lib/auth/mercadolibre';
+import { getApiUrl } from '@/lib/config/integrations';
 
 // Middleware para hacer requests autenticadas con refresh automático
 export async function withMercadoLibreAuth<T>(
@@ -56,7 +57,7 @@ export async function makeAuthenticatedRequestWithRefresh(
   options: RequestInit = {}
 ): Promise<Response> {
   return withMercadoLibreAuth(userId, async (accessToken) => {
-    const url = endpoint.startsWith('http') ? endpoint : `https://api.mercadolibre.com${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : getApiUrl('mercadolibre', endpoint);
 
     const response = await fetch(url, {
       ...options,

@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
         id: orders.id,
         userId: orders.userId,
         email: orders.email,
-        currentStatus: orders.shippingStatus
+        currentStatus: orders.shippingStatus,
+        shippingAgency: orders.shippingAgency
       })
       .from(orders)
       .where(eq(orders.mercadoLibreShipmentId, shipmentId))
@@ -67,17 +68,54 @@ export async function POST(request: NextRequest) {
     const order = orderData[0];
     const newStatus = ML_STATUS_TO_LOCAL[shipment.status as keyof typeof ML_STATUS_TO_LOCAL] || 'pending';
     
-    // Actualizar la orden con el nuevo estado y datos de tracking
+    // Preparar objeto de actualización base
+    const updateData: Record<string, unknown> = {
+      shippingStatus: newStatus,
+      trackingNumber: shipment.tracking_number,
+      trackingUrl: shipment.tracking_url,
+      mercadoLibreShipmentStatus: shipment.status,
+      mercadoLibreShipmentSubstatus: shipment.substatus,
+      updatedAt: new Date()
+    };
+
+    // Si es envío a sucursal y no hay agency guardada, extraer y guardar la información
+    if (shipment.receiver_address && shipment.logistic_type === 'drop_off') {
+      // Verificar si el address_line contiene información de agencia
+      const agencyInfo = shipment.receiver_address.address_line || '';
+      const isAgencyAddress = agencyInfo.toLowerCase().includes('agencia') || 
+                             agencyInfo.toLowerCase().includes('sucursal') ||
+                             agencyInfo.toLowerCase().includes('correo argentino');
+
+      if (isAgencyAddress && !order.shippingAgency) {
+        // Extraer información de la sucursal del receiver_address
+        const agencyData = {
+          id: shipment.receiver_address.id,
+          name: agencyInfo.split(',')[0]?.trim() || 'Agencia Mercado Libre',
+          address: {
+            street_name: shipment.receiver_address.street_name,
+            street_number: shipment.receiver_address.street_number,
+            address_line: shipment.receiver_address.address_line,
+            comment: shipment.receiver_address.comment
+          },
+          phone: shipment.carrier_info?.phone || null,
+          hours: null // ML no proporciona horarios en el shipment
+        };
+
+        updateData.shippingAgency = agencyData;
+        
+        logger.info('Agency information extracted and saved', {
+          orderId: order.id,
+          shipmentId,
+          agencyId: agencyData.id,
+          agencyName: agencyData.name
+        });
+      }
+    }
+
+    // Actualizar la orden con el nuevo estado y datos de tracking/agencia
     await db
       .update(orders)
-      .set({
-        shippingStatus: newStatus,
-        trackingNumber: shipment.tracking_number,
-        trackingUrl: shipment.tracking_url,
-        mercadoLibreShipmentStatus: shipment.status,
-        mercadoLibreShipmentSubstatus: shipment.substatus,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(orders.id, order.id));
 
     // Insertar registro en historial de envíos

@@ -161,6 +161,7 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         // Nuevos campos para pagos y metadata
         paymentStatus: orders.paymentStatus,
         metadata: orders.metadata,
+        shippingAgency: orders.shippingAgency, // Agregado
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         // Campos del join con users
@@ -203,6 +204,7 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
     return {
       ...order,
       items: transformedItems,
+      shippingAgency: order.shippingAgency || null,
     };
   } catch (error) {
     console.error('Error fetching order by id:', error);

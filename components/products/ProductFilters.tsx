@@ -33,7 +33,7 @@ export function ProductFilters({
       try {
         const cats = await getMlCategories();
         const mlLeafCategories = cats.filter(cat => cat.mlCategoryId && cat.isMlOfficial && cat.isLeaf);
-        setCategories(mlLeafCategories);
+        setCategories(mlLeafCategories as Category[]);
       } catch (error) {
         console.error('Error loading categories:', error);
       }

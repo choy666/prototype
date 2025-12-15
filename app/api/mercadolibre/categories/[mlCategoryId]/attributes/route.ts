@@ -39,7 +39,7 @@ export async function GET(
 
   try {
     const response = await fetch(
-      `${MERCADOLIBRE_CONFIG.apiUrl}/categories/${mlCategoryId}/attributes`
+      `${MERCADOLIBRE_CONFIG.baseUrl}/categories/${mlCategoryId}/attributes`
     )
 
     if (!response.ok) {

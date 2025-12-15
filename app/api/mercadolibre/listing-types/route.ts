@@ -26,7 +26,7 @@ const DEFAULT_SITE_ID = process.env.MERCADOLIBRE_SITE_ID || 'MLA'
 
 async function fetchListingTypeConfig(listingTypeId: string): Promise<ListingTypeConfig | null> {
   try {
-    const url = `${MERCADOLIBRE_CONFIG.apiUrl}/sites/${DEFAULT_SITE_ID}/listing_types/${listingTypeId}`
+    const url = `${MERCADOLIBRE_CONFIG.baseUrl}/sites/${DEFAULT_SITE_ID}/listing_types/${listingTypeId}`
     const auth = await MercadoLibreAuth.getInstance()
     const accessToken = await auth.getAccessToken()
 

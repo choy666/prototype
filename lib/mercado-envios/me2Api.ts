@@ -5,6 +5,7 @@ import { validateME2Calculation } from './me2Validator';
 import type { ME2CalculationRequest, ME2Dimensions, ProductForCalculation } from './me2Validator';
 import type { MLShippingMethod } from '@/lib/types/shipping';
 import { retryWithBackoff } from '@/lib/utils/retry';
+import { getApiUrl } from '@/lib/config/integrations';
 
 // Interfaces para respuesta de Mercado Libre
 interface MLOption {
@@ -47,8 +48,6 @@ interface MLResponse {
     };
   };
 }
-
-const MERCADOLIBRE_API_URL = 'https://api.mercadolibre.com';
 
 // Cache en memoria para deduplicación (TTL 30 segundos)
 const calculationCache = new Map<string, { 
@@ -206,7 +205,9 @@ async function callMercadoLibreShippingAPI(
     );
   }
 
-  const url = `${MERCADOLIBRE_API_URL}/items/${mlItemId}/shipping_options?zip_code=${encodeURIComponent(zipcode)}`;
+  const url = getApiUrl('mercadolibre', '/shipping_options/{item_id}', {
+    item_id: mlItemId
+  }) + `?zip_code=${encodeURIComponent(zipcode)}`;
   
   logger.info('[ME2] API: Consultando Mercado Libre', {
     url,
