@@ -37,6 +37,10 @@ export default function CheckoutPage() {
     documentNumber?: string;
   } | null>(null);
 
+  const requiresAgency = selectedShippingMethod?.deliver_to === 'agency';
+  const isME2Agency = Boolean(requiresAgency && selectedShippingMethod?.shipping_mode === 'me2');
+  const isAgencyMissingSelection = Boolean(requiresAgency && !requiresMlCheckout && !selectedAgency);
+
   // Cargar documento del usuario al montar
   useEffect(() => {
     const fetchDocument = async () => {
@@ -315,16 +319,13 @@ export default function CheckoutPage() {
       return;
     }
 
-    const requiresAgency = selectedShippingMethod.deliver_to === 'agency';
-    const isME2Agency = requiresAgency && selectedShippingMethod.shipping_mode === 'me2';
-
-    if (requiresAgency && !isME2Agency) {
-      if (agencyAvailable === false && !requiresMlCheckout) {
+    if (requiresAgency) {
+      if (agencyAvailable === false && !requiresMlCheckout && !isME2Agency) {
         toast.error('El retiro en sucursal no está disponible para este código postal. Selecciona envío a domicilio.');
         return;
       }
 
-      if (!selectedAgency && !requiresMlCheckout) {
+      if (!requiresMlCheckout && !selectedAgency) {
         toast.error('Debes seleccionar una sucursal para este método de envío');
         return;
       }
@@ -351,6 +352,7 @@ export default function CheckoutPage() {
           cost: selectedShippingMethod.cost,
         },
         shippingAgency: selectedAgency,
+        requiresMlCheckout,
         userId: session?.user?.id || 'test-user-id',
       };
 
@@ -467,7 +469,7 @@ export default function CheckoutPage() {
                 </Button>
                 <Button
                   onClick={handleCheckoutSubmit}
-                  disabled={isProcessing || !selectedShippingMethod}
+                  disabled={isProcessing || !selectedShippingMethod || isAgencyMissingSelection}
                 >
                   {isProcessing ? 'Procesando...' : 'Continuar al Pago'}
                 </Button>

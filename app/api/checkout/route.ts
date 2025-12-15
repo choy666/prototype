@@ -55,7 +55,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { items, shippingAddress, shippingMethod, userId, shippingAgency } = validationResult.data;
+    const { items, shippingAddress, shippingMethod, userId, shippingAgency, requiresMlCheckout } = validationResult.data;
+
+    const normalizedRequiresMlCheckout = Boolean(requiresMlCheckout);
+    const shippingMethodName = String(shippingMethod?.name || '').toLowerCase();
+    const isPickupAgencyMethod =
+      shippingMethodName.includes('sucursal') ||
+      shippingMethodName.includes('agencia') ||
+      shippingMethodName.includes('correo') ||
+      shippingMethodName.includes('retiro');
+
+    if (isPickupAgencyMethod && !normalizedRequiresMlCheckout && !shippingAgency) {
+      return NextResponse.json(
+        { error: 'Debes seleccionar una sucursal para este método de envío' },
+        { status: 400 }
+      );
+    }
 
     // Verificar que el usuario existe
     logger.info('Checkout: Verificando existencia de usuario', { userId });

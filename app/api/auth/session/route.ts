@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handlers } from '@/lib/actions/auth';
 
 // Mock del endpoint de sesión para tests E2E
 export async function GET(request: NextRequest) {
@@ -20,6 +21,5 @@ export async function GET(request: NextRequest) {
   }
   
   // Para peticiones normales, dejar que NextAuth maneje
-  // Esto es un placeholder - NextAuth sobreescribirá este archivo
-  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+  return handlers.GET(request);
 }

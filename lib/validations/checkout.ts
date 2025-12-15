@@ -180,6 +180,8 @@ export const checkoutSchema = z.object({
 
   shippingAgency: shippingAgencySchema.optional(),
 
+  requiresMlCheckout: z.boolean().optional(),
+
   userId: z.string().min(1, 'El userId es requerido'),
 });
 
