@@ -47,15 +47,16 @@ export function verifyMercadoPagoWebhook(
   // Extraer path limpio (solo el path sin dominio ni query params)
   const url = new URL(request.url);
   const cleanPath = url.pathname; // Solo el path, sin protocolo, dominio ni query
+  const dataIdUrl = url.searchParams.get('data.id') || url.searchParams.get('id') || '';
   const headers = Object.fromEntries(request.headers.entries());
   
   // Intentar validación con cuerpo limpio (sin whitespace)
   const cleanBody = rawBody.trim();
-  const result = validateHmacV1(headers, cleanBody, cleanPath);
+  const result = validateHmacV1(headers, dataIdUrl, cleanBody, cleanPath);
   
   // Si falla, intentar con body original por si MP firmó con whitespace
   if (!result.ok && cleanBody !== rawBody) {
-    return validateHmacV1(headers, rawBody, cleanPath);
+    return validateHmacV1(headers, dataIdUrl, rawBody, cleanPath);
   }
   
   return result;
@@ -66,6 +67,7 @@ export function verifyMercadoPagoWebhook(
  * -------------------------------------------------- */
 function validateHmacV1(
   headers: Record<string, string | undefined>,
+  dataIdUrl: string,
   body: string,
   cleanPath: string
 ): MercadoPagoHmacValidationResult {
@@ -75,25 +77,16 @@ function validateHmacV1(
     
     // Extraer timestamp y version de la firma
     let ts = '';
-    let requestId = headers['x-request-id'] || '';
+    const xRequestId = headers['x-request-id'] || '';
+    let receivedSignature = '';
     
     for (const part of signatureParts) {
       if (part.startsWith('ts=')) ts = part.substring(3);
-      if (part.startsWith('v1=')) {
-        // Extraer requestId del body si no viene en header
-        if (!requestId) {
-          try {
-            const parsed = JSON.parse(body);
-            requestId = parsed?.data?.id || parsed?.id || '';
-          } catch {
-            // Ignorar error, continuará con requestId vacío
-          }
-        }
-      }
+      if (part.startsWith('v1=')) receivedSignature = part.substring(3);
     }
     
     // Validaciones básicas
-    if (!ts || !requestId) {
+    if (!ts || !xRequestId || !dataIdUrl || !receivedSignature) {
       return { ok: false, reason: 'Missing required signature data' };
     }
     
@@ -108,9 +101,9 @@ function validateHmacV1(
       return { ok: false, reason: 'Invalid or expired timestamp' };
     }
     
-    // Construir string a firmar: v1:{ts}:{requestId}:{path}:{sha256(body)}
+    const normalizedDataIdUrl = String(dataIdUrl).toLowerCase();
+    const stringToSign = `id:${normalizedDataIdUrl};request-id:${xRequestId};ts:${ts};`;
     const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
-    const stringToSign = `v1:${ts}:${requestId}:${cleanPath}:${bodyHash}`;
     
     // Calcular firma esperada
     const expectedSignature = crypto
@@ -118,22 +111,16 @@ function validateHmacV1(
       .update(stringToSign)
       .digest('hex');
     
-    // Extraer firma recibida (remover prefijos si existen)
-    const receivedSignature = signature
-      .replace(/^sha256=/i, '')
-      .split(',')
-      .find(part => part.startsWith('v1='))?.substring(3) || '';
-    
     // Validar firma
     if (!timingSafeEqualSafe(receivedSignature, expectedSignature)) {
       // 🔥 NUEVO: Usar cache para evitar spam de logs
-      const cacheKey = `hmac_failed_${requestId}`;
+      const cacheKey = `hmac_failed_${xRequestId}`;
       const shouldLog = warningCache.shouldLog(cacheKey);
       
       if (shouldLog) {
         const stats = warningCache.getStats(cacheKey);
         logger.warn('HMAC validation failed - verificación vía API activada', {
-          requestId,
+          requestId: xRequestId,
           ts,
           path: cleanPath,
           bodyLength: body.length,
@@ -156,7 +143,7 @@ function validateHmacV1(
       return { ok: false, reason: 'Invalid signature' };
     }
     
-    return { ok: true, dataId: requestId };
+    return { ok: true, dataId: normalizedDataIdUrl };
     
   } catch (err) {
     logger.error('HMAC validation error', err);
