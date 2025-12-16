@@ -22,6 +22,7 @@ interface AgencySelectorProps {
   carrierId?: string;
   logisticType?: string;
   optionId?: string; // Nuevo: option_id de ME2
+  optionHash?: string; // Nuevo: option_hash de ME2
   stateId?: string; // Nuevo: state_id para endpoints geográficos
 }
 
@@ -31,13 +32,19 @@ export function AgencySelector({
   onAvailabilityChange,
   selectedAgencyId,
   shippingMethodId,
+  carrierId,
+  logisticType,
   optionId, // Nuevo parámetro
+  optionHash, // Nuevo parámetro
   stateId // Nuevo parámetro
 }: AgencySelectorProps) {
   console.log('[AgencySelector] Montando componente con:', {
     zipcode,
     shippingMethodId,
+    carrierId,
+    logisticType,
     optionId,
+    optionHash,
     stateId
   });
   
@@ -65,6 +72,7 @@ export function AgencySelector({
           zipcode,
           shippingMethodId,
           optionId,
+          optionHash,
           stateId,
         });
 
@@ -73,10 +81,23 @@ export function AgencySelector({
           zipcode: cleanZipcode,
           shipping_method_id: shippingMethodId || '',
         });
+
+        if (carrierId) {
+          params.append('carrier_id', carrierId);
+        }
+
+        if (logisticType) {
+          params.append('logistic_type', logisticType);
+        }
         
         // Agregar option_id si está disponible (para ME2)
         if (optionId) {
           params.append('option_id', optionId);
+        }
+
+        // Agregar option_hash si está disponible (para ME2)
+        if (optionHash) {
+          params.append('option_hash', optionHash);
         }
         
         // Agregar state_id si está disponible (para endpoints geográficos)
@@ -171,7 +192,7 @@ export function AgencySelector({
     };
 
     fetchAgencies();
-  }, [zipcode, shippingMethodId, optionId, stateId, onAvailabilityChange, onAgencySelect]);
+  }, [zipcode, shippingMethodId, carrierId, logisticType, optionId, optionHash, stateId, onAvailabilityChange, onAgencySelect]);
 
   // Manejar selección de sucursal
   const handleAgencySelect = (agency: FormattedAgency) => {

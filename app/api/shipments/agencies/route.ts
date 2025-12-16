@@ -68,15 +68,20 @@ export async function GET(request: NextRequest) {
     // Para ME2, intentar primero con el option_id directamente si está disponible
     // Las opciones ME2 tipo agency pueden tener su propio endpoint de agencies
     const me2OptionId = searchParams.get('option_id');
+    const me2OptionHash = searchParams.get('option_hash');
     const stateId = searchParams.get('state_id'); // AR-M para Mendoza, etc.
     
-    if (logisticType === 'me2' && me2OptionId) {
+    const me2OptionRef = me2OptionHash || me2OptionId;
+
+    if (logisticType === 'me2' && me2OptionRef) {
       // Opción 1: Usar endpoint con seller_id (recomendado para ME2)
-      const me2AgenciesUrl = `https://api.mercadolibre.com/users/${tokenOwner.mercadoLibreId}/shipping_options/${me2OptionId}/agencies?zip_code=${encodeURIComponent(cleanZipcode)}`;
+      const me2AgenciesUrl = `https://api.mercadolibre.com/users/${tokenOwner.mercadoLibreId}/shipping_options/${encodeURIComponent(me2OptionRef)}/agencies?zip_code=${encodeURIComponent(cleanZipcode)}`;
       
       logger.info('[Agencies] Intentando obtener sucursales ME2 con seller_id', {
         sellerId: tokenOwner.mercadoLibreId,
         optionId: me2OptionId,
+        optionHash: me2OptionHash,
+        optionRef: me2OptionRef,
         zipcode: cleanZipcode,
         url: me2AgenciesUrl
       });
@@ -124,6 +129,8 @@ export async function GET(request: NextRequest) {
           logger.info('[Agencies] Éxito obteniendo sucursales ME2 con seller_id', {
             sellerId: tokenOwner.mercadoLibreId,
             optionId: me2OptionId,
+            optionHash: me2OptionHash,
+            optionRef: me2OptionRef,
             agenciesCount: formattedAgencies.length
           });
           
@@ -136,6 +143,8 @@ export async function GET(request: NextRequest) {
           logger.warn('[Agencies] Endpoint ME2 seller_id falló', {
             sellerId: tokenOwner.mercadoLibreId,
             optionId: me2OptionId,
+            optionHash: me2OptionHash,
+            optionRef: me2OptionRef,
             status: me2Response.status,
             error: errorText
           });
@@ -144,28 +153,34 @@ export async function GET(request: NextRequest) {
         logger.warn('[Agencies] Error con endpoint ME2 seller_id, continuando con flujo normal', {
           sellerId: tokenOwner.mercadoLibreId,
           optionId: me2OptionId,
+          optionHash: me2OptionHash,
+          optionRef: me2OptionRef,
           error: error instanceof Error ? error.message : String(error)
         });
       }
       
       // Opción 2: Usar endpoint con shipping_option_id (alternativo)
-      const alternativeUrl = `https://api.mercadolibre.com/shipments/agencies?zip_code=${encodeURIComponent(cleanZipcode)}&shipping_option_id=${encodeURIComponent(me2OptionId)}`;
+      const alternativeUrl = me2OptionId
+        ? `https://api.mercadolibre.com/shipments/agencies?zip_code=${encodeURIComponent(cleanZipcode)}&shipping_option_id=${encodeURIComponent(me2OptionId)}`
+        : null;
       
       logger.info('[Agencies] Intentando obtener sucursales ME2 con shipping_option_id (alternativo)', {
         optionId: me2OptionId,
+        optionHash: me2OptionHash,
+        optionRef: me2OptionRef,
         zipcode: cleanZipcode,
         url: alternativeUrl
       });
       
       try {
-        const altResponse = await fetch(alternativeUrl, {
+        const altResponse = alternativeUrl ? await fetch(alternativeUrl, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
-        });
+        }) : null;
         
-        if (altResponse.ok) {
+        if (altResponse && altResponse.ok) {
           const rawAgencies = await altResponse.json();
           const agencies: Agency[] = Array.isArray(rawAgencies)
             ? rawAgencies
@@ -199,6 +214,8 @@ export async function GET(request: NextRequest) {
           
           logger.info('[Agencies] Éxito obteniendo sucursales ME2 con shipping_option_id (alternativo)', {
             optionId: me2OptionId,
+            optionHash: me2OptionHash,
+            optionRef: me2OptionRef,
             agenciesCount: formattedAgencies.length
           });
           
@@ -206,10 +223,12 @@ export async function GET(request: NextRequest) {
             zipcode: cleanZipcode,
             agencies: formattedAgencies
           });
-        } else {
+        } else if (altResponse) {
           const errorText = await altResponse.text();
           logger.warn('[Agencies] Endpoint ME2 shipping_option_id alternativo falló', {
             optionId: me2OptionId,
+            optionHash: me2OptionHash,
+            optionRef: me2OptionRef,
             status: altResponse.status,
             error: errorText
           });
@@ -217,15 +236,19 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         logger.warn('[Agencies] Error con endpoint ME2 shipping_option_id alternativo', {
           optionId: me2OptionId,
+          optionHash: me2OptionHash,
+          optionRef: me2OptionRef,
           error: error instanceof Error ? error.message : String(error)
         });
       }
       
       // Opción 3: Usar endpoint directo con option_id
-      const optionUrl = `https://api.mercadolibre.com/shipping_options/${me2OptionId}/agencies?zip_code=${encodeURIComponent(cleanZipcode)}`;
+      const optionUrl = `https://api.mercadolibre.com/shipping_options/${encodeURIComponent(me2OptionRef)}/agencies?zip_code=${encodeURIComponent(cleanZipcode)}`;
       
       logger.info('[Agencies] Intentando obtener sucursales ME2 con option_id (tercer intento)', {
         optionId: me2OptionId,
+        optionHash: me2OptionHash,
+        optionRef: me2OptionRef,
         zipcode: cleanZipcode,
         url: optionUrl
       });
@@ -272,6 +295,8 @@ export async function GET(request: NextRequest) {
           
           logger.info('[Agencies] Éxito obteniendo sucursales ME2 con option_id (tercer intento)', {
             optionId: me2OptionId,
+            optionHash: me2OptionHash,
+            optionRef: me2OptionRef,
             agenciesCount: formattedAgencies.length
           });
           
@@ -283,6 +308,8 @@ export async function GET(request: NextRequest) {
           const errorText = await optionResponse.text();
           logger.warn('[Agencies] Endpoint ME2 option_id tercer intento falló', {
             optionId: me2OptionId,
+            optionHash: me2OptionHash,
+            optionRef: me2OptionRef,
             status: optionResponse.status,
             error: errorText
           });
@@ -290,6 +317,8 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         logger.warn('[Agencies] Error con endpoint ME2 option_id tercer intento', {
           optionId: me2OptionId,
+          optionHash: me2OptionHash,
+          optionRef: me2OptionRef,
           error: error instanceof Error ? error.message : String(error)
         });
       }
@@ -370,16 +399,16 @@ export async function GET(request: NextRequest) {
       // Si todos los intentos fallan, mostrar mensaje informativo
       logger.warn('[Agencies] Todos los endpoints ME2 fallaron, posible limitación de Mercado Libre', {
         optionId: me2OptionId,
+        optionHash: me2OptionHash,
+        optionRef: me2OptionRef,
         zipcode: cleanZipcode,
         message: 'ME2 podría no permitir selección anticipada de sucursales'
       });
-      
-      return NextResponse.json({
-        zipcode: cleanZipcode,
-        agencies: [],
-        message: 'Para envíos a sucursal con Mercado Envíos 2, la sucursal se seleccionará durante el proceso de pago en Mercado Libre.',
-        requiresMlCheckout: true
-      });
+
+      // IMPORTANTE:
+      // Aunque ML no exponga agencias por option_id (endpoints ME2), todavía podemos intentar el flujo clásico
+      // por carrier_id (derivado desde shipping_method_id) para ver si ML devuelve sucursales.
+      // Si ese flujo también falla o no devuelve resultados, recién ahí informamos requiresMlCheckout.
     }
 
     // Construir URL para obtener sucursales
@@ -600,6 +629,19 @@ export async function GET(request: NextRequest) {
         url
       });
 
+      // Si venimos de ME2 con option_id, y el flujo por carrier_id tampoco funciona,
+      // informar que la selección se hará en Mercado Libre.
+      if (logisticType === 'me2' && me2OptionRef) {
+        return NextResponse.json({
+          zipcode: cleanZipcode,
+          agencies: [],
+          message:
+            'No se pudieron obtener sucursales antes del pago desde la API de Mercado Libre (ME2). Podrás continuar con el pago y confirmar el punto de retiro al volver a la tienda.',
+          requiresMlCheckout: true,
+          mercadoLibreStatus: response.status,
+        });
+      }
+
       return NextResponse.json({
         zipcode: cleanZipcode,
         agencies: [],
@@ -632,6 +674,16 @@ export async function GET(request: NextRequest) {
         logisticType,
         url
       });
+
+      if (logisticType === 'me2' && me2OptionRef) {
+        return NextResponse.json({
+          zipcode: cleanZipcode,
+          agencies: [],
+          message:
+            'No se pudieron obtener sucursales antes del pago desde la API de Mercado Libre (ME2). Podrás continuar con el pago y confirmar el punto de retiro al volver a la tienda.',
+          requiresMlCheckout: true,
+        });
+      }
       
       return NextResponse.json({
         zipcode: cleanZipcode,

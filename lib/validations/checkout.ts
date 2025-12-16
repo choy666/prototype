@@ -176,6 +176,12 @@ export const checkoutSchema = z.object({
     estimatedDays: z.number().optional(),
     type: z.enum(['standard', 'express', 'pickup']).optional(),
     freeShippingThreshold: z.number().optional(),
+    deliver_to: z.enum(['address', 'agency']).optional(),
+    carrier_id: z.number().optional(),
+    option_id: z.number().optional(),
+    option_hash: z.string().optional(),
+    state_id: z.string().optional(),
+    logistic_type: z.string().optional(),
   }),
 
   shippingAgency: shippingAgencySchema.optional(),

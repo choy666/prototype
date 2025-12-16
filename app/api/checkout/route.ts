@@ -257,7 +257,20 @@ export async function POST(req: NextRequest) {
         shippingMode: 'me2',
         source: 'local',
         shippingAgency: shippingAgency ?? null, // Guardar datos de la sucursal si aplica
-        metadata: {},
+        metadata: {
+          pickup_post_payment: Boolean(isPickupAgencyMethod && normalizedRequiresMlCheckout),
+          shipping_context: {
+            zipcode: formattedAddress.zip_code,
+            shipping_method_id: shippingMethod?.id?.toString?.() ?? String(shippingMethod?.id ?? ''),
+            shipping_method_name: shippingMethod?.name ?? null,
+            logistic_type: shippingMethod?.logistic_type ?? 'me2',
+            deliver_to: shippingMethod?.deliver_to ?? (isPickupAgencyMethod ? 'agency' : 'address'),
+            carrier_id: shippingMethod?.carrier_id ?? null,
+            option_id: shippingMethod?.option_id ?? null,
+            option_hash: shippingMethod?.option_hash ?? null,
+            state_id: shippingMethod?.state_id ?? null,
+          },
+        },
       })
       .returning({ id: orders.id });
 

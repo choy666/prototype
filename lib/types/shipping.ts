@@ -3,6 +3,7 @@
 export interface MLShippingMethod {
   shipping_method_id?: number; // Opcional para envíos internos
   option_id?: number; // ID de opción para obtener sucursales (ME2)
+  option_hash?: string; // Hash de opción (ME2) para obtener sucursales
   state_id?: string; // ID de estado para endpoints geográficos (ej: AR-M)
   name: string;
   description: string;

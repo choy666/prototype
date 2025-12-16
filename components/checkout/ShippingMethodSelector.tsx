@@ -308,6 +308,7 @@ export function ShippingMethodSelector({
             carrierId={selectedMethod.carrier_id?.toString()}
             logisticType={selectedMethod.logistic_type}
             optionId={selectedMethod.option_id?.toString()}
+            optionHash={selectedMethod.option_hash}
             stateId={selectedMethod.state_id}
           />
         </div>

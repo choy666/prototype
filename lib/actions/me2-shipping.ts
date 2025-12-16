@@ -55,6 +55,7 @@ interface ME2ShippingResult {
 
 interface MLItemShippingOption {
   id: number;
+  option_hash?: string;
   name: string;
   currency_id: string;
   list_cost: number;
@@ -830,6 +831,7 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       return {
         shipping_method_id: option.shipping_method_id,
         option_id: option.id, // Agregar option_id para obtener sucursales
+        option_hash: option.option_hash,
         state_id: rawData.destination?.state?.id, // Agregar state_id para endpoints geográficos
         name: option.name,
         description: optionType === 'address'
@@ -864,7 +866,7 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
             }
           : undefined,
         shipping_mode: 'me2',
-        logistic_type: optionType,
+        logistic_type: 'me2',
         treatment: option.shipping_method_type,
         guaranteed: false,
         order_priority: option.id,
