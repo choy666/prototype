@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { mercadolibreWebhooks, mercadolibreProductsSync, mercadolibreQuestions } from '@/lib/schema';
+import { mercadolibreWebhooks, mercadolibreProductsSync, mercadolibreQuestions, users } from '@/lib/schema';
 import { eq, and, count } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
 import crypto from 'crypto';
+import { auth } from '@/lib/actions/auth';
+import { importMercadoLibreOrderById } from '@/lib/services/mercadolibre/orders-import';
 
 interface MercadoLibreWebhookPayload {
   application_id: string;
@@ -13,6 +15,44 @@ interface MercadoLibreWebhookPayload {
   attempts: number;
   sent: string;
   received: string;
+}
+
+async function handleItemsWebhook(
+  resource: string
+): Promise<{ success: boolean; error?: string }> {
+  const itemId = resource.split('/').pop();
+
+  if (!itemId) {
+    return { success: false, error: 'ID de item no válido' };
+  }
+
+  try {
+    const syncRecord = await db.query.mercadolibreProductsSync.findFirst({
+      where: eq(mercadolibreProductsSync.mlItemId, itemId),
+    });
+
+    if (syncRecord) {
+      await db
+        .update(mercadolibreProductsSync)
+        .set({
+          lastSyncAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(mercadolibreProductsSync.id, syncRecord.id));
+
+      logger.info('Sincronización de producto actualizada por webhook', {
+        itemId,
+        syncId: syncRecord.id,
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function POST(req: Request) {
@@ -40,6 +80,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Aplicación no válida' }, { status: 401 });
     }
 
+    const localUser = await db.query.users.findFirst({
+      where: eq(users.mercadoLibreId, payload.user_id),
+      columns: {
+        id: true,
+      },
+    });
+
     // Generar ID único para el webhook
     const webhookId = crypto.randomUUID();
 
@@ -48,7 +95,7 @@ export async function POST(req: Request) {
       webhookId,
       topic: payload.topic,
       resource: payload.resource,
-      userId: parseInt(payload.user_id),
+      userId: localUser?.id ?? null,
       resourceId: payload.resource.split('/').pop() || null,
       applicationId: payload.application_id,
       payload: payload,
@@ -59,7 +106,8 @@ export async function POST(req: Request) {
     // Procesar el webhook según el topic
     const processingResult = await processWebhookNotification(
       payload.topic,
-      payload.resource
+      payload.resource,
+      localUser?.id ?? null
     );
 
     // Actualizar estado del webhook
@@ -114,6 +162,11 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const topic = searchParams.get('topic');
     const processed = searchParams.get('processed');
@@ -191,7 +244,8 @@ export async function GET(req: Request) {
 // Función principal de procesamiento de webhooks
 async function processWebhookNotification(
   topic: string,
-  resource: string
+  resource: string,
+  localUserId: number | null
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // El payload se recibe pero no se utiliza directamente en este handler
@@ -200,7 +254,7 @@ async function processWebhookNotification(
         return await handleItemsWebhook(resource);
       
       case 'orders':
-        return await handleOrdersWebhook(resource);
+        return await handleOrdersWebhook(resource, localUserId);
       
       case 'questions':
         return await handleQuestionsWebhook(resource);
@@ -227,47 +281,9 @@ async function processWebhookNotification(
   }
 }
 
-// Handlers específicos por topic
-async function handleItemsWebhook(
-  resource: string
-): Promise<{ success: boolean; error?: string }> {
-  const itemId = resource.split('/').pop();
-  
-  if (!itemId) {
-    return { success: false, error: 'ID de item no válido' };
-  }
-
-  try {
-    // Actualizar estado de sincronización del producto
-    const syncRecord = await db.query.mercadolibreProductsSync.findFirst({
-      where: eq(mercadolibreProductsSync.mlItemId, itemId),
-    });
-
-    if (syncRecord) {
-      await db.update(mercadolibreProductsSync)
-        .set({
-          lastSyncAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(mercadolibreProductsSync.id, syncRecord.id));
-
-      logger.info('Sincronización de producto actualizada por webhook', {
-        itemId,
-        syncId: syncRecord.id,
-      });
-    }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
 async function handleOrdersWebhook(
-  resource: string
+  resource: string,
+  localUserId: number | null
 ): Promise<{ success: boolean; error?: string }> {
   const orderId = resource.split('/').pop();
   
@@ -276,14 +292,19 @@ async function handleOrdersWebhook(
   }
 
   try {
-    // Aquí podrías disparar la importación automática de la orden
-    // o actualizar su estado si ya existe
-    
+    if (!localUserId) {
+      return { success: false, error: 'No se pudo resolver el usuario local para importar la orden' };
+    }
+
+    await importMercadoLibreOrderById({
+      localUserId,
+      mlOrderId: orderId,
+    });
+
     logger.info('Webhook de orden recibido', {
       orderId,
     });
 
-    // Por ahora solo registramos el evento
     return { success: true };
   } catch (error) {
     return {

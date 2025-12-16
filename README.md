@@ -26,6 +26,7 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 ## 🛠️ Tecnologías Utilizadas
 
 ### Frontend
+
 - **Next.js 15.5** - Framework React con App Router
 - **TypeScript** - Tipado estático
 - **Tailwind CSS 4.1** - Framework de estilos utilitarios
@@ -35,17 +36,20 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 - **React Query 5.90** - Gestión de estado del servidor
 
 ### Backend
+
 - **Next.js API Routes** - API REST
 - **NextAuth.js 5.0** - Autenticación (v5 beta)
 - **Drizzle ORM 0.44** - ORM para PostgreSQL
 - **Neon** - Base de datos PostgreSQL serverless
 
 ### Integraciones
+
 - **Mercado Pago** - Procesamiento de pagos completo
 - **Mercado Libre OAuth** - Autenticación social y sincronización
 - **Model Context Protocol** - Servers para ML y MP
 
 ### Herramientas de Desarrollo
+
 - **ESLint** - Linting de código
 - **Prettier** - Formateo de código
 - **Drizzle Kit** - Migraciones de base de datos
@@ -63,12 +67,14 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 ## 🚀 Instalación
 
 1. **Clona el repositorio**
+
    ```bash
    git clone <url-del-repositorio>
    cd mi-tienda
    ```
 
 2. **Instala las dependencias**
+
    ```bash
    npm install
    ```
@@ -111,6 +117,7 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
    ```
 
 5. **Inicia el servidor de desarrollo**
+
    ```bash
    npm run dev
    ```
@@ -119,7 +126,7 @@ Una plataforma de comercio electrónico completa construida con tecnologías mod
 
 ## 📁 Estructura del Proyecto
 
-```
+````
 mi-tienda/
 ├── app/                    # Páginas y rutas de Next.js
 │   ├── (auth)/            # Rutas de autenticación
@@ -237,13 +244,14 @@ npm run db:generate && npm run db:push
 
 # 4. Iniciar
 npm run dev
-```
+````
 
 🎉 **Listo!** Abre `http://localhost:3001`
 
 ## 🏗️ Arquitectura y Decisiones de Diseño
 
 ### ¿Por qué estas tecnologías?
+
 - **Next.js 15.5**: App Router para mejor SEO y rendimiento
 - **Drizzle ORM**: Type-safe, lightweight, excelente para TypeScript
 - **Neon**: PostgreSQL serverless con branching automático
@@ -251,6 +259,7 @@ npm run dev
 - **Zustand**: Estado global simple sin boilerplate
 
 ### Patrón de Arquitectura
+
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │   Backend API   │    │   Base de Datos │
@@ -275,11 +284,13 @@ npm run dev
 ## 🧪 Testing
 
 ### Estrategia de Testing
+
 - **Unit Tests**: Componentes y utilidades con Jest + Testing Library
 - **Integration Tests**: API endpoints y servicios ML/MP
 - **E2E Tests**: Flujos críticos (checkout, auth)
 
 ### Ejecutar Tests
+
 ```bash
 # Todos los tests
 npm run test
@@ -295,11 +306,13 @@ npm run test -- integration/
 ```
 
 ### Mocking Strategy
+
 - **Base de datos**: Mock global con chainable methods
 - **APIs externas**: Mocks específicos para ML/MP en `__mocks__/`
 - **Componentes**: Mock de dependencias externas
 
 ### Métricas Objetivo
+
 - **Coverage**: >85% en código crítico
 - **Tests unitarios**: >90% coverage en utilidades
 - **Integration**: 100% coverage en endpoints API
@@ -346,12 +359,14 @@ npm run migrate:simple      # Ejecuta migración simple
 ## ⚡ Performance y Optimización
 
 ### Métricas Actuales
+
 - **Lighthouse Performance**: 92/100
 - **First Contentful Paint**: <1.2s
 - **Time to Interactive**: <2.1s
 - **Bundle Size**: <450KB (gzipped)
 
 ### Optimizaciones Implementadas
+
 - **Next.js Turbopack**: Build rápido en desarrollo
 - **Dynamic Imports**: Code splitting automático
 - **Image Optimization**: Next.js Image component
@@ -359,6 +374,7 @@ npm run migrate:simple      # Ejecuta migración simple
 - **Caching Strategy**: React Query + Zustand
 
 ### Monitoreo
+
 ```bash
 # Verificar rendimiento de build
 npm run build -- --analyze
@@ -373,6 +389,7 @@ npm run build && npx bundle-analyzer .next
 ## 🔒 Seguridad
 
 ### Medidas Implementadas
+
 - **Autenticación**: NextAuth.js v5 con OAuth seguro
 - **Rate Limiting**: Middleware personalizado
 - **CORS**: Configuración restrictiva
@@ -381,6 +398,7 @@ npm run build && npx bundle-analyzer .next
 - **SQL Injection Protection**: Drizzle ORM con parameterized queries
 
 ### Best Practices
+
 ```bash
 # Validar variables de entorno
 npm run validate:env
@@ -397,6 +415,7 @@ npm audit
 ### Problemas Frecuentes
 
 #### 1. Error de conexión a base de datos
+
 ```bash
 # Verificar URL de BD
 echo $DATABASE_URL
@@ -406,12 +425,14 @@ npm run db:studio
 ```
 
 #### 2. Tests fallan con "TypeError: set is not a function"
+
 ```bash
 # Limpiar caché de Jest
 rm -rf node_modules/.cache && npm run test
 ```
 
 #### 3. Webhooks de Mercado Libre no funcionan
+
 ```bash
 # Verificar configuración
 curl -X POST https://webhook.site/unique-id
@@ -421,6 +442,7 @@ npm run tunnel
 ```
 
 #### 4. Build falla por variables de entorno
+
 ```bash
 # Validar todas las variables
 npm run validate:env
@@ -430,6 +452,7 @@ vercel env pull .env.local
 ```
 
 ### Debug Mode
+
 ```bash
 # Iniciar con debug logs
 DEBUG=* npm run dev
@@ -441,11 +464,13 @@ tail -f .next/server.log
 ## 📚 Documentación Adicional
 
 ### Guías Específicas
+
 - [Configuración Mercado Pago](docs/CONFIGURACION_MERCADOPAGO.md)
 - [Migración Mercado Envíos](docs/plan-migracion-mercado-envios-2.md)
 - [Errores y Soluciones](docs/erroresCorrecciones.md)
 
 ### API Documentation
+
 ```bash
 # Generar documentación de API
 npm run build && npm run export:api
@@ -457,16 +482,19 @@ curl http://localhost:3001/api/health
 ## 🌐 Despliegue
 
 ### Vercel (Recomendado)
+
 1. Conecta tu repositorio a Vercel
 2. Configura las variables de entorno en Vercel
 3. Despliega automáticamente
 
 ### Otros Proveedores
+
 Asegúrate de configurar las variables de entorno y la base de datos en tu proveedor de hosting.
 
 ## 🤝 Contribución
 
 ### Guía Rápida
+
 1. **Fork** el proyecto
 2. **Branch**: `git checkout -b feature/nueva-funcionalidad`
 3. **Commits**: Usa mensajes semánticos (`feat:`, `fix:`, `docs:`)
@@ -474,12 +502,14 @@ Asegúrate de configurar las variables de entorno y la base de datos en tu prove
 5. **PR**: Describe cambios y tests agregados
 
 ### Requisitos para PR
+
 - **Tests**: Todos los tests deben pasar
 - **Lint**: `npm run lint` sin errores
 - **Types**: `npm run typecheck` exitoso
 - **Docs**: Actualizar README si es necesario
 
 ### Estándar de Commits
+
 ```bash
 feat: agregar nueva funcionalidad
 fix: corregir bug en checkout
@@ -489,6 +519,7 @@ refactor: mejorar código existente
 ```
 
 ### Desarrollo Local
+
 ```bash
 # Instalar dependencias
 npm install
@@ -518,6 +549,7 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ## 📱 Screenshots y Demo
 
 ### Panel Administrativo
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 🛒 Mi Tienda - Panel Admin                              │
@@ -532,17 +564,21 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ```
 
 ### Flujo de Checkout
+
 ```
 Carrito → Dirección → Pago MP → Confirmación → Tracking ML
    ✅        ✅         ✅           ✅           ✅
 ```
 
 ### Demo Online
+
 🚀 **Prueba la demo**: [https://demo.mitienda.com](https://demo.mitienda.com)
+
 - **Usuario**: demo@mitienda.com
 - **Contraseña**: demo123
 
 ### GIF del Flujo
+
 ```bash
 # Generar GIF de demo
 gifify --start=1 --duration=10 demo.mp4
@@ -551,18 +587,20 @@ gifify --start=1 --duration=10 demo.mp4
 ## 📋 Variables de Entorno
 
 ### Referencia Completa
-| Variable | Propósito | Ejemplo | Requerido |
-|----------|-----------|---------|-----------|
-| `DATABASE_URL` | Conexión a PostgreSQL | `postgresql://user:pass@host:5432/db` | |
-| `NEXTAUTH_SECRET` | Secret para sesiones | `random-secret-string` | |
-| `NEXTAUTH_URL` | URL base de la app | `http://localhost:3000` | |
-| `MERCADO_LIBRE_CLIENT_ID` | OAuth ML Client | `ML_CLIENT_ID` | |
-| `MERCADO_LIBRE_CLIENT_SECRET` | OAuth ML Secret | `ML_CLIENT_SECRET` | |
-| `MERCADO_PAGO_ACCESS_TOKEN` | Token API MP | `MP_ACCESS_TOKEN` | |
-| `MERCADO_PAGO_PUBLIC_KEY` | Key frontend MP | `MP_PUBLIC_KEY` | |
-| `NEXT_PUBLIC_APP_URL` | URL pública app | `https://tuapp.com` | |
+
+| Variable                      | Propósito             | Ejemplo                               | Requerido |
+| ----------------------------- | --------------------- | ------------------------------------- | --------- |
+| `DATABASE_URL`                | Conexión a PostgreSQL | `postgresql://user:pass@host:5432/db` |           |
+| `NEXTAUTH_SECRET`             | Secret para sesiones  | `random-secret-string`                |           |
+| `NEXTAUTH_URL`                | URL base de la app    | `http://localhost:3000`               |           |
+| `MERCADO_LIBRE_CLIENT_ID`     | OAuth ML Client       | `ML_CLIENT_ID`                        |           |
+| `MERCADO_LIBRE_CLIENT_SECRET` | OAuth ML Secret       | `ML_CLIENT_SECRET`                    |           |
+| `MERCADO_PAGO_ACCESS_TOKEN`   | Token API MP          | `MP_ACCESS_TOKEN`                     |           |
+| `MERCADO_PAGO_PUBLIC_KEY`     | Key frontend MP       | `MP_PUBLIC_KEY`                       |           |
+| `NEXT_PUBLIC_APP_URL`         | URL pública app       | `https://tuapp.com`                   |           |
 
 ### Validación
+
 ```bash
 # Verificar todas las variables requeridas
 npm run validate:env
@@ -574,6 +612,7 @@ npm run check:env
 ## 🚀 Roadmap y Próximos Mejoras
 
 ### Timeline Estimado
+
 - **Q1 2025**: FASE 6 - Tests de integración ML completos
 - **Q1 2025**: FASE 7 - Tests E2E con Playwright
 - **Q2 2025**: Dashboard de métricas de integración
@@ -582,19 +621,23 @@ npm run check:env
 - **Q4 2025**: Multi-tenant y escalabilidad
 
 ### Issues Conocidos
+
 - [Tests de integración ML pendientes](https://github.com/tu-repo/issues/42)
 - [Dashboard métricas no implementado](https://github.com/tu-repo/issues/45)
 - [Documentación API incompleta](https://github.com/tu-repo/issues/48)
 
 ### Limitaciones Actuales
+
 - **Testing**: Entorno configurado pero tests específicos ML no implementados
 - **Monitoreo**: Sin dashboard de métricas en tiempo real
 - **Documentación**: API docs autogenerated pero no personalizadas
 
 ### 🏆 Puntuación Actual
+
 **Calidad del Proyecto**: 8.5/10 → **Objetivo Final: 9.5/10**
 
 ### ⚠️ Limitaciones Conocidas
+
 - **Tests de integración**: El entorno de testing está configurado pero los tests específicos de Mercado Libre no están implementados
 - **Monitoreo**: No hay dashboard de métricas de integración disponible aún
 - **Documentación API**: Falta documentación detallada de los endpoints implementados
@@ -604,6 +647,7 @@ npm run check:env
 ## 📝 Notas de Desarrollo
 
 ### Variables de Entorno (Vercel)
+
 ```bash
 # Listar variables de entorno
 vercel env ls
@@ -622,6 +666,7 @@ vercel env pull .env.local --environment=production
 ```
 
 ### Comandos de Drizzle Kit
+
 ```bash
 # Generar migraciones
 npx drizzle-kit generate
@@ -639,7 +684,5 @@ npx drizzle-kit check
 ---
 
 **Estado Final**: ✅ **Proyecto en desarrollo activo con integración funcional Mercado Libre**
-
-
 
 prototype-ten-dun.vercel.app/api/user/document

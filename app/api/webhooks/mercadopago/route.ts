@@ -7,6 +7,7 @@ import { logger } from '@/lib/utils/logger';
 import { verifyMercadoPagoWebhook } from '@/lib/mercado-pago/hmacVerifier';
 import { saveDeadLetterWebhook } from '@/lib/actions/webhook-failures';
 import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
+import { processMerchantOrderWebhook } from '@/lib/actions/merchant-order-processor';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { randomUUID } from 'crypto';
 
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
     const headers = req.headers;
     const { searchParams } = new URL(req.url);
     const dataIdFromUrl = searchParams.get('data.id') || searchParams.get('id') || null;
+    const topicFromUrl = searchParams.get('topic') || searchParams.get('type') || null;
 
     logger.info('Webhook received', {
       requestId,
@@ -42,6 +44,7 @@ export async function POST(req: Request) {
       rawBody,
       headers,
       dataIdFromUrl,
+      topicFromUrl,
       request: req,
     }).catch((error) => {
       logger.error('Async webhook processing failed', {
@@ -176,11 +179,12 @@ async function verifyPaymentViaAPI(paymentId: string, requestId: string): Promis
   }
 }
 
-async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl, request }: {
+async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl, topicFromUrl, request }: {
   requestId: string;
   rawBody: string;
   headers: Headers;
   dataIdFromUrl: string | null;
+  topicFromUrl: string | null;
   request: Request;
 }) {
   try {
@@ -264,7 +268,7 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
 
     // Parsear payload
     const payload = JSON.parse(rawBody);
-    const action = payload?.action || null;
+    const action = payload?.action || payload?.type || payload?.topic || topicFromUrl || null;
     let dataId = payload?.data?.id || dataIdFromUrl;
 
     // Si tenemos datos de API pero no del payload, usar los de API
@@ -298,9 +302,31 @@ async function processWebhookAsync({ requestId, rawBody, headers, dataIdFromUrl,
 
     if (isPayment) {
       await handlePaymentWebhook(dataId, requestId, rawBody, headers, requiresManualVerification, hmacValidation.reason);
-    } else if (action === 'merchant_order') {
-      logger.info('Merchant order webhook received', { requestId });
-      // TODO: Implementar procesamiento de merchant orders si es necesario
+    } else if (action === 'merchant_order' || action?.startsWith('merchant_order')) {
+      logger.info('Merchant order webhook received', { requestId, merchantOrderId: dataId });
+
+      if (!dataId) {
+        logger.error('Merchant order payload inválido - falta data.id', { requestId });
+        return;
+      }
+
+      const result = await processMerchantOrderWebhook(String(dataId), requestId);
+
+      if (!result.success) {
+        logger.error('Merchant order processing failed', {
+          requestId,
+          merchantOrderId: dataId,
+          error: result.error,
+        });
+      } else {
+        logger.info('Merchant order processed successfully', {
+          requestId,
+          merchantOrderId: dataId,
+          orderId: result.orderId,
+          shipmentId: result.shipmentId,
+          shipmentPending: result.shipmentPending,
+        });
+      }
     } else {
       logger.warn('Acción no reconocida', { requestId, action, requiresManualVerification });
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Loader2, Clock, Phone, ExternalLink } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import { FormattedAgency } from '@/types/agency';
@@ -54,10 +54,39 @@ export function AgencySelector({
   const [info, setInfo] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>(selectedAgencyId);
   const [needsMercadoLibreAuth, setNeedsMercadoLibreAuth] = useState(false);
+  const lastFetchKeyRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Obtener sucursales cuando cambia el zipcode
   useEffect(() => {
     if (!zipcode) return;
+
+    // Limpiar zipcode
+    const cleanZipcode = zipcode.replace(/[^\d]/g, '');
+
+    const fetchKey = JSON.stringify({
+      zipcode: cleanZipcode,
+      shippingMethodId: shippingMethodId || '',
+      carrierId: carrierId || '',
+      logisticType: logisticType || '',
+      optionId: optionId || '',
+      optionHash: optionHash || '',
+      stateId: stateId || '',
+    });
+
+    if (lastFetchKeyRef.current === fetchKey) {
+      return;
+    }
+
+    lastFetchKeyRef.current = fetchKey;
+
+    const prevController = abortControllerRef.current;
+    if (prevController) {
+      prevController.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const fetchAgencies = async () => {
       setLoading(true);
@@ -65,9 +94,6 @@ export function AgencySelector({
       setInfo(null);
 
       try {
-        // Limpiar zipcode
-        const cleanZipcode = zipcode.replace(/[^\d]/g, '');
-        
         logger.info('[AgencySelector] Consultando agencias', {
           zipcode,
           shippingMethodId,
@@ -105,7 +131,9 @@ export function AgencySelector({
           params.append('state_id', stateId);
         }
 
-        const response = await fetch(`/api/shipments/agencies?${params}`);
+        const response = await fetch(`/api/shipments/agencies?${params}`, {
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -174,6 +202,9 @@ export function AgencySelector({
           count: data.agencies?.length || 0
         });
       } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
         console.error('[AgencySelector] Raw error:', err);
         console.error('[AgencySelector] Error type:', typeof err);
         console.error('[AgencySelector] Error instanceof Error:', err instanceof Error);
@@ -192,6 +223,10 @@ export function AgencySelector({
     };
 
     fetchAgencies();
+
+    return () => {
+      controller.abort();
+    };
   }, [zipcode, shippingMethodId, carrierId, logisticType, optionId, optionHash, stateId, onAvailabilityChange, onAgencySelect]);
 
   // Manejar selección de sucursal

@@ -4,7 +4,7 @@ import { products, users, productVariants, orders, mercadopagoPreferences, order
 import { eq, and } from 'drizzle-orm';
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
-import { calculateME2Shipping } from '@/lib/mercado-envios/me2Api';
+import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { formatAddressForMercadoLibre } from '@/lib/utils/address-formatter';
@@ -207,10 +207,14 @@ export async function POST(req: NextRequest) {
     // Formatear dirección para Mercado Libre antes de calcular envío
     const formattedAddress = formatAddressForMercadoLibre(shippingAddress);
     
-    const me2Response = await calculateME2Shipping({
-      zipcode: formattedAddress.zip_code, // Usar código postal limpio
-      items: me2Items,
-      allowFallback: true,
+    const me2Response = await calculateME2ShippingCost({
+      zipcode: formattedAddress.zip_code,
+      items: me2Items.map((item) => ({
+        id: item.id.toString(),
+        quantity: item.quantity,
+        price: item.price,
+        mlItemId: item.mlItemId,
+      })),
     });
 
     if (!me2Response.shippingOptions || me2Response.shippingOptions.length === 0) {
@@ -218,14 +222,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 2) Intentar usar exactamente el método seleccionado por el usuario (shippingMethod.id)
-    const selectedMethodFromEngine = me2Response.shippingOptions.find(opt =>
-      String(opt.shipping_method_id) === String(shippingMethod.id),
+    const selectedMethodFromEngine = me2Response.shippingOptions.find((opt) =>
+      String(opt.shipping_method_id) === String(shippingMethod.id)
     );
 
     // 3) Si no se encuentra (por cambios en ML o fallback), usar el más barato como respaldo
-    const cheapestMethod = me2Response.shippingOptions.reduce((min, curr) =>
-      (curr.cost || 0) < (min.cost || 0) ? curr : min,
-    me2Response.shippingOptions[0]);
+    const cheapestMethod = me2Response.shippingOptions.reduce(
+      (min, curr) => ((curr.cost || 0) < (min.cost || 0) ? curr : min),
+      me2Response.shippingOptions[0]
+    );
 
     const effectiveMethod = selectedMethodFromEngine || cheapestMethod;
     const shippingCost = effectiveMethod?.cost ?? 0;
@@ -261,14 +266,14 @@ export async function POST(req: NextRequest) {
           pickup_post_payment: Boolean(isPickupAgencyMethod && normalizedRequiresMlCheckout),
           shipping_context: {
             zipcode: formattedAddress.zip_code,
-            shipping_method_id: shippingMethod?.id?.toString?.() ?? String(shippingMethod?.id ?? ''),
-            shipping_method_name: shippingMethod?.name ?? null,
-            logistic_type: shippingMethod?.logistic_type ?? 'me2',
+            shipping_method_id: String(effectiveMethod?.shipping_method_id ?? shippingMethod?.id ?? ''),
+            shipping_method_name: effectiveMethod?.name ?? shippingMethod?.name ?? null,
+            logistic_type: 'me2',
             deliver_to: shippingMethod?.deliver_to ?? (isPickupAgencyMethod ? 'agency' : 'address'),
             carrier_id: shippingMethod?.carrier_id ?? null,
-            option_id: shippingMethod?.option_id ?? null,
-            option_hash: shippingMethod?.option_hash ?? null,
-            state_id: shippingMethod?.state_id ?? null,
+            option_id: shippingMethod?.option_id ?? (effectiveMethod?.option_id ?? null),
+            option_hash: shippingMethod?.option_hash ?? (effectiveMethod?.option_hash ?? null),
+            state_id: shippingMethod?.state_id ?? (effectiveMethod?.state_id ?? null),
           },
         },
       })
@@ -339,17 +344,22 @@ export async function POST(req: NextRequest) {
             currency_id: "ARS",
             category_id: "others", // Categoría genérica pero requerida
           })),
-          // Item de envío (si no es gratis)
-          ...(shippingCost > 0 ? [{
-            id: `shipping-${shippingMethod.id}`,
-            title: `Envío - ${shippingMethod.name}`,
-            description: `Costo de envío a ${shippingAddress.ciudad}, ${shippingAddress.provincia} (CP: ${shippingAddress.codigoPostal})`,
-            quantity: 1,
-            unit_price: Math.round(shippingCost * 100) / 100, // Redondear a 2 decimales
-            currency_id: "ARS",
-            category_id: "others",
-          }] : []),
         ],
+        shipments: {
+          cost: Math.round(shippingCost * 100) / 100,
+          mode: 'not_specified',
+          receiver_address: {
+            zip_code: formattedAddress.zip_code,
+            street_name: shippingAddress.direccion,
+            street_number: shippingAddress.numero || '1',
+            city_name: shippingAddress.ciudad,
+            state_name: shippingAddress.provincia,
+            country_name: 'Argentina',
+          },
+          dimensions: me2Items[0]?.height && me2Items[0]?.width && me2Items[0]?.length
+            ? `${me2Items[0].length} x ${me2Items[0].width} x ${me2Items[0].height}`
+            : undefined,
+        },
         payer: {
           email: payerInfo.email,
           name: payerInfo.name,
@@ -382,7 +392,7 @@ export async function POST(req: NextRequest) {
         // auto_return: "approved", // Desactivado para evitar doble redirección
         notification_url:
           process.env.MERCADO_PAGO_NOTIFICATION_URL
-          || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/mercadopago/payments/notify`,
+          || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/webhooks/mercadopago`,
         external_reference: orderId.toString(),
         metadata: metadata,
         payment_methods: {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import { processPaymentWebhook, checkPaymentIdempotency } from '@/lib/actions/payment-processor';
+import { processMerchantOrderWebhook } from '@/lib/actions/merchant-order-processor';
 
 /**
  * Endpoint de fallback para procesar pagos exitosos cuando webhooks fallan
@@ -67,6 +68,19 @@ export async function POST(req: Request) {
     
     // Procesar el pago usando el mismo processor que los webhooks
     const result = await processPaymentWebhook(String(payment_id), 'success-page-fallback');
+
+    // Intentar procesar merchant_order si está disponible (para persistir shipment_id)
+    if (merchant_order_id) {
+      try {
+        await processMerchantOrderWebhook(String(merchant_order_id), 'success-page-fallback');
+      } catch (merchantOrderError) {
+        logger.error('[SUCCESS-FALLBACK] Error procesando merchant_order_id', {
+          merchant_order_id,
+          payment_id,
+          error: merchantOrderError instanceof Error ? merchantOrderError.message : String(merchantOrderError),
+        });
+      }
+    }
 
     if (result.success) {
       logger.info('[SUCCESS-FALLBACK] Pago procesado exitosamente', {

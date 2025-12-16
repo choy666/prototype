@@ -70,10 +70,12 @@ export async function GET(request: NextRequest) {
     const me2OptionId = searchParams.get('option_id');
     const me2OptionHash = searchParams.get('option_hash');
     const stateId = searchParams.get('state_id'); // AR-M para Mendoza, etc.
-    
-    const me2OptionRef = me2OptionHash || me2OptionId;
 
-    if (logisticType === 'me2' && me2OptionRef) {
+    const me2OptionRef = me2OptionId || me2OptionHash;
+
+    const allowMe2AgenciesPreCheckout = process.env.ML_ENABLE_ME2_AGENCIES_PRECHECK === 'true';
+
+    if (logisticType === 'me2' && me2OptionRef && allowMe2AgenciesPreCheckout) {
       // Opción 1: Usar endpoint con seller_id (recomendado para ME2)
       const me2AgenciesUrl = `https://api.mercadolibre.com/users/${tokenOwner.mercadoLibreId}/shipping_options/${encodeURIComponent(me2OptionRef)}/agencies?zip_code=${encodeURIComponent(cleanZipcode)}`;
       
@@ -409,6 +411,16 @@ export async function GET(request: NextRequest) {
       // Aunque ML no exponga agencias por option_id (endpoints ME2), todavía podemos intentar el flujo clásico
       // por carrier_id (derivado desde shipping_method_id) para ver si ML devuelve sucursales.
       // Si ese flujo también falla o no devuelve resultados, recién ahí informamos requiresMlCheckout.
+    }
+
+    if (logisticType === 'me2') {
+      return NextResponse.json({
+        zipcode: cleanZipcode,
+        agencies: [],
+        message:
+          'No se pudieron obtener sucursales antes del pago desde la API de Mercado Libre (ME2). Podrás continuar con el pago y confirmar el punto de retiro al volver a la tienda.',
+        requiresMlCheckout: true,
+      });
     }
 
     // Construir URL para obtener sucursales

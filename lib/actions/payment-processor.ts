@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { mercadopagoPayments, mercadopagoPreferences, orders, orderItems, products, productVariants, stockLogs } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
+import { processMerchantOrderWebhook } from '@/lib/actions/merchant-order-processor';
 // import { adjustStockWithRetry } from './stock-retry'; // TODO: Integrar sistema de retry
 
 // Extender PaymentResponse para incluir campos no documentados
@@ -376,6 +377,20 @@ export async function processPaymentWebhook(
 
     // Procesar según estado
     await processStatusChange(paymentData);
+
+    const merchantOrderId = paymentData.order?.id != null ? String(paymentData.order.id) : null;
+    if (merchantOrderId) {
+      try {
+        await processMerchantOrderWebhook(merchantOrderId, requestId);
+      } catch (merchantOrderError) {
+        logger.error('[PaymentProcessor] Error procesando merchant_order desde pago', {
+          paymentId,
+          requestId,
+          merchantOrderId,
+          error: merchantOrderError instanceof Error ? merchantOrderError.message : String(merchantOrderError),
+        });
+      }
+    }
 
     const duration = Date.now() - startTime;
     logger.info('[PaymentProcessor] Completado', {
