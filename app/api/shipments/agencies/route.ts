@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     const me2OptionRef = me2OptionId || me2OptionHash;
 
-    const allowMe2AgenciesPreCheckout = process.env.ML_ENABLE_ME2_AGENCIES_PRECHECK === 'true';
+    const allowMe2AgenciesPreCheckout = (process.env.ML_ENABLE_ME2_AGENCIES_PRECHECK ?? 'true') === 'true';
 
     if (logisticType === 'me2' && me2OptionRef && allowMe2AgenciesPreCheckout) {
       // Opción 1: Usar endpoint con seller_id (recomendado para ME2)
@@ -414,13 +414,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (logisticType === 'me2') {
-      return NextResponse.json({
-        zipcode: cleanZipcode,
-        agencies: [],
-        message:
-          'No se pudieron obtener sucursales antes del pago desde la API de Mercado Libre (ME2). Podrás continuar con el pago y confirmar el punto de retiro al volver a la tienda.',
-        requiresMlCheckout: true,
-      });
+      // Para ME2 no hacemos return temprano: intentamos también el flujo clásico por carrier_id,
+      // porque en algunos casos ML sí devuelve sucursales con /shipments/agencies.
     }
 
     // Construir URL para obtener sucursales

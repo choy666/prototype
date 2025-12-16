@@ -660,7 +660,7 @@ vercel env rm NEXTAUTH_SECRET production
 
 # Descargar variables de Vercel a un archivo local
 vercel env pull .env.local
-
+vercel env pull .env.production
 # Descargar variables de producción
 vercel env pull .env.local --environment=production
 ```
