@@ -99,7 +99,12 @@ function validateHmacV1(
     
     // Validar timestamp
     const timestampNum = Number(ts);
-    if (isNaN(timestampNum) || Math.abs(Date.now() - timestampNum) > ALLOWED_TOLERANCE_MS) {
+    if (isNaN(timestampNum)) {
+      return { ok: false, reason: 'Invalid or expired timestamp' };
+    }
+
+    const timestampMs = timestampNum < 1_000_000_000_000 ? timestampNum * 1000 : timestampNum;
+    if (Math.abs(Date.now() - timestampMs) > ALLOWED_TOLERANCE_MS) {
       return { ok: false, reason: 'Invalid or expired timestamp' };
     }
     
