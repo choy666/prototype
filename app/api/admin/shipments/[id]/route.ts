@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, shipmentHistory, orderItems, products } from '@/lib/schema';
 import { eq, desc } from 'drizzle-orm';
+import { MercadoLibreAuth } from '@/lib/auth/mercadolibre';
 
 // Verificación temporal para testing - en producción usar auth real
 async function verifyAdmin(request: NextRequest): Promise<boolean> {
@@ -66,6 +67,35 @@ export async function GET(
 
     const shipment = shipmentData[0];
 
+    let mlShipment: unknown | null = null;
+    let mlShipmentError: string | null = null;
+    let mlShipmentFetchedAt: string | null = null;
+
+    try {
+      const auth = await MercadoLibreAuth.getInstance();
+      const accessToken = await auth.getAccessToken();
+
+      const mlResponse = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+          'x-format-new': 'true',
+        },
+      });
+
+      mlShipmentFetchedAt = new Date().toISOString();
+
+      if (mlResponse.ok) {
+        mlShipment = await mlResponse.json();
+      } else {
+        const errorBody = await mlResponse.text().catch(() => '');
+        mlShipmentError = `ML API ${mlResponse.status}: ${errorBody || mlResponse.statusText}`;
+      }
+    } catch (error) {
+      mlShipmentError = error instanceof Error ? error.message : 'Error desconocido consultando shipment en ML';
+    }
+
     // Obtener items de la orden con información de productos
     const orderItemsData = await db
       .select({
@@ -114,6 +144,9 @@ export async function GET(
           shippingAddress: shipment.shippingAddress,
           items: formattedItems
         },
+        mlShipment,
+        mlShipmentError,
+        mlShipmentFetchedAt,
         history: historyData.map(event => ({
           ...event,
           dateCreated: event.dateCreated.toISOString()

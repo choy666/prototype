@@ -18,6 +18,32 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function getNested(value: unknown, path: string[]): unknown {
+  let current: unknown = value;
+  for (const key of path) {
+    const obj = asRecord(current);
+    if (!obj) return undefined;
+    current = obj[key];
+  }
+  return current;
+}
+
+function formatUnknown(value: unknown): string {
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return 'N/A';
+  }
+}
+
 interface ShippingAddress {
   nombre: string;
   direccion: string;
@@ -40,6 +66,9 @@ interface ShipmentDetail {
   createdAt: string;
   updatedAt: string;
   total: string;
+  mlShipment?: unknown | null;
+  mlShipmentError?: string | null;
+  mlShipmentFetchedAt?: string | null;
   // Información de la orden
   orderData?: {
     shippingAddress: ShippingAddress;
@@ -129,7 +158,8 @@ export default function ShipmentDetailPage() {
     );
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString('es-AR', {
       day: '2-digit',
       month: '2-digit',
@@ -144,9 +174,7 @@ export default function ShipmentDetailPage() {
   };
 
   const handlePrintLabel = () => {
-    if (shipment?.trackingNumber) {
-      window.open(`/api/admin/shipments/${shipmentId}/label`, '_blank');
-    }
+    window.open(`/api/admin/shipments/${shipmentId}/label`, '_blank');
   };
 
   if (loading) {
@@ -178,6 +206,8 @@ export default function ShipmentDetailPage() {
     );
   }
 
+  const mlShipmentFetchedAt = shipment.mlShipmentFetchedAt ?? null;
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -201,12 +231,10 @@ export default function ShipmentDetailPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Actualizar
           </Button>
-          {shipment.trackingNumber && (
-            <Button variant="outline" onClick={handlePrintLabel}>
-              <Download className="w-4 h-4 mr-2" />
-              Imprimir Etiqueta
-            </Button>
-          )}
+          <Button variant="outline" onClick={handlePrintLabel}>
+            <Download className="w-4 h-4 mr-2" />
+            Imprimir Etiqueta
+          </Button>
           <Button asChild>
             <Link href={`/admin/orders/${shipment.orderId}`}>
               <Eye className="w-4 h-4 mr-2" />
@@ -268,6 +296,103 @@ export default function ShipmentDetailPage() {
                 )}
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Datos Mercado Libre (API oficial) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Mercado Libre (API)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {shipment.mlShipmentError ? (
+            <div className="space-y-2">
+              <p className="text-sm text-red-600">{shipment.mlShipmentError}</p>
+              {mlShipmentFetchedAt ? (
+                <p className="text-xs text-gray-500">Consultado: {formatDate(mlShipmentFetchedAt)}</p>
+              ) : null}
+            </div>
+          ) : shipment.mlShipment ? (
+            <div className="space-y-4">
+              {(() => {
+                const ml = shipment.mlShipment;
+                const mlStatus = getNested(ml, ['status']);
+                const mlSubstatus = getNested(ml, ['substatus']);
+                const logisticMode = getNested(ml, ['logistic', 'mode']);
+                const logisticType = getNested(ml, ['logistic', 'type']);
+                const shipMethodName = getNested(ml, ['lead_time', 'shipping_method', 'name']);
+                const shipMethodDeliverTo = getNested(ml, ['lead_time', 'shipping_method', 'deliver_to']);
+                const leadTime = getNested(ml, ['lead_time']);
+                const originAgency = getNested(ml, ['origin', 'shipping_address', 'agency']);
+                const destinationAgency = getNested(ml, ['destination', 'shipping_address', 'agency']);
+
+                return (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">ML Status</p>
+                        <p className="text-sm mt-1 font-mono">{formatUnknown(mlStatus)}</p>
+                        {typeof mlSubstatus === 'string' && mlSubstatus ? (
+                          <p className="text-xs text-gray-500 mt-1">substatus: {mlSubstatus}</p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Logística</p>
+                        <p className="text-sm mt-1 font-mono">
+                          mode: {formatUnknown(logisticMode)}
+                        </p>
+                        <p className="text-sm mt-1 font-mono">
+                          type: {formatUnknown(logisticType)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Método</p>
+                        <p className="text-sm mt-1 font-mono">{formatUnknown(shipMethodName)}</p>
+                        {typeof shipMethodDeliverTo === 'string' && shipMethodDeliverTo ? (
+                          <p className="text-xs text-gray-500 mt-1">deliver_to: {shipMethodDeliverTo}</p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Agencia origen (despacho)</p>
+                        <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto">
+                          {JSON.stringify(originAgency ?? null, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Agencia destino (retiro/entrega)</p>
+                        <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto">
+                          {JSON.stringify(destinationAgency ?? null, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Lead time</p>
+                      <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto">
+                        {JSON.stringify(leadTime ?? null, null, 2)}
+                      </pre>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Shipment JSON (raw)</p>
+                      <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto max-h-[420px]">
+                        {JSON.stringify(shipment.mlShipment, null, 2)}
+                      </pre>
+                    </div>
+
+                    {mlShipmentFetchedAt ? (
+                      <p className="text-xs text-gray-500">Consultado: {formatDate(mlShipmentFetchedAt)}</p>
+                    ) : null}
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No hay datos de Mercado Libre disponibles.</p>
           )}
         </CardContent>
       </Card>

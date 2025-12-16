@@ -341,16 +341,14 @@ export default function ShipmentsDashboard() {
                               <Eye className="w-4 h-4" />
                             </Link>
                           </Button>
-                          {shipment.trackingNumber && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(`/api/admin/shipments/${shipment.id}/label`, '_blank')}
-                              title="Imprimir etiqueta"
-                            >
-                              <Package className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`/api/admin/shipments/${shipment.id}/label`, '_blank')}
+                            title="Imprimir etiqueta"
+                          >
+                            <Package className="w-4 h-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
