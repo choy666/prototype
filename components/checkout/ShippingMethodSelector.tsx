@@ -3,19 +3,18 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { MLShippingMethod } from '@/lib/types/shipping';
-import { AgencySelector } from './AgencySelector';
-import { FormattedAgency } from '@/types/agency';
 
- type CalculateShippingResponse = {
-   success?: boolean;
-   methods?: MLShippingMethod[];
-   fallback?: boolean;
-   error?: string;
-   pickup?: {
-     available: boolean;
-     types: ('agency' | 'place')[];
-   };
- };
+type CalculateShippingResponse = {
+  success?: boolean;
+  methods?: MLShippingMethod[];
+  fallback?: boolean;
+  source?: string;
+  error?: string;
+  pickup?: {
+    available: boolean;
+    types: ('agency' | 'place')[];
+  };
+};
 
 interface ShippingMethodSelectorProps {
   selectedMethod?: MLShippingMethod | null;
@@ -29,9 +28,6 @@ interface ShippingMethodSelectorProps {
   }>;
   zipcode: string;
   subtotal: number;
-  onAgencySelect?: (agency: FormattedAgency | null) => void;
-  selectedAgency?: FormattedAgency | null;
-  onAgencyAvailabilityChange?: (available: boolean) => void;
 }
 
 export function ShippingMethodSelector({
@@ -40,22 +36,13 @@ export function ShippingMethodSelector({
   items,
   zipcode,
   subtotal,
-  onAgencySelect,
-  selectedAgency,
-  onAgencyAvailabilityChange,
 }: ShippingMethodSelectorProps) {
   const [shippingMethods, setShippingMethods] = useState<MLShippingMethod[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
+  const [source, setSource] = useState<string | null>(null);
 
   const handleMethodSelect = (method: MLShippingMethod) => {
-    console.log('[ShippingMethodSelector] Método seleccionado:', {
-      name: method.name,
-      shipping_method_id: method.shipping_method_id,
-      deliver_to: method.deliver_to,
-      carrier_id: method.carrier_id,
-    });
-    
     onMethodSelect(method);
   };
 
@@ -86,6 +73,7 @@ export function ShippingMethodSelector({
     const fetchShippingMethods = async () => {
       setIsLoading(true);
       setIsFallback(false);
+      setSource(null);
       try {
         const response = await fetch('/api/shipments/calculate', {
           method: 'POST',
@@ -115,31 +103,10 @@ export function ShippingMethodSelector({
           });
 
           if (data.success && data.methods) {
-            // Asegurar que los métodos tengan todos los campos necesarios
-            const methodsWithAllFields = data.methods.map((method) => {
-              const name = method.name.toLowerCase();
-              const isAgency =
-                method.deliver_to === 'agency' ||
-                name.includes('sucursal') ||
-                name.includes('agencia') ||
-                name.includes('correo');
-
-              console.log('[ShippingMethodSelector] Procesando método:', {
-                name: method.name,
-                original_deliver_to: method.deliver_to,
-                calculated_isAgency: isAgency,
-                shipping_method_id: method.shipping_method_id,
-                carrier_id: method.carrier_id,
-              });
-
-              return {
-                ...method,
-                deliver_to: method.deliver_to ?? (isAgency ? 'agency' : 'address'),
-                carrier_id: method.carrier_id ?? (isAgency ? 154 : undefined),
-              };
-            });
-            setShippingMethods(methodsWithAllFields);
+            const domicileOnly = data.methods.filter((m) => (m.deliver_to ?? 'address') === 'address');
+            setShippingMethods(domicileOnly);
             setIsFallback(Boolean(data.fallback));
+            setSource(typeof data.source === 'string' ? data.source : null);
           } else {
             console.error('[ShippingMethodSelector] Error en respuesta:', data);
             throw new Error(data.error || 'Error al obtener métodos de envío');
@@ -188,9 +155,11 @@ export function ShippingMethodSelector({
           Selecciona cómo quieres recibir tu pedido
         </p>
         <p className="text-xs text-gray-500">
-          {isFallback
-            ? 'Mostrando métodos de envío locales (fallback) porque la API de Mercado Libre no está disponible. Los costos son estimados.'
-            : 'Mostrando métodos de Mercado Envíos 2 provistos por Mercado Libre.'}
+          {source === 'internal_shipping'
+            ? 'Mostrando método de envío local provisto por la tienda.'
+            : isFallback
+              ? 'Mostrando métodos de envío locales (fallback) porque la API de Mercado Libre no está disponible. Los costos son estimados.'
+              : 'Mostrando métodos de Mercado Envíos 2 provistos por Mercado Libre.'}
         </p>
       </div>
 
@@ -218,12 +187,6 @@ export function ShippingMethodSelector({
                   : 'border-gray-200 hover:border-gray-300'
               }`}
               onClick={() => {
-                console.log('[ShippingMethodSelector] Click en método:', {
-                  name: method.name,
-                  shipping_method_id: method.shipping_method_id,
-                  deliver_to: method.deliver_to,
-                  carrier_id: method.carrier_id,
-                });
                 handleMethodSelect(method);
               }}
             >
@@ -235,14 +198,8 @@ export function ShippingMethodSelector({
                     name="shipping-method"
                     checked={isSelected}
                     onChange={() => {
-                console.log('[ShippingMethodSelector] Change en método:', {
-                  name: method.name,
-                  shipping_method_id: method.shipping_method_id,
-                  deliver_to: method.deliver_to,
-                  carrier_id: method.carrier_id,
-                });
-                handleMethodSelect(method);
-              }}
+                      handleMethodSelect(method);
+                    }}
                     className="w-4 h-4 text-blue-600 focus:ring-blue-500"
                   />
                   <label
@@ -292,25 +249,6 @@ export function ShippingMethodSelector({
               {selectedMethod.cost === 0 ? 'Gratis' : formatCurrency(selectedMethod.cost)}
             </span>
           </div>
-        </div>
-      )}
-
-      {/* Mostrar selector de sucursales SOLO si el método es de retiro Y pickup está disponible */}
-      {selectedMethod && 
-       selectedMethod.deliver_to === 'agency' && (
-        <div className="mt-4">
-          <AgencySelector
-            zipcode={zipcode}
-            onAgencySelect={onAgencySelect || (() => {})}
-            onAvailabilityChange={onAgencyAvailabilityChange}
-            selectedAgencyId={selectedAgency?.id}
-            shippingMethodId={selectedMethod.shipping_method_id?.toString()}
-            carrierId={selectedMethod.carrier_id?.toString()}
-            logisticType={selectedMethod.logistic_type}
-            optionId={selectedMethod.option_id?.toString()}
-            optionHash={selectedMethod.option_hash}
-            stateId={selectedMethod.state_id}
-          />
         </div>
       )}
     </div>

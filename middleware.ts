@@ -9,7 +9,6 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const protectedRoutes = [
   '/dashboard',
   '/checkout',
-  '/pickup-confirmation',
   '/profile',
   '/orders',
 ];

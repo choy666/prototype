@@ -56,26 +56,8 @@ export default function PaymentSuccess() {
       return;
     }
 
-    // Si el checkout fue retiro post-pago, forzar pantalla de confirmación
-    fetch(`/api/orders/${orderId}/pickup/status`)
-      .then(async (res) => {
-        if (!res.ok) return null;
-        return await res.json();
-      })
-      .then((data) => {
-        if (data?.requiresPickupConfirmation && !data?.pickupConfirmed) {
-          console.log('[TIMER] Redirigiendo a confirmación de retiro', { orderId });
-          router.push(`/pickup-confirmation?order_id=${orderId}`);
-          return;
-        }
-
-        console.log('[TIMER] Redirigiendo al dashboard');
-        router.push(`/dashboard?payment_id=${paymentId}&order_id=${orderId}&status=success`);
-      })
-      .catch(() => {
-        console.log('[TIMER] Redirigiendo al dashboard (fallback)');
-        router.push(`/dashboard?payment_id=${paymentId}&order_id=${orderId}&status=success`);
-      });
+    console.log('[TIMER] Redirigiendo al dashboard');
+    router.push(`/dashboard?payment_id=${paymentId}&order_id=${orderId}&status=success`);
   }, [paymentInfo, router]);
 
   // Procesar pago vía fallback si es aprobado

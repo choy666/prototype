@@ -8,16 +8,14 @@ import { AddressSelector } from '@/components/checkout/AddressSelector';
 import { AddressForm } from '@/components/checkout/AddressForm';
 import { ShippingMethodSelector } from '@/components/checkout/ShippingMethodSelector';
 import { CheckoutSummary } from '@/components/checkout/CheckoutSummary';
-import { ShippingFormWithAutocomplete } from '@/components/checkout/ShippingFormWithAutocomplete';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { ShippingFormData } from '@/lib/validations/checkout';
 import { Address } from '@/lib/schema';
 import { toast } from 'react-hot-toast';
 import { MLShippingMethod } from '@/lib/types/shipping';
-import { FormattedAgency } from '@/types/agency';
 
-type CheckoutStep = 'address-selection' | 'shipping-form' | 'shipping-form-autocomplete' | 'shipping-method' | 'new-address-form';
+type CheckoutStep = 'address-selection' | 'shipping-form' | 'shipping-method' | 'new-address-form';
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
@@ -26,9 +24,6 @@ export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('address-selection');
   const [selectedAddress, setSelectedAddress] = useState<Address & { id: number } | null>(null);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<MLShippingMethod | null>(null);
-  const [selectedAgency, setSelectedAgency] = useState<FormattedAgency | null>(null);
-  const [agencyAvailable, setAgencyAvailable] = useState<boolean | null>(null);
-  const [requiresMlCheckout, setRequiresMlCheckout] = useState(false);
   const [shippingAddress, setShippingAddress] = useState<ShippingFormData | null>(null);
   const [documentType, setDocumentType] = useState<'DNI' | 'CUIT' | ''>('');
   const [documentNumber, setDocumentNumber] = useState<string>('');
@@ -36,10 +31,6 @@ export default function CheckoutPage() {
     documentType?: string;
     documentNumber?: string;
   } | null>(null);
-
-  const requiresAgency = selectedShippingMethod?.deliver_to === 'agency';
-  const isME2Agency = Boolean(requiresAgency && selectedShippingMethod?.shipping_mode === 'me2');
-  const isAgencyMissingSelection = Boolean(requiresAgency && !requiresMlCheckout && !selectedAgency);
 
   // Cargar documento del usuario al montar
   useEffect(() => {
@@ -59,26 +50,7 @@ export default function CheckoutPage() {
     fetchDocument();
   }, []);
 
-  // Limpiar sucursal seleccionada cuando cambia el zipcode
-  useEffect(() => {
-    setSelectedAgency(null);
-    setAgencyAvailable(null);
-    setRequiresMlCheckout(false);
-  }, [shippingAddress?.codigoPostal]);
 
-  useEffect(() => {
-    // Ya no usamos heurísticas por nombre: solo confiamos en deliver_to y el flag pickup del backend
-    const requiresAgency = selectedShippingMethod?.deliver_to === 'agency';
-    const isME2Agency =
-      requiresAgency &&
-      selectedShippingMethod?.shipping_mode === 'me2';
-
-    if (requiresAgency && !isME2Agency && agencyAvailable === false && !requiresMlCheckout) {
-      setSelectedAgency(null);
-      setSelectedShippingMethod(null);
-      toast.error('El retiro en sucursal no está disponible para este código postal. Selecciona envío a domicilio.');
-    }
-  }, [agencyAvailable, selectedShippingMethod, requiresMlCheckout]);
 
   // Verificar autenticación
   if (status === 'loading') {
@@ -158,10 +130,6 @@ export default function CheckoutPage() {
     setCurrentStep('new-address-form');
   };
 
-  const handleNewAddressWithAutocomplete = () => {
-    setCurrentStep('shipping-form-autocomplete');
-  };
-
   const handleAddressFormSubmit = async (addressData: ShippingFormData) => {
     try {
       const response = await fetch('/api/addresses', {
@@ -176,31 +144,6 @@ export default function CheckoutPage() {
         const newAddress = await response.json();
         setSelectedAddress(newAddress);
         setCurrentStep('shipping-form');
-        toast.success('Dirección guardada correctamente');
-      } else {
-        toast.error('Error al guardar la dirección');
-      }
-    } catch (error) {
-      console.error('Error saving address:', error);
-      toast.error('Error al guardar la dirección');
-    }
-  };
-
-  const handleShippingFormSubmit = async (addressData: ShippingFormData) => {
-    try {
-      const response = await fetch('/api/addresses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(addressData),
-      });
-
-      if (response.ok) {
-        const newAddress = await response.json();
-        setSelectedAddress(newAddress);
-        setShippingAddress(addressData);
-        setCurrentStep('shipping-method');
         toast.success('Dirección guardada correctamente');
       } else {
         toast.error('Error al guardar la dirección');
@@ -275,60 +218,13 @@ export default function CheckoutPage() {
   };
 
   const handleShippingMethodSelect = (method: MLShippingMethod) => {
-    console.log('[Checkout] handleShippingMethodSelect:', {
-      name: method.name,
-      shipping_method_id: method.shipping_method_id,
-      deliver_to: method.deliver_to,
-      carrier_id: method.carrier_id,
-    });
-    
     setSelectedShippingMethod(method);
-    if (method.deliver_to !== 'agency') {
-      setSelectedAgency(null);
-      setAgencyAvailable(null);
-      setRequiresMlCheckout(false);
-    } else {
-      // Resetear el estado de ME2 checkout cuando cambia a un método agency
-      setRequiresMlCheckout(false);
-    }
-  };
-
-  const handleAgencyAvailabilityChange = (available: boolean | null) => {
-    setAgencyAvailable(available);
-  };
-
-  const handleAgencySelectWithCheckout = (agency: FormattedAgency | null, requiresMlCheckout?: boolean) => {
-    console.log('[Checkout] handleAgencySelectWithCheckout llamado:', { 
-      agency: agency?.name || 'null', 
-      requiresMlCheckout 
-    });
-    setSelectedAgency(agency);
-    if (requiresMlCheckout === true) {
-      console.log('[Checkout] Estableciendo requiresMlCheckout=true');
-      setRequiresMlCheckout(true);
-    } else if (requiresMlCheckout === false) {
-      console.log('[Checkout] Estableciendo requiresMlCheckout=false');
-      setRequiresMlCheckout(false);
-    }
-    // Si requiresMlCheckout es undefined, no cambiar el estado actual
   };
 
   const handleCheckoutSubmit = async () => {
     if (!shippingAddress || !selectedShippingMethod) {
       toast.error('Faltan datos de envío o método de envío');
       return;
-    }
-
-    if (requiresAgency) {
-      if (agencyAvailable === false && !requiresMlCheckout && !isME2Agency) {
-        toast.error('El retiro en sucursal no está disponible para este código postal. Selecciona envío a domicilio.');
-        return;
-      }
-
-      if (!requiresMlCheckout && !selectedAgency) {
-        toast.error('Debes seleccionar una sucursal para este método de envío');
-        return;
-      }
     }
 
     setIsProcessing(true);
@@ -357,8 +253,6 @@ export default function CheckoutPage() {
           state_id: selectedShippingMethod.state_id,
           logistic_type: selectedShippingMethod.logistic_type,
         },
-        shippingAgency: selectedAgency,
-        requiresMlCheckout,
         userId: session?.user?.id || 'test-user-id',
       };
 
@@ -406,15 +300,6 @@ export default function CheckoutPage() {
               selectedAddressId={selectedAddress?.id}
               onAddressSelect={handleAddressSelect}
               onNewAddress={handleNewAddress}
-              onNewAddressWithAutocomplete={handleNewAddressWithAutocomplete}
-            />
-          )}
-
-          {currentStep === 'shipping-form-autocomplete' && (
-            <ShippingFormWithAutocomplete
-              onSubmit={handleShippingFormSubmit}
-              onCancel={() => setCurrentStep('address-selection')}
-              isProcessing={isProcessing}
             />
           )}
 
@@ -451,9 +336,6 @@ export default function CheckoutPage() {
               <ShippingMethodSelector
                 selectedMethod={selectedShippingMethod}
                 onMethodSelect={handleShippingMethodSelect}
-                onAgencySelect={handleAgencySelectWithCheckout}
-                onAgencyAvailabilityChange={handleAgencyAvailabilityChange}
-                selectedAgency={selectedAgency}
                 items={items}
                 zipcode={shippingAddress?.codigoPostal || ''}
                 subtotal={items.reduce((acc, item) => {
@@ -475,7 +357,7 @@ export default function CheckoutPage() {
                 </Button>
                 <Button
                   onClick={handleCheckoutSubmit}
-                  disabled={isProcessing || !selectedShippingMethod || isAgencyMissingSelection}
+                  disabled={isProcessing || !selectedShippingMethod}
                 >
                   {isProcessing ? 'Procesando...' : 'Continuar al Pago'}
                 </Button>
@@ -494,7 +376,6 @@ export default function CheckoutPage() {
               estimated: selectedShippingMethod.estimated_delivery?.date || selectedShippingMethod.estimatedTime
             } : null}
             shippingAddress={shippingAddress}
-            selectedAgency={selectedAgency}
           />
         </div>
       </div>

@@ -13,7 +13,6 @@ interface AddressSelectorProps {
   selectedAddressId?: number;
   onAddressSelect: (address: Address) => void;
   onNewAddress: () => void;
-  onNewAddressWithAutocomplete?: () => void;
   loading?: boolean;
 }
 
@@ -22,7 +21,6 @@ export function AddressSelector({
   selectedAddressId,
   onAddressSelect,
   onNewAddress,
-  onNewAddressWithAutocomplete,
   loading
 }: AddressSelectorProps) {
   const { data: session } = useSession();
@@ -132,17 +130,6 @@ export function AddressSelector({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Seleccionar Dirección de Envío</h3>
         <div className="flex gap-2">
-          {onNewAddressWithAutocomplete && (
-            <Button
-              onClick={onNewAddressWithAutocomplete}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Buscar Dirección
-            </Button>
-          )}
           <Button
             onClick={onNewAddress}
             variant="outline"
@@ -163,11 +150,6 @@ export function AddressSelector({
             Agrega una dirección para agilizar tus futuras compras
           </p>
           <div className="space-y-2">
-            {onNewAddressWithAutocomplete && (
-              <Button onClick={onNewAddressWithAutocomplete} className="w-full">
-                Buscar con Google Maps
-              </Button>
-            )}
             <Button onClick={onNewAddress} variant="outline" className="w-full">
               Ingresar manualmente
             </Button>

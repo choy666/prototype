@@ -1,7 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { ShippingMethodSelector } from '@/components/checkout/ShippingMethodSelector';
-import { MLShippingMethod } from '@/lib/types/shipping';
 import { toast } from 'react-hot-toast';
 
 // Mock de react-hot-toast
@@ -16,7 +15,7 @@ global.fetch = jest.fn();
 
 const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
-const createMockShippingResponse = (pickup?: { available: boolean; types: ('agency' | 'place')[] }) => ({
+const createMockShippingResponse = (includePickupOptions?: boolean) => ({
   success: true,
   methods: [
     {
@@ -27,21 +26,20 @@ const createMockShippingResponse = (pickup?: { available: boolean; types: ('agen
       currency_id: 'ARS',
       deliver_to: 'address' as const,
     },
-    ...(pickup?.available
+    ...(includePickupOptions
       ? [
           {
-              shipping_method_id: 2,
-              name: 'Retiro en sucursal',
-              description: 'Retiro en sucursal de correo',
-              cost: 300,
-              currency_id: 'ARS',
-              deliver_to: 'agency' as const,
-            },
+            shipping_method_id: 2,
+            name: 'Retiro en sucursal',
+            description: 'Retiro en sucursal de correo',
+            cost: 300,
+            currency_id: 'ARS',
+            deliver_to: 'agency' as const,
+          },
         ]
       : []),
   ],
   fallback: false,
-  pickup,
 });
 
 describe('ShippingMethodSelector', () => {
@@ -63,8 +61,8 @@ describe('ShippingMethodSelector', () => {
   it('debería mostrar métodos de envío cuando pickup no está disponible', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => createMockShippingResponse({ available: false, types: [] }),
-    });
+      json: async () => createMockShippingResponse(false),
+    } as unknown as Response);
 
     render(<ShippingMethodSelector {...defaultProps} />);
 
@@ -77,60 +75,17 @@ describe('ShippingMethodSelector', () => {
     expect(screen.queryByText('Selecciona una sucursal')).not.toBeInTheDocument();
   });
 
-  it('debería mostrar opción de retiro cuando pickup incluye agency', async () => {
+  it('debería ocultar opciones de retiro aunque el backend las incluya', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => createMockShippingResponse({ available: true, types: ['agency'] }),
-    });
+      json: async () => createMockShippingResponse(true),
+    } as unknown as Response);
 
     render(<ShippingMethodSelector {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('Envío a domicilio')).toBeInTheDocument();
-      expect(screen.getByText('Retiro en sucursal')).toBeInTheDocument();
-    });
-
-    // Al seleccionar retiro, debe mostrar el selector de agencias
-    const agencyOption = screen.getByText('Retiro en sucursal');
-    fireEvent.click(agencyOption);
-
-    // El selector de agencias debería aparecer
-    await waitFor(() => {
-      expect(defaultProps.onMethodSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          deliver_to: 'agency',
-          name: 'Retiro en sucursal',
-        })
-      );
-    });
-  });
-
-  it('debería mostrar opción de retiro cuando pickup incluye place', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockShippingResponse({ available: true, types: ['place'] }),
-    });
-
-    render(<ShippingMethodSelector {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Envío a domicilio')).toBeInTheDocument();
-      expect(screen.getByText('Retiro en punto de retiro')).toBeInTheDocument();
-    });
-  });
-
-  it('debería mostrar ambas opciones de retiro cuando pickup incluye agency y place', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockShippingResponse({ available: true, types: ['agency', 'place'] }),
-    });
-
-    render(<ShippingMethodSelector {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Envío a domicilio')).toBeInTheDocument();
-      expect(screen.getByText('Retiro en sucursal')).toBeInTheDocument();
-      expect(screen.getByText('Retiro en punto de retiro')).toBeInTheDocument();
+      expect(screen.queryByText('Retiro en sucursal')).not.toBeInTheDocument();
     });
   });
 
@@ -141,11 +96,11 @@ describe('ShippingMethodSelector', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => createMockShippingResponse({ available: true, types: ['agency'] }),
-    });
+      json: async () => createMockShippingResponse(true),
+    } as unknown as Response);
 
     await waitFor(() => {
-      expect(screen.getByText('Retiro en sucursal')).toBeInTheDocument();
+      expect(screen.queryByText('Retiro en sucursal')).not.toBeInTheDocument();
     });
 
     // Cambiar zipcode
@@ -153,8 +108,8 @@ describe('ShippingMethodSelector', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => createMockShippingResponse({ available: false, types: [] }),
-    });
+      json: async () => createMockShippingResponse(false),
+    } as unknown as Response);
 
     await waitFor(() => {
       expect(screen.queryByText('Retiro en sucursal')).not.toBeInTheDocument();
@@ -165,7 +120,7 @@ describe('ShippingMethodSelector', () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       json: async () => ({ error: 'Error en la API' }),
-    });
+    } as unknown as Response);
 
     render(<ShippingMethodSelector {...defaultProps} />);
 
@@ -177,8 +132,8 @@ describe('ShippingMethodSelector', () => {
   it('debería usar fallback cuando pickup es undefined', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => createMockShippingResponse(undefined),
-    });
+      json: async () => createMockShippingResponse(false),
+    } as unknown as Response);
 
     render(<ShippingMethodSelector {...defaultProps} />);
 

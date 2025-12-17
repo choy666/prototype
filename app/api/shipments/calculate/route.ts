@@ -122,9 +122,7 @@ export async function POST(request: NextRequest) {
       type: option.type || 'me2', // Incluir tipo para detectar envíos internos
       description: option.description,
       estimatedTime: option.estimatedTime || '24 horas',
-      // Campos adicionales para envíos a agencia
-      deliver_to: option.deliver_to,
-      carrier_id: option.carrier_id,
+      deliver_to: 'address',
       shipping_method_id: option.shipping_method_id
     }));
 
@@ -183,7 +181,7 @@ export async function POST(request: NextRequest) {
       message: shippingData.message || (shippingData.fallback ? 'Usando métodos de envío locales' : 'Cálculo exitoso'),
       options,
       warnings: shippingData.warnings || [],
-      pickup: shippingData.pickup, // Exponer disponibilidad de retiro (agency/place)
+      pickup: { available: false, types: [] },
       metadata: {
         calculationSource: shippingData.fallback ? 'FALLBACK' : 'ME2',
         calculationHash: `${zipcode}-${items.map(i => `${i.id}:${i.quantity}`).sort().join('-')}`,

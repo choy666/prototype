@@ -9,7 +9,7 @@ import type { MLShippingMethod } from '@/lib/types/shipping';
 import type { MLShippingCalculateResponse } from '@/types/mercadolibre';
 import { getValidatedME2Dimensions } from '@/lib/validations/me2-products';
 import { me2ShippingCircuitBreaker } from '@/lib/utils/circuit-breaker';
-import { getBusinessShippingConfig } from './business-settings';
+import { getBusinessShippingConfig } from '@/lib/actions/business-settings';
 
 // Configuración de Mercado Libre
 const MERCADOLIBRE_API_URL = 'https://api.mercadolibre.com';
@@ -326,27 +326,30 @@ async function calculateShippingCostsWithDimensions(
         handling: option.estimated_delivery_time?.handling ?? 1,
         shipping: option.estimated_delivery_time?.shipping ?? 4,
       },
-      // Campos adicionales para envíos a agencia
-      deliver_to: option.name?.toLowerCase().includes('sucursal') || option.name?.toLowerCase().includes('agencia') || option.name?.toLowerCase().includes('correo') ? 'agency' : 'address',
-      carrier_id: option.shipping_method_id || option.id || 154 // Default a 154 para envíos a sucursal
+      deliver_to: 'address',
     }));
 
-    const cheapestOption = shippingOptions.length > 0 
-      ? shippingOptions.reduce((min, option) => 
+    const domicileOptions = shippingOptions;
+    const standardOptions = domicileOptions.filter((opt) => opt.treatment === 'standard');
+    const candidates = standardOptions.length > 0 ? standardOptions : domicileOptions;
+    const cheapestOption = candidates.length > 0
+      ? candidates.reduce((min, option) =>
           (option.cost || 0) < (min.cost || 0) ? option : min
         )
       : null;
 
+    const selectedOption = cheapestOption;
+
     const result: ME2ShippingResult = {
-      shippingOptions,
-      cheapestOption,
-      estimatedDelivery: cheapestOption?.estimated_delivery_time?.value ?? 5,
-      totalCost: cheapestOption?.cost || 0,
-      currency: cheapestOption?.currency_id || 'ARS',
+      shippingOptions: selectedOption ? [selectedOption] : [],
+      cheapestOption: selectedOption,
+      estimatedDelivery: selectedOption?.estimated_delivery_time?.value ?? 5,
+      totalCost: selectedOption?.cost || 0,
+      currency: selectedOption?.currency_id || 'ARS',
       source: 'me2',
       fallback: false,
       message: 'Cálculo ME2 exitoso usando /shipments/costs',
-      pickup: { available: false, types: [] }, // /shipments/costs no devuelve info de pickup
+      pickup: { available: false, types: [] },
     };
 
     logger.info('[ME2] Response: Cálculo completado con /shipments/costs', {
@@ -811,15 +814,8 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
     });
     
     // Procesar resultados según la estructura real de la API de ML
-    // Detectar opciones de retiro (agency/place) para habilitar selector
-    const pickupTypes: ('agency' | 'place')[] = [];
     const shippingOptions: MLShippingMethod[] = (rawData.options ?? []).map((option): MLShippingMethod => {
       const optionType = option.option_type ?? option.shipping_option_type;
-
-      // Recolectar tipos de retiro disponibles
-      if (optionType === 'agency' || optionType === 'place') {
-        pickupTypes.push(optionType);
-      }
 
       console.log('[ME2] Procesando opción:', {
         name: option.name,
@@ -834,13 +830,7 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
         option_hash: option.option_hash,
         state_id: rawData.destination?.state?.id, // Agregar state_id para endpoints geográficos
         name: option.name,
-        description: optionType === 'address'
-          ? 'Envío a domicilio'
-          : optionType === 'agency'
-            ? 'Retiro en sucursal de correo'
-            : optionType === 'place'
-              ? 'Retiro en punto de retiro'
-              : 'Opción de envío',
+        description: optionType === 'address' ? 'Envío a domicilio' : 'Opción de envío',
         currency_id: option.currency_id,
         list_cost: option.list_cost,
         cost: option.cost,
@@ -878,11 +868,21 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       };
     });
 
-    const cheapestOption = shippingOptions.length > 0 
-      ? shippingOptions.reduce((min, option) => 
-          (option.cost || 0) < (min.cost || 0) ? option : min
-        )
-      : null;
+    const domicileOptions = shippingOptions.filter((opt) => opt.deliver_to === 'address');
+    if (domicileOptions.length === 0) {
+      logger.warn('[ME2] Warning: No hay opciones a domicilio en ML, usando fallback local', {
+        zipcode: cleanZipcode,
+        itemId: mlItemId,
+        optionsCount: shippingOptions.length,
+      });
+      return await calculateLocalShippingFallback(cleanZipcode, options.items);
+    }
+
+    const standardOptions = domicileOptions.filter((opt) => opt.treatment === 'standard');
+    const candidates = standardOptions.length > 0 ? standardOptions : domicileOptions;
+    const selectedOption = candidates.reduce((min, option) =>
+      (option.cost || 0) < (min.cost || 0) ? option : min
+    );
 
     const coverage: MLShippingCalculateResponse['coverage'] = {
       all_country: true,
@@ -913,25 +913,25 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       },
       item_price: firstItem.price,
       free_shipping: false,
-      list_cost: cheapestOption?.list_cost ?? 0,
-      cost: cheapestOption?.cost ?? 0,
+      list_cost: selectedOption?.list_cost ?? 0,
+      cost: selectedOption?.cost ?? 0,
       seller_id: 0,
     };
 
     const result: ME2ShippingResult = {
-      shippingOptions,
-      cheapestOption,
-      estimatedDelivery: cheapestOption?.estimated_delivery_time?.value ?? 5,
-      totalCost: cheapestOption?.cost || 0,
-      currency: cheapestOption?.currency_id || 'ARS',
+      shippingOptions: [selectedOption],
+      cheapestOption: selectedOption,
+      estimatedDelivery: selectedOption?.estimated_delivery_time?.value ?? 5,
+      totalCost: selectedOption?.cost || 0,
+      currency: selectedOption?.currency_id || 'ARS',
       coverage,
       destination,
       source: 'me2',
       input,
       fallback: false,
       pickup: {
-        available: pickupTypes.length > 0,
-        types: Array.from(new Set(pickupTypes)), // Eliminar duplicados
+        available: false,
+        types: [],
       },
     };
 
@@ -940,7 +940,7 @@ export async function calculateME2ShippingCost(options: ME2ShippingOptions): Pro
       totalCost: result.totalCost,
       optionsCount: shippingOptions.length,
       deliveryDays: result.estimatedDelivery,
-      cheapestOption: cheapestOption?.name || 'N/A',
+      cheapestOption: selectedOption?.name || 'N/A',
       source: result.source,
       fallback: result.fallback,
       pickup: result.pickup // Log de disponibilidad de retiro

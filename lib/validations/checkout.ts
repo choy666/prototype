@@ -114,30 +114,6 @@ export const shippingMethodSchema = z.object({
   name: z.string(),
 });
 
-const shippingAgencySchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    address: z.object({
-      street: z.string(),
-      number: z.string(),
-      city: z.string(),
-      state: z.string(),
-      zipcode: z.string(),
-    }),
-    phone: z.string(),
-    hours: z.string(),
-    carrier: z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-    coordinates: z.object({
-      latitude: z.number().nullable(),
-      longitude: z.number().nullable(),
-    }),
-  })
-  .nullable();
-
 /**
  * Schema para el checkout completo
  * Incluye items del carrito, dirección de envío y método de envío
@@ -183,10 +159,6 @@ export const checkoutSchema = z.object({
     state_id: z.string().optional(),
     logistic_type: z.string().optional(),
   }),
-
-  shippingAgency: shippingAgencySchema.optional(),
-
-  requiresMlCheckout: z.boolean().optional(),
 
   userId: z.string().min(1, 'El userId es requerido'),
 });

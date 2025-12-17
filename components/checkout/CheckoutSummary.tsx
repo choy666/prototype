@@ -3,7 +3,6 @@
 import { useCartStore } from "@/lib/stores/useCartStore";
 import Link from "next/link";
 import Image from "next/image";
-import { FormattedAgency } from '@/types/agency';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -19,10 +18,9 @@ interface CheckoutSummaryProps {
     codigoPostal: string;
     provincia: string;
   } | null;
-  selectedAgency?: FormattedAgency | null;
 }
 
-export function CheckoutSummary({ selectedShippingMethod, shippingAddress, selectedAgency }: CheckoutSummaryProps) {
+export function CheckoutSummary({ selectedShippingMethod, shippingAddress }: CheckoutSummaryProps) {
   const { items } = useCartStore();
 
   // Calcular total con descuentos
@@ -114,22 +112,6 @@ export function CheckoutSummary({ selectedShippingMethod, shippingAddress, selec
           {selectedShippingMethod.estimated && (
             <p className="text-xs text-gray-500">Entrega estimada: {selectedShippingMethod.estimated}</p>
           )}
-        </div>
-      )}
-
-      {/* Sucursal seleccionada */}
-      {selectedAgency && (
-        <div className="border-t pt-3 space-y-2">
-          <h3 className="font-medium text-sm">Sucursal seleccionada</h3>
-          <div className="text-sm text-gray-600">
-            <p className="font-medium text-gray-900">{selectedAgency.name}</p>
-            <p>{selectedAgency.address.street} {selectedAgency.address.number}</p>
-            <p>{selectedAgency.address.city}, {selectedAgency.address.state}</p>
-            <p>CP: {selectedAgency.address.zipcode}</p>
-            {selectedAgency.phone && (
-              <p className="text-xs mt-1">Tel: {selectedAgency.phone}</p>
-            )}
-          </div>
         </div>
       )}
 

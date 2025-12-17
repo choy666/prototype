@@ -55,19 +55,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { items, shippingAddress, shippingMethod, userId, shippingAgency, requiresMlCheckout } = validationResult.data;
+    const { items, shippingAddress, shippingMethod, userId } = validationResult.data;
 
-    const normalizedRequiresMlCheckout = Boolean(requiresMlCheckout);
-    const shippingMethodName = String(shippingMethod?.name || '').toLowerCase();
-    const isPickupAgencyMethod =
-      shippingMethodName.includes('sucursal') ||
-      shippingMethodName.includes('agencia') ||
-      shippingMethodName.includes('correo') ||
-      shippingMethodName.includes('retiro');
-
-    if (isPickupAgencyMethod && !normalizedRequiresMlCheckout && !shippingAgency) {
+    if (shippingMethod?.deliver_to === 'agency') {
       return NextResponse.json(
-        { error: 'Debes seleccionar una sucursal para este método de envío' },
+        { error: 'El retiro en sucursal no está disponible. Selecciona envío a domicilio.' },
         { status: 400 }
       );
     }
@@ -217,6 +209,13 @@ export async function POST(req: NextRequest) {
       })),
     });
 
+    const resolvedShippingMode =
+      me2Response.source === 'internal_shipping'
+        ? 'internal_shipping'
+        : me2Response.source === 'me2'
+          ? 'me2'
+          : 'local';
+
     if (!me2Response.shippingOptions || me2Response.shippingOptions.length === 0) {
       throw new Error('No shipping methods available for this zipcode');
     }
@@ -259,17 +258,16 @@ export async function POST(req: NextRequest) {
         shippingAddress,
         shippingMethodId: null,
         shippingCost: shippingCost.toString(),
-        shippingMode: 'me2',
+        shippingMode: resolvedShippingMode,
         source: 'local',
-        shippingAgency: shippingAgency ?? null, // Guardar datos de la sucursal si aplica
+        shippingAgency: null,
         metadata: {
-          pickup_post_payment: Boolean(isPickupAgencyMethod && normalizedRequiresMlCheckout),
           shipping_context: {
             zipcode: formattedAddress.zip_code,
             shipping_method_id: String(effectiveMethod?.shipping_method_id ?? shippingMethod?.id ?? ''),
             shipping_method_name: effectiveMethod?.name ?? shippingMethod?.name ?? null,
-            logistic_type: 'me2',
-            deliver_to: shippingMethod?.deliver_to ?? (isPickupAgencyMethod ? 'agency' : 'address'),
+            logistic_type: resolvedShippingMode,
+            deliver_to: 'address',
             carrier_id: shippingMethod?.carrier_id ?? null,
             option_id: shippingMethod?.option_id ?? (effectiveMethod?.option_id ?? null),
             option_hash: shippingMethod?.option_hash ?? (effectiveMethod?.option_hash ?? null),
@@ -312,7 +310,7 @@ export async function POST(req: NextRequest) {
       order_id: orderId.toString(),
       shipping_address: shippingAddress, // Guardar como objeto JSONB, no string
       shipping_method_id: shippingMethod.id.toString(),
-      shipping_agency: shippingAgency ?? null,
+      shipping_agency: null,
       items: JSON.stringify(items.map((item: CheckoutItem) => ({
         ...item,
         variantId: item.variantId || null

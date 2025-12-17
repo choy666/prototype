@@ -55,7 +55,6 @@ export async function GET(
     }
 
     const metadata = (order.metadata ?? {}) as Record<string, unknown>;
-    const pickupPostPayment = Boolean((metadata as { pickup_post_payment?: unknown }).pickup_post_payment);
     const shippingContextRaw = (metadata as { shipping_context?: unknown }).shipping_context;
 
     const shippingContext =
@@ -66,8 +65,8 @@ export async function GET(
     const deliverTo =
       typeof shippingContext.deliver_to === 'string' ? shippingContext.deliver_to : null;
 
-    const requiresPickupConfirmation = pickupPostPayment && deliverTo === 'agency';
-    const pickupConfirmed = Boolean(order.shippingAgency);
+    const requiresPickupConfirmation = false;
+    const pickupConfirmed = false;
 
     return NextResponse.json({
       success: true,
@@ -83,7 +82,7 @@ export async function GET(
           typeof shippingContext.shipping_method_name === 'string' ? shippingContext.shipping_method_name : null,
         logistic_type:
           typeof shippingContext.logistic_type === 'string' ? shippingContext.logistic_type : null,
-        deliver_to: deliverTo === 'agency' || deliverTo === 'address' ? (deliverTo as 'agency' | 'address') : null,
+        deliver_to: deliverTo === 'address' ? 'address' : null,
         carrier_id:
           typeof shippingContext.carrier_id === 'number' ? shippingContext.carrier_id : null,
         option_id:

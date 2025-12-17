@@ -2,12 +2,21 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/shipments/calculate/route';
 import { MercadoLibreAuth } from '@/lib/auth/mercadolibre';
 
+jest.mock('@/lib/auth/session', () => ({
+  authOptions: jest.fn().mockResolvedValue({
+    user: { email: 'test@example.com' },
+  }),
+}));
+
 // Mock de MercadoLibreAuth
 jest.mock('@/lib/auth/mercadolibre');
 const mockMercadoLibreAuth = MercadoLibreAuth as jest.Mocked<typeof MercadoLibreAuth>;
 
-// Mock de funciones de DB
-jest.mock('@/lib/actions/me2-shipping', () => ({
+jest.mock('@/lib/actions/business-settings', () => ({
+  getBusinessShippingConfig: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('@/lib/validations/me2-products', () => ({
   getValidatedME2Dimensions: jest.fn().mockResolvedValue({
     dimensions: {
       weight: 1000,
@@ -18,7 +27,6 @@ jest.mock('@/lib/actions/me2-shipping', () => ({
     hasInvalidProducts: false,
     validationWarnings: [],
   }),
-  getBusinessShippingConfig: jest.fn().mockResolvedValue(null), // No es envío interno
 }));
 
 // Mock de fetch global
@@ -65,7 +73,7 @@ describe('/api/shipments/calculate - Pickup Detection', () => {
     mockMercadoLibreAuth.getInstance.mockResolvedValue(mockInstance as any);
   });
 
-  it('debería devolver pickup.available=true cuando ML devuelve option_type=agency', async () => {
+  it('debería filtrar opciones de retiro y devolver solo envío a domicilio cuando ML devuelve option_type=agency', async () => {
     // Mock de la respuesta de ML con option_type=agency
     mockFetch.mockResolvedValueOnce(
       createMockResponse({
@@ -142,15 +150,14 @@ describe('/api/shipments/calculate - Pickup Detection', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.pickup).toEqual({
-      available: true,
-      types: ['agency'],
+      available: false,
+      types: [],
     });
-    expect(data.options).toHaveLength(2);
-    expect(data.options[0].deliver_to).toBe('agency');
-    expect(data.options[1].deliver_to).toBe('address');
+    expect(data.options).toHaveLength(1);
+    expect(data.options[0].deliver_to).toBe('address');
   });
 
-  it('debería devolver pickup.available=true cuando ML devuelve option_type=place', async () => {
+  it('debería filtrar opciones de retiro y devolver solo envío a domicilio cuando ML devuelve option_type=place', async () => {
     // Mock de la respuesta de ML con option_type=place
     mockFetch.mockResolvedValueOnce(
       createMockResponse({
@@ -227,12 +234,11 @@ describe('/api/shipments/calculate - Pickup Detection', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.pickup).toEqual({
-      available: true,
-      types: ['place'],
+      available: false,
+      types: [],
     });
-    expect(data.options).toHaveLength(2);
-    expect(data.options[0].deliver_to).toBe('agency'); // place se mapea a agency para el selector
-    expect(data.options[1].deliver_to).toBe('address');
+    expect(data.options).toHaveLength(1);
+    expect(data.options[0].deliver_to).toBe('address');
   });
 
   it('debería devolver pickup.available=false cuando no hay opciones de retiro', async () => {
@@ -379,13 +385,13 @@ describe('/api/shipments/calculate - Pickup Detection', () => {
           {
             shipping_method_id: 73333,
             id: 1,
-            name: 'Retiro en sucursal',
+            name: 'Envío a domicilio',
             currency_id: 'ARS',
             base_cost: 0,
             cost: 0,
             list_cost: 0,
             shipping_method_type: 'standard',
-            shipping_option_type: 'agency', // <-- Nombre alternativo del campo
+            shipping_option_type: 'address', // <-- Nombre alternativo del campo
             estimated_delivery_time: {
               date: '2024-01-10',
               time_frame: { from: '09:00', to: '18:00' },
@@ -423,9 +429,10 @@ describe('/api/shipments/calculate - Pickup Detection', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.pickup).toEqual({
-      available: true,
-      types: ['agency'],
+      available: false,
+      types: [],
     });
-    expect(data.options[0].deliver_to).toBe('agency');
+    expect(data.options).toHaveLength(1);
+    expect(data.options[0].deliver_to).toBe('address');
   });
 });
