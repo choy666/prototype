@@ -545,7 +545,6 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
       paymentId: paymentData.id?.toString(),
       mercadoPagoId: paymentData.id?.toString(),
       updatedAt: new Date(),
-      stockDeducted: false, // Se marcará como true después de ajustar stock
     })
     .where(eq(orders.id, preference.orderId));
 
@@ -588,7 +587,7 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
     // Usar bloqueo optimista con verificación de stockDeducted
     // 1. Verificar idempotencia sin bloqueo explícito
     const existingOrder = await db
-      .select({ stockDeducted: orders.stockDeducted })
+      .select({ stockDeducted: orders.stockDeducted, userId: orders.userId })
       .from(orders)
       .where(eq(orders.id, orderId))
       .limit(1);
@@ -606,6 +605,8 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
       });
       return; // Salir sin hacer cambios
     }
+
+    const orderUserId = existingOrder[0].userId;
 
     // 3. Obtener items de la orden
     const orderItemsData = await db
@@ -639,6 +640,8 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
 
     // 4. Ajustar stock para cada item con doble verificación de idempotencia
     let totalAdjusted = 0;
+    let itemsAdjusted = 0;
+    let itemsFailed = 0;
     for (const item of orderItemsData) {
       try {
         // 🔥 VERIFICACIÓN EXTRA: Re-check stockDeducted antes de cada item
@@ -655,7 +658,7 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             itemId: item.id,
             stockDeducted: currentOrder[0].stockDeducted,
           });
-          break; // Salir del loop si ya fue procesado
+          return; // Salir si ya fue procesado por otro proceso
         }
 
         const change = -Math.abs(item.quantity); // Siempre restar stock
@@ -685,6 +688,9 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             })
             .where(eq(productVariants.id, item.variantId));
 
+          totalAdjusted += Math.abs(change);
+          itemsAdjusted += 1;
+
           // Obtener nuevo stock para logging
           const updatedVariant = await db
             .select({ stock: productVariants.stock, isActive: productVariants.isActive })
@@ -693,15 +699,28 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             .limit(1);
 
           // Registrar en stockLogs
-          await db.insert(stockLogs).values({
-            productId: item.productId,
-            variantId: item.variantId,
-            oldStock: oldStock, // 🔥 Valor real antes del ajuste
-            newStock: updatedVariant[0]?.stock || 0,
-            change,
-            reason,
-            userId: 1, // System user
-          });
+          try {
+            await db.insert(stockLogs).values({
+              productId: item.productId,
+              variantId: item.variantId,
+              oldStock: oldStock, // 🔥 Valor real antes del ajuste
+              newStock: updatedVariant[0]?.stock || 0,
+              change,
+              reason,
+              userId: orderUserId,
+            });
+          } catch (logError) {
+            logger.warn('[PaymentProcessor] No se pudo registrar stockLogs (ajuste aplicado igual)', {
+              orderId,
+              paymentId,
+              itemId: item.id,
+              productId: item.productId,
+              variantId: item.variantId,
+              errorMessage: logError instanceof Error ? logError.message : String(logError),
+              errorCode: (logError as { code?: string })?.code || 'N/A',
+              errorDetail: (logError as { detail?: string })?.detail || 'N/A',
+            });
+          }
 
           logger.info('[PaymentProcessor] Stock de variante ajustado', {
             orderId,
@@ -734,6 +753,9 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             })
             .where(eq(products.id, item.productId));
 
+          totalAdjusted += Math.abs(change);
+          itemsAdjusted += 1;
+
           // Obtener nuevo stock para logging
           const updatedProduct = await db
             .select({ stock: products.stock })
@@ -742,14 +764,27 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             .limit(1);
 
           // Registrar en stockLogs
-          await db.insert(stockLogs).values({
-            productId: item.productId,
-            oldStock: oldStock, // 🔥 Valor real antes del ajuste
-            newStock: updatedProduct[0]?.stock || 0,
-            change,
-            reason,
-            userId: 1, // System user
-          });
+          try {
+            await db.insert(stockLogs).values({
+              productId: item.productId,
+              oldStock: oldStock, // 🔥 Valor real antes del ajuste
+              newStock: updatedProduct[0]?.stock || 0,
+              change,
+              reason,
+              userId: orderUserId,
+            });
+          } catch (logError) {
+            logger.warn('[PaymentProcessor] No se pudo registrar stockLogs (ajuste aplicado igual)', {
+              orderId,
+              paymentId,
+              itemId: item.id,
+              productId: item.productId,
+              variantId: null,
+              errorMessage: logError instanceof Error ? logError.message : String(logError),
+              errorCode: (logError as { code?: string })?.code || 'N/A',
+              errorDetail: (logError as { detail?: string })?.detail || 'N/A',
+            });
+          }
 
           logger.info('[PaymentProcessor] Stock de producto ajustado', {
             orderId,
@@ -760,8 +795,8 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
           });
         }
 
-        totalAdjusted += Math.abs(change);
       } catch (stockError) {
+        itemsFailed += 1;
         // 🔥 MEJORADO: Exponer error real para diagnóstico pero cambiar nivel a WARN para no alertar en Vercel
         const errorMessage = stockError instanceof Error ? stockError.message : String(stockError);
         const errorStack = stockError instanceof Error ? stockError.stack : undefined;
@@ -837,6 +872,19 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
         // Continuar con otros items en lugar de cancelar todo
         continue;
       }
+    }
+
+    if (itemsFailed > 0 || itemsAdjusted < orderItemsData.length) {
+      logger.error('[PaymentProcessor] Ajuste de stock incompleto - no se marca stockDeducted', {
+        orderId,
+        paymentId,
+        totalItems: orderItemsData.length,
+        itemsAdjusted,
+        itemsFailed,
+        totalAdjusted,
+        duration: `${Date.now() - startTime}ms`,
+      });
+      return;
     }
 
     // 5. Marcar orden como procesada

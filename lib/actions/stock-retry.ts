@@ -24,6 +24,7 @@ interface StockAdjustmentItem {
   quantity: number;
   change: number;
   reason: string;
+  userId?: number;
 }
 
 /**
@@ -39,9 +40,9 @@ export async function adjustStockWithRetry(
   for (let attempt = 1; attempt <= finalConfig.maxRetries; attempt++) {
     try {
       if (item.variantId) {
-        await adjustVariantStock(item.variantId, item.productId, item.change, item.reason);
+        await adjustVariantStock(item.variantId, item.productId, item.change, item.reason, item.userId);
       } else {
-        await adjustProductStock(item.productId, item.change, item.reason);
+        await adjustProductStock(item.productId, item.change, item.reason, item.userId);
       }
 
       if (attempt > 1) {
@@ -100,7 +101,8 @@ async function adjustVariantStock(
   variantId: number,
   productId: number,
   change: number,
-  reason: string
+  reason: string,
+  userId?: number
 ): Promise<void> {
   // Obtener stock actual
   const currentVariant = await db
@@ -133,15 +135,17 @@ async function adjustVariantStock(
     .limit(1);
 
   // Registrar en logs
-  await db.insert(stockLogs).values({
-    productId,
-    variantId,
-    oldStock,
-    newStock: updatedVariant[0]?.stock || 0,
-    change,
-    reason,
-    userId: 1,
-  });
+  if (typeof userId === 'number') {
+    await db.insert(stockLogs).values({
+      productId,
+      variantId,
+      oldStock,
+      newStock: updatedVariant[0]?.stock || 0,
+      change,
+      reason,
+      userId,
+    });
+  }
 }
 
 /**
@@ -150,7 +154,8 @@ async function adjustVariantStock(
 async function adjustProductStock(
   productId: number,
   change: number,
-  reason: string
+  reason: string,
+  userId?: number
 ): Promise<void> {
   // Obtener stock actual
   const currentProduct = await db
@@ -182,12 +187,14 @@ async function adjustProductStock(
     .limit(1);
 
   // Registrar en logs
-  await db.insert(stockLogs).values({
-    productId,
-    oldStock,
-    newStock: updatedProduct[0]?.stock || 0,
-    change,
-    reason,
-    userId: 1,
-  });
+  if (typeof userId === 'number') {
+    await db.insert(stockLogs).values({
+      productId,
+      oldStock,
+      newStock: updatedProduct[0]?.stock || 0,
+      change,
+      reason,
+      userId,
+    });
+  }
 }

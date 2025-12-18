@@ -117,7 +117,7 @@ export async function checkDatabaseConnection() {
 // 9. Función para verificar existencia de tablas críticas
 export async function checkCriticalTables() {
   try {
-    const tables = ['users', 'orders', 'order_items', 'products'];
+    const tables = ['users', 'orders', 'order_items', 'products', 'product_variants', 'stock_logs'];
     const results: Record<string, { exists: boolean; count?: number; error?: string }> = {};
 
     for (const table of tables) {
