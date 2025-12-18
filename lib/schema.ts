@@ -700,6 +700,13 @@ export const integrationMetrics = pgTable("integration_metrics", {
 // ======================
 // Relaciones de la base de datos
 // ======================
+export const mercadolibreWebhooksRelations = relations(mercadolibreWebhooks, ({ one }) => ({
+  user: one(users, {
+    fields: [mercadolibreWebhooks.userId],
+    references: [users.id],
+  }),
+}));
+
 export const productsRelations = relations(products, ({ one, many }) => ({
   variants: many(productVariants),
   mlSync: one(mercadolibreProductsSync, {

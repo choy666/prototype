@@ -131,6 +131,22 @@ export async function processPaymentWebhook(
     const idempotencyCheck = await checkPaymentIdempotency(paymentId);
     
     if (!idempotencyCheck.canProcess) {
+      let existingStatus: string | undefined;
+      try {
+        const existingPaymentRow = await db
+          .select({ status: mercadopagoPayments.status })
+          .from(mercadopagoPayments)
+          .where(eq(mercadopagoPayments.paymentId, paymentId.toString()))
+          .limit(1);
+
+        existingStatus = existingPaymentRow[0]?.status ?? undefined;
+      } catch (statusError) {
+        logger.error('[PaymentProcessor] Error obteniendo status existente de pago duplicado', {
+          paymentId,
+          error: statusError instanceof Error ? statusError.message : String(statusError),
+        });
+      }
+
       logger.info('[PaymentProcessor] Pago rechazado por cache local', {
         paymentId,
         requestId,
@@ -141,9 +157,11 @@ export async function processPaymentWebhook(
       
       // 🔥 IMPORTANTE: Verificar si el stock necesita ajuste incluso en pagos duplicados
       // Esto puede ocurrir si el primer intento falló antes de ajustar stock
+      let mpStatus: string | undefined;
       try {
         const payment = new Payment(client);
         const paymentData = await payment.get({ id: paymentId }) as unknown as ExtendedPaymentResponse;
+        mpStatus = paymentData.status;
         
         logger.info('[PaymentProcessor] Verificando stock en pago duplicado', {
           paymentId,
@@ -246,6 +264,7 @@ export async function processPaymentWebhook(
       
       return {
         success: true,
+        status: existingStatus ?? mpStatus,
         alreadyProcessed: true,
       };
     }
@@ -351,11 +370,27 @@ export async function processPaymentWebhook(
           preferenceId: insertData.preferenceId,
           status: insertData.status,
         });
-        
+
+        let existingStatus: string | undefined;
+        try {
+          const existingPaymentRow = await db
+            .select({ status: mercadopagoPayments.status })
+            .from(mercadopagoPayments)
+            .where(eq(mercadopagoPayments.paymentId, insertData.paymentId))
+            .limit(1);
+
+          existingStatus = existingPaymentRow[0]?.status ?? undefined;
+        } catch (statusError) {
+          logger.error('[PaymentProcessor] Error obteniendo status existente para pago duplicado', {
+            paymentId,
+            error: statusError instanceof Error ? statusError.message : String(statusError),
+          });
+        }
+
         // El pago ya fue insertado por otra instancia, retornar éxito
         return {
           success: true,
-          status: insertData.status,
+          status: existingStatus ?? insertData.status,
           alreadyProcessed: true,
         };
       }
