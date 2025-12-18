@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoLibreAuth } from '@/lib/auth/mercadolibre';
+import { auth } from '@/lib/actions/auth';
 
 // Verificación temporal para testing - en producción usar auth real
 async function verifyAdmin(request: NextRequest): Promise<boolean> {
-  // Para testing, permitir llamadas con header específico o desde localhost
-  const isAdmin = request.headers.get('x-admin-request') === 'true';
-  const authHeader = request.headers.get('authorization');
-  const isLocalhost = request.headers.get('host')?.includes('localhost') || false;
-
-  return isAdmin || authHeader?.startsWith('Bearer admin-') || isLocalhost;
+  void request;
+  const session = await auth();
+  return !!session && session.user?.role === 'admin';
 }
 
 export async function GET(
