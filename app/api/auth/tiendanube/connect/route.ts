@@ -34,10 +34,12 @@ export async function GET() {
 
   const authUrl = new URL(`${config.authBase}/apps/${config.appId}/authorize`);
   authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('redirect_uri', `${process.env.NEXT_PUBLIC_APP_URL || 'https://prototype-ten-dun.vercel.app'}/api/auth/tiendanube/callback`);
 
   logger.info('[TIENDANUBE] OAuth iniciado', {
     state: `${state.substring(0, 8)}...`,
+    redirectUri: authUrl.searchParams.get('redirect_uri'),
   });
 
-  return NextResponse.json({ url: authUrl.toString() });
+  return NextResponse.redirect(authUrl.toString());
 }
