@@ -70,5 +70,15 @@
     "*.spec.tsx": "typescriptreact"
   },
   "typescript.preferences.includeCompletionsForModuleExports": true,
-  "typescript.updateImportsOnFileMove.enabled": "always"
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "debug.terminal.clearBeforeReusing": true,
+  "terminal.explorerKind": "external",
+  "terminal.integrated.accessibleViewFocusOnCommandExecution": true,
+  "terminal.integrated.accessibleViewPreserveCursorPosition": true,
+  "terminal.integrated.allowMnemonics": true,
+  "terminal.integrated.automationProfile.linux": {},
+  "terminal.integrated.automationProfile.osx": {},
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "terminal.integrated.enableImages": true,
+  "terminal.integrated.enableVisualBell": true
 }
