@@ -14,10 +14,14 @@ interface TabsProps {
   defaultValue: string
   children: ReactNode
   className?: string
+  value?: string
+  onValueChange?: (value: string) => void
 }
 
-export function Tabs({ defaultValue, children, className }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultValue)
+export function Tabs({ defaultValue, children, className, value, onValueChange }: TabsProps) {
+  const [internalActiveTab, setInternalActiveTab] = useState(defaultValue)
+  const activeTab = value ?? internalActiveTab
+  const setActiveTab = onValueChange ?? setInternalActiveTab
 
   return (
     <TabsContext.Provider value={{ activeTab, setActiveTab }}>

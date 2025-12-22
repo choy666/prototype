@@ -36,6 +36,23 @@ const configs: Record<string, EnvConfig> = {
     development: ['MERCADO_PAGO_SUCCESS_URL', 'MERCADO_PAGO_FAILURE_URL', 'MERCADO_PAGO_PENDING_URL'],
   },
   
+  tiendanube: {
+    required: [
+      'TIENDANUBE_APP_ID',
+      'TIENDANUBE_CLIENT_SECRET',
+      'TIENDANUBE_API_BASE',
+      'TIENDANUBE_AUTH_BASE',
+      'TIENDANUBE_USER_AGENT',
+      'INTEGRATION_TOKEN_ENCRYPTION_KEY',
+      'INTEGRATION_WEBHOOKS_BASE_URL',
+    ],
+    optional: [
+      'TIENDANUBE_API_TIMEOUT',
+      'TIENDANUBE_API_RETRY_ATTEMPTS',
+      'TIENDANUBE_API_RETRY_DELAY',
+    ],
+  },
+  
   // URLs de aplicación
   urls: {
     required: ['NEXT_PUBLIC_APP_URL'],
@@ -50,6 +67,19 @@ export function validateEnvGroup(groupName: string): { isValid: boolean; errors:
   const config = configs[groupName];
   if (!config) {
     return { isValid: false, errors: [`Grupo de configuración '${groupName}' no encontrado`] };
+  }
+
+  if (groupName === 'tiendanube') {
+    const hasAnyTiendanubeEnv = Boolean(
+      process.env.TIENDANUBE_APP_ID ||
+        process.env.TIENDANUBE_CLIENT_SECRET ||
+        process.env.TIENDANUBE_API_BASE ||
+        process.env.TIENDANUBE_AUTH_BASE
+    );
+
+    if (!hasAnyTiendanubeEnv) {
+      return { isValid: true, errors: [] };
+    }
   }
 
   const errors: string[] = [];

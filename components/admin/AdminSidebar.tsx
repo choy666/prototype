@@ -13,7 +13,8 @@ import {
   Truck,
   CreditCard,
   ShoppingBag,
-  BarChart3
+  BarChart3,
+  Store
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { signOut } from 'next-auth/react'
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Métodos de Envío', href: '/admin/shipping-methods', icon: Truck },
   { name: 'MercadoLibre', href: '/admin/mercadolibre', icon: ShoppingBag },
   { name: 'MercadoPago', href: '/admin/mercadopago', icon: CreditCard },
+  { name: 'Tiendanube', href: '/admin/tiendanube', icon: Store },
   { name: 'Usuarios', href: '/admin/users', icon: Users },
   { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
   { name: 'Configuración', href: '/admin/business-settings', icon: Settings },

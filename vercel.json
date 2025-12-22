@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/tiendanube/sync/products",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/health/webhooks",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

@@ -25,6 +25,14 @@ export const API_ENDPOINTS = {
     notifications: '/ipn/notifications',
     customers: '/v1/customers',
   },
+  tiendanube: {
+    base: process.env.TIENDANUBE_API_BASE || 'https://api.tiendanube.com/2025-03',
+    products: '/{store_id}/products',
+    orders: '/{store_id}/orders',
+    customers: '/{store_id}/customers',
+    webhooks: '/{store_id}/webhooks',
+    stockPrice: '/{store_id}/products/stock-price',
+  },
 } as const;
 
 // Configuración por país (site_id de Mercado Libre)
@@ -103,6 +111,18 @@ export const getMercadoPagoConfig = () => ({
   timeout: parseInt(process.env.MP_API_TIMEOUT || '30000'),
   retryAttempts: parseInt(process.env.MP_API_RETRY_ATTEMPTS || '3'),
   retryDelay: parseInt(process.env.MP_API_RETRY_DELAY || '1000'),
+});
+
+export const getTiendanubeConfig = () => ({
+  appId: process.env.TIENDANUBE_APP_ID,
+  clientSecret: process.env.TIENDANUBE_CLIENT_SECRET,
+  apiBase: process.env.TIENDANUBE_API_BASE || 'https://api.tiendanube.com/2025-03',
+  authBase: process.env.TIENDANUBE_AUTH_BASE || 'https://www.tiendanube.com',
+  userAgent: process.env.TIENDANUBE_USER_AGENT,
+  webhooksBaseUrl: process.env.INTEGRATION_WEBHOOKS_BASE_URL,
+  timeout: parseInt(process.env.TIENDANUBE_API_TIMEOUT || '30000'),
+  retryAttempts: parseInt(process.env.TIENDANUBE_API_RETRY_ATTEMPTS || '3'),
+  retryDelay: parseInt(process.env.TIENDANUBE_API_RETRY_DELAY || '1000'),
 });
 
 // Configuración de paginación y límites
@@ -184,7 +204,7 @@ export const validateConfig = () => {
 };
 
 // Helper para obtener URL completa de API
-export const getApiUrl = (service: 'mercadolibre' | 'mercadopago', endpoint: string, params?: Record<string, string>) => {
+export const getApiUrl = (service: 'mercadolibre' | 'mercadopago' | 'tiendanube', endpoint: string, params?: Record<string, string>) => {
   const baseUrl = API_ENDPOINTS[service].base;
   let url = baseUrl + endpoint;
   

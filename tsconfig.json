@@ -41,6 +41,7 @@
   "**/*.test.ts",
   "**/*.test.tsx",
   "**/*.spec.ts",
-  "**/*.spec.tsx"
+  "**/*.spec.tsx",
+  "scripts/build-tiendanube.ts"
 ]
 }

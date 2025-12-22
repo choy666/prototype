@@ -346,6 +346,9 @@ export const orders = pgTable("orders", {
   mercadoLibreShipmentStatus: varchar("mercado_libre_shipment_status", { length: 50 }), // Estado shipment ML
   mercadoLibreShipmentSubstatus: varchar("mercado_libre_shipment_substatus", { length: 50 }), // Subestado ML
   mlOrderId: text("ml_order_id").unique(),
+  tiendanubeStoreId: text("tiendanube_store_id"),
+  tiendanubeOrderId: text("tiendanube_order_id"),
+  tiendanubeShippingId: text("tiendanube_shipping_id"),
   source: text("source").default("local"),
   // Información de sucursal para envíos a agencia
   shippingAgency: jsonb("shipping_agency"), // Datos de la sucursal seleccionada
@@ -364,7 +367,11 @@ export const orders = pgTable("orders", {
   index("orders_mercado_libre_shipment_id_idx").on(table.mercadoLibreShipmentId),
   index("orders_shipping_status_idx").on(table.shippingStatus),
   index("orders_shipping_mode_idx").on(table.shippingMode),
+  index("orders_tiendanube_store_id_idx").on(table.tiendanubeStoreId),
+  index("orders_tiendanube_order_id_idx").on(table.tiendanubeOrderId),
+  index("orders_tiendanube_shipping_id_idx").on(table.tiendanubeShippingId),
   uniqueIndex("orders_payment_id_unique").on(table.paymentId),
+  uniqueIndex("orders_tiendanube_store_order_unique").on(table.tiendanubeStoreId, table.tiendanubeOrderId),
 ]);
 
 // ======================
@@ -697,6 +704,114 @@ export const integrationMetrics = pgTable("integration_metrics", {
   index("integration_metrics_metric_name_idx").on(table.metricName),
 ]);
 
+export const tiendanubeStores = pgTable("tiendanube_stores", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  scopes: text("scopes"),
+  status: varchar("status", { length: 50 }).default("connected").notNull(),
+  installedAt: timestamp("installed_at"),
+  uninstalledAt: timestamp("uninstalled_at"),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tiendanube_stores_store_id_unique").on(table.storeId),
+  index("tiendanube_stores_status_idx").on(table.status),
+]);
+
+export const tiendanubeWebhooks = pgTable("tiendanube_webhooks", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  event: text("event").notNull(),
+  resourceId: text("resource_id"),
+  payload: jsonb("payload").notNull(),
+  hmacValid: boolean("hmac_valid").default(false).notNull(),
+  processed: boolean("processed").default(false).notNull(),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("tiendanube_webhooks_store_id_idx").on(table.storeId),
+  index("tiendanube_webhooks_event_idx").on(table.event),
+  index("tiendanube_webhooks_processed_idx").on(table.processed),
+]);
+
+export const tiendanubeWebhooksRaw = pgTable("tiendanube_webhooks_raw", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  event: text("event").notNull(),
+  rawBody: text("raw_body").notNull(),
+  headers: jsonb("headers").notNull(),
+  processed: boolean("processed").default(false).notNull(),
+  retryCount: integer("retry_count").default(0).notNull(),
+  maxRetries: integer("max_retries").default(5).notNull(),
+  lastRetryAt: timestamp("last_retry_at"),
+  nextRetryAt: timestamp("next_retry_at"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, retrying, failed, dead_letter
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("tiendanube_webhooks_raw_store_id_idx").on(table.storeId),
+  index("tiendanube_webhooks_raw_event_idx").on(table.event),
+  index("tiendanube_webhooks_raw_processed_idx").on(table.processed),
+  index("tiendanube_webhooks_raw_status_idx").on(table.status),
+  index("tiendanube_webhooks_raw_next_retry_idx").on(table.status, table.nextRetryAt),
+  index("tiendanube_webhooks_raw_created_at_idx").on(table.createdAt),
+]);
+
+export const tiendanubeProductMapping = pgTable("tiendanube_product_mapping", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  localProductId: integer("local_product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  localVariantId: integer("local_variant_id").references(() => productVariants.id, { onDelete: "cascade" }),
+  tiendanubeProductId: text("tiendanube_product_id"),
+  tiendanubeVariantId: text("tiendanube_variant_id"),
+  sku: text("sku").notNull(),
+  syncStatus: varchar("sync_status", { length: 50 }).default("pending").notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tiendanube_product_mapping_store_sku_unique").on(table.storeId, table.sku),
+  index("tiendanube_product_mapping_store_id_idx").on(table.storeId),
+  index("tiendanube_product_mapping_local_product_id_idx").on(table.localProductId),
+  index("tiendanube_product_mapping_local_variant_id_idx").on(table.localVariantId),
+  index("tiendanube_product_mapping_tiendanube_variant_id_idx").on(table.tiendanubeVariantId),
+  index("tiendanube_product_mapping_sync_status_idx").on(table.syncStatus),
+]);
+
+export const tiendanubeSyncState = pgTable("tiendanube_sync_state", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  resource: varchar("resource", { length: 100 }).notNull(),
+  cursor: text("cursor"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tiendanube_sync_state_store_resource_unique").on(table.storeId, table.resource),
+  index("tiendanube_sync_state_store_id_idx").on(table.storeId),
+]);
+
+export const tiendanubeCustomerMapping = pgTable("tiendanube_customer_mapping", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  tiendanubeCustomerId: text("tiendanube_customer_id").notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tiendanube_customer_mapping_store_customer_unique").on(table.storeId, table.tiendanubeCustomerId),
+  index("tiendanube_customer_mapping_user_id_idx").on(table.userId),
+  index("tiendanube_customer_mapping_store_id_idx").on(table.storeId),
+]);
+
 // ======================
 // Relaciones de la base de datos
 // ======================
@@ -733,6 +848,16 @@ export type MercadoLibreQuestion = typeof mercadolibreQuestions.$inferSelect;
 export type NewMercadoLibreQuestion = typeof mercadolibreQuestions.$inferInsert;
 export type MercadoLibreWebhook = typeof mercadolibreWebhooks.$inferSelect;
 export type NewMercadoLibreWebhook = typeof mercadolibreWebhooks.$inferInsert;
+export type TiendanubeStore = typeof tiendanubeStores.$inferSelect;
+export type NewTiendanubeStore = typeof tiendanubeStores.$inferInsert;
+export type TiendanubeWebhook = typeof tiendanubeWebhooks.$inferSelect;
+export type NewTiendanubeWebhook = typeof tiendanubeWebhooks.$inferInsert;
+export type TiendanubeProductMapping = typeof tiendanubeProductMapping.$inferSelect;
+export type NewTiendanubeProductMapping = typeof tiendanubeProductMapping.$inferInsert;
+export type TiendanubeSyncState = typeof tiendanubeSyncState.$inferSelect;
+export type NewTiendanubeSyncState = typeof tiendanubeSyncState.$inferInsert;
+export type TiendanubeCustomerMapping = typeof tiendanubeCustomerMapping.$inferSelect;
+export type NewTiendanubeCustomerMapping = typeof tiendanubeCustomerMapping.$inferInsert;
 export type MercadoPagoPreference = typeof mercadopagoPreferences.$inferSelect;
 export type NewMercadoPagoPreference = typeof mercadopagoPreferences.$inferInsert;
 export type MercadoPagoPayment = typeof mercadopagoPayments.$inferSelect;
