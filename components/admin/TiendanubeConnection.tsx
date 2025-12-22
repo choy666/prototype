@@ -9,6 +9,10 @@ import {
   Store,
   Webhook,
   ExternalLink,
+  Lightbulb,
+  CheckCircle,
+  AlertCircle,
+  Info,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -163,7 +167,7 @@ export function TiendanubeConnection() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('¿Estás seguro de que deseas desconectar la tienda?')) {
+    if (!confirm('¿Estás seguro de que deseas desconectar la tienda? Podrás volver a conectarla cuando quieras.')) {
       return;
     }
 
@@ -176,7 +180,8 @@ export function TiendanubeConnection() {
       if (!response.ok) throw new Error('Error al desconectar');
       
       toast.success('Tienda desconectada exitosamente');
-      await loadBase();
+      setStatus(null);
+      setSelectedStoreId('');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al desconectar');
     } finally {
@@ -452,6 +457,84 @@ export function TiendanubeConnection() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Consejos y Recomendaciones */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lightbulb className="h-5 w-5" />
+            Consejos y Recomendaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Buenas Prácticas
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">•</span>
+                  <span>Mantén siempre activados los webhooks para sincronización automática de productos y órdenes</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">•</span>
+                  <span>{'Verifica la conexión periódicamente usando el botón "Verificar tienda"'}</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">•</span>
+                  <span>Asegúrate de que los productos tengan todos los atributos requeridos (peso, dimensiones)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">•</span>
+                  <span>Configura correctamente las zonas de envío en Tiendanube para evitar errores</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                Problemas Comunes
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-600 mt-0.5">•</span>
+                  <span>Si los webhooks fallan, verifica que tu URL pública sea accesible</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-600 mt-0.5">•</span>
+                  <span>Los productos sin SKU no se sincronizarán correctamente</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-600 mt-0.5">•</span>
+                  <span>Errores de autenticación pueden requerir volver a conectar la tienda</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-600 mt-0.5">•</span>
+                  <span>Las órdenes se importan solo si el cliente existe en el sistema local</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="space-y-2 text-sm text-blue-800">
+                <p className="font-semibold">Información Importante</p>
+                <p>La integración con Tiendanube funciona en modo bidireccional:</p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li><strong>Local → Tiendanube:</strong> Catálogo, stock y precios se sincronizan desde tu sistema hacia Tiendanube</li>
+                  <li><strong>Tiendanube → Local:</strong> Órdenes, clientes y envíos se importan desde Tiendanube a tu sistema</li>
+                </ul>
+                <p className="mt-2">Para soporte técnico, consulta la documentación en <code>/docs/02-integracion-tiendanube.md</code></p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
