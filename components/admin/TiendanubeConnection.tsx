@@ -216,10 +216,10 @@ export function TiendanubeConnection() {
     loadBase();
   }, [loadBase]);
 
-  const currentStore = useMemo(() => {
-    if (!status?.stores || !selectedStoreId) return null;
-    return status.stores.find(s => s.storeId === selectedStoreId) || null;
-  }, [status, selectedStoreId]);
+  const connectedStore = useMemo(() => {
+    if (!status?.stores) return null;
+    return status.stores.find(s => s.status === 'connected') || null;
+  }, [status]);
 
   if (isLoading) {
     return (
@@ -252,19 +252,21 @@ export function TiendanubeConnection() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {currentStore ? (
+          {connectedStore ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold">Tienda Conectada</h3>
-                  <p className="text-sm text-gray-500">ID: {currentStore.storeId}</p>
+                  <h3 className="font-semibold">
+                    {connectedStore.status === 'connected' ? 'Tienda Conectada' : 'Tienda Desconectada'}
+                  </h3>
+                  <p className="text-sm text-gray-500">ID: {connectedStore.storeId}</p>
                   <p className="text-sm text-gray-500">
-                    Conectada el: {formatDate(currentStore.installedAt)}
+                    {connectedStore.status === 'connected' ? 'Conectada' : 'Desconectada'} el: {formatDate(connectedStore.installedAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={currentStore.status === 'connected' ? 'default' : 'destructive'}>
-                    {currentStore.status}
+                  <Badge variant={connectedStore.status === 'connected' ? 'default' : 'destructive'}>
+                    {connectedStore.status}
                   </Badge>
                   <Button
                     onClick={() => loadDetail(selectedStoreId, true)}
@@ -297,50 +299,71 @@ export function TiendanubeConnection() {
 
               <div className="flex gap-2">
                 <Button
-                  onClick={() => window.open(`https://www.tiendanube.com/admin/${currentStore.storeId}`, '_blank')}
+                  onClick={() => window.open(`https://www.tiendanube.com/admin/${connectedStore.storeId}`, '_blank')}
                   variant="outline"
                   size="sm"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Administrar Tienda
                 </Button>
-                <Button
-                  onClick={handleDisconnect}
-                  disabled={isLoading}
-                  variant="outline"
-                  size="sm"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Desconectando...
-                    </>
-                  ) : (
-                    "Desconectar"
-                  )}
-                </Button>
+                {connectedStore.status === 'connected' ? (
+                  <Button
+                    onClick={handleDisconnect}
+                    disabled={isLoading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Desconectando...
+                      </>
+                    ) : (
+                      "Desconectar"
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleConnect}
+                    disabled={isConnecting}
+                    variant="default"
+                    size="sm"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      <>
+                        <Store className="w-4 h-4 mr-2" />
+                        Conectar
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
 
-              {currentStore && (
+              {connectedStore && (
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="rounded-lg border bg-card p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Estado
                     </p>
-                    <p className="mt-2 text-sm">{currentStore.status}</p>
+                    <p className="mt-2 text-sm">{connectedStore.status}</p>
                   </div>
                   <div className="rounded-lg border bg-card p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Instalado
                     </p>
-                    <p className="mt-2 text-sm">{formatDate(currentStore.installedAt)}</p>
+                    <p className="mt-2 text-sm">{formatDate(connectedStore.installedAt)}</p>
                   </div>
                   <div className="rounded-lg border bg-card p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Scopes
                     </p>
                     <p className="mt-2 text-sm font-mono break-all">
-                      {currentStore.scopes || '-'}
+                      {connectedStore.scopes || '-'}
                     </p>
                   </div>
                 </div>
