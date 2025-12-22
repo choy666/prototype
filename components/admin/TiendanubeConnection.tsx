@@ -299,7 +299,7 @@ export function TiendanubeConnection() {
 
               <div className="flex gap-2">
                 <Button
-                  onClick={() => window.open(`https://www.tiendanube.com/admin/${connectedStore.storeId}`, '_blank')}
+                  onClick={() => window.open(`https://technocat2.mitiendanube.com/admin/v2/dashboard/`, '_blank')}
                   variant="outline"
                   size="sm"
                 >
