@@ -23,9 +23,8 @@ export type TiendanubeWebhookUpsertResult = {
 };
 
 export const REQUIRED_TIENDANUBE_WEBHOOK_EVENTS = [
-  'store/redact',
-  'customers/redact',
-  'customers/data_request',
+  // Los eventos LGPD (store/redact, customers/redact, customers/data_request) 
+  // solo aplican para Brasil y no son válidos en todas las instancias de Tiendanube
 ] as const;
 
 export const DEFAULT_TIENDANUBE_WEBHOOK_EVENTS = [
