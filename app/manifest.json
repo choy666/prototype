@@ -1,0 +1,18 @@
+{
+  "name": "TechnoCat",
+  "short_name": "TechnoCat",
+  "description": "Integración de e-commerce con Tiendanube",
+  "start_url": "https://prototype-ten-dun.vercel.app/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "scope": "https://prototype-ten-dun.vercel.app/",
+  "icons": [
+    {
+      "src": "https://prototype-ten-dun.vercel.app/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
