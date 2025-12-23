@@ -19,7 +19,6 @@ interface Category {
   isMlOfficial: boolean;
   isLeaf: boolean;
   attributes?: unknown;
-  me2Compatible?: boolean | null;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -31,7 +30,6 @@ interface NewCategory {
   isMlOfficial: boolean;
   isLeaf: boolean;
   attributes?: unknown;
-  me2Compatible?: boolean | null;
 }
 
 // Interfaz para caché de categorías ML
@@ -341,7 +339,6 @@ export async function syncMLCategories(): Promise<{
             isMlOfficial: true,
             isLeaf: categoryData.isLeaf,
             attributes: categoryData.attributes,
-            me2Compatible: hasRequiredAttributes,
             created_at: new Date(),
             updated_at: new Date(),
           });
@@ -361,7 +358,6 @@ export async function syncMLCategories(): Promise<{
               isMlOfficial: true,
               isLeaf: categoryData.isLeaf,
               attributes: categoryData.attributes,
-              me2Compatible: hasRequiredAttributes,
               updated_at: new Date()
             })
             .where(eq(categories.mlCategoryId, categoryId));
@@ -421,7 +417,6 @@ export async function syncMLCategories(): Promise<{
       .set({
         isLeaf: false,
         isMlOfficial: false,
-        me2Compatible: false,
         updated_at: new Date(),
       })
       .where(

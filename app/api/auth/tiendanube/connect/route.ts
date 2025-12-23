@@ -35,6 +35,7 @@ export async function GET() {
   const authUrl = new URL(`${config.authBase}/apps/${config.appId}/authorize`);
   authUrl.searchParams.set('state', state);
   authUrl.searchParams.set('redirect_uri', `${process.env.NEXT_PUBLIC_APP_URL || 'https://prototype-ten-dun.vercel.app'}/api/auth/tiendanube/callback`);
+  authUrl.searchParams.set('scope', 'write_products,read_products,write_orders,read_orders,write_customers,read_customers,write_shipping,read_shipping');
 
   logger.info('[TIENDANUBE] OAuth iniciado', {
     state: `${state.substring(0, 8)}...`,

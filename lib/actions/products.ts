@@ -10,7 +10,6 @@ import type { ProductFilters } from '@/types';
 import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
 import { validateProductForMercadoLibre } from '@/lib/validations/mercadolibre';
-import { validateProductME2Attributes } from '@/lib/validations/me2-products';
 import { calculateAvailableQuantityFromProduct } from '@/lib/domain/ml-stock';
 
 /**
@@ -210,18 +209,11 @@ export async function getProducts(
 
     const count = Number(countResult[0]?.count ?? 0);
 
-    const me2Validations = await Promise.all(
-      data.map(product => validateProductME2Attributes(product.id)),
-    );
-    const me2ValidationMap = new Map(me2Validations.map(result => [result.productId, result]));
-
     const normalizedData = data.map(product => {
-      const me2Validation = me2ValidationMap.get(product.id);
       return {
         ...product,
         images: normalizeImages(product.images),
         syncError: product.mlSync?.syncError ?? null,
-        me2CanUse: me2Validation?.canUseME2 ?? false,
       };
     });
 

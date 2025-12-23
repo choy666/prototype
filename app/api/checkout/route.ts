@@ -4,10 +4,9 @@ import { products, users, productVariants, orders, mercadopagoPreferences, order
 import { eq, and } from 'drizzle-orm';
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
-import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
-import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { formatAddressForMercadoLibre } from '@/lib/utils/address-formatter';
+import { unifiedShipping } from '@/lib/services/unified-shipping';
 
 // Tipo para items del checkout (sin stock requerido)
 type CheckoutItem = {
@@ -165,86 +164,35 @@ export async function POST(req: NextRequest) {
       return acc + finalPrice * item.quantity;
     }, 0);
 
-    // Calcular costo de envío usando el mismo motor ME2 que /api/shipments/calculate,
-    // respetando el método seleccionado por el usuario y con fallback a métodos locales.
-
-    // 1) Obtener productos enriquecidos desde la base de datos para ME2
-    const productIds = items.map((item: CheckoutItem) => item.id);
-    const dbProducts = await getProductsByIds(productIds);
-
-    const me2Items = items.map((item: CheckoutItem) => {
-      const dbProduct = dbProducts.find(p => p.id === item.id);
-
-      const basePrice = item.price;
-      const finalPrice = item.discount && item.discount > 0
-        ? basePrice * (1 - item.discount / 100)
-        : basePrice;
-
-      return {
-        id: item.id,
-        name: dbProduct?.name || item.name,
-        weight: dbProduct?.weight ?? undefined,
-        height: dbProduct?.height ?? undefined,
-        width: dbProduct?.width ?? undefined,
-        length: dbProduct?.length ?? undefined,
-        shippingMode: dbProduct?.shippingMode ?? undefined,
-        shippingAttributes: dbProduct?.shippingAttributes ?? undefined,
-        me2Compatible: dbProduct?.me2Compatible ?? false,
-        mlItemId: dbProduct?.mlItemId ?? undefined,
-        quantity: item.quantity,
-        price: finalPrice,
-      };
-    });
-
+    // Calcular costo de envío usando unified shipping service
     // Formatear dirección para Mercado Libre antes de calcular envío
     const formattedAddress = formatAddressForMercadoLibre(shippingAddress);
     
-    const me2Response = await calculateME2ShippingCost({
-      zipcode: formattedAddress.zip_code,
-      items: me2Items.map((item) => ({
-        id: item.id.toString(),
-        quantity: item.quantity,
-        price: item.price,
-        mlItemId: item.mlItemId,
-      })),
+    // ME2 shipping removed - using Tiendanube only
+    // Calculate shipping using unified shipping service
+    const shippingOptions = await unifiedShipping.calculateShipping({
+      customerZip: formattedAddress.zip_code,
+      items: items.map(item => ({ ...item, id: item.id.toString() })),
+      subtotal: subtotal
     });
 
-    const resolvedShippingMode =
-      me2Response.source === 'internal_shipping'
-        ? 'internal_shipping'
-        : me2Response.source === 'me2'
-          ? 'me2'
-          : 'local';
-
-    if (!me2Response.shippingOptions || me2Response.shippingOptions.length === 0) {
+    if (!shippingOptions || shippingOptions.length === 0) {
       throw new Error('No shipping methods available for this zipcode');
     }
 
-    // 2) Intentar usar exactamente el método seleccionado por el usuario (shippingMethod.id)
-    const selectedMethodFromEngine = me2Response.shippingOptions.find((opt) =>
-      String(opt.shipping_method_id) === String(shippingMethod.id)
-    );
-
-    // 3) Si no se encuentra (por cambios en ML o fallback), usar el más barato como respaldo
-    const cheapestMethod = me2Response.shippingOptions.reduce(
-      (min, curr) => ((curr.cost || 0) < (min.cost || 0) ? curr : min),
-      me2Response.shippingOptions[0]
-    );
-
-    const effectiveMethod = selectedMethodFromEngine || cheapestMethod;
+    // Find selected shipping method
+    const selectedMethod = shippingOptions.find(opt => opt.id === shippingMethod.id);
+    const effectiveMethod = selectedMethod || shippingOptions[0];
     const shippingCost = effectiveMethod?.cost ?? 0;
 
-    logger.info('Shipping cost calculated via ME2/core', { 
+    logger.info('Shipping cost calculated via unified shipping', { 
       zipcode: shippingAddress.codigoPostal,
       cost: shippingCost,
       method: effectiveMethod?.name,
       selectedMethodId: shippingMethod.id,
-      matchedSelectedMethod: Boolean(selectedMethodFromEngine),
-      source: me2Response.source,
-      fallback: me2Response.fallback ?? false,
+      availableOptions: shippingOptions.length
     });
 
-    // Calcular total final
     const total = subtotal + shippingCost;
 
     // Crear orden local pendiente vinculada al checkout
@@ -258,20 +206,17 @@ export async function POST(req: NextRequest) {
         shippingAddress,
         shippingMethodId: null,
         shippingCost: shippingCost.toString(),
-        shippingMode: resolvedShippingMode,
+        shippingMode: 'tiendanube',
         source: 'local',
         shippingAgency: null,
         metadata: {
           shipping_context: {
             zipcode: formattedAddress.zip_code,
-            shipping_method_id: String(effectiveMethod?.shipping_method_id ?? shippingMethod?.id ?? ''),
+            shipping_method_id: String(effectiveMethod?.id ?? shippingMethod?.id ?? ''),
             shipping_method_name: effectiveMethod?.name ?? shippingMethod?.name ?? null,
-            logistic_type: resolvedShippingMode,
+            logistic_type: 'tiendanube',
             deliver_to: 'address',
             carrier_id: shippingMethod?.carrier_id ?? null,
-            option_id: shippingMethod?.option_id ?? (effectiveMethod?.option_id ?? null),
-            option_hash: shippingMethod?.option_hash ?? (effectiveMethod?.option_hash ?? null),
-            state_id: shippingMethod?.state_id ?? (effectiveMethod?.state_id ?? null),
           },
         },
       })
@@ -321,8 +266,7 @@ export async function POST(req: NextRequest) {
       // Metadata de tracking y versión
       checkout_version: '1.0',
       migration_applied: true,
-      me2_source: me2Response.source,
-      me2_fallback: me2Response.fallback ?? false,
+      shipping_source: 'tiendanube',
       created_at: new Date().toISOString(),
     };
 
@@ -354,8 +298,8 @@ export async function POST(req: NextRequest) {
             state_name: shippingAddress.provincia,
             country_name: 'Argentina',
           },
-          dimensions: me2Items[0]?.height && me2Items[0]?.width && me2Items[0]?.length
-            ? `${me2Items[0].length} x ${me2Items[0].width} x ${me2Items[0].height}`
+          dimensions: items[0]?.weight || (items[0]?.variantId ? 'Varies' : 'No dimensions')
+            ? 'Package dimensions available'
             : undefined,
         },
         payer: {

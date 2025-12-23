@@ -1,12 +1,11 @@
 // lib/services/unified-shipping.ts
-// Servicio unificado para calcular envíos locales, Tiendanube y Mercado Envíos 2
+// Servicio simplificado para calcular envíos con Tiendanube
 
 import { db } from '@/lib/db';
-import { orders, tiendanubeStores } from '@/lib/schema';
+import { orders, tiendanubeStores, products } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { createTiendanubeShippingClient, TiendanubeShippingParams } from '@/lib/clients/tiendanube-shipping';
 import { decryptString } from '@/lib/utils/encryption';
-import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 
 export interface ShippingItem {
   id: string;
@@ -25,7 +24,7 @@ export interface ShippingOption {
   name: string;
   cost: number;
   estimated: string;
-  type: 'local' | 'tiendanube' | 'me2';
+  type: 'local' | 'tiendanube';
   carrier?: string;
 }
 
@@ -62,6 +61,9 @@ export class UnifiedShippingService {
     const settings = await this.getBusinessSettings();
     const options: ShippingOption[] = [];
 
+    // Enriquecer items con datos de productos si faltan peso/dimensiones
+    const enrichedItems = await this.enrichItemsWithProductData(params.items);
+
     // 1. Verificar envío local (mismo código postal)
     if (this.isLocalShipping(params.customerZip, settings.businessZipCode as string)) {
       const localCost = params.subtotal >= (settings.free_shipping_threshold as number) 
@@ -78,71 +80,74 @@ export class UnifiedShippingService {
       });
     }
 
-    // 2. Obtener opciones de ME2 y Tiendanube en paralelo
+    // 2. Obtener opciones de Tiendanube
     console.log('[Unified Shipping] Tiendanube enabled:', settings.tiendanubeEnabled);
     console.log('[Unified Shipping] Tiendanube store ID:', settings.tiendanubeStoreId);
     
-    const [me2Options, tiendanubeOptions] = await Promise.allSettled([
-      this.getME2ShippingOptions(params),
-      settings.tiendanubeEnabled ? this.getTiendanubeShippingOptions(params, settings) : []
-    ]);
-
-    // 3. Procesar opciones de ME2
-    if (me2Options.status === 'fulfilled') {
-      options.push(...me2Options.value);
-    } else {
-      console.error('[Unified Shipping] Error getting ME2 options:', me2Options.reason);
-    }
-
-    // 4. Procesar opciones de Tiendanube
-    if (tiendanubeOptions.status === 'fulfilled') {
-      options.push(...tiendanubeOptions.value);
-    } else {
-      console.error('[Unified Shipping] Error getting Tiendanube options:', tiendanubeOptions.reason);
-      // No agregar fallback estático - si Tiendanube falla, no mostrar opciones
+    if (settings.tiendanubeEnabled) {
+      try {
+        const tiendanubeOptions = await this.getTiendanubeShippingOptions(
+          { ...params, items: enrichedItems }, 
+          settings
+        );
+        options.push(...tiendanubeOptions);
+      } catch (error) {
+        console.error('[Unified Shipping] Error getting Tiendanube options:', error);
+        // No agregar fallback estático - si Tiendanube falla, no mostrar opciones
+      }
     }
 
     // Ordenar por costo
     return options.sort((a, b) => a.cost - b.cost);
   }
 
+  /**
+   * Enriquece los items con datos de peso y dimensiones de la BD si no los tienen
+   */
+  private async enrichItemsWithProductData(items: ShippingItem[]): Promise<ShippingItem[]> {
+    const enrichedItems = await Promise.all(items.map(async (item) => {
+      // Si ya tiene peso y dimensiones, devolverlo tal cual
+      if (item.weight && item.dimensions) {
+        return item;
+      }
+
+      // Buscar en la BD
+      const product = await db.query.products.findFirst({
+        where: eq(products.id, parseInt(item.id))
+      });
+
+      if (!product) {
+        console.warn(`[Unified Shipping] Producto ${item.id} no encontrado`);
+        return item;
+      }
+
+      // Usar datos del producto (las variantes no tienen peso/dimensiones)
+      const source = product;
+      
+      return {
+        ...item,
+        weight: source.weight ? Number(source.weight) * 1000 : 0, // Convertir kg a gramos
+        dimensions: {
+          length: source.length ? Number(source.length) : 0,
+          width: source.width ? Number(source.width) : 0,
+          height: source.height ? Number(source.height) : 0
+        }
+      };
+    }));
+
+    console.log('[Unified Shipping] Items enriquecidos:', enrichedItems.map(i => ({
+      id: i.id,
+      weight: i.weight,
+      dimensions: i.dimensions
+    })));
+
+    return enrichedItems;
+  }
+
   private isLocalShipping(customerZip: string, businessZip: string): boolean {
     // Lógica simple: mismo código postal = envío local
     // Podría expandirse para incluir códigos postales cercanos
     return customerZip === businessZip;
-  }
-
-  private async getME2ShippingOptions(params: ShippingCalculationParams): Promise<ShippingOption[]> {
-    try {
-      const me2Result = await calculateME2ShippingCost({
-        zipcode: params.customerZip,
-        items: params.items.map(item => ({
-          id: item.id,
-          quantity: item.quantity,
-          price: item.price
-        }))
-      });
-
-      // Convertir opciones de ME2 al formato unificado
-      return me2Result.shippingOptions
-        .filter(option => (option.deliver_to ?? 'address') === 'address') // Solo envíos a domicilio
-        .map(option => ({
-          id: option.shipping_method_id?.toString() || 'me2-' + option.name,
-          name: option.name,
-          cost: option.cost,
-          estimated: option.estimated_delivery?.date 
-            ? new Date(option.estimated_delivery.date).toLocaleDateString('es-AR', {
-                day: 'numeric',
-                month: 'short'
-              })
-            : '3-5 días',
-          type: me2Result.fallback ? 'local' as const : 'me2' as const,
-          carrier: me2Result.fallback ? 'Envío Local' : 'Mercado Envíos'
-        }));
-    } catch (error) {
-      console.error('[Unified Shipping] ME2 error:', error);
-      return [];
-    }
   }
 
   private async getTiendanubeShippingOptions(

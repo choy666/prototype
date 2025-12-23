@@ -4,7 +4,6 @@ import { orders, orderItems, products, users } from '@/lib/schema';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { z } from 'zod';
 import { CheckoutItem, ShippingAddress, ShippingMethod } from '@/types/checkout';
-import { validateProductsForME2Shipping } from '@/lib/validations/me2-products';
 
 // Esquema de validación para el checkout
 const checkoutSchema = z.object({
@@ -83,14 +82,8 @@ export class CheckoutService {
       }
     }
 
-    // 3. Validar compatibilidad con ME2 si el método de envío es ME2
-    if (validatedData.shippingMethod.id.includes('me2')) {
-      const productIds = validatedData.items.map(item => parseInt(item.id));
-      const me2Validation = await validateProductsForME2Shipping(productIds);
-      if (!me2Validation.allValid) {
-        throw new Error('Uno o más productos no son compatibles con Mercado Envíos 2');
-      }
-    }
+    // 3. Validar compatibilidad con envíos (solo para métodos que lo requieran)
+    // ME2 shipping removed - using Tiendanube only
 
     // 4. Obtener datos del usuario
     const [userData] = await db

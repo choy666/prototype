@@ -103,14 +103,30 @@ export class TiendanubeShippingClient {
     const carriers = await this.getCarriers();
     const rates: TiendanubeShippingRate[] = [];
 
+    console.log('[Tiendanube Shipping] Raw carriers data:', carriers);
+    console.log('[Tiendanube Shipping] Found carriers:', carriers.length);
+
     // Para cada carrier, intentar calcular la tarifa
     for (const carrier of carriers) {
-      if (!carrier.enabled) continue;
+      console.log(`[Tiendanube Shipping] Processing carrier:`, {
+        id: carrier.id,
+        name: carrier.name,
+        enabled: carrier.enabled,
+        carrier_type: carrier.carrier_type
+      });
+      
+      // Si enabled es undefined, asumir que está habilitado (la API no siempre lo devuelve)
+      if (carrier.enabled === false) {
+        console.log(`[Tiendanube Shipping] Skipping ${carrier.name} - explicitly disabled`);
+        continue;
+      }
 
       try {
         const rate = await this.calculateCarrierRate(carrier, params);
         if (rate && rate.coverage) {
           rates.push(rate);
+        } else {
+          console.log(`[Tiendanube Shipping] No rate returned for ${carrier.name} or no coverage`);
         }
       } catch (error) {
         console.warn(`[Tiendanube Shipping] Error calculating rate for ${carrier.name}:`, error);
@@ -145,6 +161,13 @@ export class TiendanubeShippingClient {
     carrier: TiendanubeCarrier,
     params: TiendanubeShippingParams
   ): Promise<TiendanubeShippingRate | null> {
+    console.log(`[Tiendanube Shipping] Calculating rate for carrier:`, {
+      id: carrier.id,
+      name: carrier.name,
+      type: carrier.carrier_type,
+      enabled: carrier.enabled
+    });
+
     // Para carriers tipo "pickup_point", el cálculo es diferente
     if (carrier.carrier_type === 'pickup_point') {
       return {
@@ -172,6 +195,11 @@ export class TiendanubeShippingClient {
       items_count: 1
     };
 
+    console.log(`[Tiendanube Shipping] Calling rates endpoint for ${carrier.name}:`, {
+      url: `${this.baseUrl}/${this.storeId}/shipping_carriers/${carrier.id}/rates`,
+      params: rateParams
+    });
+
     const response = await fetch(
       `${this.baseUrl}/${this.storeId}/shipping_carriers/${carrier.id}/rates`,
       {
@@ -185,6 +213,12 @@ export class TiendanubeShippingClient {
       }
     );
 
+    console.log(`[Tiendanube Shipping] Response for ${carrier.name}:`, {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
       // Si el carrier no soporta el endpoint de rates, devolver null
       if (response.status === 404 || response.status === 405) {
@@ -195,6 +229,7 @@ export class TiendanubeShippingClient {
     }
 
     const rateData = await response.json();
+    console.log(`[Tiendanube Shipping] Rate data for ${carrier.name}:`, rateData);
     
     // Mapear la respuesta al formato esperado
     return {

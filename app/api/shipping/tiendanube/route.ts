@@ -2,84 +2,53 @@
 // Endpoint para calcular envíos con Envío Nube
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createTiendanubeShippingClient, TiendanubeShippingParams } from '@/lib/clients/tiendanube-shipping';
-import { db } from '@/lib/db';
-import { tiendanubeStores } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
-import { decryptString } from '@/lib/utils/encryption';
+import { tiendanubeShippingOnly } from '@/lib/services/tiendanube-shipping-only';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { zipCode, items, subtotal } = body;
+    const { customerZip, items, subtotal } = body;
 
-    // Validaciones
-    if (!zipCode || !items) {
+    // Validaciones básicas
+    if (!customerZip || !items || !Array.isArray(items)) {
       return NextResponse.json(
-        { error: 'Faltan datos requeridos: zipCode, items' },
+        { error: 'Datos incompletos para calcular envío' },
         { status: 400 }
       );
     }
 
-    // Calcular peso y dimensiones totales
-    const totalWeight = items.reduce((sum: number, item: { weight?: number; quantity: number }) => sum + (item.weight || 0) * item.quantity, 0);
-    const maxDimensions = items.reduce((max: { length: number; width: number; height: number }, item: { dimensions?: { length: number; width: number; height: number } }) => {
-      if (!item.dimensions) return max;
-      return {
-        length: Math.max(max.length, item.dimensions.length),
-        width: Math.max(max.width, item.dimensions.width),
-        height: Math.max(max.height, item.dimensions.height)
-      };
-    }, { length: 0, width: 0, height: 0 });
+    // Validar que cada item tenga peso y dimensiones
+    const validatedItems = items.map(item => ({
+      ...item,
+      weight: item.weight || 0,
+      dimensions: item.dimensions || { length: 0, width: 0, height: 0 }
+    }));
 
-    const shippingParams: TiendanubeShippingParams = {
-      origin_zip: '1001', // CP del negocio
-      destination_zip: zipCode,
-      weight: totalWeight,
-      height: maxDimensions.height || undefined,
-      width: maxDimensions.width || undefined,
-      length: maxDimensions.length || undefined,
-      declared_value: subtotal || 0
-    };
-    
-    // Usar la tienda conectada (7078702)
-    const storeId = '7078702';
-    
-    // Obtener access token
-    const store = await db.query.tiendanubeStores.findFirst({
-      where: eq(tiendanubeStores.storeId, storeId),
-    });
-
-    if (!store) {
-      return NextResponse.json(
-        { error: 'Tienda no conectada' },
-        { status: 400 }
-      );
-    }
-
-    // Crear cliente y calcular
-    const client = createTiendanubeShippingClient({
-      storeId,
-      accessToken: decryptString(store.accessTokenEncrypted)
-    });
-
-    const options = await client.calculateShipping(shippingParams);
-
-    return NextResponse.json({
-      success: true,
-      options: options.map((opt) => ({
-        id: opt.id,
-        name: opt.carrier_name,
-        cost: opt.price,
-        estimated: `${opt.delivery_time.min_days}-${opt.delivery_time.max_days} días`,
-        carrier: opt.carrier_code
+    console.log('[API Tiendanube] Request:', {
+      customerZip,
+      itemCount: items.length,
+      items: validatedItems.map(i => ({ 
+        id: i.id, 
+        weight: i.weight, 
+        dimensions: i.dimensions 
       }))
     });
 
+    // Calcular envío usando solo Tiendanube
+    const options = await tiendanubeShippingOnly.calculateShipping({
+      customerZip,
+      items: validatedItems,
+      subtotal
+    });
+
+    console.log('[API Tiendanube] Opciones devueltas:', options.length);
+
+    return NextResponse.json({ options });
   } catch (error) {
-    console.error('[API] Tiendanube shipping error:', error);
+    console.error('[API Tiendanube] Error:', error);
+    
     return NextResponse.json(
-      { error: 'Error al calcular envío' },
+      { error: 'No se pudieron calcular las opciones de envío. Intente nuevamente.' },
       { status: 500 }
     );
   }
