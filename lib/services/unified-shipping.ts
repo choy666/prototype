@@ -4,7 +4,7 @@
 import { db } from '@/lib/db';
 import { orders, tiendanubeStores } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { createTiendanubeShippingClient, TiendanubeShippingParams } from '@/lib/clients/tiendanube-shipping';
+import { createTiendanubeShippingClient, TiendanubeShippingParams, TiendanubeShippingRate } from '@/lib/clients/tiendanube-shipping';
 import { decryptString } from '@/lib/utils/encryption';
 import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 
@@ -195,19 +195,15 @@ export class UnifiedShippingService {
     const tiendanubeOptions = await client.calculateShipping(shippingParams);
     console.log('[Unified Shipping] Tiendanube returned', tiendanubeOptions.length, 'options');
 
-    return tiendanubeOptions.map((option: {
-      id: string;
-      name: string;
-      price: number;
-      deliveryTime: string;
-      carrier: string;
-    }) => ({
+    return tiendanubeOptions.map((option: TiendanubeShippingRate) => ({
       id: option.id,
-      name: option.name,
+      name: option.carrier_name,
       cost: option.price,
-      estimated: option.deliveryTime,
+      estimated: option.delivery_time.min_days === option.delivery_time.max_days 
+        ? `${option.delivery_time.min_days} días`
+        : `${option.delivery_time.min_days}-${option.delivery_time.max_days} días`,
       type: 'tiendanube' as const,
-      carrier: option.carrier
+      carrier: option.carrier_code
     }));
   }
 

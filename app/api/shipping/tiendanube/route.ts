@@ -67,17 +67,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      options: options.map((opt: {
-        id: string;
-        name: string;
-        price: number;
-        deliveryTime: string;
-        carrier: string;
-      }) => ({
+      options: options.map((opt) => ({
         id: opt.id,
-        name: opt.name,
+        name: opt.carrier_name,
         cost: opt.price,
-        estimated: opt.deliveryTime
+        estimated: `${opt.delivery_time.min_days}-${opt.delivery_time.max_days} días`,
+        carrier: opt.carrier_code
       }))
     });
 
