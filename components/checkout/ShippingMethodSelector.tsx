@@ -246,7 +246,7 @@ export function ShippingMethodSelector({
                       Entrega estimada: {new Date(method.estimated_delivery.date).toLocaleDateString('es-AR')}
                     </p>
                   )}
-                  <p>Modo: {method.shipping_mode}</p>
+                  <p>Modo: {method.shipping_mode === 'custom' ? 'Local' : method.shipping_mode === 'tiendanube' ? 'Tiendanube' : 'ME2'}</p>
                 </div>
               </div>
             </div>

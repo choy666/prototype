@@ -80,6 +80,9 @@ export class UnifiedShippingService {
     }
 
     // 2. Obtener opciones de ME2 y Tiendanube en paralelo
+    console.log('[Unified Shipping] Tiendanube enabled:', settings.tiendanube_enabled);
+    console.log('[Unified Shipping] Tiendanube store ID:', settings.tiendanube_store_id);
+    
     const [me2Options, tiendanubeOptions] = await Promise.allSettled([
       this.getME2ShippingOptions(params),
       settings.tiendanube_enabled ? this.getTiendanubeShippingOptions(params, settings) : []
@@ -147,16 +150,21 @@ export class UnifiedShippingService {
     params: ShippingCalculationParams, 
     settings: Record<string, unknown>
   ): Promise<ShippingOption[]> {
+    console.log('[Unified Shipping] getTiendanubeShippingOptions called');
+    
     // Obtener tienda de Tiendanube
     const store = await db.query.tiendanubeStores.findFirst({
       where: eq(tiendanubeStores.storeId, settings.tiendanube_store_id as string),
     });
+
+    console.log('[Unified Shipping] Tiendanube store found:', !!store);
 
     if (!store) {
       throw new Error('Tienda de Tiendanube no configurada');
     }
 
     // Crear cliente y calcular
+    console.log('[Unified Shipping] Creating Tiendanube client...');
     const client = createTiendanubeShippingClient({
       storeId: settings.tiendanube_store_id as string,
       accessToken: decryptString(store.accessTokenEncrypted)
@@ -183,7 +191,9 @@ export class UnifiedShippingService {
       declared_value: params.subtotal
     };
 
+    console.log('[Unified Shipping] Calling Tiendanube API...');
     const tiendanubeOptions = await client.calculateShipping(shippingParams);
+    console.log('[Unified Shipping] Tiendanube returned', tiendanubeOptions.length, 'options');
 
     return tiendanubeOptions.map((option: {
       id: string;
