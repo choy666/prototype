@@ -19,7 +19,7 @@ export async function GET() {
     let apiError = null;
     
     try {
-      const response = await fetch(`https://api.tiendanube.com/v1/${store.storeId}/`, {
+      const response = await fetch(`https://api.tiendanube.com/v1/${store.storeId}/store`, {
         headers: {
           'Authorization': `Bearer ${decryptedToken}`,
           'Content-Type': 'application/json'

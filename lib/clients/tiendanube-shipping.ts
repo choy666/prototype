@@ -2,6 +2,7 @@
 // Cliente para Envío Nube de Tiendanube
 
 import { createTiendanubeClient } from '@/lib/clients/tiendanube';
+import { tiendanubeTokenManager } from '@/lib/services/tiendanube-token-manager';
 
 export interface TiendanubeShippingOption {
   id: string;
@@ -34,6 +35,14 @@ export class TiendanubeShippingClient {
 
   async calculateShipping(params: TiendanubeShippingParams) {
     try {
+      // Verificar estado del token antes de hacer la llamada
+      const tokenStatus = await tiendanubeTokenManager.validateToken(this.storeId);
+      
+      if (!tokenStatus.valid) {
+        console.warn(`[Tiendanube] Token inválido para store ${this.storeId}, necesita reautenticación`);
+        return [];
+      }
+
       // Primero obtener lista de transportistas disponibles
       const carriersUrl = `https://api.tiendanube.com/v1/${this.storeId}/shipping_carriers`;
       const carriersResponse = await fetch(carriersUrl, {
@@ -44,6 +53,12 @@ export class TiendanubeShippingClient {
           'Authorization': `Bearer ${this.accessToken}`
         }
       });
+
+      // Manejar error de autenticación
+      if (carriersResponse.status === 401) {
+        await tiendanubeTokenManager.handleAuthError(this.storeId, { status: 401 });
+        return [];
+      }
 
       if (!carriersResponse.ok) {
         throw new Error(`Error ${carriersResponse.status}: ${carriersResponse.statusText}`);
@@ -74,6 +89,12 @@ export class TiendanubeShippingClient {
             })
           });
 
+          // Manejar error de autenticación en rates
+          if (ratesResponse.status === 401) {
+            await tiendanubeTokenManager.handleAuthError(this.storeId, { status: 401 });
+            return null;
+          }
+
           if (!ratesResponse.ok) {
             console.error(`[Tiendanube] Error calculating rate for ${carrier.name}:`, ratesResponse.status);
             return null;
@@ -95,6 +116,17 @@ export class TiendanubeShippingClient {
       return shippingOptions.filter(option => option !== null && option.price >= 0);
 
     } catch (error) {
+      // Verificar si es error de autenticación
+      const isAuthError = await tiendanubeTokenManager.handleAuthError(
+        this.storeId, 
+        error instanceof Error ? error : { status: undefined, message: String(error) }
+      );
+      
+      if (isAuthError) {
+        console.warn('[Tiendanube Shipping] Error de autenticación - se requiere reconexión');
+        return [];
+      }
+      
       console.error('[Tiendanube Shipping] Error:', error);
       
       // No hay datos disponibles - devolver array vacío
