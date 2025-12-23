@@ -4,6 +4,7 @@
 import { db } from '@/lib/db';
 import { tiendanubeStores } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { decryptString } from '@/lib/utils/encryption';
 
 export class TiendanubeOAuthHandler {
   // Verificar si la tienda está realmente conectada
@@ -18,11 +19,12 @@ export class TiendanubeOAuthHandler {
       }
 
       // Endpoint oficial para verificar conexión
-      const response = await fetch(`https://api.tiendanube.com/v1/${storeId}/store`, {
+      const decryptedToken = decryptString(store.accessTokenEncrypted);
+      const response = await fetch(`https://api.tiendanube.com/2025-03/${storeId}/store`, {
         headers: {
-          'Authorization': `Bearer ${store.accessTokenEncrypted}`,
+          'Authentication': `bearer ${decryptedToken}`,
           'Content-Type': 'application/json',
-          'User-Agent': 'Prototype-Store/1.0'
+          'User-Agent': 'Technocat-Integration/1.0 (contact@technocat.com)'
         }
       });
 

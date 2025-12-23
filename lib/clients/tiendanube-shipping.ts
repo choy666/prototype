@@ -41,7 +41,8 @@ export interface TiendanubeShippingRate {
 export class TiendanubeShippingClient {
   private storeId: string;
   private accessToken: string;
-  private baseUrl = 'https://api.tiendanube.com/v1';
+  private baseUrl = 'https://api.tiendanube.com/2025-03';
+  private userAgent = 'Technocat-Integration/1.0 (contact@technocat.com)';
 
   constructor({ storeId, accessToken }: { storeId: string; accessToken: string }) {
     this.storeId = storeId;
@@ -56,9 +57,9 @@ export class TiendanubeShippingClient {
     
     const response = await fetch(`${this.baseUrl}/${this.storeId}/shipping_carriers`, {
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
+        'Authentication': `bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'Technocat-Integration/1.0'
+        'User-Agent': this.userAgent
       }
     });
 
@@ -176,9 +177,9 @@ export class TiendanubeShippingClient {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
+          'Authentication': `bearer ${this.accessToken}`,
           'Content-Type': 'application/json',
-          'User-Agent': 'Technocat-Integration/1.0'
+          'User-Agent': this.userAgent
         },
         body: JSON.stringify(rateParams)
       }

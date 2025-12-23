@@ -213,6 +213,6 @@ export class TiendanubeClient {
   }
 }
 
-export function createTiendanubeClient(params: { storeId: string; accessToken: string }): TiendanubeClient {
+export function createTiendanubeClient(params: { storeId: string; accessToken: string }) {
   return new TiendanubeClient(params);
 }

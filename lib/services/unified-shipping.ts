@@ -47,15 +47,14 @@ export class UnifiedShippingService {
   }
 
   async getBusinessSettings(): Promise<Record<string, unknown>> {
-    if (!this.businessSettings) {
-      const settings = await db.query.shippingSettings.findFirst();
-      
-      if (!settings) {
-        throw new Error('Configuración de envío no encontrada. Por favor, configure los datos en el panel de administración.');
-      }
-      
-      this.businessSettings = settings;
+    // Forzar recarga siempre para evitar caché stale
+    const settings = await db.query.shippingSettings.findFirst();
+    
+    if (!settings) {
+      throw new Error('Configuración de envío no encontrada. Por favor, configure los datos en el panel de administración.');
     }
+    
+    this.businessSettings = settings;
     return this.businessSettings as Record<string, unknown>;
   }
 
@@ -64,7 +63,7 @@ export class UnifiedShippingService {
     const options: ShippingOption[] = [];
 
     // 1. Verificar envío local (mismo código postal)
-    if (this.isLocalShipping(params.customerZip, settings.business_zip_code as string)) {
+    if (this.isLocalShipping(params.customerZip, settings.businessZipCode as string)) {
       const localCost = params.subtotal >= (settings.free_shipping_threshold as number) 
         ? 0 
         : (settings.local_shipping_cost as number);
@@ -137,8 +136,8 @@ export class UnifiedShippingService {
                 month: 'short'
               })
             : '3-5 días',
-          type: 'me2' as const,
-          carrier: 'Mercado Envíos'
+          type: me2Result.fallback ? 'local' as const : 'me2' as const,
+          carrier: me2Result.fallback ? 'Envío Local' : 'Mercado Envíos'
         }));
     } catch (error) {
       console.error('[Unified Shipping] ME2 error:', error);
@@ -151,6 +150,11 @@ export class UnifiedShippingService {
     settings: Record<string, unknown>
   ): Promise<ShippingOption[]> {
     console.log('[Unified Shipping] getTiendanubeShippingOptions called');
+    console.log('[Unified Shipping] Settings:', {
+      tiendanubeEnabled: settings.tiendanubeEnabled,
+      tiendanubeStoreId: settings.tiendanubeStoreId,
+      businessZipCode: settings.businessZipCode
+    });
     
     // Obtener tienda de Tiendanube
     const store = await db.query.tiendanubeStores.findFirst({
@@ -158,8 +162,16 @@ export class UnifiedShippingService {
     });
 
     console.log('[Unified Shipping] Tiendanube store found:', !!store);
+    if (store) {
+      console.log('[Unified Shipping] Store details:', {
+        storeId: store.storeId,
+        status: store.status,
+        hasToken: !!store.accessTokenEncrypted
+      });
+    }
 
     if (!store) {
+      console.error('[Unified Shipping] Tienda de Tiendanube no configurada');
       throw new Error('Tienda de Tiendanube no configurada');
     }
 
@@ -182,7 +194,7 @@ export class UnifiedShippingService {
     }, { length: 0, width: 0, height: 0 });
 
     const shippingParams: TiendanubeShippingParams = {
-      origin_zip: settings.business_zip_code as string,
+      origin_zip: settings.businessZipCode as string,
       destination_zip: params.customerZip,
       weight: totalWeight,
       height: maxDimensions.height || undefined,
@@ -191,20 +203,22 @@ export class UnifiedShippingService {
       declared_value: params.subtotal
     };
 
-    console.log('[Unified Shipping] Calling Tiendanube API...');
+    console.log('[Unified Shipping] Calling Tiendanube API with params:', shippingParams);
     const tiendanubeOptions = await client.calculateShipping(shippingParams);
-    console.log('[Unified Shipping] Tiendanube returned', tiendanubeOptions.length, 'options');
+    console.log('[Unified Shipping] Tiendanube API returned options:', tiendanubeOptions.length);
 
-    return tiendanubeOptions.map((option: TiendanubeShippingRate) => ({
-      id: option.id,
-      name: option.carrier_name,
+    // Convertir al formato unificado
+    const unifiedOptions = tiendanubeOptions.map(option => ({
+      id: option.id.toString(),
+      name: `${option.carrier_name} - ${option.service_type}`,
       cost: option.price,
-      estimated: option.delivery_time.min_days === option.delivery_time.max_days 
-        ? `${option.delivery_time.min_days} días`
-        : `${option.delivery_time.min_days}-${option.delivery_time.max_days} días`,
+      estimated: option.delivery_time.estimated_date || `${option.delivery_time.min_days}-${option.delivery_time.max_days} días`,
       type: 'tiendanube' as const,
-      carrier: option.carrier_code
+      carrier: option.carrier_name
     }));
+
+    console.log('[Unified Shipping] Returning Tiendanube options:', unifiedOptions);
+    return unifiedOptions;
   }
 
   async saveShippingToOrder(orderId: number, shippingOption: ShippingOption, address: Record<string, unknown>) {
