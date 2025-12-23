@@ -62,13 +62,9 @@ export default async function Home() {
             Estamos trabajando para traerte la mejor experiencia de compra online. Pronto podrás disfrutar de nuestros productos con envíos rápidos y seguros.
           </p>
           <div className='mt-8 flex flex-wrap items-center gap-5 md:mt-9 lg:mt-10'>
-            <Link
-              className='rounded-full bg-gray-400 px-5 py-2.5 font-semibold tracking-tight text-white cursor-not-allowed opacity-75 lg:px-7 lg:py-3'
-              href='#'
-              onClick={(e) => e.preventDefault()}
-            >
+            <div className='rounded-full bg-gray-400 px-5 py-2.5 font-semibold tracking-tight text-white cursor-not-allowed opacity-75 lg:px-7 lg:py-3'>
               🚧 Compras Deshabilitadas
-            </Link>
+            </div>
             <Link
               className='group flex items-center gap-2 leading-none tracking-tight text-gray-500'
               href='https://github.com/choy666/prototype'
