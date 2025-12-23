@@ -19,7 +19,7 @@ export async function GET() {
     
     // Crear cliente
     const client = createTiendanubeShippingClient({
-      storeId: settings!.tiendanubeStoreId,
+      storeId: settings!.tiendanubeStoreId!,
       accessToken: decryptString(store.accessTokenEncrypted)
     });
     

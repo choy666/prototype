@@ -4,7 +4,7 @@
 import { db } from '@/lib/db';
 import { orders, tiendanubeStores } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { createTiendanubeShippingClient, TiendanubeShippingParams, TiendanubeShippingRate } from '@/lib/clients/tiendanube-shipping';
+import { createTiendanubeShippingClient, TiendanubeShippingParams } from '@/lib/clients/tiendanube-shipping';
 import { decryptString } from '@/lib/utils/encryption';
 import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 

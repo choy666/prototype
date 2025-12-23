@@ -32,13 +32,15 @@ export async function POST(request: Request) {
     
     // 3. Crear cliente
     const client = createTiendanubeShippingClient({
-      storeId: settings!.tiendanubeStoreId,
+      storeId: settings!.tiendanubeStoreId!,
       accessToken: decryptString(store.accessTokenEncrypted)
     });
     
     // 4. Calcular envío
-    const totalWeight = items.reduce((sum: number, item: any) => sum + (item.weight || 0) * item.quantity, 0);
-    const maxDimensions = items.reduce((max: any, item: any) => {
+    const totalWeight = items.reduce((sum: number, item: { weight?: number; quantity: number }) => 
+      sum + (item.weight || 0) * item.quantity, 0);
+    const maxDimensions = items.reduce((max: { length: number; width: number; height: number }, 
+      item: { dimensions?: { length: number; width: number; height: number } }) => {
       if (!item.dimensions) return max;
       return {
         length: Math.max(max.length, item.dimensions.length),
