@@ -43,7 +43,7 @@ async function generateSKUs(storeId: string) {
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
-          target: [tiendanubeProductMapping.storeId, tiendanubeProductMapping.localProductId],
+          target: [tiendanubeProductMapping.storeId, tiendanubeProductMapping.sku],
           set: {
             sku: newSku,
             updatedAt: new Date(),

@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import ErrorFallback from '@/components/ui/ErrorFallback'
 import { ConditionalLayout } from './ConditionalLayout'
+import { ShippingProvider } from '@/contexts/ShippingContext'
 import { auth } from '@/lib/actions/auth'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -28,9 +29,11 @@ export default async function RootLayout({
         <ErrorBoundary
           fallback={<ErrorFallback />}
         >
-          <ConditionalLayout session={session}>
-            {children}
-          </ConditionalLayout>
+          <ShippingProvider>
+            <ConditionalLayout session={session}>
+              {children}
+            </ConditionalLayout>
+          </ShippingProvider>
         </ErrorBoundary>
         <Toaster />
       </body>

@@ -799,6 +799,21 @@ export const tiendanubeSyncState = pgTable("tiendanube_sync_state", {
   index("tiendanube_sync_state_store_id_idx").on(table.storeId),
 ]);
 
+// ======================
+// Configuración de envíos
+// ======================
+export const shippingSettings = pgTable("shipping_settings", {
+  id: serial("id").primaryKey(),
+  businessZipCode: varchar("business_zip_code", { length: 10 }).notNull(),
+  localShippingCost: decimal("local_shipping_cost", { precision: 10, scale: 2 }).default("0"),
+  localShippingRadius: integer("local_shipping_radius").default(10),
+  freeShippingThreshold: decimal("free_shipping_threshold", { precision: 10, scale: 2 }).default("0"),
+  tiendanubeStoreId: varchar("tiendanube_store_id", { length: 20 }).default("7078702"),
+  tiendanubeEnabled: boolean("tiendanube_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const tiendanubeCustomerMapping = pgTable("tiendanube_customer_mapping", {
   id: serial("id").primaryKey(),
   storeId: text("store_id").notNull(),

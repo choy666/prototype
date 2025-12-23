@@ -1,0 +1,258 @@
+<!-- Template personalizado para página de inicio - Tiendanube -->
+<!-- Reemplazar el contenido existente en: Panel > Tienda Online > Personalizar diseño > Editar código HTML > home.tpl -->
+
+<!-- Header personalizado -->
+<header class="header-container">
+  <nav class="nav-container">
+    <div class="nav-logo">
+      <a href="{{ store.url }}">
+        <img src="{{ 'logo.svg' | asset_url }}" alt="{{ store.name }}" width="88" height="24" />
+      </a>
+    </div>
+
+    <ul class="nav-menu">
+      <li><a href="{{ store.url }}">Inicio</a></li>
+      <li><a href="{{ store.url }}/products">Productos</a></li>
+      <li><a href="{{ store.url }}/pages/nosotros">Nosotros</a></li>
+      <li><a href="{{ store.url }}/pages/envios">Envíos</a></li>
+    </ul>
+
+    <div class="nav-actions">
+      {% if customer %}
+      <a href="{{ store.url }}/account" class="btn btn-secondary">Mi Cuenta</a>
+      {% else %}
+      <a href="{{ store.url }}/login" class="btn btn-secondary">Iniciar Sesión</a>
+      <a href="{{ store.url }}/register" class="btn btn-secondary">Registrarse</a>
+      {% endif %}
+      <a href="{{ store.url }}/cart" class="btn btn-primary"> Carrito ({{ cart.items_count }}) </a>
+    </div>
+  </nav>
+</header>
+
+<!-- Hero Section -->
+<section class="hero-section">
+  <h1 class="hero-title">{{ store.name }}</h1>
+  <p class="hero-subtitle">
+    {{ store.description | default: 'La mejor selección de productos de calidad para todos los
+    gustos y necesidades.' }}
+  </p>
+  <div class="hero-actions">
+    <a href="{{ store.url }}/products" class="btn btn-primary">Ver Productos</a>
+    <a href="{{ store.url }}/pages/contacto" class="btn btn-secondary">Contacto</a>
+  </div>
+</section>
+
+<!-- Productos Destacados -->
+{% if products.featured.size > 0 %}
+<section class="featured-section">
+  <h2 class="section-title">Destacados</h2>
+
+  <div class="featured-grid">
+    <!-- Producto principal -->
+    {% assign main_product = products.featured.first %}
+    <div class="featured-main">
+      <a href="{{ main_product.url }}" class="featured-item">
+        {% if main_product.featured_image %}
+        <img
+          src="{{ main_product.featured_image | product_img_url: 'large' }}"
+          alt="{{ main_product.name }}"
+          class="featured-image"
+        />
+        {% endif %} {% if main_product.compare_at_price > main_product.price %} {% assign discount =
+        main_product.compare_at_price | minus: main_product.price %} {% assign discount_percent =
+        discount | times: 100 | divided_by: main_product.compare_at_price %}
+        <span class="discount-badge">-{{ discount_percent }}%</span>
+        {% endif %}
+
+        <div class="featured-overlay">
+          <h3 class="featured-title">{{ main_product.name }}</h3>
+          <p class="featured-price">
+            {% if main_product.compare_at_price > main_product.price %}
+            <span class="price-original">{{ main_product.compare_at_price | money }}</span>
+            <span class="price-discount">{{ main_product.price | money }}</span>
+            {% else %}
+            <span>{{ main_product.price | money }}</span>
+            {% endif %}
+          </p>
+        </div>
+      </a>
+    </div>
+
+    <!-- Productos secundarios -->
+    <div class="featured-side">
+      {% for product in products.featured offset: 1 limit: 2 %}
+      <div class="featured-item">
+        <a href="{{ product.url }}" class="featured-item">
+          {% if product.featured_image %}
+          <img
+            src="{{ product.featured_image | product_img_url: 'medium' }}"
+            alt="{{ product.name }}"
+            class="featured-image"
+          />
+          {% endif %} {% if product.compare_at_price > product.price %} {% assign discount =
+          product.compare_at_price | minus: product.price %} {% assign discount_percent = discount |
+          times: 100 | divided_by: product.compare_at_price %}
+          <span class="discount-badge">-{{ discount_percent }}%</span>
+          {% endif %}
+
+          <div class="featured-overlay">
+            <h3 class="featured-title">{{ product.name }}</h3>
+            <p class="featured-price">
+              {% if product.compare_at_price > product.price %}
+              <span class="price-original">{{ product.compare_at_price | money }}</span>
+              <span class="price-discount">{{ product.price | money }}</span>
+              {% else %}
+              <span>{{ product.price | money }}</span>
+              {% endif %}
+            </p>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- Más Productos -->
+{% if products.size > 0 %}
+<section class="products-section">
+  <h2 class="section-title">Más productos</h2>
+
+  <div class="products-slider">
+    {% for product in products limit: 8 %}
+    <div class="product-card">
+      <a href="{{ product.url }}">
+        {% if product.featured_image %}
+        <img
+          src="{{ product.featured_image | product_img_url: 'medium' }}"
+          alt="{{ product.name }}"
+          class="product-image"
+        />
+        {% endif %}
+
+        <div class="product-info">
+          <h3 class="product-name">{{ product.name }}</h3>
+          <p class="product-price">
+            {% if product.compare_at_price > product.price %}
+            <span class="price-original">{{ product.compare_at_price | money }}</span>
+            <span class="price-discount">{{ product.price | money }}</span>
+            {% else %}
+            <span>{{ product.price | money }}</span>
+            {% endif %}
+          </p>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- Newsletter -->
+<section class="newsletter-section">
+  <h2 class="section-title">Newsletter</h2>
+  <p>Registrate y recibí nuestras ofertas.</p>
+
+  <form class="newsletter-form" action="{{ store.url }}/newsletter" method="post">
+    <input
+      type="email"
+      name="email"
+      class="newsletter-input"
+      placeholder="Tu correo electrónico"
+      required
+    />
+    <button type="submit" class="newsletter-button">Suscribirse</button>
+  </form>
+</section>
+
+<!-- Footer personalizado -->
+<footer class="footer">
+  <div class="footer-content">
+    <div class="footer-section">
+      <h3>{{ store.name }}</h3>
+      <p>La mejor selección de productos de calidad para todos los gustos y necesidades.</p>
+    </div>
+
+    <div class="footer-section">
+      <h3>Enlaces rápidos</h3>
+      <ul class="footer-links">
+        <li><a href="{{ store.url }}">Inicio</a></li>
+        <li><a href="{{ store.url }}/products">Productos</a></li>
+        <li><a href="{{ store.url }}/pages/nosotros">Nosotros</a></li>
+        <li><a href="{{ store.url }}/pages/contacto">Contacto</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-section">
+      <h3>Contacto</h3>
+      <ul class="footer-links">
+        <li><a href="mailto:{{ store.email }}">{{ store.email }}</a></li>
+        <li><a href="tel:{{ store.phone }}">{{ store.phone }}</a></li>
+        <li>{{ store.address }}</li>
+      </ul>
+    </div>
+
+    <div class="footer-section">
+      <h3>Legal</h3>
+      <ul class="footer-links">
+        <li><a href="{{ store.url }}/pages/terminos">Términos y condiciones</a></li>
+        <li><a href="{{ store.url }}/pages/privacidad">Política de privacidad</a></li>
+        <li><a href="{{ store.url }}/pages/devoluciones">Devoluciones</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <p>&copy; {{ 'now' | date: '%Y' }} {{ store.name }}. Todos los derechos reservados.</p>
+    <p>
+      <a
+        href="https://www.argentina.gob.ar/produccion/defensadelconsumidor/formulario"
+        target="_blank"
+      >
+        Defensa del Consumidor
+      </a>
+      <a href="{{ store.url }}/pages/arrepentimiento">Botón de arrepentimiento</a>
+    </p>
+  </div>
+</footer>
+
+<!-- Scripts personalizados -->
+<script>
+  // Animaciones y mejoras interactivas
+  document.addEventListener('DOMContentLoaded', function () {
+    // Smooth scroll para enlaces internos
+    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+
+    // Animación de hover en productos
+    const productCards = document.querySelectorAll('.product-card');
+    productCards.forEach((card) => {
+      card.addEventListener('mouseenter', function () {
+        this.style.transform = 'translateY(-4px)';
+      });
+      card.addEventListener('mouseleave', function () {
+        this.style.transform = 'translateY(0)';
+      });
+    });
+
+    // Validación del newsletter
+    const newsletterForm = document.querySelector('.newsletter-form');
+    if (newsletterForm) {
+      newsletterForm.addEventListener('submit', function (e) {
+        const email = this.querySelector('input[type="email"]').value;
+        if (!email || !email.includes('@')) {
+          e.preventDefault();
+          alert('Por favor, ingresa un correo electrónico válido');
+        }
+      });
+    }
+  });
+</script>

@@ -4,17 +4,6 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { MLShippingMethod } from '@/lib/types/shipping';
 
-type CalculateShippingResponse = {
-  success?: boolean;
-  methods?: MLShippingMethod[];
-  fallback?: boolean;
-  source?: string;
-  error?: string;
-  pickup?: {
-    available: boolean;
-    types: ('agency' | 'place')[];
-  };
-};
 
 interface ShippingMethodSelectorProps {
   selectedMethod?: MLShippingMethod | null;
@@ -75,13 +64,13 @@ export function ShippingMethodSelector({
       setIsFallback(false);
       setSource(null);
       try {
-        const response = await fetch('/api/shipments/calculate', {
+        const response = await fetch('/api/shipping/unified', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            zipcode,
+            customerZip: zipcode,
             items: items.map(item => ({
               id: item.id.toString(),
               quantity: item.quantity,
@@ -94,25 +83,47 @@ export function ShippingMethodSelector({
         });
 
         if (response.ok) {
-          const data = (await response.json()) as CalculateShippingResponse;
+          const data = await response.json();
           console.log('[ShippingMethodSelector] Datos recibidos de API:', {
-            success: data.success,
-            methods: data.methods,
-            pickup: data.pickup,
-            fallback: data.fallback,
+            options: data.options,
+            length: data.options?.length
           });
 
-          if (data.success && data.methods) {
-            const domicileOnly = data.methods.filter((m) => (m.deliver_to ?? 'address') === 'address');
-            setShippingMethods(domicileOnly);
-            setIsFallback(Boolean(data.fallback));
-            setSource(typeof data.source === 'string' ? data.source : null);
+          if (data.options && Array.isArray(data.options)) {
+            // Convertir opciones unificadas al formato esperado
+            const convertedMethods = data.options.map((option: {
+              id: string;
+              name: string;
+              cost: number;
+              estimated: string;
+              carrier?: string;
+              type: string;
+            }) => ({
+              shipping_method_id: option.id,
+              name: option.name,
+              cost: option.cost,
+              description: `${option.estimated} ${option.carrier ? `• ${option.carrier}` : ''}`,
+              shipping_mode: option.type || 'me2',
+              deliver_to: 'address',
+              type: option.type,
+              estimated_delivery: option.estimated ? {
+                date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // Estimado 3 días
+              } : undefined
+            }));
+            
+            setShippingMethods(convertedMethods);
+            setIsFallback(convertedMethods.some((m: {
+              type: string;
+            }) => m.type === 'local'));
+            setSource(convertedMethods.some((m: {
+              type: string;
+            }) => m.type === 'local') ? 'unified_shipping' : 'me2');
           } else {
             console.error('[ShippingMethodSelector] Error en respuesta:', data);
-            throw new Error(data.error || 'Error al obtener métodos de envío');
+            throw new Error('Error al obtener métodos de envío');
           }
         } else {
-          const errorData = await response.json();
+          const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || 'Error en la API de envíos');
         }
       } catch (error) {
@@ -155,11 +166,13 @@ export function ShippingMethodSelector({
           Selecciona cómo quieres recibir tu pedido
         </p>
         <p className="text-xs text-gray-500">
-          {source === 'internal_shipping'
-            ? 'Mostrando método de envío local provisto por la tienda.'
-            : isFallback
-              ? 'Mostrando métodos de envío locales (fallback) porque la API de Mercado Libre no está disponible. Los costos son estimados.'
-              : 'Mostrando métodos de Mercado Envíos 2 provistos por Mercado Libre.'}
+          {source === 'unified_shipping'
+            ? 'Mostrando métodos de envío combinados (Mercado Libre + Tiendanube).'
+            : source === 'internal_shipping'
+              ? 'Mostrando método de envío local provisto por la tienda.'
+              : isFallback
+                ? 'Mostrando métodos de envío locales (fallback) porque la API de Mercado Libre no está disponible. Los costos son estimados.'
+                : 'Mostrando métodos de envío disponibles.'}
         </p>
       </div>
 
