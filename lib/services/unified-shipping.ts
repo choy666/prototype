@@ -80,12 +80,12 @@ export class UnifiedShippingService {
     }
 
     // 2. Obtener opciones de ME2 y Tiendanube en paralelo
-    console.log('[Unified Shipping] Tiendanube enabled:', settings.tiendanube_enabled);
-    console.log('[Unified Shipping] Tiendanube store ID:', settings.tiendanube_store_id);
+    console.log('[Unified Shipping] Tiendanube enabled:', settings.tiendanubeEnabled);
+    console.log('[Unified Shipping] Tiendanube store ID:', settings.tiendanubeStoreId);
     
     const [me2Options, tiendanubeOptions] = await Promise.allSettled([
       this.getME2ShippingOptions(params),
-      settings.tiendanube_enabled ? this.getTiendanubeShippingOptions(params, settings) : []
+      settings.tiendanubeEnabled ? this.getTiendanubeShippingOptions(params, settings) : []
     ]);
 
     // 3. Procesar opciones de ME2
@@ -154,7 +154,7 @@ export class UnifiedShippingService {
     
     // Obtener tienda de Tiendanube
     const store = await db.query.tiendanubeStores.findFirst({
-      where: eq(tiendanubeStores.storeId, settings.tiendanube_store_id as string),
+      where: eq(tiendanubeStores.storeId, settings.tiendanubeStoreId as string),
     });
 
     console.log('[Unified Shipping] Tiendanube store found:', !!store);
@@ -166,7 +166,7 @@ export class UnifiedShippingService {
     // Crear cliente y calcular
     console.log('[Unified Shipping] Creating Tiendanube client...');
     const client = createTiendanubeShippingClient({
-      storeId: settings.tiendanube_store_id as string,
+      storeId: settings.tiendanubeStoreId as string,
       accessToken: decryptString(store.accessTokenEncrypted)
     });
 
