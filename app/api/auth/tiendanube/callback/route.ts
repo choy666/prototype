@@ -6,6 +6,8 @@ import { getTiendanubeConfig } from '@/lib/config/integrations';
 import { encryptString } from '@/lib/utils/encryption';
 import { logger } from '@/lib/utils/logger';
 import { retryWithBackoff } from '@/lib/utils/retry';
+import { TiendanubeClient } from '@/lib/clients/tiendanube';
+import { eq } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +16,42 @@ interface TiendanubeTokenData {
   token_type: string;
   scope?: string;
   user_id: string;
+}
+
+interface TiendanubeStoreInfo {
+  id: number;
+  name: { [lang: string]: string } | string;
+  description?: { [lang: string]: string } | string | null;
+  email: string;
+  business_address?: {
+    street?: string;
+    number?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    country?: string;
+  } | null;
+  address?: {
+    street?: string;
+    number?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    country?: string;
+  } | null;
+  country: string;
+  main_currency: string;
+}
+
+interface TiendanubeLocation {
+  id: number;
+  name: string;
+  address: string;
+  number?: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  country: string;
 }
 
 async function exchangeCodeForToken(code: string): Promise<TiendanubeTokenData> {
@@ -70,6 +108,114 @@ async function exchangeCodeForToken(code: string): Promise<TiendanubeTokenData> 
       maxDelay: config.retryDelay * 10,
     }
   );
+}
+
+async function fetchAndStoreStoreInfo(storeId: string, accessToken: string): Promise<void> {
+  try {
+    const client = new TiendanubeClient({ storeId, accessToken });
+    
+    // Obtener información básica de la tienda
+    const storeInfo = await client.get<TiendanubeStoreInfo>('/store');
+    
+    // Obtener ubicaciones de fulfillment
+    const locations = await client.get<TiendanubeLocation[]>('/locations');
+    
+    // Extraer dirección de origen
+    let originAddress = null;
+    let originZipCode = null;
+    
+    // Usar business_address si está disponible
+    if (storeInfo.business_address) {
+      originAddress = storeInfo.business_address;
+      originZipCode = storeInfo.business_address.zip_code;
+    } else if (storeInfo.address) {
+      originAddress = storeInfo.address;
+      originZipCode = storeInfo.address.zip_code;
+    } else if (locations && locations.length > 0) {
+      // Usar la primera ubicación disponible
+      const mainLocation = locations[0];
+      originAddress = {
+        street: mainLocation.address,
+        number: mainLocation.number,
+        city: mainLocation.city,
+        state: mainLocation.state,
+        zip_code: mainLocation.zip_code,
+        country: mainLocation.country
+      };
+      originZipCode = mainLocation.zip_code;
+    }
+
+    // Actualizar la información en la base de datos
+    await db
+      .update(tiendanubeStores)
+      .set({
+        name: typeof storeInfo.name === 'string' ? storeInfo.name : storeInfo.name?.es || storeInfo.name?.['es'] || '',
+        email: storeInfo.email,
+        country: storeInfo.country,
+        currency: storeInfo.main_currency,
+        originAddress,
+        originZipCode,
+        locations,
+        updatedAt: new Date(),
+      })
+      .where(eq(tiendanubeStores.storeId, storeId));
+
+    logger.info('[TIENDANUBE] Información de tienda guardada', {
+      storeId,
+      name: typeof storeInfo.name === 'string' ? storeInfo.name : storeInfo.name?.es || storeInfo.name?.['es'] || '',
+      country: storeInfo.country,
+      currency: storeInfo.main_currency,
+      hasOriginAddress: Boolean(originAddress),
+      originZipCode,
+      locationsCount: locations?.length || 0
+    });
+  } catch (error) {
+    logger.error('[TIENDANUBE] Error obteniendo información de tienda', {
+      storeId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    // No fallamos el flujo si no podemos obtener la info
+  }
+}
+
+async function registerCustomCarrier(storeId: string, accessToken: string): Promise<void> {
+  try {
+    const client = new TiendanubeClient({ storeId, accessToken });
+    
+    // Verificar si el carrier ya existe
+    const existingCarriers = await client.getCarriers();
+    const existingCarrier = existingCarriers.find((c: { code?: string }) => c.code === 'standard-shipping');
+    
+    if (existingCarrier) {
+      logger.info('[TIENDANUBE] Carrier personalizado ya existe', { 
+        storeId, 
+        carrierId: existingCarrier.id 
+      });
+      return;
+    }
+
+    // Registrar nuevo carrier
+    const carrierData = {
+      name: 'Envío Estándar',
+      code: 'standard-shipping',
+      callback_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000'}/api/webhooks/tiendanube/shipping`,
+      handling_fee: 0,
+      active: true
+    };
+
+    const newCarrier = await client.registerCarrier(carrierData);
+    logger.info('[TIENDANUBE] Carrier personalizado registrado exitosamente', { 
+      storeId, 
+      carrierId: newCarrier.id,
+      carrierName: newCarrier.name
+    });
+  } catch (error) {
+    logger.error('[TIENDANUBE] Error registrando carrier personalizado', {
+      storeId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    // No fallamos el flujo si el carrier no se puede registrar
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -144,6 +290,19 @@ export async function GET(request: NextRequest) {
       storeId,
       hasScope: Boolean(tokenData.scope),
     });
+
+    // Obtener y guardar información adicional de la tienda
+    await fetchAndStoreStoreInfo(storeId, tokenData.access_token);
+
+    // Registrar carrier personalizado automáticamente si tenemos el scope write_shipping
+    if (tokenData.scope?.includes('write_shipping')) {
+      await registerCustomCarrier(storeId, tokenData.access_token);
+    } else {
+      logger.warn('[TIENDANUBE] Scope write_shipping no disponible, omitiendo registro de carrier', {
+        storeId,
+        scopes: tokenData.scope
+      });
+    }
 
     const response = NextResponse.redirect(
       new URL(`/admin/tiendanube?auth=success&connected=tiendanube&storeId=${encodeURIComponent(storeId)}`, request.url)

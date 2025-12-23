@@ -713,6 +713,16 @@ export const tiendanubeStores = pgTable("tiendanube_stores", {
   installedAt: timestamp("installed_at"),
   uninstalledAt: timestamp("uninstalled_at"),
   lastSyncAt: timestamp("last_sync_at"),
+  // Información de la tienda para envíos
+  name: text("name"),
+  email: text("email"),
+  country: varchar("country", { length: 2 }),
+  currency: varchar("currency", { length: 3 }),
+  // Dirección de origen para cálculo de envíos
+  originAddress: jsonb("origin_address"), // { street, number, city, state, zip_code, country }
+  originZipCode: varchar("origin_zip_code", { length: 10 }),
+  // Ubicaciones de fulfillment
+  locations: jsonb("locations"), // Array de warehouses con sus direcciones
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

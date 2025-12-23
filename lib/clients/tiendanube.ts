@@ -211,6 +211,20 @@ export class TiendanubeClient {
   async delete<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
     return this.apiRequest<T>('DELETE', endpoint, { params });
   }
+
+  async getCarriers(): Promise<Array<{ id: number; name: string; code?: string; carrier_type?: string; enabled?: boolean; coverage?: unknown }>> {
+    return this.get('/shipping_carriers');
+  }
+
+  async registerCarrier(carrierData: {
+    name: string;
+    code: string;
+    callback_url: string;
+    handling_fee: number;
+    active: boolean;
+  }): Promise<{ id: number; name: string; code: string }> {
+    return this.post('/shipping_carriers', carrierData);
+  }
 }
 
 export function createTiendanubeClient(params: { storeId: string; accessToken: string }) {
