@@ -158,6 +158,12 @@ export const checkoutSchema = z.object({
     option_hash: z.string().optional(),
     state_id: z.string().optional(),
     logistic_type: z.string().optional(),
+    quote_key: z.string().optional(),
+    cart_id: z.string().optional(),
+    source: z.string().optional(),
+    ttl_seconds: z.number().optional(),
+    expires_at: z.string().optional(),
+    carrier_name: z.string().optional(),
   }),
 
   userId: z.string().min(1, 'El userId es requerido'),

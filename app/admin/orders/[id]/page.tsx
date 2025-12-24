@@ -61,6 +61,12 @@ interface Order {
   userEmail: string
   userName: string
   items: OrderItem[]
+  shippingQuoteKey?: string | null
+  shippingCartId?: string | null
+  shippingCarrierId?: string | null
+  shippingCarrierName?: string | null
+  shippingQuoteSource?: string | null
+  shippingQuoteExpiresAt?: string | null
 }
 
 const statusLabels = {
@@ -408,6 +414,53 @@ export default function AdminOrderDetailPage() {
               </div>
             </CardContent>
           </Card>
+          {(order.shippingQuoteKey || order.shippingQuoteSource || order.shippingCarrierName) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Metadata Tiendanube (cache)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {order.shippingQuoteKey && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground">Quote key</span>
+                    <code className="px-2 py-1 rounded bg-muted text-xs break-all">
+                      {order.shippingQuoteKey}
+                    </code>
+                  </div>
+                )}
+                {order.shippingCartId && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground">Cart ID</span>
+                    <code className="px-2 py-1 rounded bg-muted text-xs break-all">
+                      {order.shippingCartId}
+                    </code>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-2">
+                  {order.shippingQuoteSource && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Fuente</span>
+                      <Badge variant="outline" className="uppercase tracking-wide text-[11px]">
+                        {order.shippingQuoteSource}
+                      </Badge>
+                    </div>
+                  )}
+                  {order.shippingCarrierName && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Carrier</span>
+                      <span className="font-medium">{order.shippingCarrierName}</span>
+                    </div>
+                  )}
+                  {order.shippingQuoteExpiresAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Expira</span>
+                      <span>{formatDate(order.shippingQuoteExpiresAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Dirección de Envío</CardTitle>

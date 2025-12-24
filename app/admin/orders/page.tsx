@@ -39,6 +39,12 @@ interface Order {
   userEmail: string
   userName: string
   itemCount: number
+  shippingQuoteKey?: string | null
+  shippingCartId?: string | null
+  shippingCarrierId?: string | null
+  shippingCarrierName?: string | null
+  shippingQuoteSource?: string | null
+  shippingQuoteExpiresAt?: string | null
 }
 
 interface ApiResponse {
@@ -234,6 +240,23 @@ export default function AdminOrdersPage() {
                         <Package className="h-4 w-4 flex-shrink-0" />
                         <span>{order.itemCount} producto{order.itemCount !== 1 ? 's' : ''}</span>
                       </div>
+                      {order.shippingQuoteKey && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-primary-600 dark:text-primary-400">
+                            Quote {order.shippingQuoteKey.slice(0, 8)}…
+                          </span>
+                          {order.shippingQuoteSource && (
+                            <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
+                              {order.shippingQuoteSource}
+                            </Badge>
+                          )}
+                          {order.shippingQuoteExpiresAt && (
+                            <span className="text-xs">
+                              expira {formatDate(order.shippingQuoteExpiresAt)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   {/* Total and Actions */}

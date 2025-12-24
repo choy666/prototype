@@ -42,6 +42,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         updatedAt: orders.updatedAt,
         userEmail: users.email,
         userName: users.name,
+        shippingQuoteKey: orders.shippingQuoteKey,
+        shippingCartId: orders.shippingCartId,
+        shippingCarrierId: orders.shippingCarrierId,
+        shippingCarrierName: orders.shippingCarrierName,
+        shippingQuoteSource: orders.shippingQuoteSource,
+        shippingQuoteExpiresAt: orders.shippingQuoteExpiresAt,
       })
       .from(orders)
       .leftJoin(users, eq(orders.userId, users.id))
@@ -77,6 +83,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ...order,
       total: Number(order.total),
       shippingCost: Number(order.shippingCost),
+      shippingQuoteExpiresAt: order.shippingQuoteExpiresAt
+        ? order.shippingQuoteExpiresAt.toISOString()
+        : null,
       items: items.map(item => ({
         id: item.id.toString(),
         quantity: item.quantity,

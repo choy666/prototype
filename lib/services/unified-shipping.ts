@@ -4,8 +4,13 @@
 import { db } from '@/lib/db';
 import { orders, tiendanubeStores, products } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { createTiendanubeShippingClient, TiendanubeShippingParams } from '@/lib/clients/tiendanube-shipping';
-import { decryptString } from '@/lib/utils/encryption';
+import {
+  buildQuoteKey,
+  getOrCreateQuote,
+  LocalQuoteItemInput,
+  QuoteSignatureItem,
+} from '@/lib/services/tiendanube-shipping-quotes';
+import { buildLocalCartId } from '@/lib/utils/shipping-quote';
 
 export interface ShippingItem {
   id: string;
@@ -26,6 +31,11 @@ export interface ShippingOption {
   estimated: string;
   type: 'local' | 'tiendanube';
   carrier?: string;
+  quoteKey?: string;
+  cartId?: string;
+  quoteSource?: string;
+  quoteExpiresAt?: string;
+  ttlSeconds?: number;
 }
 
 export interface ShippingCalculationParams {
@@ -161,68 +171,90 @@ export class UnifiedShippingService {
       businessZipCode: settings.businessZipCode
     });
     
-    // Obtener tienda de Tiendanube
+    const storeId = settings.tiendanubeStoreId as string | undefined;
+    if (!storeId) {
+      throw new Error('No hay tienda de Tiendanube configurada en shipping settings.');
+    }
+
     const store = await db.query.tiendanubeStores.findFirst({
-      where: eq(tiendanubeStores.storeId, settings.tiendanubeStoreId as string),
+      where: eq(tiendanubeStores.storeId, storeId),
     });
 
-    console.log('[Unified Shipping] Tiendanube store found:', !!store);
-    if (store) {
-      console.log('[Unified Shipping] Store details:', {
-        storeId: store.storeId,
-        status: store.status,
-        hasToken: !!store.accessTokenEncrypted
-      });
+    if (!store || store.status !== 'connected') {
+      throw new Error('Tienda de Tiendanube no conectada. Reconecta desde el panel de administración.');
     }
 
-    if (!store) {
-      console.error('[Unified Shipping] Tienda de Tiendanube no configurada');
-      throw new Error('Tienda de Tiendanube no configurada');
-    }
-
-    // Crear cliente y calcular
-    console.log('[Unified Shipping] Creating Tiendanube client...');
-    const client = createTiendanubeShippingClient({
-      storeId: settings.tiendanubeStoreId as string,
-      accessToken: decryptString(store.accessTokenEncrypted)
-    });
-
-    // Calcular peso y dimensiones totales de los items
-    const totalWeight = params.items.reduce((sum, item) => sum + (item.weight || 0) * item.quantity, 0);
-    const maxDimensions = params.items.reduce((max, item) => {
-      if (!item.dimensions) return max;
-      return {
-        length: Math.max(max.length, item.dimensions.length),
-        width: Math.max(max.width, item.dimensions.width),
-        height: Math.max(max.height, item.dimensions.height)
-      };
-    }, { length: 0, width: 0, height: 0 });
-
-    const shippingParams: TiendanubeShippingParams = {
-      origin_zip: settings.businessZipCode as string,
-      destination_zip: params.customerZip,
-      weight: totalWeight,
-      height: maxDimensions.height || undefined,
-      width: maxDimensions.width || undefined,
-      length: maxDimensions.length || undefined,
-      declared_value: params.subtotal
-    };
-
-    console.log('[Unified Shipping] Calling Tiendanube API with params:', shippingParams);
-    const tiendanubeOptions = await client.calculateShipping(shippingParams);
-    console.log('[Unified Shipping] Tiendanube API returned options:', tiendanubeOptions.length);
-
-    // Convertir al formato unificado
-    const unifiedOptions = tiendanubeOptions.map(option => ({
-      id: option.id.toString(),
-      name: `${option.carrier_name} - ${option.service_type}`,
-      cost: option.price,
-      estimated: option.delivery_time.estimated_date || `${option.delivery_time.min_days}-${option.delivery_time.max_days} días`,
-      type: 'tiendanube' as const,
-      carrier: option.carrier_name
+    const signatureItems: QuoteSignatureItem[] = params.items.map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      grams: item.weight ?? 0,
+      price: item.price ?? 0,
     }));
 
-    console.log('[Unified Shipping] Returning Tiendanube options:', unifiedOptions);
+    const localItems: LocalQuoteItemInput[] = params.items.map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      price: item.price ?? 0,
+      weightGrams: item.weight ?? 0,
+      dimensions: item.dimensions ?? undefined,
+    }));
+
+    const quoteKey = buildQuoteKey({
+      storeId,
+      destinationZip: params.customerZip,
+      items: signatureItems,
+    });
+
+    const cartId = buildLocalCartId(
+      params.customerZip,
+      params.items.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price ?? 0,
+      }))
+    );
+
+    console.log('[Unified Shipping] Quote key generated:', quoteKey);
+    console.log('[Unified Shipping] Cart ID generated:', cartId);
+
+    const quote = await getOrCreateQuote({
+      quoteKey,
+      destinationZip: params.customerZip,
+      items: localItems,
+      storeId,
+      cartId,
+      source: 'local',
+    });
+
+    console.log('[Unified Shipping] Quote source:', quote.source, 'options:', quote.options.length);
+
+    const expiresAt = quote.expiresAt instanceof Date
+      ? quote.expiresAt
+      : new Date(quote.expiresAt);
+    const ttlSeconds = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+
+    const metadata = {
+      quoteKey: quote.quoteKey,
+      cartId: quote.cartId ?? cartId,
+      quoteSource: quote.source,
+      quoteExpiresAt: expiresAt.toISOString(),
+      ttlSeconds,
+    };
+
+    const unifiedOptions = quote.options.map((option) => ({
+      id: option.id.toString(),
+      name: `${option.carrier_name} - ${option.name}`,
+      cost: option.cost,
+      estimated: option.estimated_delivery,
+      type: 'tiendanube' as const,
+      carrier: option.carrier_name,
+      quoteKey: metadata.quoteKey,
+      cartId: metadata.cartId,
+      quoteSource: metadata.quoteSource,
+      quoteExpiresAt: metadata.quoteExpiresAt,
+      ttlSeconds: metadata.ttlSeconds,
+    }));
+
     return unifiedOptions;
   }
 

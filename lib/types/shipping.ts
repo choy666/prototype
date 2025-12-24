@@ -1,7 +1,7 @@
 // Interfaces para métodos de envío de Mercado Libre API
 
 export interface MLShippingMethod {
-  shipping_method_id?: number; // Opcional para envíos internos
+  shipping_method_id?: number | string; // Opcional para envíos internos
   option_id?: number; // ID de opción para obtener sucursales (ME2)
   option_hash?: string; // Hash de opción (ME2) para obtener sucursales
   state_id?: string; // ID de estado para endpoints geográficos (ej: AR-M)
@@ -42,7 +42,13 @@ export interface MLShippingMethod {
   id?: string; // Para envíos internos
   estimatedTime?: string; // Formato legible para humanos
   currency?: string; // ARS para envíos internos
-  type?: 'me2' | 'internal'; // Tipo de envío
+  type?: 'me2' | 'internal' | 'tiendanube'; // Tipo de envío
+  quote_key?: string;
+  cart_id?: string;
+  source?: string;
+  ttl_seconds?: number;
+  expires_at?: string;
+  carrier_name?: string;
 }
 
 export interface MLShippingResponse {

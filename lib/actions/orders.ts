@@ -128,7 +128,7 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
     // Obtener orden con información del usuario
     const orderData = await db
       .select({
-        // Todos los campos de orders
+        // Todos los campos
         id: orders.id,
         userId: orders.userId,
         email: orders.email,
@@ -165,6 +165,12 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
         paymentStatus: orders.paymentStatus,
         metadata: orders.metadata,
         shippingAgency: orders.shippingAgency, // Agregado
+        shippingQuoteKey: orders.shippingQuoteKey,
+        shippingCartId: orders.shippingCartId,
+        shippingCarrierId: orders.shippingCarrierId,
+        shippingCarrierName: orders.shippingCarrierName,
+        shippingQuoteSource: orders.shippingQuoteSource,
+        shippingQuoteExpiresAt: orders.shippingQuoteExpiresAt,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         // Campos del join con users
@@ -208,6 +214,12 @@ export async function getOrderById(id: number): Promise<Order & { items: { id: s
       ...order,
       items: transformedItems,
       shippingAgency: order.shippingAgency || null,
+      shippingQuoteKey: order.shippingQuoteKey || null,
+      shippingCartId: order.shippingCartId || null,
+      shippingCarrierId: order.shippingCarrierId || null,
+      shippingCarrierName: order.shippingCarrierName || null,
+      shippingQuoteSource: order.shippingQuoteSource || null,
+      shippingQuoteExpiresAt: order.shippingQuoteExpiresAt || null,
     };
   } catch (error) {
     console.error('Error fetching order by id:', error);

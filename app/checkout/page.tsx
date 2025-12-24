@@ -252,6 +252,12 @@ export default function CheckoutPage() {
           option_hash: selectedShippingMethod.option_hash,
           state_id: selectedShippingMethod.state_id,
           logistic_type: selectedShippingMethod.logistic_type,
+          quote_key: selectedShippingMethod.quote_key,
+          cart_id: selectedShippingMethod.cart_id,
+          source: selectedShippingMethod.source,
+          ttl_seconds: selectedShippingMethod.ttl_seconds,
+          expires_at: selectedShippingMethod.expires_at,
+          carrier_name: selectedShippingMethod.carrier_name,
         },
         userId: session?.user?.id || 'test-user-id',
       };

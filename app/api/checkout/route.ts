@@ -185,6 +185,22 @@ export async function POST(req: NextRequest) {
     const effectiveMethod = selectedMethod || shippingOptions[0];
     const shippingCost = effectiveMethod?.cost ?? 0;
 
+    const shippingQuoteMeta = {
+      quoteKey: effectiveMethod?.quoteKey ?? shippingMethod?.quote_key ?? null,
+      cartId: effectiveMethod?.cartId ?? shippingMethod?.cart_id ?? null,
+      source: effectiveMethod?.quoteSource ?? shippingMethod?.source ?? null,
+      ttlSeconds: effectiveMethod?.ttlSeconds ?? shippingMethod?.ttl_seconds ?? null,
+      expiresAt: effectiveMethod?.quoteExpiresAt ?? shippingMethod?.expires_at ?? null,
+      carrierName: shippingMethod?.carrier_name ?? effectiveMethod?.carrier ?? null,
+      carrierId: shippingMethod?.carrier_id
+        ? shippingMethod.carrier_id.toString()
+        : null,
+    };
+
+    const shippingQuoteExpiresAt = shippingQuoteMeta.expiresAt
+      ? new Date(shippingQuoteMeta.expiresAt)
+      : null;
+
     logger.info('Shipping cost calculated via unified shipping', { 
       zipcode: shippingAddress.codigoPostal,
       cost: shippingCost,
@@ -209,6 +225,12 @@ export async function POST(req: NextRequest) {
         shippingMode: 'tiendanube',
         source: 'local',
         shippingAgency: null,
+        shippingQuoteKey: shippingQuoteMeta.quoteKey,
+        shippingCartId: shippingQuoteMeta.cartId,
+        shippingCarrierId: shippingQuoteMeta.carrierId,
+        shippingCarrierName: shippingQuoteMeta.carrierName,
+        shippingQuoteSource: shippingQuoteMeta.source,
+        shippingQuoteExpiresAt,
         metadata: {
           shipping_context: {
             zipcode: formattedAddress.zip_code,
@@ -217,6 +239,11 @@ export async function POST(req: NextRequest) {
             logistic_type: 'tiendanube',
             deliver_to: 'address',
             carrier_id: shippingMethod?.carrier_id ?? null,
+            quote_key: shippingQuoteMeta.quoteKey,
+            cart_id: shippingQuoteMeta.cartId,
+            quote_source: shippingQuoteMeta.source,
+            ttl_seconds: shippingQuoteMeta.ttlSeconds,
+            expires_at: shippingQuoteMeta.expiresAt,
           },
         },
       })

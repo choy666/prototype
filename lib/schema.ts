@@ -352,6 +352,12 @@ export const orders = pgTable("orders", {
   source: text("source").default("local"),
   // Información de sucursal para envíos a agencia
   shippingAgency: jsonb("shipping_agency"), // Datos de la sucursal seleccionada
+  shippingQuoteKey: text("shipping_quote_key"),
+  shippingCartId: text("shipping_cart_id"),
+  shippingCarrierId: text("shipping_carrier_id"),
+  shippingCarrierName: text("shipping_carrier_name"),
+  shippingQuoteSource: text("shipping_quote_source"),
+  shippingQuoteExpiresAt: timestamp("shipping_quote_expires_at"),
   mlStatus: text("ml_status"),
   mlBuyerInfo: jsonb("ml_buyer_info"),
   mlShippingInfo: jsonb("ml_shipping_info"),
@@ -824,6 +830,24 @@ export const shippingSettings = pgTable("shipping_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const tiendanubeShippingQuotes = pgTable("tiendanube_shipping_quotes", {
+  id: serial("id").primaryKey(),
+  cartId: text("cart_id"),
+  quoteKey: text("quote_key").notNull(),
+  storeId: text("store_id").notNull(),
+  destinationZip: varchar("destination_zip", { length: 10 }).notNull(),
+  payload: jsonb("payload"),
+  options: jsonb("options").notNull(),
+  source: varchar("source", { length: 20 }).default("tiendanube").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  quoteKeyIdx: uniqueIndex("tiendanube_shipping_quotes_quote_key_idx").on(table.quoteKey),
+  cartIdx: index("tiendanube_shipping_quotes_cart_idx").on(table.cartId),
+  expiresIdx: index("tiendanube_shipping_quotes_expires_idx").on(table.expiresAt),
+}));
+
 export const tiendanubeCustomerMapping = pgTable("tiendanube_customer_mapping", {
   id: serial("id").primaryKey(),
   storeId: text("store_id").notNull(),
@@ -883,6 +907,8 @@ export type TiendanubeSyncState = typeof tiendanubeSyncState.$inferSelect;
 export type NewTiendanubeSyncState = typeof tiendanubeSyncState.$inferInsert;
 export type TiendanubeCustomerMapping = typeof tiendanubeCustomerMapping.$inferSelect;
 export type NewTiendanubeCustomerMapping = typeof tiendanubeCustomerMapping.$inferInsert;
+export type TiendanubeShippingQuote = typeof tiendanubeShippingQuotes.$inferSelect;
+export type NewTiendanubeShippingQuote = typeof tiendanubeShippingQuotes.$inferInsert;
 export type MercadoPagoPreference = typeof mercadopagoPreferences.$inferSelect;
 export type NewMercadoPagoPreference = typeof mercadopagoPreferences.$inferInsert;
 export type MercadoPagoPayment = typeof mercadopagoPayments.$inferSelect;

@@ -1,54 +1,53 @@
-// app/api/shipping/tiendanube/route.ts
-// Endpoint para calcular envíos con Envío Nube
-
 import { NextRequest, NextResponse } from 'next/server';
-import { tiendanubeShippingOnly } from '@/lib/services/tiendanube-shipping-only';
 
-export async function POST(request: NextRequest) {
+import {
+  getQuoteByCartId,
+  getQuoteByKey,
+} from '@/lib/services/tiendanube-shipping-quotes';
+
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { customerZip, items, subtotal } = body;
+    const { searchParams } = new URL(request.url);
+    const quoteKey = searchParams.get('quoteKey');
+    const cartId = searchParams.get('cartId');
 
-    // Validaciones básicas
-    if (!customerZip || !items || !Array.isArray(items)) {
+    if (!quoteKey && !cartId) {
       return NextResponse.json(
-        { error: 'Datos incompletos para calcular envío' },
+        { error: 'Debe indicar quoteKey o cartId' },
         { status: 400 }
       );
     }
 
-    // Validar que cada item tenga peso y dimensiones
-    const validatedItems = items.map(item => ({
-      ...item,
-      weight: item.weight || 0,
-      dimensions: item.dimensions || { length: 0, width: 0, height: 0 }
-    }));
+    let quote = quoteKey ? await getQuoteByKey(quoteKey) : null;
 
-    console.log('[API Tiendanube] Request:', {
-      customerZip,
-      itemCount: items.length,
-      items: validatedItems.map(i => ({ 
-        id: i.id, 
-        weight: i.weight, 
-        dimensions: i.dimensions 
-      }))
+    if (!quote && cartId) {
+      quote = await getQuoteByCartId(cartId);
+    }
+
+    if (!quote) {
+      return NextResponse.json(
+        { error: 'No hay cotizaciones vigentes' },
+        { status: 404 }
+      );
+    }
+
+    const now = Date.now();
+    const expiresAt = new Date(quote.expiresAt).getTime();
+    const ttlSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+
+    return NextResponse.json({
+      cartId: quote.cartId,
+      quoteKey: quote.quoteKey,
+      destinationZip: quote.destinationZip,
+      options: quote.options,
+      source: quote.source,
+      expiresAt: quote.expiresAt,
+      ttlSeconds,
     });
-
-    // Calcular envío usando solo Tiendanube
-    const options = await tiendanubeShippingOnly.calculateShipping({
-      customerZip,
-      items: validatedItems,
-      subtotal
-    });
-
-    console.log('[API Tiendanube] Opciones devueltas:', options.length);
-
-    return NextResponse.json({ options });
   } catch (error) {
-    console.error('[API Tiendanube] Error:', error);
-    
+    console.error('[API Tiendanube GET] Error:', error);
     return NextResponse.json(
-      { error: 'No se pudieron calcular las opciones de envío. Intente nuevamente.' },
+      { error: 'No se pudieron recuperar las opciones de envío.' },
       { status: 500 }
     );
   }
