@@ -21,22 +21,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parsear el body
-    const body: TiendanubeWebhookRequest = await request.json();
+    // Obtener el body raw para validar HMAC
+    const body = await request.text();
+    let parsedBody: TiendanubeWebhookRequest;
+    
+    try {
+      parsedBody = JSON.parse(body);
+    } catch (jsonError) {
+      console.error('[Tiendanube Webhook] Invalid JSON body', jsonError);
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400 }
+      );
+    }
+
+    // TODO: Implementar validación HMAC SHA256
+    // const secret = process.env.TIENDANUBE_WEBHOOK_SECRET;
+    // const expectedSignature = crypto.createHmac('sha256', secret)
+    //   .update(body)
+    //   .digest('hex');
+    // if (authHeader !== `sha256=${expectedSignature}`) {
+    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    // }
+
     console.log('[Tiendanube Webhook] Request data:', {
-      cart_id: body.cart_id,
-      store_id: body.store_id,
-      destination: body.destination.postal_code,
-      items_count: body.items.length
+      cart_id: parsedBody.cart_id,
+      store_id: parsedBody.store_id,
+      destination: parsedBody.destination.postal_code,
+      items_count: parsedBody.items.length
     });
 
     // Verificar que la tienda existe
     const store = await db.query.tiendanubeStores.findFirst({
-      where: eq(tiendanubeStores.storeId, body.store_id.toString()),
+      where: eq(tiendanubeStores.storeId, parsedBody.store_id.toString()),
     });
 
     if (!store) {
-      console.error('[Tiendanube Webhook] Store not found:', body.store_id);
+      console.error('[Tiendanube Webhook] Store not found:', parsedBody.store_id);
       return NextResponse.json(
         { error: 'Store not found' },
         { status: 404 }
@@ -44,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calcular tarifas usando el servicio
-    const options = await tiendanubeWebhookService.calculateShippingRates(body);
+    const options = await tiendanubeWebhookService.calculateShippingRates(parsedBody);
     
     console.log('[Tiendanube Webhook] Calculated options:', options.length);
     

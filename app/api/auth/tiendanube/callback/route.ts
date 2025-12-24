@@ -133,16 +133,21 @@ async function fetchAndStoreStoreInfo(storeId: string, accessToken: string): Pro
       originZipCode = storeInfo.address.zip_code;
     } else if (locations && locations.length > 0) {
       // Usar la primera ubicación disponible
-      const mainLocation = locations[0];
+      const mainLocation = locations[0] as TiendanubeLocation & {
+        zipcode?: string;
+        postal_code?: string;
+      };
+      console.log('[TIENDANUBE] Primera ubicación:', mainLocation);
+      
       originAddress = {
         street: mainLocation.address,
         number: mainLocation.number,
         city: mainLocation.city,
         state: mainLocation.state,
-        zip_code: mainLocation.zip_code,
+        zip_code: mainLocation.zip_code || mainLocation.zipcode || mainLocation.postal_code,
         country: mainLocation.country
       };
-      originZipCode = mainLocation.zip_code;
+      originZipCode = mainLocation.zip_code || mainLocation.zipcode || mainLocation.postal_code;
     }
 
     // Actualizar la información en la base de datos
