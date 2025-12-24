@@ -241,7 +241,7 @@ async function registerCustomCarrier(storeId: string, accessToken: string): Prom
     const carrierData = {
       name: 'Envío Estándar',
       code: 'standard-shipping',
-      types: ['shipping'],
+      types: 'ship',
       callback_url: `${baseSiteUrl}/api/webhooks/tiendanube/shipping`,
       handling_fee: 0,
       active: true

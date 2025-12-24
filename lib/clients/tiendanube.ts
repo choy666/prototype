@@ -219,7 +219,7 @@ export class TiendanubeClient {
   async registerCarrier(carrierData: {
     name: string;
     code: string;
-    types: string[];
+    types: string;
     callback_url: string;
     handling_fee: number;
     active: boolean;
