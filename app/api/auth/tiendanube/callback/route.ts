@@ -43,15 +43,39 @@ interface TiendanubeStoreInfo {
   main_currency: string;
 }
 
-interface TiendanubeLocation {
-  id: number;
-  name: string;
-  address: string;
+interface TiendanubeLocationAddress {
+  zipcode?: string;
+  zip_code?: string;
+  postal_code?: string;
+  street?: string;
   number?: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  country: string;
+  floor?: string | null;
+  locality?: string | null;
+  reference?: string | null;
+  between_streets?: string | null;
+  country?: { code?: string; name?: string } | string;
+  region?: { code?: string; name?: string } | null;
+  province?: { code?: string; name?: string } | null;
+  city?: string | null;
+}
+
+interface TiendanubeLocation {
+  id: string | number;
+  store_id?: string | number;
+  name?: { [lang: string]: string } | string;
+  priority?: number;
+  is_default?: boolean;
+  address?: TiendanubeLocationAddress | null;
+  tags?: unknown;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  address_legacy?: string;
+  number?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
 }
 
 async function exchangeCodeForToken(code: string): Promise<TiendanubeTokenData> {
@@ -133,21 +157,30 @@ async function fetchAndStoreStoreInfo(storeId: string, accessToken: string): Pro
       originZipCode = storeInfo.address.zip_code;
     } else if (locations && locations.length > 0) {
       // Usar la primera ubicación disponible
-      const mainLocation = locations[0] as TiendanubeLocation & {
-        zipcode?: string;
-        postal_code?: string;
-      };
+      const mainLocation = locations[0];
       console.log('[TIENDANUBE] Primera ubicación:', mainLocation);
-      
+
+      const addr = mainLocation.address;
+      const inferredZip =
+        addr?.zip_code ||
+        addr?.zipcode ||
+        addr?.postal_code ||
+        mainLocation.zip_code ||
+        (mainLocation as { zipcode?: string }).zipcode ||
+        (mainLocation as { postal_code?: string }).postal_code;
+
       originAddress = {
-        street: mainLocation.address,
-        number: mainLocation.number,
-        city: mainLocation.city,
-        state: mainLocation.state,
-        zip_code: mainLocation.zip_code || mainLocation.zipcode || mainLocation.postal_code,
-        country: mainLocation.country
+        street: addr?.street ?? mainLocation.address_legacy ?? '',
+        number: addr?.number ?? mainLocation.number ?? undefined,
+        city: addr?.city ?? mainLocation.city ?? undefined,
+        state: addr?.province?.name ?? addr?.region?.name ?? mainLocation.state ?? undefined,
+        zip_code: inferredZip ?? undefined,
+        country:
+          typeof addr?.country === 'string'
+            ? addr?.country
+            : addr?.country?.code ?? mainLocation.country ?? undefined,
       };
-      originZipCode = mainLocation.zip_code || mainLocation.zipcode || mainLocation.postal_code;
+      originZipCode = inferredZip ?? null;
     }
 
     // Actualizar la información en la base de datos
@@ -200,10 +233,16 @@ async function registerCustomCarrier(storeId: string, accessToken: string): Prom
     }
 
     // Registrar nuevo carrier
+    const baseSiteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
     const carrierData = {
       name: 'Envío Estándar',
       code: 'standard-shipping',
-      callback_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000'}/api/webhooks/tiendanube/shipping`,
+      types: ['shipping'],
+      callback_url: `${baseSiteUrl}/api/webhooks/tiendanube/shipping`,
       handling_fee: 0,
       active: true
     };
