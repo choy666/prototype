@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { MercadoLibreStatus } from '@/components/admin/MercadoLibreStatus';
 import { MercadoPagoStatus } from '@/components/admin/MercadoPagoStatus';
-import { McpDiagnosticsPanel } from '@/components/admin/McpDiagnosticsPanel';
 import {
   Users as UsersIcon,
   ShoppingCart,
@@ -124,9 +123,6 @@ async function DashboardContent() {
         </div>
         <div className='sm:col-span-2 lg:col-span-1 xl:col-span-2'>
           <MercadoPagoStatus />
-        </div>
-        <div className='sm:col-span-2 lg:col-span-2 xl:col-span-4'>
-          <McpDiagnosticsPanel />
         </div>
       </div>
 
