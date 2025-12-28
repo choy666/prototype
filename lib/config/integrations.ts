@@ -63,21 +63,33 @@ export const SITE_CONFIG = {
   },
 } as const;
 
+const getEnvValue = (...keys: string[]) => {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value) return value;
+  }
+  return null;
+};
+
 // Configuración dinámica basada en variables de entorno
 export const getMercadoLibreConfig = () => {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
 
-  const siteId = process.env.MERCADO_LIBRE_SITE_ID || process.env.ML_SITE_ID || 'MLA';
-  const sellerId = process.env.MERCADO_LIBRE_SELLER_ID || process.env.ML_SELLER_ID || null;
-  const appId = process.env.MERCADO_LIBRE_CLIENT_ID || process.env.ML_APP_ID || null;
-  const clientSecret =
-    process.env.MERCADO_LIBRE_CLIENT_SECRET || process.env.ML_CLIENT_SECRET || null;
+  const siteId =
+    getEnvValue('MERCADO_LIBRE_SITE_ID', 'MERCADOLIBRE_SITE_ID', 'ML_SITE_ID') || 'MLA';
+  const sellerId = getEnvValue('MERCADO_LIBRE_SELLER_ID', 'MERCADOLIBRE_SELLER_ID', 'ML_SELLER_ID');
+  const appId = getEnvValue('MERCADO_LIBRE_CLIENT_ID', 'MERCADOLIBRE_CLIENT_ID', 'ML_APP_ID');
+  const clientSecret = getEnvValue(
+    'MERCADO_LIBRE_CLIENT_SECRET',
+    'MERCADOLIBRE_CLIENT_SECRET',
+    'ML_CLIENT_SECRET'
+  );
   const redirectUri =
-    process.env.MERCADO_LIBRE_REDIRECT_URI ||
-    process.env.ML_REDIRECT_URI ||
+    getEnvValue('MERCADO_LIBRE_REDIRECT_URI', 'MERCADOLIBRE_REDIRECT_URI', 'ML_REDIRECT_URI') ||
     `${appUrl}/api/auth/mercadolibre/callback`;
 
-  const scopesFromEnv = process.env.MERCADO_LIBRE_SCOPES || process.env.ML_OAUTH_SCOPES;
+  const scopesFromEnv =
+    getEnvValue('MERCADO_LIBRE_SCOPES', 'MERCADOLIBRE_SCOPES') || process.env.ML_OAUTH_SCOPES;
 
   const oauthScopes = scopesFromEnv
     ? scopesFromEnv
