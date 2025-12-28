@@ -1,5 +1,16 @@
 import type { Product, Category } from '@/lib/schema';
 import { makeAuthenticatedRequest } from '@/lib/auth/mercadolibre';
+import {
+  getCategoryME2Rules,
+  validateDimensionsWithRules,
+  validateShippingAttributesWithRules,
+} from '@/lib/mercado-envios/me2Rules';
+import {
+  evaluateCategoryAttributeRequirements,
+  type AttributeRequirementResult,
+  type InvalidAttributeEntry,
+  type CategoryAttributeDefinition,
+} from '@/lib/mercado-envios/attribute-requirements';
 
 // Interfaz para atributos de categoría de ML
 interface MLAttribute {
@@ -56,6 +67,7 @@ export interface MLValidationResult {
   missingRequired: MLAttribute[];
   missingConditional: MLAttribute[];
   categoryAttributes: MLAttribute[];
+  invalidAttributes: InvalidAttributeEntry[];
 }
 
 // Cache para atributos de categorías (TTL: 5 minutos)
@@ -77,7 +89,7 @@ export async function fetchCategoryAttributes(
 
   try {
     let attributes: MLAttribute[] = [];
-    
+
     if (userId && typeof window === 'undefined') {
       // Server-side: usar autenticación directa con ML
       try {
@@ -86,7 +98,7 @@ export async function fetchCategoryAttributes(
           `/categories/${categoryId}/attributes`,
           { method: 'GET' }
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           attributes = (data || []).map((attr: MLApiResponse) => ({
@@ -100,53 +112,56 @@ export async function fetchCategoryAttributes(
             allowed_units: attr.allowed_units,
             max_length: attr.max_length,
             min_value: attr.min_value,
-            max_value: attr.max_value
+            max_value: attr.max_value,
           }));
         }
       } catch (error) {
         console.warn(`Error obteniendo atributos directamente de ML para ${categoryId}:`, error);
       }
     }
-    
+
     // Fallback a API local (client-side o si falló la directa)
     if (attributes.length === 0) {
-      const baseUrl = typeof window !== 'undefined' 
-        ? '' 
-        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-      
-      const url = userId 
+      const baseUrl =
+        typeof window !== 'undefined'
+          ? ''
+          : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+      const url = userId
         ? `${baseUrl}/api/mercadolibre/categories/${categoryId}/attributes?userId=${userId}`
         : `${baseUrl}/api/mercadolibre/categories/${categoryId}/attributes`;
-      
+
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        attributes = (data.attributes || []).map((attr: {
-          id: string;
-          key: string;
-          name: string;
-          label: string;
-          required?: boolean;
-          value_type?: string;
-          values?: Array<{ name: string }>;
-        }) => ({
-          id: attr.id || attr.key, // Usar key como fallback
-          name: attr.name || attr.label, // Usar label como fallback
-          type: 'string',
-          tags: {
-            required: attr.required,
-            catalog_required: false,
-            allow_variations: false,
-            conditional_required: false
-          },
-          value_type: attr.value_type,
-          values: attr.values,
-          help_value: undefined,
-          allowed_units: undefined,
-          max_length: undefined,
-          min_value: undefined,
-          max_value: undefined
-        }));
+        attributes = (data.attributes || []).map(
+          (attr: {
+            id: string;
+            key: string;
+            name: string;
+            label: string;
+            required?: boolean;
+            value_type?: string;
+            values?: Array<{ name: string }>;
+          }) => ({
+            id: attr.id || attr.key, // Usar key como fallback
+            name: attr.name || attr.label, // Usar label como fallback
+            type: 'string',
+            tags: {
+              required: attr.required,
+              catalog_required: false,
+              allow_variations: false,
+              conditional_required: false,
+            },
+            value_type: attr.value_type,
+            values: attr.values,
+            help_value: undefined,
+            allowed_units: undefined,
+            max_length: undefined,
+            min_value: undefined,
+            max_value: undefined,
+          })
+        );
       }
     }
 
@@ -154,7 +169,7 @@ export async function fetchCategoryAttributes(
     if (attributes.length > 0) {
       categoryAttributesCache.set(categoryId, {
         data: attributes,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -171,102 +186,16 @@ export async function fetchCategoryAttributes(
 function hasRequiredAttributes(
   productAttributes: unknown,
   categoryAttributes: MLAttribute[]
-): { hasAll: boolean; missing: MLAttribute[]; missingConditional: MLAttribute[] } {
-  // Filtrar solo los atributos requeridos según la API de ML
-  const requiredAttributes = categoryAttributes.filter(attr => 
-    attr.tags?.required === true || attr.tags?.catalog_required === true
+): AttributeRequirementResult & { hasAll: boolean } {
+  const evaluation = evaluateCategoryAttributeRequirements(
+    productAttributes,
+    categoryAttributes as unknown as CategoryAttributeDefinition[]
   );
 
-  // Filtrar atributos condicionalmente requeridos
-  const conditionalAttributes = categoryAttributes.filter(attr => 
-    attr.tags?.conditional_required === true
-  );
-
-  if (!requiredAttributes || requiredAttributes.length === 0) {
-    return { hasAll: true, missing: [], missingConditional: [] };
-  }
-
-  const missing: MLAttribute[] = [];
-  const missingConditional: MLAttribute[] = [];
-  
-  // Normalizar atributos del producto
-  const normalizedAttrs = new Map();
-  if (productAttributes && Array.isArray(productAttributes)) {
-    productAttributes.forEach((attr: {
-      id?: string;
-      name?: string;
-      value_name?: string;
-      values?: string[];
-    }) => {
-      // Validar que el atributo tenga la estructura esperada
-      if (!attr || typeof attr !== 'object') {
-        console.warn('[ML-Sync-Validation] Atributo inválido (no es objeto):', attr);
-        return;
-      }
-      
-      const key = attr.id || attr.name;
-      
-      // Manejar ambos formatos: value_name (ML) o values (nuestro formato)
-      let value = attr.value_name;
-      if (!value && attr.values && Array.isArray(attr.values) && attr.values.length > 0) {
-        value = attr.values[0]; // Tomar el primer valor para validación
-      }
-      
-      if (key && value) {
-        try {
-          if (typeof key === 'string') {
-            normalizedAttrs.set(key.toLowerCase(), value);
-          } else {
-            console.warn('[ML-Sync-Validation] Key no es string:', { key, attr });
-          }
-        } catch (error) {
-          console.error('[ML-Sync-Validation] Error procesando atributo:', { key, attr, error });
-        }
-      }
-    });
-  }
-
-  // Verificar atributos requeridos usando los IDs de la API
-  requiredAttributes.forEach((reqAttr) => {
-    // Validar que reqAttr tenga id antes de procesar
-    if (!reqAttr.id) {
-      console.warn('[ML-Sync-Validation] Atributo requerido sin id:', reqAttr);
-      return;
-    }
-    
-    // Debug logging
-    console.log('[ML-Sync-Validation] Verificando atributo requerido:', {
-      required: reqAttr,
-      hasId: normalizedAttrs.has(reqAttr.id.toLowerCase()),
-      normalizedAttrs: Array.from(normalizedAttrs.entries())
-    });
-    
-    const hasValue = normalizedAttrs.has(reqAttr.id.toLowerCase());
-    
-    if (!hasValue) {
-      console.log('[ML-Sync-Validation] Atributo faltante:', reqAttr);
-      missing.push(reqAttr);
-    }
-  });
-
-  // Verificar atributos condicionalmente requeridos
-  conditionalAttributes.forEach((condAttr) => {
-    if (!condAttr.id) return;
-    
-    const hasValue = normalizedAttrs.has(condAttr.id.toLowerCase());
-    
-    if (!hasValue) {
-      // Para atributos condicionales, verificar si hay un atributo "EMPTY_*" correspondiente
-      const emptyReasonAttr = `EMPTY_${condAttr.id}_REASON`;
-      const hasEmptyReason = normalizedAttrs.has(emptyReasonAttr.toLowerCase());
-      
-      if (!hasEmptyReason) {
-        missingConditional.push(condAttr);
-      }
-    }
-  });
-
-  return { hasAll: missing.length === 0, missing, missingConditional };
+  return {
+    hasAll: evaluation.missingRequired.length === 0 && evaluation.invalidValues.length === 0,
+    ...evaluation,
+  };
 }
 
 /**
@@ -282,6 +211,7 @@ export async function validateProductForMLSync(
   let categoryAttributes: MLAttribute[] = [];
   const missing: MLAttribute[] = [];
   const missingConditional: MLAttribute[] = [];
+  let invalidAttributes: InvalidAttributeEntry[] = [];
 
   // 1. Validaciones básicas obligatorias
   if (!product.name || product.name.trim().length < 3) {
@@ -301,50 +231,98 @@ export async function validateProductForMLSync(
   }
 
   // 2. Validación de imágenes
-  const images = product.images ? 
-    (Array.isArray(product.images) ? product.images : [product.image]) : 
-    [product.image].filter(Boolean);
-  
+  const images = product.images
+    ? Array.isArray(product.images)
+      ? product.images
+      : [product.image]
+    : [product.image].filter(Boolean);
+
   if (!images || images.length === 0) {
     errors.push('Se requiere al menos una imagen');
   }
 
-  // 3. Validaciones ME2 (obligatorias)
-  if (!product.weight || Number(product.weight) <= 0) {
-    errors.push('El peso es obligatorio para Mercado Envíos');
+  // 3. Validaciones ME2 con reglas por categoría
+  const me2Rules = await getCategoryME2Rules(product.mlCategoryId);
+  const dimensionValidation = validateDimensionsWithRules(
+    {
+      height: Number(product.height) || 0,
+      width: Number(product.width) || 0,
+      length: Number(product.length) || 0,
+      weight: Number(product.weight) || 0,
+    },
+    me2Rules
+  );
+
+  if (!dimensionValidation.isValid) {
+    errors.push(`Dimensiones/peso inválidos para ME2: ${dimensionValidation.missing.join(', ')}`);
   }
-  
-  if (!product.height || Number(product.height) <= 0) {
-    errors.push('La altura es obligatoria para Mercado Envíos');
+  warnings.push(...dimensionValidation.warnings);
+
+  const shippingValidation = validateShippingAttributesWithRules(
+    (product as unknown as { shippingAttributes?: Record<string, unknown> }).shippingAttributes,
+    me2Rules
+  );
+
+  if (!shippingValidation.isValid) {
+    errors.push(`Atributos de envío incompletos: ${shippingValidation.missing.join(', ')}`);
   }
-  
-  if (!product.width || Number(product.width) <= 0) {
-    errors.push('El ancho es obligatorio para Mercado Envíos');
-  }
-  
-  if (!product.length || Number(product.length) <= 0) {
-    errors.push('El largo es obligatorio para Mercado Envíos');
-  }
+  warnings.push(...shippingValidation.warnings);
 
   // 4. Obtener y validar atributos de la categoría
   if (product.mlCategoryId) {
     categoryAttributes = await fetchCategoryAttributes(product.mlCategoryId, userId);
-    
-    const { hasAll, missing, missingConditional } = hasRequiredAttributes(
-      product.attributes, 
-      categoryAttributes
-    );
 
-    if (!hasAll) {
-      errors.push(
-        `Faltan atributos obligatorios de la categoría: ${missing.map(m => m.name).join(', ')}`
-      );
+    const requirementResult = hasRequiredAttributes(product.attributes, categoryAttributes);
+    const mapToMLAttribute = (attr: CategoryAttributeDefinition): MLAttribute => ({
+      id: attr.id,
+      name: attr.name ?? attr.id,
+      type: attr.type ?? 'string',
+      tags: attr.tags as MLAttribute['tags'],
+      value_type: attr.value_type,
+      values: attr.values?.map((value) => ({
+        id: value.id,
+        name: value.name,
+      })),
+      help_value: attr.help_value,
+      allowed_units: attr.allowed_units,
+      max_length: attr.max_length,
+      min_value: attr.min_value,
+      max_value: attr.max_value,
+    });
+
+    missing.push(...requirementResult.missingRequired.map(mapToMLAttribute));
+    missingConditional.push(...requirementResult.missingConditional.map(mapToMLAttribute));
+    invalidAttributes = requirementResult.invalidValues;
+
+    if (!requirementResult.hasAll) {
+      if (requirementResult.missingRequired.length > 0) {
+        errors.push(
+          `Faltan atributos obligatorios de la categoría: ${requirementResult.missingRequired
+            .map((m) => m.name || m.id)
+            .join(', ')}`
+        );
+      }
+
+      if (requirementResult.invalidValues.length > 0) {
+        requirementResult.invalidValues.forEach((invalidAttr) => {
+          errors.push(
+            `El atributo "${invalidAttr.attribute.name ?? invalidAttr.attribute.id}" tiene un valor inválido (${invalidAttr.providedValue}).`
+          );
+        });
+      }
     }
 
-    // Agregar advertencias para atributos condicionalmente faltantes
-    if (missingConditional.length > 0) {
+    if (requirementResult.missingConditional.length > 0) {
+      const conditionalList = requirementResult.missingConditional
+        .map((m) => m.name || m.id)
+        .join(', ');
+
+      errors.push(
+        `Faltan atributos condicionales: ${conditionalList}. Completa los valores o marca la opción "No aplica" usando EMPTY_*_REASON.`
+      );
+
       warnings.push(
-        `Atributos condicionalmente requeridos faltantes: ${missingConditional.map(m => m.name).join(', ')}. Estos pueden ser necesarios para sincronización.`
+        `Atributos condicionalmente requeridos faltantes: ${conditionalList}. Puedes justificar con EMPTY_*_REASON si no aplican.`
       );
     }
   }
@@ -372,7 +350,8 @@ export async function validateProductForMLSync(
     warnings,
     missingRequired: missing,
     missingConditional,
-    categoryAttributes
+    categoryAttributes,
+    invalidAttributes,
   };
 }
 
@@ -382,15 +361,18 @@ export async function validateProductForMLSync(
 export async function validateMultipleProductsForML(
   products: Product[],
   userId?: number
-): Promise<{ results: MLValidationResult[]; summary: { ready: number; notReady: number; errors: number } }> {
+): Promise<{
+  results: MLValidationResult[];
+  summary: { ready: number; notReady: number; errors: number };
+}> {
   const results = await Promise.all(
-    products.map(product => validateProductForMLSync(product, undefined, userId))
+    products.map((product) => validateProductForMLSync(product, undefined, userId))
   );
 
   const summary = {
-    ready: results.filter(r => r.isReadyForSync).length,
-    notReady: results.filter(r => !r.isValid).length,
-    errors: results.filter(r => r.errors.length > 0).length
+    ready: results.filter((r) => r.isReadyForSync).length,
+    notReady: results.filter((r) => !r.isValid).length,
+    errors: results.filter((r) => r.errors.length > 0).length,
   };
 
   return { results, summary };
@@ -407,10 +389,7 @@ export function clearCategoryAttributesCache(): void {
 /**
  * Verifica si un producto está listo para sincronizar (versión simplificada)
  */
-export async function isProductReadyForMLSync(
-  product: Product,
-  userId?: number
-): Promise<boolean> {
+export async function isProductReadyForMLSync(product: Product, userId?: number): Promise<boolean> {
   const validation = await validateProductForMLSync(product, undefined, userId);
   return validation.isReadyForSync;
 }

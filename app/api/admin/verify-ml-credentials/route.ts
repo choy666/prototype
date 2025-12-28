@@ -3,15 +3,15 @@ import { MERCADOLIBRE_CONFIG } from '@/lib/auth/mercadolibre';
 
 export async function GET() {
   try {
-    console.log('🔍 Verificando credenciales de Mercado Libre...');
-    console.log('Client ID:', MERCADOLIBRE_CONFIG.clientId);
+    console.log(' Verificando credenciales de Mercado Libre...');
+    console.log('Client ID:', MERCADOLIBRE_CONFIG.appId);
     console.log('Redirect URI:', MERCADOLIBRE_CONFIG.redirectUri);
     
     // Probar obtener token de aplicación (client_credentials flow)
     const params = new URLSearchParams({
       grant_type: 'client_credentials',
-      client_id: MERCADOLIBRE_CONFIG.clientId,
-      client_secret: MERCADOLIBRE_CONFIG.clientSecret,
+      client_id: MERCADOLIBRE_CONFIG.appId ?? '',
+      client_secret: MERCADOLIBRE_CONFIG.clientSecret ?? '',
     });
 
     const response = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {

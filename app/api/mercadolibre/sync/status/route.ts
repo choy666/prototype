@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/actions/auth';
 import { db } from '@/lib/db';
-import { mercadolibreProductsSync } from '@/lib/schema';
-import { count } from 'drizzle-orm';
+import { mercadolibreProductsSync, products } from '@/lib/schema';
+import { count, desc, eq } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
+import { validateProductForMLSync } from '@/lib/validations/ml-sync-validation';
 
 // Devuelve un resumen global del estado de sincronización con Mercado Libre
 // Utilizado por el componente MercadoLibreStatus en el panel de admin
@@ -41,11 +42,78 @@ export async function GET() {
       .filter((s) => s.status === 'error' || s.status === 'conflict')
       .reduce((sum, s) => sum + Number(s.count), 0);
 
+    const recentItems = await db
+      .select({
+        sync: mercadolibreProductsSync,
+        product: products,
+      })
+      .from(mercadolibreProductsSync)
+      .leftJoin(
+        products,
+        eq(mercadolibreProductsSync.productId, products.id),
+      )
+      .orderBy(desc(mercadolibreProductsSync.updatedAt))
+      .limit(15);
+
+    const userId = parseInt(session.user.id);
+
+    const items = await Promise.all(
+      recentItems.map(async ({ sync, product }) => {
+        if (!product) {
+          return {
+            id: sync.id,
+            productId: sync.productId,
+            productName: 'Producto no encontrado',
+            syncStatus: sync.syncStatus,
+            mlItemId: sync.mlItemId,
+            lastSyncAt: sync.lastSyncAt,
+            updatedAt: sync.updatedAt,
+            syncError: sync.syncError,
+            syncAttempts: sync.syncAttempts,
+            validation: null,
+          };
+        }
+
+        const validation = await validateProductForMLSync(
+          product,
+          undefined,
+          userId,
+        );
+
+        return {
+          id: sync.id,
+          productId: sync.productId,
+          productName: product.name,
+          syncStatus: sync.syncStatus,
+          mlItemId: sync.mlItemId,
+          lastSyncAt: sync.lastSyncAt,
+          updatedAt: sync.updatedAt,
+          syncError: sync.syncError,
+          syncAttempts: sync.syncAttempts,
+          stock: product.stock,
+          me2Compatible: product.me2Compatible,
+          mlCategoryId: product.mlCategoryId,
+          validation: {
+            isValid: validation.isValid,
+            errors: validation.errors,
+            warnings: validation.warnings,
+            missingRequired: validation.missingRequired.map(
+              (attr) => attr.name || attr.id,
+            ),
+            missingConditional: validation.missingConditional.map(
+              (attr) => attr.name || attr.id,
+            ),
+          },
+        };
+      }),
+    );
+
     return NextResponse.json({
       total,
       synced,
       pending,
       errors,
+      items,
     });
   } catch (error) {
     logger.error('Error obteniendo estado de sincronización de Mercado Libre', {

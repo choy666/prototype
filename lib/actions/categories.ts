@@ -20,6 +20,7 @@ interface Category {
   isLeaf: boolean;
   attributes?: unknown;
   me2Compatible?: boolean | null;
+  mlSettings?: unknown;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -32,20 +33,54 @@ interface NewCategory {
   isLeaf: boolean;
   attributes?: unknown;
   me2Compatible?: boolean | null;
+  mlSettings?: unknown;
 }
 
 // Interfaz para caché de categorías ML
+type MLAttributeDefinition = {
+  id: string;
+  name?: string;
+  tags?: Record<string, unknown>;
+  value_type?: string;
+  values?: unknown[];
+  allowed_units?: string[];
+  default_unit?: string;
+  min_value?: number;
+  max_value?: number;
+  required?: boolean;
+  required_by?: unknown;
+  restrictions?: unknown;
+  variation_attribute?: boolean;
+  children_categories?: Array<{ id: string; name: string }>;
+};
+
 interface MLCategoryCache {
-  data: Map<string, {
-    id: string;
-    name: string;
-    attributes: Array<{ id: string; tags: string[]; valueType?: string }>;
-    isLeaf: boolean;
-    children_categories?: Array<{ id: string; name: string }>;
-  }>;
+  data: Map<
+    string,
+    {
+      id: string;
+      name: string;
+      attributes: MLAttributeDefinition[];
+      isLeaf: boolean;
+      children_categories?: Array<{ id: string; name: string }>;
+      settings?: MLCategorySettingsData;
+    }
+  >;
   timestamp: number;
   ttl: number;
 }
+
+type RawListingType = {
+  id: string;
+  name?: string;
+  [key: string]: unknown;
+};
+
+type MLCategorySettingsData = {
+  settings?: Record<string, unknown>;
+  channels?: unknown;
+  listing_types?: RawListingType[];
+};
 
 // Inicializar caché global si no existe
 declare global {
@@ -61,7 +96,7 @@ function getCategoriesCache(): MLCategoryCache {
     globalThis._mlCategoriesCache = {
       data: new Map(),
       timestamp: 0,
-      ttl: CACHE_TTL
+      ttl: CACHE_TTL,
     };
   }
   return globalThis._mlCategoriesCache;
@@ -73,12 +108,16 @@ function isCacheValid(cache: MLCategoryCache): boolean {
 }
 
 // Obtener categoría del caché o fetch desde ML
-async function getMLCategoryWithAttributes(categoryId: string, accessToken: string): Promise<{
+async function getMLCategoryWithAttributes(
+  categoryId: string,
+  accessToken: string
+): Promise<{
   id: string;
   name: string;
-  attributes: Array<{ id: string; tags: string[]; valueType?: string }>;
+  attributes: MLAttributeDefinition[];
   isLeaf: boolean;
   children_categories?: Array<{ id: string; name: string }>;
+  settings?: MLCategorySettingsData;
 }> {
   // Verificar caché primero
   const cache = getCategoriesCache();
@@ -91,91 +130,114 @@ async function getMLCategoryWithAttributes(categoryId: string, accessToken: stri
 
   // Obtener detalles básicos de la categoría
   const detailUrl = `https://api.mercadolibre.com/categories/${categoryId}`;
-  const detailResponse = await retryWithBackoff(async () => {
-    const response = await fetch(detailUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
-    });
+  const detailResponse = await retryWithBackoff(
+    async () => {
+      const response = await fetch(detailUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 401) {
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new MercadoLibreError(
+            MercadoLibreErrorCode.AUTH_FAILED,
+            'Token de ML caducado durante fetch de categoría',
+            { status: response.status, categoryId }
+          );
+        }
+        if (response.status === 429) {
+          throw new MercadoLibreError(
+            MercadoLibreErrorCode.API_RATE_LIMIT_EXCEEDED,
+            'Rate limit de ML durante fetch de categoría',
+            { status: response.status, categoryId }
+          );
+        }
         throw new MercadoLibreError(
-          MercadoLibreErrorCode.AUTH_FAILED,
-          'Token de ML caducado durante fetch de categoría',
+          MercadoLibreErrorCode.CATEGORY_NOT_FOUND,
+          `Categoría ${categoryId} no encontrada en ML`,
           { status: response.status, categoryId }
         );
       }
-      if (response.status === 429) {
-        throw new MercadoLibreError(
-          MercadoLibreErrorCode.API_RATE_LIMIT_EXCEEDED,
-          'Rate limit de ML durante fetch de categoría',
-          { status: response.status, categoryId }
-        );
-      }
-      throw new MercadoLibreError(
-        MercadoLibreErrorCode.CATEGORY_NOT_FOUND,
-        `Categoría ${categoryId} no encontrada en ML`,
-        { status: response.status, categoryId }
-      );
-    }
 
-    return response;
-  }, {
-    maxRetries: 3,
-    shouldRetry: (error: unknown) => {
-      return error instanceof MercadoLibreError && 
-             (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
-              error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
-              error.code === MercadoLibreErrorCode.API_RATE_LIMIT_EXCEEDED);
+      return response;
+    },
+    {
+      maxRetries: 3,
+      shouldRetry: (error: unknown) => {
+        return (
+          error instanceof MercadoLibreError &&
+          (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
+            error.code === MercadoLibreErrorCode.TIMEOUT_ERROR ||
+            error.code === MercadoLibreErrorCode.API_RATE_LIMIT_EXCEEDED)
+        );
+      },
     }
-  });
+  );
 
   const details = await detailResponse.json();
 
   // Obtener atributos de la categoría
   const attributesUrl = `https://api.mercadolibre.com/categories/${categoryId}/attributes`;
-  const attributesResponse = await retryWithBackoff(async () => {
-    const response = await fetch(attributesUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      logger.warn('[ML Categories] No se pudieron obtener atributos', {
-        categoryId,
-        status: response.status
+  const attributesResponse = await retryWithBackoff(
+    async () => {
+      const response = await fetch(attributesUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
       });
-      // Retornar array vacío si falla el fetch de atributos
-      return { ok: true, json: async () => ({}) };
-    }
 
-    return response;
-  }, {
-    maxRetries: 2,
-    shouldRetry: (error: unknown) => {
-      return error instanceof MercadoLibreError && 
-             (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
-              error.code === MercadoLibreErrorCode.TIMEOUT_ERROR);
+      if (!response.ok) {
+        logger.warn('[ML Categories] No se pudieron obtener atributos', {
+          categoryId,
+          status: response.status,
+        });
+        // Retornar array vacío si falla el fetch de atributos
+        return { ok: true, json: async () => ({}) };
+      }
+
+      return response;
+    },
+    {
+      maxRetries: 2,
+      shouldRetry: (error: unknown) => {
+        return (
+          error instanceof MercadoLibreError &&
+          (error.code === MercadoLibreErrorCode.CONNECTION_ERROR ||
+            error.code === MercadoLibreErrorCode.TIMEOUT_ERROR)
+        );
+      },
     }
-  });
+  );
 
   const attributesData = await attributesResponse.json();
-  const attributes = Array.isArray(attributesData) 
-    ? attributesData.map((attr: { id: string; tags?: string[]; value_type?: string }) => ({
-        id: attr.id,
-        tags: attr.tags || [],
-        valueType: attr.value_type
-      }))
+  const attributes = Array.isArray(attributesData)
+    ? attributesData
+        .filter((attr: { id?: string }) => Boolean(attr?.id))
+        .map((attr: MLAttributeDefinition) => ({
+          id: attr.id,
+          name: attr.name,
+          tags: attr.tags,
+          value_type: attr.value_type,
+          min_value: attr.min_value,
+          max_value: attr.max_value,
+          allowed_units: attr.allowed_units,
+          default_unit: attr.default_unit,
+          values: attr.values,
+          required: attr.required,
+          required_by: attr.required_by,
+          restrictions: attr.restrictions,
+          variation_attribute: attr.variation_attribute,
+          children_categories: attr.children_categories,
+        }))
     : [];
 
   // Validar que tenga al menos 3 atributos obligatorios para ME2
   const requiredAttributes = ['weight', 'height', 'width', 'length'];
-  const hasRequiredAttributes = requiredAttributes.some(req => 
-    attributes.some(attr => attr.id.toLowerCase().includes(req))
+  const hasRequiredAttributes = requiredAttributes.some((req) =>
+    attributes.some((attr) => attr.id.toLowerCase().includes(req))
   );
 
   if (!hasRequiredAttributes) {
@@ -183,16 +245,27 @@ async function getMLCategoryWithAttributes(categoryId: string, accessToken: stri
       categoryId,
       categoryName: details.name,
       attributes: attributes.slice(0, 10),
-      requiredAttributes
+      requiredAttributes,
     });
   }
+
+  const listingTypes = await fetchCategoryListingTypes(categoryId, accessToken);
+  const settingsData: MLCategorySettingsData | undefined =
+    details?.settings || listingTypes?.length
+      ? {
+          settings: details?.settings,
+          channels: details?.channels,
+          listing_types: listingTypes,
+        }
+      : undefined;
 
   const categoryData = {
     id: details.id,
     name: details.name,
     attributes,
     isLeaf: !details.children_categories || details.children_categories.length === 0,
-    children_categories: details.children_categories
+    children_categories: details.children_categories,
+    settings: settingsData,
   };
 
   // Guardar en caché
@@ -203,33 +276,80 @@ async function getMLCategoryWithAttributes(categoryId: string, accessToken: stri
     categoryId,
     attributesCount: attributes.length,
     hasRequiredAttributes,
-    isLeaf: categoryData.isLeaf
+    isLeaf: categoryData.isLeaf,
   });
 
   return categoryData;
 }
 
+async function fetchCategoryListingTypes(
+  categoryId: string,
+  accessToken: string
+): Promise<RawListingType[] | undefined> {
+  try {
+    const url = `https://api.mercadolibre.com/categories/${categoryId}/listing_types`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      logger.warn('[ML Categories] No se pudieron obtener listing_types', {
+        categoryId,
+        status: response.status,
+      });
+      return undefined;
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      return undefined;
+    }
+
+    return data
+      .filter((entry): entry is RawListingType => Boolean(entry && typeof entry.id === 'string'))
+      .map((entry) => ({
+        ...entry,
+        id: entry.id,
+        name: typeof entry.name === 'string' ? entry.name : undefined,
+      }));
+  } catch (error) {
+    logger.warn('[ML Categories] Error obteniendo listing_types', {
+      categoryId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
 // Obtener todas las categorías (solo categorías hoja para productos)
-export async function getCategories(search?: string, onlyLeaf: boolean = true): Promise<Category[]> {
+export async function getCategories(
+  search?: string,
+  onlyLeaf: boolean = true
+): Promise<Category[]> {
   try {
     // Construir condiciones dinámicamente sin reasignar el query
-    const conditions = []
-    
+    const conditions = [];
+
     if (search) {
-      conditions.push(like(categories.name, `%${search}%`))
+      conditions.push(like(categories.name, `%${search}%`));
     }
-    
+
     // Filtrar solo categorías hoja (se pueden usar para publicar productos)
     if (onlyLeaf) {
-      conditions.push(eq(categories.isLeaf, true))
+      conditions.push(eq(categories.isLeaf, true));
     }
-    
+
     // Aplicar where condicionalmente sin reasignación
-    const query = db.select().from(categories)
+    const query = db
+      .select()
+      .from(categories)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(categories.created_at))
-    
-    return await query
+      .orderBy(desc(categories.created_at));
+
+    return await query;
   } catch (error) {
     console.error('Error fetching categories:', error);
     throw new Error('No se pudieron obtener las categorías');
@@ -280,60 +400,60 @@ export async function syncMLCategories(): Promise<{
 }> {
   try {
     logger.info('[ML Categories] Iniciando sincronización con caché y validación ME2');
-    
+
     // Obtener token de acceso de Mercado Libre con retry
     const mlAuth = await MercadoLibreAuth.getInstance();
     const accessToken = await mlAuth.getAccessToken();
-    
+
     if (!accessToken) {
       throw new MercadoLibreError(
         MercadoLibreErrorCode.AUTH_FAILED,
         'No se pudo obtener el token de acceso de Mercado Libre'
       );
     }
-    
+
     // Obtener categorías dinámicamente (configuradas o populares)
     const categoryIds = await getConfiguredCategories(accessToken);
-    
-    const syncResults = { 
-      created: 0, 
-      updated: 0, 
-      errors: 0, 
+
+    const syncResults = {
+      created: 0,
+      updated: 0,
+      errors: 0,
       cacheHits: 0,
-      warnings: [] as string[]
+      warnings: [] as string[],
     };
-    
+
     for (const categoryId of categoryIds) {
       try {
         // Obtener categoría con atributos (usando caché)
         const categoryData = await getMLCategoryWithAttributes(categoryId, accessToken);
-        
+
         // Verificar si fue un cache hit
         const cache = getCategoriesCache();
         const wasCached = isCacheValid(cache) && cache.data.has(categoryId);
         if (wasCached) {
           syncResults.cacheHits++;
         }
-        
+
         // Validar atributos ME2
         const requiredAttributes = ['weight', 'height', 'width', 'length'];
-        const hasRequiredAttributes = requiredAttributes.some(req => 
-          categoryData.attributes.some(attr => attr.id.toLowerCase().includes(req))
+        const hasRequiredAttributes = requiredAttributes.some((req) =>
+          categoryData.attributes.some((attr) => attr.id.toLowerCase().includes(req))
         );
-        
+
         if (!hasRequiredAttributes && categoryData.isLeaf) {
           syncResults.warnings.push(
             `⚠️ Categoría ${categoryData.name} (${categoryId}) no tiene atributos suficientes para ME2`
           );
         }
-        
+
         // Insertar o actualizar en BD
         const existing = await db
           .select()
           .from(categories)
           .where(eq(categories.mlCategoryId, categoryId))
           .limit(1);
-        
+
         if (existing.length === 0) {
           await db.insert(categories).values({
             name: categoryData.name,
@@ -342,6 +462,7 @@ export async function syncMLCategories(): Promise<{
             isLeaf: categoryData.isLeaf,
             attributes: categoryData.attributes,
             me2Compatible: hasRequiredAttributes,
+            mlSettings: categoryData.settings,
             created_at: new Date(),
             updated_at: new Date(),
           });
@@ -351,18 +472,20 @@ export async function syncMLCategories(): Promise<{
             categoryName: categoryData.name,
             isLeaf: categoryData.isLeaf,
             hasRequiredAttributes,
-            fromCache: wasCached
+            fromCache: wasCached,
           });
         } else {
           // Actualizar categorías existentes
-          await db.update(categories)
+          await db
+            .update(categories)
             .set({
               name: categoryData.name,
               isMlOfficial: true,
               isLeaf: categoryData.isLeaf,
               attributes: categoryData.attributes,
               me2Compatible: hasRequiredAttributes,
-              updated_at: new Date()
+              mlSettings: categoryData.settings,
+              updated_at: new Date(),
             })
             .where(eq(categories.mlCategoryId, categoryId));
           syncResults.updated++;
@@ -371,18 +494,20 @@ export async function syncMLCategories(): Promise<{
             categoryName: categoryData.name,
             isLeaf: categoryData.isLeaf,
             hasRequiredAttributes,
-            fromCache: wasCached
+            fromCache: wasCached,
           });
         }
-        
+
         // Delay más corto si usamos caché para evitar rate limiting innecesario
-        await new Promise(resolve => setTimeout(resolve, wasCached ? 50 : 150));
-        
+        await new Promise((resolve) => setTimeout(resolve, wasCached ? 50 : 150));
       } catch (error) {
         // Manejo específico de errores de autenticación
-        if (error instanceof MercadoLibreError && error.code === MercadoLibreErrorCode.AUTH_FAILED) {
+        if (
+          error instanceof MercadoLibreError &&
+          error.code === MercadoLibreErrorCode.AUTH_FAILED
+        ) {
           logger.warn('[ML Categories] Intentando refrescar token', { categoryId });
-          
+
           try {
             // Intentar refrescar el token - necesitamos obtener el usuario actual
             // Por ahora, vamos a simplificar y lanzar error para que se reintente más tarde
@@ -391,11 +516,10 @@ export async function syncMLCategories(): Promise<{
               'Token de ML caducado - reintente más tarde',
               { categoryId }
             );
-            
           } catch (refreshError) {
             logger.error('[ML Categories] ❌ Error refrescando token', {
               categoryId,
-              error: refreshError instanceof Error ? refreshError.message : String(refreshError)
+              error: refreshError instanceof Error ? refreshError.message : String(refreshError),
             });
             syncResults.errors++;
             syncResults.warnings.push(
@@ -406,7 +530,7 @@ export async function syncMLCategories(): Promise<{
           logger.error('[ML Categories] ❌ Error sincronizando categoría', {
             categoryId,
             error: error instanceof Error ? error.message : String(error),
-            errorType: error instanceof MercadoLibreError ? error.code : 'UNKNOWN'
+            errorType: error instanceof MercadoLibreError ? error.code : 'UNKNOWN',
           });
           syncResults.errors++;
           syncResults.warnings.push(
@@ -415,9 +539,10 @@ export async function syncMLCategories(): Promise<{
         }
       }
     }
-    
+
     // Asegurar que solo las categorías de la lista fija queden marcadas como hoja y oficiales de ML
-    await db.update(categories)
+    await db
+      .update(categories)
       .set({
         isLeaf: false,
         isMlOfficial: false,
@@ -425,45 +550,42 @@ export async function syncMLCategories(): Promise<{
         updated_at: new Date(),
       })
       .where(
-        and(
-          eq(categories.isMlOfficial, true),
-          notInArray(categories.mlCategoryId, categoryIds)
-        )
+        and(eq(categories.isMlOfficial, true), notInArray(categories.mlCategoryId, categoryIds))
       );
-    
+
     // Limpiar caché antiguo si es necesario
     const cache = getCategoriesCache();
     const cacheSize = cache.data.size;
-    if (cacheSize > 100) { // Limitar tamaño de caché
+    if (cacheSize > 100) {
+      // Limitar tamaño de caché
       logger.warn('[ML Categories] Limpiando caché por tamaño excesivo', { cacheSize });
       cache.data.clear();
       cache.timestamp = 0;
     }
-    
+
     revalidatePath('/admin/categories');
-    
+
     const result = {
       ...syncResults,
-      totalCategories: categoryIds.length
+      totalCategories: categoryIds.length,
     };
-    
+
     logger.info('[ML Categories] ✅ Sincronización completada', {
       created: result.created,
       updated: result.updated,
       errors: result.errors,
       cacheHits: result.cacheHits,
       warningsCount: result.warnings.length,
-      totalCategories: result.totalCategories
+      totalCategories: result.totalCategories,
     });
-    
+
     return result;
-    
   } catch (error) {
     logger.error('[ML Categories] ❌ Error crítico en sincronización', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
-    
+
     throw new MercadoLibreError(
       MercadoLibreErrorCode.SYNC_FAILED,
       'Error al sincronizar categorías de Mercado Libre',

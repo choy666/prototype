@@ -3,8 +3,43 @@ import { auth } from '@/lib/actions/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { isTokenExpired, refreshAccessToken, checkCriticalScopes } from '@/lib/auth/mercadolibre';
+import {
+  isTokenExpired,
+  refreshAccessToken,
+  markUserNeedsReauth,
+  syncMercadoLibreScopes,
+  CRITICAL_SCOPES,
+  REQUIRED_SCOPES,
+} from '@/lib/auth/mercadolibre';
 import { logger } from '@/lib/utils/logger';
+
+const parseScopes = (value?: string | null): string[] =>
+  value
+    ? value
+        .split(/[\s,]+/)
+        .map((scope) => scope.trim())
+        .filter(Boolean)
+    : [];
+
+const buildScopeModules = (availableScopes: string[]) =>
+  Object.entries(REQUIRED_SCOPES).map(([module, requiredScopes]) => {
+    const missingScopes = requiredScopes.filter((scope) => !availableScopes.includes(scope));
+    return {
+      module,
+      hasAllScopes: missingScopes.length === 0,
+      missingScopes,
+    };
+  });
+
+const evaluateScopes = (availableScopes: string[]) => {
+  const modules = buildScopeModules(availableScopes);
+  const missingCriticalScopes = CRITICAL_SCOPES.filter((scope) => !availableScopes.includes(scope));
+  return {
+    modules,
+    missingCriticalScopes,
+    hasCriticalScopes: missingCriticalScopes.length === 0,
+  };
+};
 
 export async function GET() {
   const session = await auth();
@@ -37,6 +72,12 @@ export async function GET() {
         mercadoLibreRefreshTokenExpiresAt: true,
         mercadoLibreScopes: true,
         mlNickname: true,
+        mlNeedsReauth: true,
+        mlReauthReason: true,
+        mlSiteId: true,
+        mlSellerId: true,
+        mlPermalink: true,
+        mlLevelId: true,
       },
     });
 
@@ -44,7 +85,12 @@ export async function GET() {
       logger.info('MercadoLibre Status: Usuario no conectado', { userId });
       return NextResponse.json({
         connected: false,
-        reason: 'no_tokens'
+        reason: 'no_tokens',
+        mlNeedsReauth: user?.mlNeedsReauth ?? false,
+        mlReauthReason: user?.mlReauthReason ?? null,
+        missingCriticalScopes: [],
+        hasCriticalScopes: false,
+        modules: [],
       });
     }
 
@@ -86,18 +132,26 @@ export async function GET() {
           newExpiresAt: newAccessTokenExpiresAt
         });
 
-        // Verificar scopes críticos después del refresh
-        const scopeCheck = await checkCriticalScopes(userId);
+        const syncedScopes = await syncMercadoLibreScopes(userId, newTokens.access_token);
+        const availableScopes =
+          (syncedScopes && syncedScopes.length > 0 ? syncedScopes : parseScopes(newTokens.scope)) ||
+          [];
+        const scopeState = evaluateScopes(availableScopes);
 
         return NextResponse.json({
           connected: true,
           userId: user.mercadoLibreId,
           nickname: user.mlNickname,
-          scopes: newTokens.scope ? newTokens.scope.split(' ') : [],
+          scopes: availableScopes,
+          mlSiteId: user.mlSiteId,
+          mlSellerId: user.mercadoLibreId,
+          mlPermalink: user.mlPermalink,
+          mlLevelId: user.mlLevelId,
           expiresAt: newAccessTokenExpiresAt,
           refreshed: true,
-          hasCriticalScopes: scopeCheck.hasCriticalScopes,
-          missingCriticalScopes: scopeCheck.missingCriticalScopes,
+          hasCriticalScopes: scopeState.hasCriticalScopes,
+          missingCriticalScopes: scopeState.missingCriticalScopes,
+          modules: scopeState.modules,
         });
 
       } catch (refreshError) {
@@ -107,17 +161,7 @@ export async function GET() {
         });
 
         // Si falla el refresh, marcar como desconectado
-        const now = new Date();
-        await db.update(users)
-          .set({
-            mercadoLibreAccessToken: null,
-            mercadoLibreRefreshToken: null,
-            mercadoLibreAccessTokenExpiresAt: null,
-            mercadoLibreRefreshTokenExpiresAt: null,
-            mercadoLibreScopes: null,
-            updatedAt: now,
-          })
-          .where(eq(users.id, userId));
+        await markUserNeedsReauth(userId, 'refresh_failed');
 
         return NextResponse.json({
           connected: false,
@@ -132,16 +176,7 @@ export async function GET() {
       logger.info('MercadoLibre Status: Refresh token expirado', { userId });
       
       // Limpiar tokens expirados
-      await db.update(users)
-        .set({
-          mercadoLibreAccessToken: null,
-          mercadoLibreRefreshToken: null,
-          mercadoLibreAccessTokenExpiresAt: null,
-          mercadoLibreRefreshTokenExpiresAt: null,
-          mercadoLibreScopes: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
+        await markUserNeedsReauth(userId, 'token_expired');
 
       return NextResponse.json({
         connected: false,
@@ -149,18 +184,25 @@ export async function GET() {
       });
     }
 
-    // Verificar scopes críticos
-    const scopeCheck = await checkCriticalScopes(userId);
+    const storedScopes = parseScopes(user.mercadoLibreScopes);
+    const scopeState = evaluateScopes(storedScopes);
 
     return NextResponse.json({
       connected: true,
       userId: user.mercadoLibreId,
       nickname: user.mlNickname,
-      scopes: user.mercadoLibreScopes ? user.mercadoLibreScopes.split(' ') : [],
+      scopes: storedScopes,
       expiresAt: user.mercadoLibreAccessTokenExpiresAt,
       refreshed: false,
-      hasCriticalScopes: scopeCheck.hasCriticalScopes,
-      missingCriticalScopes: scopeCheck.missingCriticalScopes,
+      hasCriticalScopes: scopeState.hasCriticalScopes,
+      missingCriticalScopes: scopeState.missingCriticalScopes,
+      mlNeedsReauth: user.mlNeedsReauth || !scopeState.hasCriticalScopes,
+      mlReauthReason: user.mlReauthReason,
+      mlSiteId: user.mlSiteId,
+      mlSellerId: user.mercadoLibreId,
+      mlPermalink: user.mlPermalink,
+      mlLevelId: user.mlLevelId,
+      modules: scopeState.modules,
     });
 
   } catch (error) {

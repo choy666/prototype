@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -8,10 +8,25 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Edit3, Check, X, Package, Plus, Tag } from "lucide-react";
+import { Trash2, Edit3, Check, X, Package, Plus, Tag, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { ImageManager } from "@/components/ui/ImageManager";
 
+type MLAttributeDefinition = {
+  id: string;
+  name: string;
+  values?: Array<{ id?: string; name: string }>;
+  tags?: {
+    allow_variations?: boolean;
+  };
+};
+
+type NormalizedAttributeCombination = {
+  id: string;
+  name: string;
+  value_name: string;
+  value_id?: string;
+};
 
 export interface ProductVariant {
   id?: number;
@@ -22,12 +37,18 @@ export interface ProductVariant {
   stock: number;
   images?: string[];
   isActive: boolean;
+  sku?: string;
+  mlAttributeCombinations?: NormalizedAttributeCombination[];
+  normalizationWarnings?: string[];
+  errors?: string[];
 }
 
 interface ProductVariantsNewProps {
   productId: number;
   variants: ProductVariant[];
   onChange: (variants: ProductVariant[]) => void;
+  mlAttributes?: MLAttributeDefinition[];
+  mlCategoryId?: string;
 }
 
 
@@ -104,7 +125,7 @@ function AdditionalAttributesBuilder({
   );
 }
 
-export function ProductVariantsNew({ productId, variants, onChange }: ProductVariantsNewProps) {
+export function ProductVariantsNew({ productId, variants, onChange, mlAttributes = [], mlCategoryId }: ProductVariantsNewProps) {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingVariant, setEditingVariant] = useState<number | null>(null);
@@ -114,7 +135,175 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
     stock: 0,
     images: [],
     isActive: true,
+    mlAttributeCombinations: [],
+    normalizationWarnings: [],
   });
+  const [variationAttributes, setVariationAttributes] = useState<MLAttributeDefinition[]>(mlAttributes);
+  const [variationAttributesLoading, setVariationAttributesLoading] = useState(false);
+  const [variationAttributesError, setVariationAttributesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!mlCategoryId) {
+      setVariationAttributes(mlAttributes);
+      setVariationAttributesError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchVariationAttributes = async () => {
+      setVariationAttributesLoading(true);
+      setVariationAttributesError(null);
+
+      try {
+        const response = await fetch(`/api/mercadolibre/categories/${mlCategoryId}/attributes?t=${Date.now()}`);
+        if (!response.ok) {
+          throw new Error('No se pudieron obtener los atributos de la categoría seleccionada');
+        }
+
+        const data = await response.json();
+        const rawAttributes: MLAttributeDefinition[] =
+          data?.mlAttributes?.all ??
+          data?.rawAttributes ??
+          data?.attributes ??
+          mlAttributes;
+
+        const allowVariationAttributes = rawAttributes.filter(
+          (attr) => attr?.tags?.allow_variations
+        );
+
+        if (!cancelled) {
+          setVariationAttributes(allowVariationAttributes);
+          if (allowVariationAttributes.length === 0) {
+            setVariationAttributesError('La categoría no expone atributos oficiales para variaciones.');
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setVariationAttributes([]);
+          setVariationAttributesError(
+            error instanceof Error
+              ? error.message
+              : 'No se pudieron obtener los atributos de variación'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setVariationAttributesLoading(false);
+        }
+      }
+    };
+
+    fetchVariationAttributes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mlCategoryId, mlAttributes]);
+
+  const normalizeVariantAttributes = useCallback(
+    (additionalAttributes?: Record<string, string>) => {
+      if (!additionalAttributes || Object.keys(additionalAttributes).length === 0) {
+        return { mlAttributeCombinations: [], warnings: variationAttributes.length ? ['Debes definir al menos un atributo oficial para crear variaciones en ML.'] : [] };
+      }
+
+      const warnings: string[] = [];
+      const combinations: NormalizedAttributeCombination[] = [];
+
+      Object.entries(additionalAttributes).forEach(([key, value]) => {
+        const cleanedKey = key.trim().toLowerCase();
+        const attr = variationAttributes.find(
+          (definition) =>
+            definition.id.toLowerCase() === cleanedKey ||
+            definition.name?.toLowerCase() === cleanedKey
+        );
+
+        if (!attr) {
+          warnings.push(`"${key}" no corresponde a un atributo de variación oficial de Mercado Libre.`);
+          return;
+        }
+
+        if (!value?.trim()) {
+          warnings.push(`"${attr.name}" requiere un valor para sincronizar la variante.`);
+          return;
+        }
+
+        const trimmedValue = value.trim();
+        const loweredValue = trimmedValue.toLowerCase();
+        const matchedValue = attr.values?.find(
+          (option) =>
+            option.name?.toLowerCase() === loweredValue || option.id?.toLowerCase() === loweredValue
+        );
+
+        combinations.push({
+          id: attr.id,
+          name: attr.name,
+          value_name: matchedValue?.name ?? trimmedValue,
+          value_id: matchedValue?.id,
+        });
+
+        if (!matchedValue && attr.values && attr.values.length > 0) {
+          warnings.push(`El valor "${trimmedValue}" no coincide con los valores oficiales de ${attr.name}.`);
+        }
+      });
+
+      const uniqueCombinations = combinations.filter(
+        (combo, index, self) =>
+          index === self.findIndex((other) => other.id === combo.id && other.value_name === combo.value_name)
+      );
+
+      if (uniqueCombinations.length > 2) {
+        warnings.push('Mercado Libre recomienda un máximo de 2 atributos de variación (p. ej. Color y Talle).');
+      }
+
+      return {
+        mlAttributeCombinations: uniqueCombinations,
+        warnings,
+      };
+    },
+    [variationAttributes]
+  );
+
+  const normalizedVariants = useMemo(
+    () =>
+      variants.map((variant) => {
+        const { mlAttributeCombinations, warnings } = normalizeVariantAttributes(
+          variant.additionalAttributes
+        );
+
+        return {
+          ...variant,
+          mlAttributeCombinations,
+          normalizationWarnings: warnings,
+        };
+      }),
+    [variants, normalizeVariantAttributes]
+  );
+
+  const handleNewVariantAttributesChange = useCallback(
+    (attributes: Record<string, string>) => {
+      const normalization = normalizeVariantAttributes(attributes);
+      setNewVariantForm((prev) => ({
+        ...prev,
+        additionalAttributes: attributes,
+        mlAttributeCombinations: normalization.mlAttributeCombinations,
+        normalizationWarnings: normalization.warnings,
+      }));
+    },
+    [normalizeVariantAttributes]
+  );
+
+  const handleEditVariantAttributesChange = useCallback(
+    (attributes: Record<string, string>) => {
+      const normalization = normalizeVariantAttributes(attributes);
+      setEditForm((prev) => ({
+        ...prev,
+        additionalAttributes: attributes,
+        mlAttributeCombinations: normalization.mlAttributeCombinations,
+        normalizationWarnings: normalization.warnings,
+      }));
+    },
+    [normalizeVariantAttributes]
+  );
 
   // Cargar variantes existentes al montar
   useEffect(() => {
@@ -214,12 +403,20 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
 
       if (response.ok) {
         const newVariant = await response.json();
-        onChange([...variants, newVariant]);
+        const normalization = normalizeVariantAttributes(newVariant.additionalAttributes || {});
+        const variantWithNormalization = {
+          ...newVariant,
+          mlAttributeCombinations: normalization.mlAttributeCombinations,
+          normalizationWarnings: normalization.warnings,
+        };
+        onChange([...variants, variantWithNormalization]);
         setNewVariantForm({
           additionalAttributes: {},
           stock: 0,
           images: [],
           isActive: true,
+          mlAttributeCombinations: [],
+          normalizationWarnings: [],
         });
         setShowCreateForm(false);
         toast({
@@ -247,6 +444,7 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
   const handleEditVariant = (index: number) => {
     setEditingVariant(index);
     const variant = variants[index];
+    const normalization = normalizeVariantAttributes(variant.additionalAttributes || {});
     setEditForm({
       ...variant,
       name: variant.name ?? undefined,
@@ -254,6 +452,14 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
       price: variant.price ?? undefined,
       additionalAttributes: variant.additionalAttributes ?? undefined,
       images: variant.images ?? undefined,
+      mlAttributeCombinations:
+        variant.mlAttributeCombinations && variant.mlAttributeCombinations.length > 0
+          ? variant.mlAttributeCombinations
+          : normalization.mlAttributeCombinations,
+      normalizationWarnings:
+        variant.normalizationWarnings && variant.normalizationWarnings.length > 0
+          ? variant.normalizationWarnings
+          : normalization.warnings,
     });
   };
 
@@ -391,6 +597,27 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
         </div>
       </div>
 
+      <div className="rounded-lg border border-muted/30 bg-muted/5 px-3 py-2 text-sm">
+        {variationAttributesLoading ? (
+          <div className="text-muted-foreground">Cargando atributos de variación oficiales…</div>
+        ) : variationAttributesError ? (
+          <div className="flex items-start gap-2 text-destructive">
+            <AlertTriangle className="h-4 w-4 mt-0.5" />
+            <span>{variationAttributesError}</span>
+          </div>
+        ) : variationAttributes.length > 0 ? (
+          <div className="text-muted-foreground">
+            <span className="font-medium text-foreground">Atributos disponibles:</span>{" "}
+            {variationAttributes.map((attr) => attr.name).join(", ")}
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 text-amber-700">
+            <AlertTriangle className="h-4 w-4 mt-0.5" />
+            <span>Esta categoría no expone atributos de variación oficiales. Agrega atributos manualmente y revisa las advertencias.</span>
+          </div>
+        )}
+      </div>
+
       {/* Recomendaciones de Mercado Libre para variantes */}
       {exceedsMlLimit && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -460,11 +687,36 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
 
             <AdditionalAttributesBuilder
               attributes={newVariantForm.additionalAttributes || {}}
-              onChange={(attributes) => setNewVariantForm(prev => ({
-                ...prev,
-                additionalAttributes: attributes
-              }))}
+              onChange={handleNewVariantAttributesChange}
             />
+
+            {(newVariantForm.mlAttributeCombinations?.length ?? 0) > 0 && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                <p className="font-medium mb-1">Combinaciones oficiales a enviar:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {newVariantForm.mlAttributeCombinations?.map((combo) => (
+                    <li key={combo.id}>
+                      {combo.name}: <span className="font-semibold">{combo.value_name}</span>
+                      {combo.value_id ? ` (ID ${combo.value_id})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(newVariantForm.normalizationWarnings?.length ?? 0) > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-1">
+                <div className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="h-4 w-4" />
+                  Advertencias de normalización
+                </div>
+                <ul className="list-disc pl-5 space-y-1">
+                  {newVariantForm.normalizationWarnings?.map((warning, idx) => (
+                    <li key={`new-warning-${idx}`}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="variant-images">Imágenes *</Label>
@@ -517,8 +769,10 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
 
       {/* Lista de variantes */}
       <div className="grid gap-4">
-        {variants.map((variant, index) => (
-          <Card key={variant.id || index} className={`transition-all ${!variant.isActive ? 'opacity-60' : ''}`}>
+        {normalizedVariants.map((variant, index) => {
+          const originalVariant = variants[index];
+          return (
+          <Card key={variant.id || originalVariant?.id || index} className={`transition-all ${!variant.isActive ? 'opacity-60' : ''}`}>
             <CardContent className="p-4">
               {editingVariant === index ? (
                 <div className="space-y-4">
@@ -577,11 +831,36 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
 
                   <AdditionalAttributesBuilder
                     attributes={editForm.additionalAttributes || {}}
-                    onChange={(attributes) => setEditForm(prev => ({
-                      ...prev,
-                      additionalAttributes: attributes
-                    }))}
+                    onChange={handleEditVariantAttributesChange}
                   />
+
+                  {(editForm.mlAttributeCombinations?.length ?? 0) > 0 && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                      <p className="font-medium mb-1">Combinaciones oficiales a enviar:</p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {editForm.mlAttributeCombinations?.map((combo) => (
+                          <li key={`edit-combo-${combo.id}`}>
+                            {combo.name}: <span className="font-semibold">{combo.value_name}</span>
+                            {combo.value_id ? ` (ID ${combo.value_id})` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(editForm.normalizationWarnings?.length ?? 0) > 0 && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-1">
+                      <div className="flex items-center gap-2 font-medium">
+                        <AlertTriangle className="h-4 w-4" />
+                        Advertencias de normalización
+                      </div>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {editForm.normalizationWarnings?.map((warning, idx) => (
+                          <li key={`edit-warning-${idx}`}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -640,6 +919,32 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
                       {formatAdditionalAttributes(variant.additionalAttributes) && (
                         <p>Atributos adicionales: {formatAdditionalAttributes(variant.additionalAttributes)}</p>
                       )}
+                      {(variant.mlAttributeCombinations?.length ?? 0) > 0 && (
+                        <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+                          <p className="font-medium mb-1">Combinaciones oficiales</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {variant.mlAttributeCombinations?.map((combo) => (
+                              <li key={`list-combo-${variant.id}-${combo.id}`}>
+                                {combo.name}: <span className="font-semibold">{combo.value_name}</span>
+                                {combo.value_id ? ` (ID ${combo.value_id})` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {(variant.normalizationWarnings?.length ?? 0) > 0 && (
+                        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 space-y-1">
+                          <div className="flex items-center gap-2 font-medium">
+                            <AlertTriangle className="h-4 w-4" />
+                            Advertencias de normalización
+                          </div>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {variant.normalizationWarnings?.map((warning, idx) => (
+                              <li key={`list-warning-${variant.id}-${idx}`}>{warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -658,7 +963,7 @@ export function ProductVariantsNew({ productId, variants, onChange }: ProductVar
               )}
             </CardContent>
           </Card>
-        ))}
+        )})}
       </div>
 
       {variants.length === 0 && !showCreateForm && (

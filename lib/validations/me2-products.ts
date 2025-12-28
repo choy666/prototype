@@ -2,6 +2,11 @@ import { logger } from '@/lib/utils/logger';
 import { db } from '@/lib/db';
 import { products } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import {
+  getCategoryME2Rules,
+  validateDimensionsWithRules,
+  validateShippingAttributesWithRules,
+} from '@/lib/mercado-envios/me2Rules';
 
 export interface ProductME2ValidationResult {
   productId: number;
@@ -36,6 +41,7 @@ export async function validateProductME2Attributes(productId: number): Promise<P
         shippingAttributes: true,
         me2Compatible: true,
         mlItemId: true,
+        mlCategoryId: true,
       }
     });
 
@@ -53,21 +59,22 @@ export async function validateProductME2Attributes(productId: number): Promise<P
     const missingAttributes: string[] = [];
     const warnings: string[] = [];
 
-    // Validar peso (obligatorio para ME2)
-    if (!product.weight || Number(product.weight) <= 0) {
-      missingAttributes.push('weight');
-      warnings.push('⚠️ Peso no configurado o inválido (requerido para ME2)');
-    }
+    const rules = await getCategoryME2Rules(product.mlCategoryId);
 
-    // Validar dimensiones (obligatorias para ME2)
-    const dimensions = ['height', 'width', 'length'];
-    for (const dim of dimensions) {
-      const value = product[dim as keyof typeof product];
-      if (!value || Number(value) <= 0) {
-        missingAttributes.push(dim);
-        warnings.push(`⚠️ Dimensión ${dim} no configurada o inválida (requerida para ME2)`);
-      }
+    const dimensionValidation = validateDimensionsWithRules(
+      {
+        height: Number(product.height) || 0,
+        width: Number(product.width) || 0,
+        length: Number(product.length) || 0,
+        weight: Number(product.weight) || 0,
+      },
+      rules
+    );
+
+    if (!dimensionValidation.isValid) {
+      missingAttributes.push(...dimensionValidation.missing);
     }
+    warnings.push(...dimensionValidation.warnings);
 
     // Validar modo de envío
     if (!product.shippingMode) {
@@ -78,9 +85,16 @@ export async function validateProductME2Attributes(productId: number): Promise<P
     }
 
     // Validar atributos de envío
-    if (!product.shippingAttributes) {
-      warnings.push('⚠️ Atributos de envío no configurados');
+    const shippingValidation = validateShippingAttributesWithRules(
+      product.shippingAttributes as Record<string, unknown> | null,
+      rules
+    );
+    if (!shippingValidation.isValid) {
+      missingAttributes.push(
+        ...shippingValidation.missing.map((attr) => `shipping_${attr}`)
+      );
     }
+    warnings.push(...shippingValidation.warnings);
 
     // Validar compatibilidad ME2 explícita
     if (product.me2Compatible !== true) {

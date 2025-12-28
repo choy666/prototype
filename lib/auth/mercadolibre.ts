@@ -4,15 +4,111 @@ import { eq } from 'drizzle-orm';
 import { retryWithBackoff } from '@/lib/utils/retry';
 import { MercadoLibreError, MercadoLibreErrorCode } from '@/lib/errors/mercadolibre-errors';
 import { logger } from '@/lib/utils/logger';
-import { getApiUrl } from '@/lib/config/integrations';
+import { getApiUrl, getMercadoLibreConfig } from '@/lib/config/integrations';
 
-// Configuración de Mercado Libre
-export const MERCADOLIBRE_CONFIG = {
-  clientId: process.env.MERCADOLIBRE_CLIENT_ID!,
-  clientSecret: process.env.MERCADOLIBRE_CLIENT_SECRET!,
-  redirectUri: process.env.MERCADOLIBRE_REDIRECT_URI || 'https://prototype-ten-dun.vercel.app/api/auth/mercadolibre/callback',
-  baseUrl: getApiUrl('mercadolibre', ''),
+// Configuración centralizada
+export const MERCADOLIBRE_CONFIG = getMercadoLibreConfig();
+const MERCADOLIBRE_BASE_URL =
+  MERCADOLIBRE_CONFIG.apiBaseUrl || getApiUrl('mercadolibre', '');
+const REQUIRED_OAUTH_SCOPES = MERCADOLIBRE_CONFIG.oauthScopes;
+
+export type MercadoLibreReauthReason =
+  | 'invalid_token'
+  | 'token_expired'
+  | 'scope_missing'
+  | 'manual'
+  | 'refresh_failed'
+  | 'auth_error'
+  | 'unknown';
+
+type MarkReauthOptions = {
+  preserveTokens?: boolean;
 };
+
+function parseScopeString(value?: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(/[\s,]+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+}
+
+function serializeScopes(scopes: string[]): string {
+  return Array.from(new Set(scopes))
+    .map((scope) => scope.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function assertOAuthCredentials() {
+  const { appId, clientSecret, redirectUri } = MERCADOLIBRE_CONFIG;
+  if (!appId || !clientSecret) {
+    throw new Error('Mercado Libre OAuth credentials are not configured');
+  }
+  if (!redirectUri) {
+    throw new Error('Mercado Libre redirect URI is not configured');
+  }
+  return {
+    clientId: appId,
+    clientSecret,
+    redirectUri,
+  };
+}
+
+export function buildMercadoLibreAuthUrl(params: {
+  state: string;
+  codeChallenge: string;
+}) {
+  const { clientId, redirectUri } = assertOAuthCredentials();
+  const authUrl = new URL(
+    MERCADOLIBRE_CONFIG.authUrl ||
+      'https://auth.mercadolibre.com.ar/authorization'
+  );
+  authUrl.searchParams.append('response_type', 'code');
+  authUrl.searchParams.append('client_id', clientId);
+  authUrl.searchParams.append('redirect_uri', redirectUri);
+  authUrl.searchParams.append('code_challenge', params.codeChallenge);
+  authUrl.searchParams.append('code_challenge_method', 'S256');
+  authUrl.searchParams.append('state', params.state);
+  authUrl.searchParams.append('scope', REQUIRED_OAUTH_SCOPES.join(' '));
+  return authUrl.toString();
+}
+
+export async function markUserNeedsReauth(
+  userId: number,
+  reason: MercadoLibreReauthReason,
+  options: MarkReauthOptions = {}
+) {
+  const now = new Date();
+  const updateData: Partial<typeof users.$inferInsert> = {
+    mlNeedsReauth: true,
+    mlReauthReason: reason,
+    updatedAt: now,
+  };
+
+  if (!options.preserveTokens) {
+    Object.assign(updateData, {
+      mercadoLibreAccessToken: null,
+      mercadoLibreRefreshToken: null,
+      mercadoLibreAccessTokenExpiresAt: null,
+      mercadoLibreRefreshTokenExpiresAt: null,
+      mercadoLibreScopes: null,
+    });
+  }
+
+  await db.update(users).set(updateData).where(eq(users.id, userId));
+}
+
+export async function clearMercadoLibreReauthFlag(userId: number) {
+  await db
+    .update(users)
+    .set({
+      mlNeedsReauth: false,
+      mlReauthReason: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
 
 // Generar code_verifier para PKCE
 export function generateCodeVerifier(): string {
@@ -51,17 +147,18 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
   user_id: string;
   token_type: string;
 }> {
+  const { clientId, clientSecret, redirectUri } = assertOAuthCredentials();
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
-    client_id: MERCADOLIBRE_CONFIG.clientId,
-    client_secret: MERCADOLIBRE_CONFIG.clientSecret,
+    client_id: clientId,
+    client_secret: clientSecret,
     code,
-    redirect_uri: MERCADOLIBRE_CONFIG.redirectUri,
+    redirect_uri: redirectUri,
     code_verifier: codeVerifier,
   });
 
   const response = await retryWithBackoff(async () => {
-    const res = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {
+    const res = await fetch(`${MERCADOLIBRE_BASE_URL}/oauth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -102,15 +199,16 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
   scope: string;
   token_type: string;
 }> {
+  const { clientId, clientSecret } = assertOAuthCredentials();
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
-    client_id: MERCADOLIBRE_CONFIG.clientId,
-    client_secret: MERCADOLIBRE_CONFIG.clientSecret,
+    client_id: clientId,
+    client_secret: clientSecret,
     refresh_token: refreshToken,
   });
 
   const response = await retryWithBackoff(async () => {
-    const res = await fetch(`${MERCADOLIBRE_CONFIG.baseUrl}/oauth/token`, {
+    const res = await fetch(`${MERCADOLIBRE_BASE_URL}/oauth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -149,6 +247,12 @@ export async function getUserInfo(accessToken: string): Promise<{
   email: string;
   first_name: string;
   last_name: string;
+  site_id?: string;
+  permalink?: string;
+  user_type?: string;
+  seller_experience?: string;
+  status?: Record<string, unknown>;
+  tags?: string[];
 }> {
   const response = await fetch(getApiUrl('mercadolibre', '/users/me'), {
     headers: {
@@ -164,17 +268,79 @@ export async function getUserInfo(accessToken: string): Promise<{
   return response.json();
 }
 
+async function fetchApplicationScopes(accessToken: string): Promise<string[]> {
+  const appId = MERCADOLIBRE_CONFIG.appId;
+  if (!appId) {
+    throw new Error('Mercado Libre appId is not configured');
+  }
+
+  const response = await fetch(`${MERCADOLIBRE_BASE_URL}/applications/${appId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text().catch(() => response.statusText);
+    throw new Error(`Error fetching application scopes: ${error}`);
+  }
+
+  const data = await response.json();
+  const rawScopes = data?.scopes;
+
+  if (Array.isArray(rawScopes)) {
+    return rawScopes.filter((scope: unknown): scope is string => typeof scope === 'string' && scope.length > 0);
+  }
+
+  if (typeof rawScopes === 'string') {
+    return rawScopes
+      .split(/[\s,]+/)
+      .map((scope: string) => scope.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+export async function syncMercadoLibreScopes(
+  userId: number,
+  accessToken: string
+): Promise<string[] | null> {
+  try {
+    const scopes = await fetchApplicationScopes(accessToken);
+    if (scopes.length > 0) {
+      await saveScopes(userId, scopes);
+      return scopes;
+    }
+    return null;
+  } catch (error) {
+    logger.warn('MercadoLibre: No se pudieron sincronizar los scopes de la aplicación', {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 // Guardar tokens en BD
-export async function saveTokens(userId: number, tokens: {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  user_id: string;
-}): Promise<void> {
+export async function saveTokens(
+  userId: number,
+  tokens: {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    user_id: string;
+    scope?: string;
+  }
+): Promise<void> {
   const now = new Date();
   const accessTokenExpiresAt = new Date(now.getTime() + tokens.expires_in * 1000);
   // Estimar expiración del refresh token en ~6 meses según ML
   const refreshTokenExpiresAt = new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000);
+  const normalizedScopes = tokens.scope
+    ? serializeScopes(parseScopeString(tokens.scope))
+    : null;
 
   await db.update(users)
     .set({
@@ -183,9 +349,12 @@ export async function saveTokens(userId: number, tokens: {
       mercadoLibreRefreshToken: tokens.refresh_token,
       mercadoLibreAccessTokenExpiresAt: accessTokenExpiresAt,
       mercadoLibreRefreshTokenExpiresAt: refreshTokenExpiresAt,
+      mercadoLibreScopes: normalizedScopes,
       updatedAt: now,
     })
     .where(eq(users.id, userId));
+
+  await clearMercadoLibreReauthFlag(userId);
 }
 
 // Obtener tokens de BD
@@ -236,182 +405,119 @@ export async function makeAuthenticatedRequest(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  try {
-    const tokens = await getTokens(userId);
-    if (!tokens?.access_token) {
-      throw new Error('Usuario no conectado a Mercado Libre');
+  const tokens = await getTokens(userId);
+  if (!tokens?.access_token) {
+    throw new Error('Usuario no conectado a Mercado Libre');
+  }
+
+  let currentTokens = { ...tokens };
+
+  const ensureFreshToken = async () => {
+    if (!isTokenExpired(currentTokens.accessTokenExpiresAt)) {
+      return;
     }
 
-    // Verificar si el access token está expirado y refrescar si es necesario
-    if (isTokenExpired(tokens.accessTokenExpiresAt)) {
-      logger.info('MercadoLibre: Access token expirado, intentando refrescar', { userId });
-      
-      if (!tokens.refresh_token || isTokenExpired(tokens.refreshTokenExpiresAt)) {
-        throw new Error('Tokens expirados. Se requiere重新autenticación');
-      }
-
-      try {
-        const newTokens = await refreshAccessToken(tokens.refresh_token);
-        
-        // Actualizar tokens en la base de datos
-        const now = new Date();
-        const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
-        
-        await db.update(users)
-          .set({
-            mercadoLibreAccessToken: newTokens.access_token,
-            mercadoLibreRefreshToken: newTokens.refresh_token,
-            mercadoLibreAccessTokenExpiresAt: newAccessTokenExpiresAt,
-            mercadoLibreScopes: newTokens.scope || '',
-            updatedAt: now,
-          })
-          .where(eq(users.id, userId));
-
-        logger.info('MercadoLibre: Tokens refrescados exitosamente', { userId });
-        
-        // Usar el nuevo token
-        tokens.access_token = newTokens.access_token;
-        
-      } catch (refreshError) {
-        logger.error('MercadoLibre: Error refrescando tokens', {
-          userId,
-          error: refreshError instanceof Error ? refreshError.message : String(refreshError)
-        });
-        
-        // Limpiar tokens inválidos
-        await db.update(users)
-          .set({
-            mercadoLibreAccessToken: null,
-            mercadoLibreRefreshToken: null,
-            mercadoLibreAccessTokenExpiresAt: null,
-            mercadoLibreRefreshTokenExpiresAt: null,
-            mercadoLibreScopes: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, userId));
-        
-        throw new Error('Tokens expirados. Se requiere重新autenticación');
-      }
+    if (!currentTokens.refresh_token || isTokenExpired(currentTokens.refreshTokenExpiresAt)) {
+      await markUserNeedsReauth(userId, 'token_expired');
+      throw new Error('Tokens expirados. Se requiere重新autenticación');
     }
 
-    const url = endpoint.startsWith('http') ? endpoint : `${MERCADOLIBRE_CONFIG.baseUrl}${endpoint}`;
+    const newTokens = await refreshAccessToken(currentTokens.refresh_token);
+    const now = new Date();
+    const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
 
-    const response = await fetch(url, {
+    await db
+      .update(users)
+      .set({
+        mercadoLibreAccessToken: newTokens.access_token,
+        mercadoLibreRefreshToken: newTokens.refresh_token,
+        mercadoLibreAccessTokenExpiresAt: newAccessTokenExpiresAt,
+        mercadoLibreScopes: newTokens.scope || '',
+        updatedAt: now,
+      })
+      .where(eq(users.id, userId));
+
+    await syncMercadoLibreScopes(userId, newTokens.access_token);
+
+    currentTokens = {
+      access_token: newTokens.access_token,
+      refresh_token: newTokens.refresh_token,
+      mercadoLibreId: currentTokens.mercadoLibreId,
+      accessTokenExpiresAt: newAccessTokenExpiresAt,
+      refreshTokenExpiresAt: new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000),
+    };
+  };
+
+  await ensureFreshToken();
+
+  const url = endpoint.startsWith('http')
+    ? endpoint
+    : `${MERCADOLIBRE_BASE_URL}${endpoint}`;
+
+  const performRequest = async (tokenOverride?: string) => {
+    const bearer = tokenOverride ?? currentTokens.access_token;
+    if (!bearer) {
+      throw new Error('Token de acceso no disponible');
+    }
+
+    return fetch(url, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${tokens.access_token}`,
+        'Authorization': `Bearer ${bearer}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },
     });
+  };
 
-    // Si recibimos 401 o 403, puede ser que el token fue revocado O un error temporal
-    if (response.status === 401 || response.status === 403) {
-      // Leer el body ANTES de intentar refrescar el token
-      const errorBody = await response.text().catch(() => '');
-      
-      logger.warn('MercadoLibre: Token rechazado por la API', {
-        userId,
-        status: response.status,
-        endpoint,
-        errorBody: errorBody.substring(0, 200) // Primeros 200 caracteres para debug
-      });
-      
-      // Intentar refrescar el token antes de limpiar todo
-      if (tokens.refresh_token && !isTokenExpired(tokens.refreshTokenExpiresAt)) {
-        try {
-          logger.info('MercadoLibre: Intentando refrescar token después de 401/403', { userId });
-          const newTokens = await refreshAccessToken(tokens.refresh_token);
-          
-          // Actualizar tokens en la base de datos
-          const now = new Date();
-          const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
-          
-          await db.update(users)
-            .set({
-              mercadoLibreAccessToken: newTokens.access_token,
-              mercadoLibreRefreshToken: newTokens.refresh_token,
-              mercadoLibreAccessTokenExpiresAt: newAccessTokenExpiresAt,
-              mercadoLibreScopes: newTokens.scope || '',
-              updatedAt: now,
-            })
-            .where(eq(users.id, userId));
-          
-          logger.info('MercadoLibre: Token refrescado exitosamente después de 401/403', { userId });
-          
-          // Reintentar la request original con el nuevo token
-          return fetch(url, {
-            ...options,
-            headers: {
-              'Authorization': `Bearer ${newTokens.access_token}`,
-              'Content-Type': 'application/json',
-              ...options.headers,
-            },
-          });
-          
-        } catch (refreshError) {
-          logger.error('MercadoLibre: Error refrescando token después de 401/403', {
-            userId,
-            error: refreshError instanceof Error ? refreshError.message : String(refreshError)
-          });
-          
-          // Verificar el tipo de error original
-          const isTokenRevoked = errorBody.includes('invalid_token') || 
-                               errorBody.includes('token_revoked') ||
-                               errorBody.includes('expired_token');
-          const isScopeError = errorBody.includes('forbidden') ||
-                              errorBody.includes('insufficient_scope') ||
-                              errorBody.includes('permission denied');
-          
-          if (isTokenRevoked) {
-            // Limpiar tokens solo si están realmente revocados
-            await db.update(users)
-              .set({
-                mercadoLibreAccessToken: null,
-                mercadoLibreRefreshToken: null,
-                mercadoLibreAccessTokenExpiresAt: null,
-                mercadoLibreRefreshTokenExpiresAt: null,
-                mercadoLibreScopes: null,
-                updatedAt: new Date(),
-              })
-              .where(eq(users.id, userId));
-            
-            throw new Error('Token invalidado por la API. Se requiere重新autenticación');
-          } else if (isScopeError || response.status === 403) {
-            // Para errores de scopes, no limpiar tokens pero notificar
-            throw new Error(`Error de permisos: ${errorBody || response.statusText}. Es posible que necesites re-autorizar con permisos adicionales.`);
-          } else {
-            // Para otros errores 401, mantener los tokens y lanzar error específico
-            throw new Error(`Error de autenticación temporal: ${errorBody || response.statusText}`);
-          }
+  let response = await performRequest();
+
+  if (response.status === 401 || response.status === 403) {
+    const errorBody = await response.text().catch(() => '');
+    const refreshable = currentTokens.refresh_token && !isTokenExpired(currentTokens.refreshTokenExpiresAt);
+
+    if (refreshable) {
+      try {
+        await ensureFreshToken();
+        response = await performRequest();
+        if (response.ok) {
+          return response;
         }
-      } else {
-        // No hay refresh token válido, limpiar todo
-        await db.update(users)
-          .set({
-            mercadoLibreAccessToken: null,
-            mercadoLibreRefreshToken: null,
-            mercadoLibreAccessTokenExpiresAt: null,
-            mercadoLibreRefreshTokenExpiresAt: null,
-            mercadoLibreScopes: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, userId));
-        
-        throw new Error('Tokens expirados. Se requiere重新autenticación');
+      } catch (refreshError) {
+        logger.error('MercadoLibre: Error refrescando después de 401/403', {
+          userId,
+          error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+        });
       }
     }
 
-    return response;
-    
-  } catch (error) {
-    logger.error('MercadoLibre: Error en request autenticada', {
-      userId,
-      endpoint,
-      error: error instanceof Error ? error.message : String(error)
-    });
-    throw error;
+    const bodySnippet = errorBody.substring(0, 200);
+    const isTokenRevoked =
+      bodySnippet.includes('invalid_token') ||
+      bodySnippet.includes('token_revoked') ||
+      bodySnippet.includes('expired_token');
+    const isScopeError =
+      bodySnippet.includes('forbidden') ||
+      bodySnippet.includes('insufficient_scope') ||
+      bodySnippet.includes('permission denied');
+
+    if (isTokenRevoked) {
+      await markUserNeedsReauth(userId, 'invalid_token');
+      throw new Error('Token invalidado por la API. Se requiere重新autenticación');
+    }
+
+    if (isScopeError || response.status === 403) {
+      await markUserNeedsReauth(userId, 'scope_missing', { preserveTokens: true });
+      throw new Error(
+        `Error de permisos: ${bodySnippet || response.statusText}. Es posible que necesites re-autorizar con permisos adicionales.`,
+      );
+    }
+
+    await markUserNeedsReauth(userId, 'auth_error', { preserveTokens: true });
+    throw new Error(`Error de autenticación temporal: ${bodySnippet || response.statusText}`);
   }
+
+  return response;
 }
 
 // Scopes requeridos por módulo
@@ -516,9 +622,10 @@ export async function checkCriticalScopes(userId: number): Promise<{
 // Guardar scopes en BD
 async function saveScopes(userId: number, scopes: string[]): Promise<void> {
   const now = new Date();
-  const scopesString = scopes.join(',');
+  const scopesString = serializeScopes(scopes);
 
-  await db.update(users)
+  await db
+    .update(users)
     .set({
       mercadoLibreScopes: scopesString,
       updatedAt: now,
@@ -537,29 +644,28 @@ export async function getCachedScopes(userId: number): Promise<string[] | null> 
 
   if (!user?.mercadoLibreScopes) return null;
 
-  return user.mercadoLibreScopes.split(',');
+  return parseScopeString(user.mercadoLibreScopes);
 }
 
 // Clase MercadoLibreAuth para compatibilidad con shipments
 export class MercadoLibreAuth {
   private static instance: MercadoLibreAuth;
-  
+
   public static getInstance(): MercadoLibreAuth {
     if (!MercadoLibreAuth.instance) {
       MercadoLibreAuth.instance = new MercadoLibreAuth();
     }
     return MercadoLibreAuth.instance;
   }
-  
+
   private async refreshAndPersist(userId: number, refreshToken: string): Promise<string> {
     try {
       const newTokens = await refreshAccessToken(refreshToken);
-      
-      // Guardar tokens actualizados en BD
       const now = new Date();
       const newAccessTokenExpiresAt = new Date(now.getTime() + newTokens.expires_in * 1000);
-      
-      await db.update(users)
+
+      await db
+        .update(users)
         .set({
           mercadoLibreAccessToken: newTokens.access_token,
           mercadoLibreRefreshToken: newTokens.refresh_token,
@@ -569,17 +675,18 @@ export class MercadoLibreAuth {
         })
         .where(eq(users.id, userId));
 
+      await syncMercadoLibreScopes(userId, newTokens.access_token);
       logger.info('MercadoLibreAuth: Tokens refrescados y persistidos', { userId });
+
       return newTokens.access_token;
-      
     } catch (error) {
       logger.error('MercadoLibreAuth: Error refrescando y persistiendo tokens', {
         userId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
-      
-      // Limpiar tokens inválidos
-      await db.update(users)
+
+      await db
+        .update(users)
         .set({
           mercadoLibreAccessToken: null,
           mercadoLibreRefreshToken: null,
@@ -589,13 +696,13 @@ export class MercadoLibreAuth {
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
-      
+
+      await markUserNeedsReauth(userId, 'token_expired');
       throw error;
     }
   }
-  
+
   public async getAccessToken(): Promise<string> {
-    // Obtener el primer usuario con tokens de ML
     const user = await db.query.users.findFirst({
       where: (users, { isNotNull }) => isNotNull(users.mercadoLibreAccessToken),
       columns: {
@@ -605,26 +712,22 @@ export class MercadoLibreAuth {
         id: true,
       },
     });
-    
+
     if (!user?.mercadoLibreAccessToken) {
       throw new Error('No se encontró token de acceso de Mercado Libre');
     }
-    
-    // Verificar si el token ha expirado y refresh si es necesario
+
     if (user.mercadoLibreAccessTokenExpiresAt && new Date() > user.mercadoLibreAccessTokenExpiresAt) {
       if (user.mercadoLibreRefreshToken) {
-        return await this.refreshAndPersist(user.id, user.mercadoLibreRefreshToken);
-      } else {
-        throw new Error('Token de acceso expirado y no hay refresh token');
+        return this.refreshAndPersist(user.id, user.mercadoLibreRefreshToken);
       }
+      throw new Error('Token de acceso expirado y no hay refresh token');
     }
-    
+
     return user.mercadoLibreAccessToken;
   }
-  
-  // Método público para refresh explícito (usado por me2-shipping.ts)
+
   public async refreshAccessToken(): Promise<string> {
-    // Obtener el primer usuario con refresh token
     const user = await db.query.users.findFirst({
       where: (users, { isNotNull }) => isNotNull(users.mercadoLibreRefreshToken),
       columns: {
@@ -632,11 +735,11 @@ export class MercadoLibreAuth {
         id: true,
       },
     });
-    
+
     if (!user?.mercadoLibreRefreshToken) {
       throw new Error('No se encontró refresh token de Mercado Libre');
     }
-    
-    return await this.refreshAndPersist(user.id, user.mercadoLibreRefreshToken);
+
+    return this.refreshAndPersist(user.id, user.mercadoLibreRefreshToken);
   }
 }

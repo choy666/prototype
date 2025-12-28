@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { products, users, productVariants, orders, mercadopagoPreferences, orderItems } from '@/lib/schema';
+import {
+  products,
+  users,
+  productVariants,
+  orders,
+  mercadopagoPreferences,
+  orderItems,
+} from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { checkoutSchema } from '@/lib/validations/checkout';
 import { logger } from '@/lib/utils/logger';
 import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
 import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import mpClient from '@/lib/clients/mercadopago';
 import { formatAddressForMercadoLibre } from '@/lib/utils/address-formatter';
 
 // Tipo para items del checkout (sin stock requerido)
@@ -20,24 +27,26 @@ type CheckoutItem = {
   weight?: number | null;
   variantId?: number | null;
 };
-// Configuración de Mercado Pago según documentación oficial (SDK v2)
-const mpClient = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
-});
-const mercadopago = new Preference(mpClient);
-
 export async function POST(req: NextRequest) {
   try {
     // Verificar que el usuario no sea admin
-    const { auth } = await import("@/lib/actions/auth");
+    const { auth } = await import('@/lib/actions/auth');
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
     if (session.user.role === 'admin') {
       return NextResponse.json(
-        { error: "Los administradores no pueden realizar compras" },
+        { error: 'Los administradores no pueden realizar compras' },
         { status: 403 }
+      );
+    }
+
+    if (!mpClient.isReady()) {
+      logger.error('Checkout: Cliente de Mercado Pago no configurado');
+      return NextResponse.json(
+        { error: 'Mercado Pago no está disponible. Intenta nuevamente más tarde.' },
+        { status: 503 }
       );
     }
 
@@ -48,8 +57,8 @@ export async function POST(req: NextRequest) {
     if (!validationResult.success) {
       return NextResponse.json(
         {
-          error: "Datos de entrada inválidos",
-          details: validationResult.error.issues
+          error: 'Datos de entrada inválidos',
+          details: validationResult.error.issues,
         },
         { status: 400 }
       );
@@ -74,13 +83,13 @@ export async function POST(req: NextRequest) {
 
     if (userExists.length === 0) {
       logger.error('Checkout: Usuario no encontrado', { userId });
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 400 });
     }
 
-    logger.info('Checkout: Usuario verificado correctamente', { userId, userEmail: userExists[0].email });
+    logger.info('Checkout: Usuario verificado correctamente', {
+      userId,
+      userEmail: userExists[0].email,
+    });
 
     // Verificar stock de todos los items antes de crear preferencia
     logger.info('Checkout: Verificando stock de items', { itemCount: items.length });
@@ -88,22 +97,26 @@ export async function POST(req: NextRequest) {
       if (item.variantId) {
         // Verificar stock de variante y que tanto la variante como el producto estén activos
         const variant = await db
-          .select({ 
-            stock: productVariants.stock, 
+          .select({
+            stock: productVariants.stock,
             productId: productVariants.productId,
-            isVariantActive: productVariants.isActive
+            isVariantActive: productVariants.isActive,
           })
           .from(productVariants)
           .innerJoin(products, eq(productVariants.productId, products.id))
-          .where(and(
-            eq(productVariants.id, item.variantId),
-            eq(productVariants.isActive, true),
-            eq(products.isActive, true)
-          ))
+          .where(
+            and(
+              eq(productVariants.id, item.variantId),
+              eq(productVariants.isActive, true),
+              eq(products.isActive, true)
+            )
+          )
           .limit(1);
 
         if (!variant.length) {
-          logger.error('Checkout: Variante no encontrada, inactiva o producto inactivo', { variantId: item.variantId });
+          logger.error('Checkout: Variante no encontrada, inactiva o producto inactivo', {
+            variantId: item.variantId,
+          });
           return NextResponse.json(
             { error: `Variante no disponible para producto ${item.id}` },
             { status: 400 }
@@ -114,7 +127,7 @@ export async function POST(req: NextRequest) {
           logger.error('Checkout: Stock insuficiente para variante', {
             variantId: item.variantId,
             availableStock: variant[0].stock,
-            requestedQuantity: item.quantity
+            requestedQuantity: item.quantity,
           });
           return NextResponse.json(
             { error: `Stock insuficiente para la variante seleccionada` },
@@ -126,10 +139,7 @@ export async function POST(req: NextRequest) {
         const product = await db
           .select({ stock: products.stock, isActive: products.isActive })
           .from(products)
-          .where(and(
-            eq(products.id, item.id),
-            eq(products.isActive, true)
-          ))
+          .where(and(eq(products.id, item.id), eq(products.isActive, true)))
           .limit(1);
 
         if (!product.length) {
@@ -144,7 +154,7 @@ export async function POST(req: NextRequest) {
           logger.error('Checkout: Stock insuficiente para producto', {
             productId: item.id,
             availableStock: product[0].stock,
-            requestedQuantity: item.quantity
+            requestedQuantity: item.quantity,
           });
           return NextResponse.json(
             { error: `Stock insuficiente para el producto` },
@@ -159,9 +169,8 @@ export async function POST(req: NextRequest) {
     // Calcular subtotal con descuentos aplicados
     const subtotal = items.reduce((acc: number, item: CheckoutItem) => {
       const basePrice = item.price;
-      const finalPrice = item.discount && item.discount > 0
-        ? basePrice * (1 - item.discount / 100)
-        : basePrice;
+      const finalPrice =
+        item.discount && item.discount > 0 ? basePrice * (1 - item.discount / 100) : basePrice;
       return acc + finalPrice * item.quantity;
     }, 0);
 
@@ -173,12 +182,11 @@ export async function POST(req: NextRequest) {
     const dbProducts = await getProductsByIds(productIds);
 
     const me2Items = items.map((item: CheckoutItem) => {
-      const dbProduct = dbProducts.find(p => p.id === item.id);
+      const dbProduct = dbProducts.find((p) => p.id === item.id);
 
       const basePrice = item.price;
-      const finalPrice = item.discount && item.discount > 0
-        ? basePrice * (1 - item.discount / 100)
-        : basePrice;
+      const finalPrice =
+        item.discount && item.discount > 0 ? basePrice * (1 - item.discount / 100) : basePrice;
 
       return {
         id: item.id,
@@ -198,7 +206,7 @@ export async function POST(req: NextRequest) {
 
     // Formatear dirección para Mercado Libre antes de calcular envío
     const formattedAddress = formatAddressForMercadoLibre(shippingAddress);
-    
+
     const me2Response = await calculateME2ShippingCost({
       zipcode: formattedAddress.zip_code,
       items: me2Items.map((item) => ({
@@ -221,8 +229,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 2) Intentar usar exactamente el método seleccionado por el usuario (shippingMethod.id)
-    const selectedMethodFromEngine = me2Response.shippingOptions.find((opt) =>
-      String(opt.shipping_method_id) === String(shippingMethod.id)
+    const selectedMethodFromEngine = me2Response.shippingOptions.find(
+      (opt) => String(opt.shipping_method_id) === String(shippingMethod.id)
     );
 
     // 3) Si no se encuentra (por cambios en ML o fallback), usar el más barato como respaldo
@@ -234,7 +242,7 @@ export async function POST(req: NextRequest) {
     const effectiveMethod = selectedMethodFromEngine || cheapestMethod;
     const shippingCost = effectiveMethod?.cost ?? 0;
 
-    logger.info('Shipping cost calculated via ME2/core', { 
+    logger.info('Shipping cost calculated via ME2/core', {
       zipcode: shippingAddress.codigoPostal,
       cost: shippingCost,
       method: effectiveMethod?.name,
@@ -247,7 +255,20 @@ export async function POST(req: NextRequest) {
     // Calcular total final
     const total = subtotal + shippingCost;
 
-    // Crear orden local pendiente vinculada al checkout
+    const shippingMetadata = {
+      shipping_context: {
+        zipcode: formattedAddress.zip_code,
+        shipping_method_id: String(effectiveMethod?.shipping_method_id ?? shippingMethod?.id ?? ''),
+        shipping_method_name: effectiveMethod?.name ?? shippingMethod?.name ?? null,
+        logistic_type: resolvedShippingMode,
+        deliver_to: 'address',
+        carrier_id: shippingMethod?.carrier_id ?? null,
+        option_id: shippingMethod?.option_id ?? effectiveMethod?.option_id ?? null,
+        option_hash: shippingMethod?.option_hash ?? effectiveMethod?.option_hash ?? null,
+        state_id: shippingMethod?.state_id ?? effectiveMethod?.state_id ?? null,
+      },
+    };
+
     const [newOrder] = await db
       .insert(orders)
       .values({
@@ -261,25 +282,12 @@ export async function POST(req: NextRequest) {
         shippingMode: resolvedShippingMode,
         source: 'local',
         shippingAgency: null,
-        metadata: {
-          shipping_context: {
-            zipcode: formattedAddress.zip_code,
-            shipping_method_id: String(effectiveMethod?.shipping_method_id ?? shippingMethod?.id ?? ''),
-            shipping_method_name: effectiveMethod?.name ?? shippingMethod?.name ?? null,
-            logistic_type: resolvedShippingMode,
-            deliver_to: 'address',
-            carrier_id: shippingMethod?.carrier_id ?? null,
-            option_id: shippingMethod?.option_id ?? (effectiveMethod?.option_id ?? null),
-            option_hash: shippingMethod?.option_hash ?? (effectiveMethod?.option_hash ?? null),
-            state_id: shippingMethod?.state_id ?? (effectiveMethod?.state_id ?? null),
-          },
-        },
+        metadata: shippingMetadata,
       })
       .returning({ id: orders.id });
 
     const orderId = newOrder.id;
 
-    // Transferir items del carrito a la tabla orderItems
     const orderItemsData = items.map((item: CheckoutItem) => ({
       orderId,
       productId: item.id,
@@ -287,7 +295,8 @@ export async function POST(req: NextRequest) {
       quantity: item.quantity,
       price: (item.discount && item.discount > 0
         ? item.price * (1 - item.discount / 100)
-        : item.price).toString(),
+        : item.price
+      ).toString(),
     }));
 
     if (orderItemsData.length > 0) {
@@ -298,27 +307,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Obtener información del usuario para el pagador
     const payerInfo = {
       email: userExists[0].email,
       name: userExists[0].name || '',
     };
 
-    // Preparar metadata incluyendo variantId en items y tracking de migración
-    const metadata = {
+    const preferenceMetadata = {
       user_id: userId.toString(),
       order_id: orderId.toString(),
-      shipping_address: shippingAddress, // Guardar como objeto JSONB, no string
+      shipping_address: shippingAddress,
       shipping_method_id: shippingMethod.id.toString(),
       shipping_agency: null,
-      items: JSON.stringify(items.map((item: CheckoutItem) => ({
-        ...item,
-        variantId: item.variantId || null
-      }))),
+      items: JSON.stringify(
+        items.map((item: CheckoutItem) => ({
+          ...item,
+          variantId: item.variantId || null,
+        }))
+      ),
       subtotal: subtotal.toString(),
       shipping_cost: shippingCost.toString(),
       total: total.toString(),
-      // Metadata de tracking y versión
       checkout_version: '1.0',
       migration_applied: true,
       me2_source: me2Response.source,
@@ -326,79 +334,78 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // Crear preferencia de pago según documentación oficial de Mercado Pago
-    const preference = await mercadopago.create({
-      body: {
-        items: [
-          // Items del carrito
-          ...items.map((item: CheckoutItem) => ({
-            id: item.id.toString(),
-            title: item.name,
-            description: `Producto: ${item.name} - Cantidad: ${item.quantity}${item.variantId ? ` - Variante ID: ${item.variantId}` : ''}`,
-            quantity: item.quantity,
-            unit_price: Math.round((item.discount && item.discount > 0
+    const defaultAppUrl =
+      process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000';
+    const notificationUrl =
+      process.env.MERCADO_PAGO_NOTIFICATION_URL || `${defaultAppUrl}/api/webhooks/mercadopago`;
+
+    const preferencePayload = {
+      items: items.map((item: CheckoutItem) => ({
+        id: item.id.toString(),
+        title: item.name,
+        description: `Producto: ${item.name} - Cantidad: ${item.quantity}${
+          item.variantId ? ` - Variante ID: ${item.variantId}` : ''
+        }`,
+        quantity: item.quantity,
+        unit_price:
+          Math.round(
+            (item.discount && item.discount > 0
               ? item.price * (1 - item.discount / 100)
-              : item.price) * 100) / 100, // Redondear a 2 decimales
-            currency_id: "ARS",
-            category_id: "others", // Categoría genérica pero requerida
-          })),
-        ],
-        shipments: {
-          cost: Math.round(shippingCost * 100) / 100,
-          mode: 'not_specified',
-          receiver_address: {
-            zip_code: formattedAddress.zip_code,
-            street_name: shippingAddress.direccion,
-            street_number: shippingAddress.numero || '1',
-            city_name: shippingAddress.ciudad,
-            state_name: shippingAddress.provincia,
-            country_name: 'Argentina',
-          },
-          dimensions: me2Items[0]?.height && me2Items[0]?.width && me2Items[0]?.length
+              : item.price) * 100
+          ) / 100,
+        currency_id: 'ARS',
+        category_id: 'others',
+      })),
+      shipments: {
+        cost: Math.round(shippingCost * 100) / 100,
+        mode: 'not_specified',
+        receiver_address: {
+          zip_code: formattedAddress.zip_code,
+          street_name: shippingAddress.direccion,
+          street_number: shippingAddress.numero || '1',
+          city_name: shippingAddress.ciudad,
+          state_name: shippingAddress.provincia,
+          country_name: 'Argentina',
+        },
+        dimensions:
+          me2Items[0]?.height && me2Items[0]?.width && me2Items[0]?.length
             ? `${me2Items[0].length} x ${me2Items[0].width} x ${me2Items[0].height}`
             : undefined,
+      },
+      payer: {
+        email: payerInfo.email,
+        name: payerInfo.name,
+        phone: {
+          number: shippingAddress.telefono,
         },
-        payer: {
-          email: payerInfo.email,
-          name: payerInfo.name,
-          phone: {
-            number: shippingAddress.telefono,
-          },
-          address: {
-            zip_code: shippingAddress.codigoPostal,
-            street_name: shippingAddress.direccion,
-            street_number: shippingAddress.numero || "1",
-          },
-          identification: userExists[0].documentType && userExists[0].documentNumber
+        address: {
+          zip_code: shippingAddress.codigoPostal,
+          street_name: shippingAddress.direccion,
+          street_number: shippingAddress.numero || '1',
+        },
+        identification:
+          userExists[0].documentType && userExists[0].documentNumber
             ? {
                 type: userExists[0].documentType,
                 number: userExists[0].documentNumber,
               }
             : undefined,
-        },
-        back_urls: {
-          success:
-            process.env.MERCADO_PAGO_SUCCESS_URL
-            || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-success`,
-          failure:
-            process.env.MERCADO_PAGO_FAILURE_URL
-            || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-failure`,
-          pending:
-            process.env.MERCADO_PAGO_PENDING_URL
-            || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/payment-pending`,
-        },
-        // auto_return: "approved", // Desactivado para evitar doble redirección
-        notification_url:
-          process.env.MERCADO_PAGO_NOTIFICATION_URL
-          || `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000'}/api/webhooks/mercadopago`,
-        external_reference: orderId.toString(),
-        metadata: metadata,
-        payment_methods: {
-          // No excluir tipos de pago para pruebas - mostrar todo lo disponible
-          installments: 12, // Permitir hasta 12 cuotas
-        },
       },
-    });
+      back_urls: {
+        success: process.env.MERCADO_PAGO_SUCCESS_URL || `${defaultAppUrl}/payment-success`,
+        failure: process.env.MERCADO_PAGO_FAILURE_URL || `${defaultAppUrl}/payment-failure`,
+        pending: process.env.MERCADO_PAGO_PENDING_URL || `${defaultAppUrl}/payment-pending`,
+      },
+      auto_return: 'approved',
+      notification_url: notificationUrl,
+      external_reference: orderId.toString(),
+      metadata: preferenceMetadata,
+      payment_methods: {
+        installments: 12,
+      },
+    };
+
+    const preference = await mpClient.createPreference(preferencePayload);
 
     await db.insert(mercadopagoPreferences).values({
       preferenceId: preference.id,
@@ -410,18 +417,35 @@ export async function POST(req: NextRequest) {
       payer: preference.payer || {},
       paymentMethods: preference.payment_methods || {},
       expires: preference.expires ?? false,
-      expirationDateFrom: preference.expiration_date_from ? new Date(preference.expiration_date_from) : null,
-      expirationDateTo: preference.expiration_date_to ? new Date(preference.expiration_date_to) : null,
-      notificationUrl: preference.notification_url,
+      expirationDateFrom: preference.expiration_date_from
+        ? new Date(preference.expiration_date_from)
+        : null,
+      expirationDateTo: preference.expiration_date_to
+        ? new Date(preference.expiration_date_to)
+        : null,
+      notificationUrl: preference.notification_url ?? notificationUrl,
       status: 'pending',
     });
 
-        // Debug: Verificar estructura de respuesta de Mercado Pago
-    console.log("Respuesta completa de Mercado Pago:", JSON.stringify(preference, null, 2));
-    console.log("Environment check - NODE_ENV:", process.env.NODE_ENV);
-    console.log("Environment check - SUCCESS_URL:", process.env.MERCADO_PAGO_SUCCESS_URL);
-    console.log("Environment check - VERCEL_URL:", process.env.VERCEL_URL);
-    
+    const orderMetadata = {
+      ...shippingMetadata,
+      mp_preference: {
+        id: preference.id,
+        init_point: preference.init_point,
+        sandbox_init_point: preference.sandbox_init_point,
+        created_at: new Date().toISOString(),
+      },
+    };
+
+    await db
+      .update(orders)
+      .set({
+        mercadoPagoId: preference.id,
+        paymentStatus: 'pending',
+        metadata: orderMetadata,
+      })
+      .where(eq(orders.id, orderId));
+
     logger.info('Checkout: Preferencia de MercadoPago creada exitosamente', {
       preferenceId: preference.id,
       initPoint: preference.init_point,
@@ -430,6 +454,7 @@ export async function POST(req: NextRequest) {
       shippingCost,
       orderId,
     });
+
     return NextResponse.json({
       orderId,
       preferenceId: preference.id,
@@ -439,21 +464,20 @@ export async function POST(req: NextRequest) {
       shippingCost,
       items: items.map((item: CheckoutItem) => ({
         ...item,
-        finalPrice: item.discount && item.discount > 0
-          ? item.price * (1 - item.discount / 100)
-          : item.price,
+        finalPrice:
+          item.discount && item.discount > 0 ? item.price * (1 - item.discount / 100) : item.price,
       })),
     });
   } catch (error) {
     logger.error('Checkout: Error procesando checkout', {
-      error,
-      stack: error instanceof Error ? error.stack : undefined
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return NextResponse.json(
       {
-        error: "Error procesando el pago",
-        details: error instanceof Error ? error.message : String(error)
+        error: 'Error procesando el pago',
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

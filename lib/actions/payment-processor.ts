@@ -3,7 +3,16 @@
 
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { db } from '@/lib/db';
-import { mercadopagoPayments, mercadopagoPreferences, orders, orderItems, products, productVariants, stockLogs } from '@/lib/schema';
+import {
+  mercadopagoPayments,
+  mercadopagoPreferences,
+  orders,
+  orderItems,
+  products,
+  productVariants,
+  stockLogs,
+  type Order,
+} from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/utils/logger';
 import { processMerchantOrderWebhook } from '@/lib/actions/merchant-order-processor';
@@ -61,7 +70,7 @@ export async function checkPaymentIdempotency(paymentId: string): Promise<{
       paymentId,
       reason: 'duplicate_in_progress',
     });
-    
+
     return {
       canProcess: false,
       reason: 'duplicate_in_progress',
@@ -76,7 +85,7 @@ export async function checkPaymentIdempotency(paymentId: string): Promise<{
   logger.info('[Idempotency] Permitiendo procesamiento (validación final en DB)', {
     paymentId,
   });
-  
+
   return { canProcess: true };
 }
 
@@ -122,14 +131,17 @@ export async function processPaymentWebhook(
       requestId,
       requiresManualVerification,
       hmacAuditContext,
-      source: requestId?.includes('fallback') ? 'success-page-fallback' : 
-              requiresManualVerification ? 'hmac-fallback' : 'webhook',
-      timestamp: new Date().toISOString()
+      source: requestId?.includes('fallback')
+        ? 'success-page-fallback'
+        : requiresManualVerification
+          ? 'hmac-fallback'
+          : 'webhook',
+      timestamp: new Date().toISOString(),
     });
 
     // 🔥 SIMPLIFICACIÓN: Verificación simple de cache local
     const idempotencyCheck = await checkPaymentIdempotency(paymentId);
-    
+
     if (!idempotencyCheck.canProcess) {
       let existingStatus: string | undefined;
       try {
@@ -151,24 +163,29 @@ export async function processPaymentWebhook(
         paymentId,
         requestId,
         reason: idempotencyCheck.reason,
-        source: requestId?.includes('fallback') ? 'success-page-fallback' : 
-                requiresManualVerification ? 'hmac-fallback' : 'webhook',
+        source: requestId?.includes('fallback')
+          ? 'success-page-fallback'
+          : requiresManualVerification
+            ? 'hmac-fallback'
+            : 'webhook',
       });
-      
+
       // 🔥 IMPORTANTE: Verificar si el stock necesita ajuste incluso en pagos duplicados
       // Esto puede ocurrir si el primer intento falló antes de ajustar stock
       let mpStatus: string | undefined;
       try {
         const payment = new Payment(client);
-        const paymentData = await payment.get({ id: paymentId }) as unknown as ExtendedPaymentResponse;
+        const paymentData = (await payment.get({
+          id: paymentId,
+        })) as unknown as ExtendedPaymentResponse;
         mpStatus = paymentData.status;
-        
+
         logger.info('[PaymentProcessor] Verificando stock en pago duplicado', {
           paymentId,
           status: paymentData.status,
           requiresManualVerification,
         });
-        
+
         // Si el pago es approved o pending, verificar si el stock ya fue ajustado
         if (['approved', 'pending'].includes(paymentData.status)) {
           // 🔥 CORRECCIÓN: Buscar preferencia en tabla de pagos ya existentes
@@ -178,7 +195,7 @@ export async function processPaymentWebhook(
             .from(mercadopagoPayments)
             .where(eq(mercadopagoPayments.paymentId, paymentId.toString()))
             .limit(1);
-            
+
           if (existingPayment.length > 0 && existingPayment[0].preferenceId) {
             // Obtener orden a partir de la preferencia encontrada
             // 🔥 CORRECCIÓN: Convertir preferenceId a number para el where
@@ -187,7 +204,7 @@ export async function processPaymentWebhook(
               .from(mercadopagoPreferences)
               .where(eq(mercadopagoPreferences.preferenceId, existingPayment[0].preferenceId))
               .limit(1);
-              
+
             if (preference.length > 0 && preference[0].orderId) {
               // Verificar si el stock ya fue deducido
               const orderCheck = await db
@@ -195,7 +212,7 @@ export async function processPaymentWebhook(
                 .from(orders)
                 .where(eq(orders.id, preference[0].orderId))
                 .limit(1);
-                
+
               if (orderCheck.length > 0 && !orderCheck[0].stockDeducted) {
                 logger.info('[PaymentProcessor] Stock no deducido en pago duplicado - ajustando', {
                   paymentId,
@@ -203,7 +220,7 @@ export async function processPaymentWebhook(
                   status: paymentData.status,
                   preferenceId: existingPayment[0].preferenceId,
                 });
-                
+
                 // Ajustar stock si no fue deducido previamente
                 await adjustStockForOrder(preference[0].orderId, paymentId.toString());
               } else {
@@ -220,35 +237,41 @@ export async function processPaymentWebhook(
               status: paymentData.status,
               existingPaymentCount: existingPayment.length,
             });
-            
+
             // 🔥 NUEVO: Intentar buscar por external_reference directamente si no hay preferenceId
             // Esto puede pasar si el primer pago no guardó preferenceId correctamente
             if (paymentData.external_reference) {
-              logger.info('[PaymentProcessor] Buscando orden por external_reference como fallback', {
-                paymentId,
-                externalReference: paymentData.external_reference,
-              });
-              
+              logger.info(
+                '[PaymentProcessor] Buscando orden por external_reference como fallback',
+                {
+                  paymentId,
+                  externalReference: paymentData.external_reference,
+                }
+              );
+
               const prefByExtRef = await db
                 .select({ orderId: mercadopagoPreferences.orderId })
                 .from(mercadopagoPreferences)
                 .where(eq(mercadopagoPreferences.externalReference, paymentData.external_reference))
                 .limit(1);
-                
+
               if (prefByExtRef.length > 0 && prefByExtRef[0].orderId) {
                 const orderCheck = await db
                   .select({ stockDeducted: orders.stockDeducted })
                   .from(orders)
                   .where(eq(orders.id, prefByExtRef[0].orderId))
                   .limit(1);
-                  
+
                 if (orderCheck.length > 0 && !orderCheck[0].stockDeducted) {
-                  logger.info('[PaymentProcessor] Ajustando stock via external_reference fallback', {
-                    paymentId,
-                    orderId: prefByExtRef[0].orderId,
-                    externalReference: paymentData.external_reference,
-                  });
-                  
+                  logger.info(
+                    '[PaymentProcessor] Ajustando stock via external_reference fallback',
+                    {
+                      paymentId,
+                      orderId: prefByExtRef[0].orderId,
+                      externalReference: paymentData.external_reference,
+                    }
+                  );
+
                   await adjustStockForOrder(prefByExtRef[0].orderId, paymentId.toString());
                 }
               }
@@ -261,7 +284,7 @@ export async function processPaymentWebhook(
           error: error instanceof Error ? error.message : String(error),
         });
       }
-      
+
       return {
         success: true,
         status: existingStatus ?? mpStatus,
@@ -271,7 +294,9 @@ export async function processPaymentWebhook(
 
     // Obtener información del pago desde Mercado Pago API
     const payment = new Payment(client);
-    const paymentData = await payment.get({ id: paymentId }) as unknown as ExtendedPaymentResponse;
+    const paymentData = (await payment.get({
+      id: paymentId,
+    })) as unknown as ExtendedPaymentResponse;
 
     logger.info('[PaymentProcessor] Datos obtenidos de MP', {
       paymentId,
@@ -292,26 +317,26 @@ export async function processPaymentWebhook(
     if (!paymentData.id) {
       throw new Error('paymentData.id es requerido');
     }
-    
+
     if (!paymentData.status) {
       throw new Error('paymentData.status es requerido');
     }
 
     // 🔥 CORRECCIÓN: Buscar preferenceId en DB si no viene en paymentData
     let preferenceId = paymentData.preference_id?.toString() || null;
-    
+
     if (!preferenceId && paymentData.external_reference) {
       logger.info('[PaymentProcessor] Buscando preferenceId en DB via external_reference', {
         paymentId: paymentData.id?.toString() || paymentId,
         externalReference: paymentData.external_reference,
       });
-      
+
       const prefByExtRef = await db
         .select({ preferenceId: mercadopagoPreferences.preferenceId })
         .from(mercadopagoPreferences)
         .where(eq(mercadopagoPreferences.externalReference, paymentData.external_reference))
         .limit(1);
-        
+
       if (prefByExtRef.length > 0 && prefByExtRef[0].preferenceId) {
         preferenceId = prefByExtRef[0].preferenceId;
         logger.info('[PaymentProcessor] preferenceId encontrado en DB', {
@@ -339,11 +364,15 @@ export async function processPaymentWebhook(
       statementDescriptor: paymentData.statement_descriptor?.toString() || null,
       dateCreated: paymentData.date_created ? new Date(paymentData.date_created) : new Date(),
       dateApproved: paymentData.date_approved ? new Date(paymentData.date_approved) : null,
-      dateLastUpdated: paymentData.date_last_updated ? new Date(paymentData.date_last_updated) : new Date(),
+      dateLastUpdated: paymentData.date_last_updated
+        ? new Date(paymentData.date_last_updated)
+        : new Date(),
       rawData: paymentData,
       // Campos de auditoría HMAC
       requiresManualVerification: requiresManualVerification || false,
-      hmacValidationResult: hmacAuditContext?.validationResult || (requiresManualVerification ? 'fallback_used' : 'valid'),
+      hmacValidationResult:
+        hmacAuditContext?.validationResult ||
+        (requiresManualVerification ? 'fallback_used' : 'valid'),
       hmacFailureReason: hmacAuditContext?.failureReason || null,
       hmacFallbackUsed: hmacAuditContext?.fallbackUsed || false,
       verificationTimestamp: new Date(),
@@ -363,8 +392,12 @@ export async function processPaymentWebhook(
       // 🔥 Manejar violación de constraint de unicidad (race condition)
       const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
       const errorCode = (dbError as { code?: string })?.code;
-      
-      if (errorCode === '23505' || errorMessage.includes('unique constraint') || errorMessage.includes('duplicate key')) {
+
+      if (
+        errorCode === '23505' ||
+        errorMessage.includes('unique constraint') ||
+        errorMessage.includes('duplicate key')
+      ) {
         logger.info('[PaymentProcessor] Pago duplicado detectado por constraint', {
           paymentId,
           preferenceId: insertData.preferenceId,
@@ -394,7 +427,7 @@ export async function processPaymentWebhook(
           alreadyProcessed: true,
         };
       }
-      
+
       logger.error('[PaymentProcessor] Error insertando en DB', {
         paymentId,
         error: errorMessage,
@@ -422,7 +455,10 @@ export async function processPaymentWebhook(
           paymentId,
           requestId,
           merchantOrderId,
-          error: merchantOrderError instanceof Error ? merchantOrderError.message : String(merchantOrderError),
+          error:
+            merchantOrderError instanceof Error
+              ? merchantOrderError.message
+              : String(merchantOrderError),
         });
       }
     }
@@ -440,7 +476,6 @@ export async function processPaymentWebhook(
       success: true,
       status: paymentData.status ?? undefined,
     };
-
   } catch (error) {
     logger.error('[PaymentProcessor] Error', {
       paymentId,
@@ -462,17 +497,33 @@ export async function processPaymentWebhook(
 /**
  * Procesa cambios de estado del pago
  */
+type OrderStatus = Order['status'];
+type ShippingStatus = Order['shippingStatus'];
+
 interface PaymentStatusPayload {
   id?: string | number;
   status?: string;
-  external_reference?: string;
-  preference_id?: string; // 🔥 Agregar preference_id como alternativa
+  status_detail?: string | null;
+  external_reference?: string | null;
+  preference_id?: string | null;
+  payment_method_id?: string | null;
+  payment_method?: {
+    type?: string | null;
+  };
+  transaction_amount?: number | null;
+  currency_id?: string | null;
+  installments?: number | null;
+  date_approved?: string | null;
+  date_last_updated?: string | null;
+  order?: {
+    id?: string | number;
+  };
 }
 
 async function processStatusChange(paymentData: PaymentStatusPayload): Promise<void> {
   const status = paymentData.status;
   const externalReference = paymentData.external_reference;
-  const preferenceId = paymentData.preference_id; // 🔥 Usar preference_id si external_reference no existe
+  const preferenceId = paymentData.preference_id;
 
   // 🔥 CORRECCIÓN: Permitir procesamiento si tenemos preference_id
   if (!externalReference && !preferenceId) {
@@ -492,46 +543,37 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
   }
 
   // Buscar preferencia asociada
-  let preference: {
-    id: number;
-    orderId: number | null;
-    preferenceId: string | null;
-    externalReference: string | null;
-  } | null | undefined = null;
-  
+  let preference:
+    | {
+        id: number;
+        orderId: number | null;
+        preferenceId: string | null;
+        externalReference: string | null;
+      }
+    | null
+    | undefined = null;
+
   if (preferenceId) {
-    // 🔥 NUEVO: Buscar por ID de preferencia si external_reference no existe
     logger.info('[PaymentProcessor] Buscando preferencia por ID', {
       paymentId: paymentData.id,
       preferenceId,
     });
-    
-    // 🔥 CORRECCIÓN: preferenceId es string pero el campo es serial (number)
-    // Necesitamos buscar por preferenceId en lugar de id
+
     preference = await db.query.mercadopagoPreferences.findFirst({
       where: eq(mercadopagoPreferences.preferenceId, preferenceId),
     });
   } else {
-    // ANTIGuo: Buscar por external_reference
     const normalizedExternalReference = String(externalReference);
     logger.info('[PaymentProcessor] Buscando preferencia por external_reference', {
       paymentId: paymentData.id,
       originalExternalReference: externalReference,
       normalizedExternalReference,
     });
-    
+
     preference = await db.query.mercadopagoPreferences.findFirst({
       where: eq(mercadopagoPreferences.externalReference, normalizedExternalReference),
     });
   }
-
-  logger.info('[PaymentProcessor] Preferencia encontrada', {
-    paymentId: paymentData.id,
-    preferenceFound: !!preference,
-    preferenceId: preference?.id,
-    orderId: preference?.orderId,
-    searchMethod: preferenceId ? 'byId' : 'byExternalReference',
-  });
 
   if (!preference || !preference.orderId) {
     logger.warn('[PaymentProcessor] Preferencia no encontrada', {
@@ -542,21 +584,62 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     return;
   }
 
-  // Nueva lógica de mapeo de estados - Todos los pagos van a 'pending' excepto rechazados explícitamente
-  type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'rejected' | 'processing' | 'failed' | 'returned';
-  const orderStatusMap: Record<string, OrderStatus> = {
-    approved: 'pending',    // ← Cambio: pagos aprobados van a pending para verificación manual
-    pending: 'pending',     // ← Permanece en pending
-    rejected: 'cancelled',  // ← Cambio: rechazados van a cancelled
-    cancelled: 'cancelled', // ← Permanece en cancelled
-    refunded: 'cancelled',  // ← No hay 'refunded' en schema, usar cancelled
-    charged_back: 'failed', // ← No hay 'disputed' en schema, usar failed
-    in_process: 'pending',  // ← En proceso también va a pending
-    authorised: 'pending',  // ← Autorizado también va a pending
+  const orderStatusMap: Record<
+    string,
+    {
+      orderStatus: OrderStatus;
+      paymentStatus: string;
+      adjustStock: boolean;
+      markShippingProcessing?: boolean;
+      triggerShipmentSync?: boolean;
+    }
+  > = {
+    approved: {
+      orderStatus: 'paid',
+      paymentStatus: 'approved',
+      adjustStock: true,
+      markShippingProcessing: true,
+      triggerShipmentSync: true,
+    },
+    pending: {
+      orderStatus: 'pending',
+      paymentStatus: 'pending',
+      adjustStock: true,
+    },
+    in_process: {
+      orderStatus: 'pending',
+      paymentStatus: 'in_process',
+      adjustStock: false,
+    },
+    authorised: {
+      orderStatus: 'pending',
+      paymentStatus: 'authorised',
+      adjustStock: false,
+    },
+    rejected: {
+      orderStatus: 'rejected',
+      paymentStatus: 'rejected',
+      adjustStock: false,
+    },
+    cancelled: {
+      orderStatus: 'cancelled',
+      paymentStatus: 'cancelled',
+      adjustStock: false,
+    },
+    refunded: {
+      orderStatus: 'cancelled',
+      paymentStatus: 'refunded',
+      adjustStock: false,
+    },
+    charged_back: {
+      orderStatus: 'failed',
+      paymentStatus: 'charged_back',
+      adjustStock: false,
+    },
   };
 
-  const newOrderStatus = orderStatusMap[status];
-  if (!newOrderStatus) {
+  const statusConfig = status ? orderStatusMap[status] : undefined;
+  if (!statusConfig) {
     logger.info('[PaymentProcessor] Estado no requiere actualización', {
       paymentId: paymentData.id,
       status,
@@ -564,43 +647,106 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
     return;
   }
 
-  // Log específico para la nueva lógica
-  logger.info('[PaymentProcessor] Aplicando nueva lógica de estados', {
-    paymentId: paymentData.id,
-    originalStatus: status,
-    newOrderStatus,
-    requiresManualVerification: ['approved', 'pending', 'in_process', 'authorised'].includes(status),
-    willAdjustStock: ['approved', 'pending'].includes(status), // 🔥 Corregido: approved y pending ajustan stock
+  const orderRecord = await db.query.orders.findFirst({
+    where: eq(orders.id, preference.orderId),
+    columns: {
+      id: true,
+      metadata: true,
+      shippingStatus: true,
+      shippingMode: true,
+      stockDeducted: true,
+    },
   });
 
-  // Actualizar orden
-  await db.update(orders)
-    .set({
-      status: newOrderStatus as OrderStatus,
-      paymentId: paymentData.id?.toString(),
-      mercadoPagoId: paymentData.id?.toString(),
-      updatedAt: new Date(),
-    })
-    .where(eq(orders.id, preference.orderId));
+  const currentMetadata = (orderRecord?.metadata ?? {}) as Record<string, unknown>;
+  const paymentMetadata = {
+    id: paymentData.id?.toString() ?? null,
+    status: status ?? null,
+    status_detail: paymentData.status_detail ?? null,
+    payment_method_id: paymentData.payment_method_id ?? null,
+    payment_type: paymentData.payment_method?.type ?? null,
+    installments: paymentData.installments ?? null,
+    transaction_amount: paymentData.transaction_amount ?? null,
+    currency_id: paymentData.currency_id ?? null,
+    preference_id: paymentData.preference_id ?? null,
+    external_reference: paymentData.external_reference ?? null,
+    date_approved: paymentData.date_approved ?? null,
+    date_last_updated: paymentData.date_last_updated ?? null,
+    updated_at: new Date().toISOString(),
+  };
 
-  // Actualizar preferencia
-  await db.update(mercadopagoPreferences)
+  const updatedMetadata: Record<string, unknown> = {
+    ...currentMetadata,
+    mp_payment: paymentMetadata,
+  };
+
+  const now = new Date();
+  const orderUpdate: {
+    status: OrderStatus;
+    paymentStatus: string;
+    paymentId?: string | null;
+    mercadoPagoId?: string | null;
+    metadata: Record<string, unknown>;
+    updatedAt: Date;
+    shippingStatus?: ShippingStatus | null;
+  } = {
+    status: statusConfig.orderStatus,
+    paymentStatus: statusConfig.paymentStatus,
+    paymentId: paymentData.id?.toString() ?? null,
+    mercadoPagoId: paymentData.id?.toString() ?? null,
+    metadata: updatedMetadata,
+    updatedAt: now,
+  };
+
+  if (
+    statusConfig.markShippingProcessing &&
+    orderRecord &&
+    (!orderRecord.shippingStatus || orderRecord.shippingStatus === 'pending')
+  ) {
+    orderUpdate.shippingStatus = 'processing';
+  }
+
+  await db.update(orders).set(orderUpdate).where(eq(orders.id, preference.orderId));
+
+  await db
+    .update(mercadopagoPreferences)
     .set({
       status: status === 'approved' ? 'active' : 'pending',
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(eq(mercadopagoPreferences.id, preference.id));
 
   logger.info('[PaymentProcessor] Orden actualizada', {
     paymentId: paymentData.id,
     orderId: preference.orderId,
-    newStatus: newOrderStatus,
+    newStatus: statusConfig.orderStatus,
+    paymentStatus: statusConfig.paymentStatus,
   });
 
-  // 🔥 AJUSTE DE STOCK CRÍTICO: Para pagos aprobados y pending (reservar inventario)
-  if (['approved', 'pending'].includes(status)) {
-    const paymentIdStr = paymentData.id?.toString() || paymentData.id?.toString() || 'unknown';
+  if (statusConfig.adjustStock) {
+    const paymentIdStr = paymentData.id?.toString() || 'unknown';
     await adjustStockForOrder(preference.orderId, paymentIdStr);
+  }
+
+  if (statusConfig.triggerShipmentSync) {
+    const merchantOrderFromMetadata = (
+      currentMetadata.mp_merchant_order as { id?: string | number } | undefined
+    )?.id;
+    if (merchantOrderFromMetadata) {
+      try {
+        await processMerchantOrderWebhook(
+          String(merchantOrderFromMetadata),
+          `payment-${paymentData.id ?? paymentData.preference_id ?? 'unknown'}`
+        );
+      } catch (shipmentError) {
+        logger.error('[PaymentProcessor] Error sincronizando merchant_order desde metadata', {
+          orderId: preference.orderId,
+          paymentId: paymentData.id,
+          merchantOrderId: merchantOrderFromMetadata,
+          error: shipmentError instanceof Error ? shipmentError.message : String(shipmentError),
+        });
+      }
+    }
   }
 }
 
@@ -610,7 +756,7 @@ async function processStatusChange(paymentData: PaymentStatusPayload): Promise<v
  */
 export async function adjustStockForOrder(orderId: number, paymentId: string): Promise<void> {
   const startTime = Date.now();
-  
+
   try {
     logger.info('[PaymentProcessor] Iniciando ajuste de stock', {
       orderId,
@@ -666,7 +812,7 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
       orderId,
       paymentId,
       itemsCount: orderItemsData.length,
-      items: orderItemsData.map(item => ({
+      items: orderItemsData.map((item) => ({
         productId: item.productId,
         variantId: item.variantId,
         quantity: item.quantity,
@@ -719,7 +865,7 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             .set({
               stock: sql`GREATEST(0, ${productVariants.stock} + ${change})`,
               isActive: sql`CASE WHEN GREATEST(0, ${productVariants.stock} + ${change}) > 0 THEN true ELSE false END`,
-              updated_at: new Date()
+              updated_at: new Date(),
             })
             .where(eq(productVariants.id, item.variantId));
 
@@ -745,16 +891,19 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
               userId: orderUserId,
             });
           } catch (logError) {
-            logger.warn('[PaymentProcessor] No se pudo registrar stockLogs (ajuste aplicado igual)', {
-              orderId,
-              paymentId,
-              itemId: item.id,
-              productId: item.productId,
-              variantId: item.variantId,
-              errorMessage: logError instanceof Error ? logError.message : String(logError),
-              errorCode: (logError as { code?: string })?.code || 'N/A',
-              errorDetail: (logError as { detail?: string })?.detail || 'N/A',
-            });
+            logger.warn(
+              '[PaymentProcessor] No se pudo registrar stockLogs (ajuste aplicado igual)',
+              {
+                orderId,
+                paymentId,
+                itemId: item.id,
+                productId: item.productId,
+                variantId: item.variantId,
+                errorMessage: logError instanceof Error ? logError.message : String(logError),
+                errorCode: (logError as { code?: string })?.code || 'N/A',
+                errorDetail: (logError as { detail?: string })?.detail || 'N/A',
+              }
+            );
           }
 
           logger.info('[PaymentProcessor] Stock de variante ajustado', {
@@ -782,9 +931,9 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
           // 🔥 Ajuste directo de stock de producto
           await db
             .update(products)
-            .set({ 
+            .set({
               stock: sql`GREATEST(0, ${products.stock} + ${change})`,
-              updated_at: new Date() 
+              updated_at: new Date(),
             })
             .where(eq(products.id, item.productId));
 
@@ -809,16 +958,19 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
               userId: orderUserId,
             });
           } catch (logError) {
-            logger.warn('[PaymentProcessor] No se pudo registrar stockLogs (ajuste aplicado igual)', {
-              orderId,
-              paymentId,
-              itemId: item.id,
-              productId: item.productId,
-              variantId: null,
-              errorMessage: logError instanceof Error ? logError.message : String(logError),
-              errorCode: (logError as { code?: string })?.code || 'N/A',
-              errorDetail: (logError as { detail?: string })?.detail || 'N/A',
-            });
+            logger.warn(
+              '[PaymentProcessor] No se pudo registrar stockLogs (ajuste aplicado igual)',
+              {
+                orderId,
+                paymentId,
+                itemId: item.id,
+                productId: item.productId,
+                variantId: null,
+                errorMessage: logError instanceof Error ? logError.message : String(logError),
+                errorCode: (logError as { code?: string })?.code || 'N/A',
+                errorDetail: (logError as { detail?: string })?.detail || 'N/A',
+              }
+            );
           }
 
           logger.info('[PaymentProcessor] Stock de producto ajustado', {
@@ -829,81 +981,102 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
             newStock: updatedProduct[0]?.stock,
           });
         }
-
       } catch (stockError) {
         itemsFailed += 1;
         // 🔥 MEJORADO: Exponer error real para diagnóstico pero cambiar nivel a WARN para no alertar en Vercel
         const errorMessage = stockError instanceof Error ? stockError.message : String(stockError);
         const errorStack = stockError instanceof Error ? stockError.stack : undefined;
-        
+
         // 🔥 CAMBIADO: Usar logger.warn en lugar de logger.error para no aparecer como error crítico en Vercel
-        logger.warn('[PaymentProcessor] Error ajustando stock individual (no crítico - proceso continúa)', {
-          orderId,
-          paymentId,
-          itemId: item.id,
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity,
-          // 🔥 Detalles completos del error para diagnóstico
-          errorMessage: errorMessage,
-          errorStack: errorStack,
-          errorType: stockError?.constructor?.name || 'Unknown',
-          errorCode: (stockError as { code?: string })?.code || 'N/A',
-          errorDetail: (stockError as { detail?: string })?.detail || 'N/A',
-          // 🔥 Contexto adicional para debugging
-          timestamp: new Date().toISOString(),
-          paymentStatus: 'processing',
-          action: 'stock_adjustment',
-          severity: 'warning', // Indica que no es crítico
-        });
-        
-        // 🔥 ESTRATEGIA: Analizar tipo de error para decidir si continuar
-        if (errorMessage.includes('unique constraint') || 
-            errorMessage.includes('duplicate key') ||
-            errorMessage.includes('violates unique constraint') ||
-            errorMessage.includes('23505')) { // Código PostgreSQL para unique violation
-          logger.info('[PaymentProcessor] Race condition detectada - stock ya ajustado por otro proceso', {
-            orderId,
-            paymentId,
-            itemId: item.id,
-            errorCategory: 'race_condition',
-            action: 'continue_processing',
-          });
-        } else if (errorMessage.includes('no encontrado') || 
-                   errorMessage.includes('not found') ||
-                   errorMessage.includes('does not exist')) {
-          logger.warn('[PaymentProcessor] Producto/variante no encontrado - posible eliminación previa', {
+        logger.warn(
+          '[PaymentProcessor] Error ajustando stock individual (no crítico - proceso continúa)',
+          {
             orderId,
             paymentId,
             itemId: item.id,
             productId: item.productId,
             variantId: item.variantId,
-            errorCategory: 'entity_not_found',
-            action: 'continue_processing',
-          });
-        } else if (errorMessage.includes('connection') || 
-                   errorMessage.includes('timeout') ||
-                   errorMessage.includes('network')) {
-          logger.warn('[PaymentProcessor] Error de conexión en ajuste de stock - se reintentará más tarde', {
-            orderId,
-            paymentId,
-            itemId: item.id,
-            errorCategory: 'connection_error',
-            action: 'continue_processing',
-            recommendation: 'Verificar stock manualmente si es necesario',
-          });
+            quantity: item.quantity,
+            // 🔥 Detalles completos del error para diagnóstico
+            errorMessage: errorMessage,
+            errorStack: errorStack,
+            errorType: stockError?.constructor?.name || 'Unknown',
+            errorCode: (stockError as { code?: string })?.code || 'N/A',
+            errorDetail: (stockError as { detail?: string })?.detail || 'N/A',
+            // 🔥 Contexto adicional para debugging
+            timestamp: new Date().toISOString(),
+            paymentStatus: 'processing',
+            action: 'stock_adjustment',
+            severity: 'warning', // Indica que no es crítico
+          }
+        );
+
+        // 🔥 ESTRATEGIA: Analizar tipo de error para decidir si continuar
+        if (
+          errorMessage.includes('unique constraint') ||
+          errorMessage.includes('duplicate key') ||
+          errorMessage.includes('violates unique constraint') ||
+          errorMessage.includes('23505')
+        ) {
+          // Código PostgreSQL para unique violation
+          logger.info(
+            '[PaymentProcessor] Race condition detectada - stock ya ajustado por otro proceso',
+            {
+              orderId,
+              paymentId,
+              itemId: item.id,
+              errorCategory: 'race_condition',
+              action: 'continue_processing',
+            }
+          );
+        } else if (
+          errorMessage.includes('no encontrado') ||
+          errorMessage.includes('not found') ||
+          errorMessage.includes('does not exist')
+        ) {
+          logger.warn(
+            '[PaymentProcessor] Producto/variante no encontrado - posible eliminación previa',
+            {
+              orderId,
+              paymentId,
+              itemId: item.id,
+              productId: item.productId,
+              variantId: item.variantId,
+              errorCategory: 'entity_not_found',
+              action: 'continue_processing',
+            }
+          );
+        } else if (
+          errorMessage.includes('connection') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('network')
+        ) {
+          logger.warn(
+            '[PaymentProcessor] Error de conexión en ajuste de stock - se reintentará más tarde',
+            {
+              orderId,
+              paymentId,
+              itemId: item.id,
+              errorCategory: 'connection_error',
+              action: 'continue_processing',
+              recommendation: 'Verificar stock manualmente si es necesario',
+            }
+          );
         } else {
           // Otros tipos de error
-          logger.warn('[PaymentProcessor] Error inesperado en ajuste de stock - continuando con otros items', {
-            orderId,
-            paymentId,
-            itemId: item.id,
-            errorCategory: 'unknown_error',
-            action: 'continue_processing',
-            needsReview: true,
-          });
+          logger.warn(
+            '[PaymentProcessor] Error inesperado en ajuste de stock - continuando con otros items',
+            {
+              orderId,
+              paymentId,
+              itemId: item.id,
+              errorCategory: 'unknown_error',
+              action: 'continue_processing',
+              needsReview: true,
+            }
+          );
         }
-        
+
         // Continuar con otros items en lugar de cancelar todo
         continue;
       }
@@ -923,10 +1096,7 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
     }
 
     // 5. Marcar orden como procesada
-    await db
-      .update(orders)
-      .set({ stockDeducted: true })
-      .where(eq(orders.id, orderId));
+    await db.update(orders).set({ stockDeducted: true }).where(eq(orders.id, orderId));
 
     logger.info('[PaymentProcessor] Stock ajustado y orden marcada como procesada', {
       orderId,
@@ -935,26 +1105,25 @@ export async function adjustStockForOrder(orderId: number, paymentId: string): P
       totalAdjusted,
       duration: `${Date.now() - startTime}ms`,
     });
-
   } catch (error) {
     // 🔥 MEJORADO: Logging completo sin redactar para debugging
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
+
     logger.error('[PaymentProcessor] Error crítico en ajuste de stock', {
       orderId,
       paymentId,
       error: errorMessage, // 🔥 Error real visible
-      stack: errorStack,   // 🔥 Stack trace completo
+      stack: errorStack, // 🔥 Stack trace completo
       duration: `${Date.now() - startTime}ms`,
       // 🔥 Información de diagnóstico adicional
       errorType: error?.constructor?.name || 'Unknown',
       timestamp: new Date().toISOString(),
     });
-    
+
     // 🔥 ELIMINADO: No registrar en stockLogs para evitar foreign key constraint violations
     // El error ya está siendo loggeado arriba con logger.error
-    
+
     // No relanzar el error para no afectar el procesamiento del pago
     // El stock se puede ajustar manualmente si es necesario
     logger.warn('[PaymentProcessor] Error de stock no bloquea el procesamiento del pago', {

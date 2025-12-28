@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveTokens, getUserInfo } from '@/lib/auth/mercadolibre';
+import { saveTokens, getUserInfo, syncMercadoLibreScopes } from '@/lib/auth/mercadolibre';
 import { getSession } from '@/lib/actions/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
@@ -25,8 +25,15 @@ async function saveTokensToDatabase(tokenData: MercadoLibreTokenData): Promise<v
   const userId = parseInt(session.user.id);
   
   try {
-    // Obtener información adicional del usuario
+    // Obtener información adicional del usuario y scopes
     const userInfo = await getUserInfo(tokenData.access_token);
+    const syncedScopes = await syncMercadoLibreScopes(userId, tokenData.access_token);
+    const normalizedTokenScopes = tokenData.scope
+      ? tokenData.scope
+          .split(/[\s,]+/)
+          .map((scope) => scope.trim())
+          .filter(Boolean)
+      : [];
     
     logger.info('MercadoLibre: Obteniendo información de usuario', {
       userId,
@@ -41,13 +48,18 @@ async function saveTokensToDatabase(tokenData: MercadoLibreTokenData): Promise<v
       refresh_token: tokenData.refresh_token,
       expires_in: tokenData.expires_in,
       user_id: tokenData.user_id,
+      scope: normalizedTokenScopes.join(' '),
     });
 
     // Actualizar información adicional del usuario
     await db.update(users)
       .set({
         mlNickname: userInfo.nickname,
-        mercadoLibreScopes: tokenData.scope || '',
+        mlSiteId: userInfo.site_id ?? null,
+        mlSellerId: userInfo.id ?? null,
+        mlPermalink: userInfo.permalink ?? null,
+        mlLevelId: userInfo.seller_experience ?? null,
+        mercadoLibreScopes: syncedScopes?.join(' ') || normalizedTokenScopes.join(' '),
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));

@@ -44,7 +44,7 @@ export async function validateProductForMercadoLibre(productData: ProductForm) {
       mlLastSync: null,
       mlPermalink: null,
       mlThumbnail: null,
-      shippingAttributes: null
+      shippingAttributes: productData.shippingAttributes ?? null
     }
     
     console.log('[Product-Validation] Producto convertido, llamando a validateProductForMLSync')

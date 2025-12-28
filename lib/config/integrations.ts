@@ -64,30 +64,63 @@ export const SITE_CONFIG = {
 } as const;
 
 // Configuración dinámica basada en variables de entorno
-export const getMercadoLibreConfig = () => ({
-  siteId: process.env.ML_SITE_ID || 'MLA',
-  sellerId: process.env.ML_SELLER_ID,
-  appId: process.env.ML_APP_ID,
-  clientSecret: process.env.ML_CLIENT_SECRET,
-  redirectUri: process.env.ML_REDIRECT_URI,
-  webhookUrl: process.env.ML_WEBHOOK_URL,
-  notificationTopics: process.env.ML_WEBHOOK_TOPICS?.split(',') || [
-    'payments',
-    'orders',
-    'shipments',
-    'questions',
-    'items',
-  ],
-  scopes: [
-    'read',
-    'write',
-    'offline_access',
-  ],
-  apiVersion: 'v1',
-  timeout: parseInt(process.env.ML_API_TIMEOUT || '30000'),
-  retryAttempts: parseInt(process.env.ML_API_RETRY_ATTEMPTS || '3'),
-  retryDelay: parseInt(process.env.ML_API_RETRY_DELAY || '1000'),
-});
+export const getMercadoLibreConfig = () => {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
+
+  const siteId = process.env.MERCADO_LIBRE_SITE_ID || process.env.ML_SITE_ID || 'MLA';
+  const sellerId = process.env.MERCADO_LIBRE_SELLER_ID || process.env.ML_SELLER_ID || null;
+  const appId = process.env.MERCADO_LIBRE_CLIENT_ID || process.env.ML_APP_ID || null;
+  const clientSecret =
+    process.env.MERCADO_LIBRE_CLIENT_SECRET || process.env.ML_CLIENT_SECRET || null;
+  const redirectUri =
+    process.env.MERCADO_LIBRE_REDIRECT_URI ||
+    process.env.ML_REDIRECT_URI ||
+    `${appUrl}/api/auth/mercadolibre/callback`;
+
+  const scopesFromEnv = process.env.MERCADO_LIBRE_SCOPES || process.env.ML_OAUTH_SCOPES;
+
+  const oauthScopes = scopesFromEnv
+    ? scopesFromEnv
+        .split(/[,\s]+/)
+        .map((scope) => scope.trim())
+        .filter(Boolean)
+    : [
+        'read_orders',
+        'write_products',
+        'read_products',
+        'offline_access',
+        'read_inventory',
+        'write_inventory',
+        'read_shipping',
+        'write_shipping',
+        'read_user_email',
+        'read_user_profile',
+      ];
+
+  return {
+    siteId,
+    sellerId,
+    appId,
+    clientSecret,
+    redirectUri,
+    baseUrl: API_ENDPOINTS.mercadolibre.base,
+    authUrl: process.env.MERCADO_LIBRE_AUTH_URL || 'https://auth.mercadolibre.com.ar/authorization',
+    webhookUrl: process.env.MERCADO_LIBRE_WEBHOOK_URL || process.env.ML_WEBHOOK_URL || null,
+    notificationTopics: process.env.ML_WEBHOOK_TOPICS?.split(',') || [
+      'payments',
+      'orders',
+      'shipments',
+      'questions',
+      'items',
+    ],
+    scopes: ['read', 'write', 'offline_access'],
+    oauthScopes,
+    apiBaseUrl: API_ENDPOINTS.mercadolibre.base,
+    timeout: parseInt(process.env.ML_API_TIMEOUT || '30000'),
+    retryAttempts: parseInt(process.env.ML_API_RETRY_ATTEMPTS || '3'),
+    retryDelay: parseInt(process.env.ML_API_RETRY_DELAY || '1000'),
+  };
+};
 
 export const getMercadoPagoConfig = () => ({
   accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
@@ -154,11 +187,12 @@ export const getME2Config = () => ({
 
 // Configuración de webhooks
 export const WEBHOOK_CONFIG = {
-  maxRetries: 3,
-  retryDelay: 5000, // 5 segundos
-  timeout: 30000, // 30 segundos
-  signatureHeader: 'x-signature',
-  requestIdHeader: 'x-request-id',
+  maxRetries: parseInt(process.env.ML_WEBHOOK_MAX_RETRIES || '3'),
+  retryDelay: parseInt(process.env.ML_WEBHOOK_RETRY_DELAY || '5000'),
+  timeout: parseInt(process.env.ML_WEBHOOK_TIMEOUT || '30000'),
+  signatureHeader: process.env.ML_WEBHOOK_SIGNATURE_HEADER || 'x-signature',
+  requestIdHeader: process.env.ML_WEBHOOK_REQUEST_ID_HEADER || 'x-request-id',
+  replayCacheTtlMs: parseInt(process.env.ML_WEBHOOK_REPLAY_TTL_MS || `${5 * 60 * 1000}`),
 } as const;
 
 // Validación de configuración requerida
@@ -168,9 +202,10 @@ export const validateConfig = () => {
   const errors: string[] = [];
 
   // Validar Mercado Libre
-  if (!mlConfig.sellerId) errors.push('ML_SELLER_ID es requerido');
-  if (!mlConfig.appId) errors.push('ML_APP_ID es requerido');
-  if (!mlConfig.clientSecret) errors.push('ML_CLIENT_SECRET es requerido');
+  if (!mlConfig.sellerId) errors.push('MERCADO_LIBRE_SELLER_ID/ML_SELLER_ID es requerido');
+  if (!mlConfig.appId) errors.push('MERCADO_LIBRE_CLIENT_ID/ML_APP_ID es requerido');
+  if (!mlConfig.clientSecret)
+    errors.push('MERCADO_LIBRE_CLIENT_SECRET/ML_CLIENT_SECRET es requerido');
 
   // Validar Mercado Pago
   if (!mpConfig.accessToken) errors.push('MERCADO_PAGO_ACCESS_TOKEN es requerido');
@@ -184,13 +219,17 @@ export const validateConfig = () => {
 };
 
 // Helper para obtener URL completa de API
-export const getApiUrl = (service: 'mercadolibre' | 'mercadopago', endpoint: string, params?: Record<string, string>) => {
+export const getApiUrl = (
+  service: 'mercadolibre' | 'mercadopago',
+  endpoint: string,
+  params?: Record<string, string>
+) => {
   const baseUrl = API_ENDPOINTS[service].base;
   let url = baseUrl + endpoint;
-  
+
   // Crear copia de params para evitar mutar el objeto original
   const paramsCopy = params ? { ...params } : {};
-  
+
   // Reemplazar parámetros en la URL (ej: {site_id})
   url = url.replace(/\{([^}]+)\}/g, (match, key) => {
     if (paramsCopy[key]) {
@@ -200,12 +239,12 @@ export const getApiUrl = (service: 'mercadolibre' | 'mercadopago', endpoint: str
     }
     throw new Error(`Missing required URL parameter: ${key}`);
   });
-  
+
   if (Object.keys(paramsCopy).length > 0) {
     const searchParams = new URLSearchParams(paramsCopy);
     url += '?' + searchParams.toString();
   }
-  
+
   return url;
 };
 

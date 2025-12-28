@@ -3,7 +3,12 @@
  * Centraliza todas las llamadas a la API de MP con configuración dinámica
  */
 
-import { getMercadoPagoConfig, getApiUrl, validateConfig, PAGINATION } from '@/lib/config/integrations';
+import {
+  getMercadoPagoConfig,
+  getApiUrl,
+  validateConfig,
+  PAGINATION,
+} from '@/lib/config/integrations';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { logger } from '@/lib/utils/logger';
 
@@ -17,6 +22,7 @@ interface MPPreference {
   expires?: boolean;
   expiration_date_from?: string;
   expiration_date_to?: string;
+  notification_url?: string;
 }
 
 interface MPPayment {
@@ -71,8 +77,8 @@ class MercadoPagoClient {
       const validation = validateConfig();
       this.isConfigured = validation.isValid;
       if (!validation.isValid) {
-        logger.warn('MercadoPago client not properly configured', { 
-          errors: validation.errors 
+        logger.warn('MercadoPago client not properly configured', {
+          errors: validation.errors,
         });
       }
     } catch (error) {
@@ -158,7 +164,7 @@ class MercadoPagoClient {
       // Crear preferencia usando el SDK de Mercado Pago
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const preference = await this.sdk.create({ body: preferenceData as any });
-      
+
       logger.info('MP preference created successfully', {
         preferenceId: preference.id,
         externalReference: data.external_reference,
@@ -188,10 +194,7 @@ class MercadoPagoClient {
   /**
    * Actualizar una preferencia existente
    */
-  async updatePreference(
-    preferenceId: string,
-    data: Partial<MPPreference>
-  ): Promise<MPPreference> {
+  async updatePreference(preferenceId: string, data: Partial<MPPreference>): Promise<MPPreference> {
     try {
       // El SDK de Mercado Pago no tiene método update directo
       // Hay que crear una nueva preferencia o usar la API directamente
@@ -233,10 +236,10 @@ class MercadoPagoClient {
     };
   }> {
     const url = getApiUrl('mercadopago', '/v1/payments/search');
-    
+
     // Construir query parameters
     const searchParams = new URLSearchParams();
-    
+
     if (params.external_reference) {
       searchParams.append('external_reference', params.external_reference);
     }
@@ -260,7 +263,7 @@ class MercadoPagoClient {
     try {
       const response = await fetch(`${url}?${searchParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
+          Authorization: `Bearer ${this.config.accessToken}`,
         },
         signal: AbortSignal.timeout(this.config.timeout),
       });
@@ -271,7 +274,7 @@ class MercadoPagoClient {
       }
 
       const data = await response.json();
-      
+
       logger.info('MP payments search completed', {
         total: data.paging.total,
         limit: data.paging.limit,
@@ -289,14 +292,14 @@ class MercadoPagoClient {
    * Obtener detalles de un pago
    */
   async getPayment(paymentId: number): Promise<MPPayment> {
-    const url = getApiUrl('mercadopago', '/v1/payments/{payment_id}', { 
-      payment_id: paymentId.toString() 
+    const url = getApiUrl('mercadopago', '/v1/payments/{payment_id}', {
+      payment_id: paymentId.toString(),
     });
 
     try {
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
+          Authorization: `Bearer ${this.config.accessToken}`,
         },
         signal: AbortSignal.timeout(this.config.timeout),
       });
@@ -342,7 +345,7 @@ class MercadoPagoClient {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
+          Authorization: `Bearer ${this.config.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
@@ -355,7 +358,7 @@ class MercadoPagoClient {
       }
 
       const customer = await response.json();
-      
+
       logger.info('MP customer created successfully', {
         customerId: customer.id,
         email: customer.email,
@@ -378,7 +381,7 @@ class MercadoPagoClient {
     try {
       const response = await fetch(`${url}?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
+          Authorization: `Bearer ${this.config.accessToken}`,
         },
         signal: AbortSignal.timeout(this.config.timeout),
       });
@@ -407,7 +410,7 @@ class MercadoPagoClient {
     card_token_id?: string;
   }) {
     const url = getApiUrl('mercadopago', '/v1/payment_methods');
-    
+
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -418,7 +421,7 @@ class MercadoPagoClient {
     try {
       const response = await fetch(`${url}?${searchParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
+          Authorization: `Bearer ${this.config.accessToken}`,
         },
         signal: AbortSignal.timeout(this.config.timeout),
       });
@@ -445,7 +448,7 @@ class MercadoPagoClient {
   ): Promise<boolean> {
     try {
       const crypto = await import('node:crypto');
-      
+
       const manifest = `id:${dataId};request-id:${xRequestId}`;
       const hmac = crypto
         .createHmac('sha256', this.config.webhookSecret!)
@@ -453,9 +456,9 @@ class MercadoPagoClient {
         .digest('hex');
 
       const receivedSignature = xSignature.replace('sha256=', '');
-      
+
       const isValid = hmac === receivedSignature;
-      
+
       logger.info('Webhook signature verified', {
         isValid,
         requestId: xRequestId,
@@ -485,7 +488,7 @@ class MercadoPagoClient {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
+          Authorization: `Bearer ${this.config.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: amount ? JSON.stringify({ amount }) : undefined,
@@ -498,7 +501,7 @@ class MercadoPagoClient {
       }
 
       const refund = await response.json();
-      
+
       logger.info('MP refund processed successfully', {
         paymentId,
         amount,

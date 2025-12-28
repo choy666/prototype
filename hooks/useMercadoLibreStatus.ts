@@ -2,11 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export interface MercadoLibreModuleStatus {
+  module: string;
+  hasAllScopes: boolean;
+  missingScopes: string[];
+}
+
 export interface MercadoLibreStatusData {
   connected: boolean;
   userId?: string;
   scopes?: string[];
   expiresAt?: string;
+  hasCriticalScopes?: boolean;
+  missingCriticalScopes?: string[];
+  mlNeedsReauth?: boolean;
+  mlReauthReason?: string | null;
+  reason?: string;
+  refreshed?: boolean;
+  mlSiteId?: string | null;
+  mlSellerId?: string | null;
+  mlPermalink?: string | null;
+  mlLevelId?: string | null;
+  modules?: MercadoLibreModuleStatus[];
 }
 
 interface UseMercadoLibreStatusOptions {

@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/actions/auth";
 import { db } from "@/lib/db";
-import { productVariants } from "@/lib/schema";
+import { productVariants, products, categories } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import {
+  getCategoryME2Rules,
+  normalizeVariantAttributeCombinations,
+  fetchMLAttributeDefinitions,
+  type MLAttributeDefinition,
+  type ME2CategoryRules,
+  type NormalizedAttributeCombination,
+} from "@/lib/mercado-envios/me2Rules";
 
 // Schema de validación para crear variante
 const createVariantSchema = z.object({
@@ -27,51 +35,87 @@ const updateVariantSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-type MlAttributeCombination = {
-  id: string;
-  name?: string;
-  value_id?: string;
-  value_name: string;
+type VariantRow = typeof productVariants.$inferSelect;
+type NormalizedVariantResponse = VariantRow & { normalizationWarnings?: string[] };
+
+const isMLAttributeDefinition = (attr: unknown): attr is MLAttributeDefinition => {
+  if (!attr || typeof attr !== "object") return false;
+  const candidate = attr as { id?: unknown };
+  return typeof candidate.id === "string";
 };
 
-function buildMlAttributeCombinations(
-  additionalAttributes?: Record<string, string> | null
-): MlAttributeCombination[] | null {
-  if (!additionalAttributes) return null;
+async function getNormalizationContext(productId: number) {
+  const product = await db.query.products.findFirst({
+    where: eq(products.id, productId),
+    columns: {
+      id: true,
+      mlCategoryId: true,
+    },
+  });
 
-  const combinations: MlAttributeCombination[] = [];
-
-  for (const [key, value] of Object.entries(additionalAttributes)) {
-    const lowerKey = key.toLowerCase();
-
-    let attrId: string | null = null;
-    let attrName: string | undefined = key;
-
-    if (lowerKey.includes("color")) {
-      // Atributo estándar de ML para color
-      attrId = "COLOR";
-      attrName = "Color";
-    } else if (
-      lowerKey.includes("talle") ||
-      lowerKey.includes("talla") ||
-      lowerKey.includes("size")
-    ) {
-      // Atributo estándar de ML para talla/tamaño
-      attrId = "SIZE";
-      attrName = "Talle";
-    }
-
-    // Si no es un atributo conocido, no generamos combinación ML automática
-    if (!attrId) continue;
-
-    combinations.push({
-      id: attrId,
-      name: attrName,
-      value_name: value,
-    });
+  if (!product) {
+    throw new Error("Producto no encontrado");
   }
 
-  return combinations.length > 0 ? combinations : null;
+  const [rules, storedCategory] = await Promise.all([
+    getCategoryME2Rules(product.mlCategoryId),
+    product.mlCategoryId
+      ? db.query.categories.findFirst({
+          where: eq(categories.mlCategoryId, product.mlCategoryId),
+          columns: { attributes: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  let attributeDefinitions: MLAttributeDefinition[] = [];
+  const storedAttributes = storedCategory?.attributes;
+  if (Array.isArray(storedAttributes)) {
+    attributeDefinitions = (storedAttributes as unknown[])
+      .filter(isMLAttributeDefinition)
+      .map((attr) => ({
+        id: attr.id,
+        name: attr.name ?? attr.id,
+        tags: attr.tags,
+        values: attr.values,
+      }));
+  }
+
+  if (attributeDefinitions.length === 0) {
+    attributeDefinitions = await fetchMLAttributeDefinitions(product.mlCategoryId);
+  }
+
+  return {
+    product,
+    rules,
+    attributeDefinitions,
+  };
+}
+
+function buildVariantResponse(
+  variant: VariantRow,
+  attributeDefinitions: MLAttributeDefinition[],
+  rules: ME2CategoryRules
+): NormalizedVariantResponse {
+  const additionalAttributes =
+    (variant.additionalAttributes as Record<string, string> | null) ?? null;
+  const normalization = normalizeVariantAttributeCombinations(
+    additionalAttributes,
+    attributeDefinitions,
+    rules
+  );
+
+  const storedCombinations = Array.isArray(variant.mlAttributeCombinations)
+    ? (variant.mlAttributeCombinations as NormalizedAttributeCombination[])
+    : null;
+
+  return {
+    ...variant,
+    mlAttributeCombinations:
+      storedCombinations && storedCombinations.length > 0
+        ? storedCombinations
+        : normalization.combinations,
+    normalizationWarnings: normalization.warnings,
+  };
 }
 
 // GET /api/admin/products/[id]/variants - Listar variantes de un producto
@@ -92,13 +136,19 @@ export async function GET(
       return NextResponse.json({ error: "ID de producto inválido" }, { status: 400 });
     }
 
+    const { attributeDefinitions, rules } = await getNormalizationContext(productId);
+
     const variants = await db
       .select()
       .from(productVariants)
       .where(eq(productVariants.productId, productId))
       .orderBy(productVariants.created_at);
 
-    return NextResponse.json(variants);
+    const normalizedVariants = variants.map((variant) =>
+      buildVariantResponse(variant, attributeDefinitions, rules)
+    );
+
+    return NextResponse.json(normalizedVariants);
   } catch (error) {
     console.error("Error al obtener variantes:", error);
     return NextResponse.json(
@@ -125,6 +175,8 @@ export async function POST(
     if (isNaN(productId)) {
       return NextResponse.json({ error: "ID de producto inválido" }, { status: 400 });
     }
+
+    const { attributeDefinitions, rules } = await getNormalizationContext(productId);
 
     const body = await request.json();
     const validatedData = createVariantSchema.parse(body);
@@ -160,9 +212,24 @@ export async function POST(
       (dataToInsert as any).additionalAttributes = null;
     }
 
-    const mlAttributeCombinations = buildMlAttributeCombinations(
-      validatedData.additionalAttributes || null
+    const normalization = normalizeVariantAttributeCombinations(
+      validatedData.additionalAttributes || null,
+      attributeDefinitions,
+      rules
     );
+
+    if (normalization.errors.length > 0) {
+      return NextResponse.json(
+        {
+          error: "No se pudieron normalizar los atributos de la variante",
+          details: normalization.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const mlAttributeCombinations =
+      normalization.combinations.length > 0 ? normalization.combinations : null;
 
     const newVariant = await db
       .insert(productVariants)
@@ -173,7 +240,13 @@ export async function POST(
       })
       .returning();
 
-    return NextResponse.json(newVariant[0], { status: 201 });
+    const responsePayload = buildVariantResponse(
+      newVariant[0],
+      attributeDefinitions,
+      rules
+    );
+
+    return NextResponse.json(responsePayload, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -214,6 +287,8 @@ export async function PUT(
       return NextResponse.json({ error: "ID de variante requerido" }, { status: 400 });
     }
 
+    const { attributeDefinitions, rules } = await getNormalizationContext(productId);
+
     const body = await request.json();
     const validatedData = updateVariantSchema.parse(body);
 
@@ -233,9 +308,24 @@ export async function PUT(
 
     // Recalcular combinaciones ML si se actualizan los atributos adicionales
     if (validatedData.additionalAttributes !== undefined) {
-      finalData.mlAttributeCombinations = buildMlAttributeCombinations(
-        validatedData.additionalAttributes
+      const normalization = normalizeVariantAttributeCombinations(
+        validatedData.additionalAttributes || null,
+        attributeDefinitions,
+        rules
       );
+
+      if (normalization.errors.length > 0) {
+        return NextResponse.json(
+          {
+            error: "No se pudieron normalizar los atributos de la variante",
+            details: normalization.errors,
+          },
+          { status: 400 }
+        );
+      }
+
+      finalData.mlAttributeCombinations =
+        normalization.combinations.length > 0 ? normalization.combinations : null;
     }
 
     const updatedVariant = await db
@@ -253,7 +343,13 @@ export async function PUT(
       return NextResponse.json({ error: "Variante no encontrada" }, { status: 404 });
     }
 
-    return NextResponse.json(updatedVariant[0]);
+    const responsePayload = buildVariantResponse(
+      updatedVariant[0],
+      attributeDefinitions,
+      rules
+    );
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
