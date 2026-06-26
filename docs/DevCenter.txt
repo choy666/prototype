@@ -1,0 +1,19 @@
+### DevCenter de Mercado Libre
+# Configuración de la aplicación prototypeML (Mercado Libre)
+- MERCADOLIBRE_CLIENT_ID : 8458968436453153
+- MERCADOLIBRE_CLIENT_SECRET : IA9SP48WNE2w5XXogwoGde6rtcvGQskq
+- MERCADOLIBRE_REDIRECT_URI : https://prototype-ten-dun.vercel.app/api/auth/mercadolibre/callback
+- MERCADOLIBRE_WEBHOOK_URL : https://prototype-ten-dun.vercel.app/api/mercadolibre/webhooks
+----
+
+### DevCenter de Mercado Pago - ID 123456 de test para el simulador de mercadopago
+# Configuración de la aplicación prototypeMC (Mercado Pago)
+- Producto integrado : Checkout Pro
+- MERCADO_PAGO_WEBHOOK_URL : https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago
+- MERCADO_PAGO_SUCCESS_URL : https://prototype-ten-dun.vercel.app/payment-success
+- MERCADO_PAGO_FAILURE_URL : https://prototype-ten-dun.vercel.app/payment-failure
+- MERCADO_PAGO_PENDING_URL : https://prototype-ten-dun.vercel.app/payment-pending
+- MERCADO_PAGO_WEBHOOK_SECRET : 6562a4c8de72b6852cebcf805622bee42c43db8973706aaa92de3d6edf23b8db
+- MERCADO_PAGO_NOTIFICATION_URL : https://prototype-ten-dun.vercel.app/api/webhooks/mercadopago
+- MERCADO_PAGO_ACCESS_TOKEN : APP_USR-3512407382157264-112123-63acaed36cb3246d2b1489bf710c4cb1-2926966384
+- NEXT_PUBLIC_MP_PUBLIC_KEY : APP_USR-69258e52-a9c1-4d81-9d1e-90cf52391d49

@@ -1,0 +1,169 @@
+// lib/mercado-pago/hmacVerifier.ts
+// Validación optimizada de webhooks de Mercado Pago
+
+import crypto from 'crypto';
+import { logger } from '@/lib/utils/logger';
+import { warningCache } from '@/lib/utils/warning-cache';
+
+/* --------------------------------------------------
+ * Tipos
+ * -------------------------------------------------- */
+export interface MercadoPagoHmacValidationResult {
+  ok: boolean;
+  reason?: string;
+  dataId?: string;
+}
+
+/* --------------------------------------------------
+ * Configuración
+ * -------------------------------------------------- */
+const MP_SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim();
+const ALLOWED_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutos
+
+// Validar configuración al inicio
+if (!MP_SECRET) {
+  logger.error('❌ MERCADO_PAGO_WEBHOOK_SECRET no configurado');
+} else {
+  // Log seguro del secret en producción (solo longitud y prefijo)
+  logger.info('✅ MERCADO_PAGO_WEBHOOK_SECRET configurado', {
+    secretLength: MP_SECRET.length,
+    secretPrefix: MP_SECRET.substring(0, 8) + '...',
+    hasWhitespace: MP_SECRET !== MP_SECRET.trim(),
+  });
+}
+
+
+/* --------------------------------------------------
+ * Validación principal optimizada
+ * -------------------------------------------------- */
+export function verifyMercadoPagoWebhook(
+  request: Request,
+  rawBody: string
+): MercadoPagoHmacValidationResult {
+  if (!MP_SECRET) {
+    return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
+  }
+
+  // Extraer path limpio (solo el path sin dominio ni query params)
+  const url = new URL(request.url);
+  const cleanPath = url.pathname; // Solo el path, sin protocolo, dominio ni query
+  const dataIdUrl = url.searchParams.get('data.id') || url.searchParams.get('id') || '';
+  const headers = Object.fromEntries(request.headers.entries());
+  
+  // Intentar validación con cuerpo limpio (sin whitespace)
+  const cleanBody = rawBody.trim();
+  const result = validateHmacV1(headers, dataIdUrl, cleanBody, cleanPath);
+  
+  // Si falla, intentar con body original por si MP firmó con whitespace
+  if (!result.ok && cleanBody !== rawBody) {
+    return validateHmacV1(headers, dataIdUrl, rawBody, cleanPath);
+  }
+  
+  return result;
+}
+
+/* --------------------------------------------------
+ * Validación HMAC v1 optimizada
+ * -------------------------------------------------- */
+function validateHmacV1(
+  headers: Record<string, string | undefined>,
+  dataIdUrl: string,
+  body: string,
+  cleanPath: string
+): MercadoPagoHmacValidationResult {
+  try {
+    const signature = headers['x-signature'] || '';
+    const signatureParts = signature.split(',');
+    
+    // Extraer timestamp y version de la firma
+    let ts = '';
+    const xRequestId = headers['x-request-id'] || '';
+    let receivedSignature = '';
+    
+    for (const part of signatureParts) {
+      if (part.startsWith('ts=')) ts = part.substring(3);
+      if (part.startsWith('v1=')) receivedSignature = part.substring(3);
+    }
+    
+    // Validaciones básicas
+    if (!ts || !xRequestId || !dataIdUrl || !receivedSignature) {
+      return { ok: false, reason: 'Missing required signature data' };
+    }
+    
+    // Validar timestamp
+    const timestampNum = Number(ts);
+    if (isNaN(timestampNum)) {
+      return { ok: false, reason: 'Invalid or expired timestamp' };
+    }
+
+    const timestampMs = timestampNum < 1_000_000_000_000 ? timestampNum * 1000 : timestampNum;
+    if (Math.abs(Date.now() - timestampMs) > ALLOWED_TOLERANCE_MS) {
+      return { ok: false, reason: 'Invalid or expired timestamp' };
+    }
+    
+    const normalizedDataIdUrl = String(dataIdUrl).toLowerCase();
+    const stringToSign = `id:${normalizedDataIdUrl};request-id:${xRequestId};ts:${ts};`;
+    const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+    
+    // Calcular firma esperada
+    const expectedSignature = crypto
+      .createHmac('sha256', MP_SECRET!)
+      .update(stringToSign)
+      .digest('hex');
+    
+    // Validar firma
+    if (!timingSafeEqualSafe(receivedSignature, expectedSignature)) {
+      // 🔥 NUEVO: Usar cache para evitar spam de logs
+      const cacheKey = `hmac_failed_${xRequestId}`;
+      const shouldLog = warningCache.shouldLog(cacheKey);
+      
+      if (shouldLog) {
+        const stats = warningCache.getStats(cacheKey);
+        logger.warn('HMAC validation failed - verificación vía API activada', {
+          requestId: xRequestId,
+          ts,
+          path: cleanPath,
+          bodyLength: body.length,
+          failureCount: stats?.count || 1,
+          // 🔥 DEBUG: Mostrar componentes exactos para identificar el problema
+          debug: {
+            receivedSignature,
+            expectedSignature,
+            stringToSign,
+            bodyHash,
+            signatureHeader: signature,
+            secretLength: MP_SECRET?.length || 0,
+            secretPrefix: MP_SECRET?.substring(0, 8) + '...',
+            userAgent: headers['user-agent'],
+            mpVersion: headers['x-mp-version'],
+          },
+          recommendation: 'Verificar configuración del webhook secret en Mercado Pago'
+        });
+      }
+      return { ok: false, reason: 'Invalid signature' };
+    }
+    
+    return { ok: true, dataId: normalizedDataIdUrl };
+    
+  } catch (err) {
+    logger.error('HMAC validation error', err);
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : 'Unknown error'
+    };
+  }
+}
+
+/* --------------------------------------------------
+ * timingSafeEqual protegido contra errores
+ * -------------------------------------------------- */
+function timingSafeEqualSafe(a: string, b: string): boolean {
+  try {
+    const ba = Buffer.from(a);
+    const bb = Buffer.from(b);
+    if (ba.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ba, bb);
+  } catch {
+    return false;
+  }
+}

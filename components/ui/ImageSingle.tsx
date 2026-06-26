@@ -1,0 +1,157 @@
+'use client'
+
+import { useState } from 'react'
+import Image from 'next/image'
+import { Button } from '@/components/ui/Button'
+import { X, Upload, ZoomIn } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
+
+interface ImageSingleProps {
+  image: string
+  onAdd: (imageUrl: string) => void
+  onRemove: () => void
+}
+
+export function ImageSingle({ image, onAdd, onRemove }: ImageSingleProps) {
+  const [newImageUrl, setNewImageUrl] = useState('')
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  const handleAddImage = () => {
+    if (!newImageUrl.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Por favor ingresa una URL de imagen válida',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      new URL(newImageUrl)
+      onAdd(newImageUrl.trim())
+      setNewImageUrl('')
+      toast({
+        title: 'Éxito',
+        description: 'Imagen agregada correctamente'
+      })
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'URL de imagen inválida',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleImageClick = (image: string) => {
+    setPreviewImage(image)
+  }
+
+  const closePreview = () => {
+    setPreviewImage(null)
+  }
+
+  return (
+    <>
+      <div className="space-y-4">
+        {/* Agregar nueva imagen */}
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={newImageUrl}
+            onChange={(e) => setNewImageUrl(e.target.value)}
+            placeholder="https://ejemplo.com/imagen.jpg"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            onKeyPress={(e) => e.key === 'Enter' && handleAddImage()}
+          />
+          <Button
+            type="button"
+            onClick={handleAddImage}
+            disabled={!newImageUrl.trim()}
+            className="min-h-[44px]"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Agregar
+          </Button>
+        </div>
+
+        {/* Vista previa de imagen principal */}
+        {image && (
+          <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800">
+            {/* Vista previa de imagen */}
+            <div className="relative w-16 h-16 rounded-lg overflow-hidden border flex-shrink-0">
+              <Image
+                src={image}
+                alt="Vista previa de imagen principal"
+                fill
+                sizes="64px"
+                className="object-cover"
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+              />
+            </div>
+
+            {/* Información de la imagen */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Imagen Principal</p>
+              <p className="text-xs text-muted-foreground truncate max-w-xs">{image}</p>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleImageClick(image)}
+                className="min-h-[32px]"
+              >
+                <ZoomIn className="h-3 w-3 mr-1" />
+                Ver
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRemove}
+                className="min-h-[32px] text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!image && (
+          <div className="text-center py-8 text-gray-500">
+            <Upload className="mx-auto h-12 w-12 mb-4" />
+            <p>No hay imagen principal. Agrega una imagen arriba.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modal de previsualización */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={closePreview}>
+          <div className="relative max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            <Image
+              src={previewImage}
+              alt="Vista previa de imagen principal"
+              width={800}
+              height={600}
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+            <button
+              onClick={closePreview}
+              className="absolute top-4 right-4 bg-white text-black rounded-full p-2 hover:bg-gray-200 transition-colors"
+              aria-label="Cerrar vista previa"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

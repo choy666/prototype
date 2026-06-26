@@ -1,0 +1,56 @@
+https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
+https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/ipn
+
+
+Cuentas de prueba
+User ID
+2932784359
+Usuario
+TESTUSER6212057417963706272
+Contraseña
+A9k1cL0awX
+
+
+Credenciales de prueba
+Public Key
+APP_USR-69258e52-a9c1-4d81-9d1e-90cf52391d49
+Access Token
+APP_USR-3512407382157264-112123-63acaed36cb3246d2b1489bf710c4cb1-2926966384
+
+Webhooks
+URL configurada
+https://prototype-ten-dun.vercel.app/api
+Webhook secret
+6562a4c8de72b6852cebcf805622bee42c43db8973706aaa92de3d6edf23b8db
+¡Excelente! Enviamos una notificación Webhook con éxito.
+Solicitud:
+
+{
+
+  action: "payment.updated",
+
+  api_version: "v1",
+
+  data: {"id":"123456"},
+
+  date_created: "2021-11-01T02:02:02Z",
+
+  id: "123456",
+
+  live_mode: false,
+
+  type: "payment",
+
+  user_id: 517448794
+
+}
+
+Respuesta:
+
+200 - OK
+
+Tarjetas de prueba
+Mastercard
+5031 7557 3453 0604
+123
+11/30

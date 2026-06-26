@@ -1,0 +1,485 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import {
+  products,
+  users,
+  productVariants,
+  orders,
+  mercadopagoPreferences,
+  orderItems,
+} from '@/lib/schema';
+import { eq, and } from 'drizzle-orm';
+import { checkoutSchema } from '@/lib/validations/checkout';
+import { logger } from '@/lib/utils/logger';
+import { calculateME2ShippingCost } from '@/lib/actions/me2-shipping';
+import { getProductsByIds } from '@/lib/mercado-envios/me2Validator';
+import mpClient from '@/lib/clients/mercadopago';
+import { formatAddressForMercadoLibre } from '@/lib/utils/address-formatter';
+
+// Tipo para items del checkout (sin stock requerido)
+type CheckoutItem = {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+  discount?: number;
+  weight?: number | null;
+  variantId?: number | null;
+};
+export async function POST(req: NextRequest) {
+  try {
+    // Verificar que el usuario no sea admin
+    const { auth } = await import('@/lib/actions/auth');
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    if (session.user.role === 'admin') {
+      return NextResponse.json(
+        { error: 'Los administradores no pueden realizar compras' },
+        { status: 403 }
+      );
+    }
+
+    if (!mpClient.isReady()) {
+      logger.error('Checkout: Cliente de Mercado Pago no configurado');
+      return NextResponse.json(
+        { error: 'Mercado Pago no está disponible. Intenta nuevamente más tarde.' },
+        { status: 503 }
+      );
+    }
+
+    const body = await req.json();
+
+    // Validar datos de entrada con Zod
+    const validationResult = checkoutSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Datos de entrada inválidos',
+          details: validationResult.error.issues,
+        },
+        { status: 400 }
+      );
+    }
+
+    const { items, shippingAddress, shippingMethod, userId } = validationResult.data;
+
+    if (shippingMethod?.deliver_to === 'agency') {
+      return NextResponse.json(
+        { error: 'El retiro en sucursal no está disponible. Selecciona envío a domicilio.' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar que el usuario existe
+    logger.info('Checkout: Verificando existencia de usuario', { userId });
+    const userExists = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, Number(userId)))
+      .limit(1);
+
+    if (userExists.length === 0) {
+      logger.error('Checkout: Usuario no encontrado', { userId });
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 400 });
+    }
+
+    logger.info('Checkout: Usuario verificado correctamente', {
+      userId,
+      userEmail: userExists[0].email,
+    });
+
+    // Verificar stock de todos los items antes de crear preferencia
+    logger.info('Checkout: Verificando stock de items', { itemCount: items.length });
+    for (const item of items) {
+      if (item.variantId) {
+        // Verificar stock de variante y que tanto la variante como el producto estén activos
+        const variant = await db
+          .select({
+            stock: productVariants.stock,
+            productId: productVariants.productId,
+            isVariantActive: productVariants.isActive,
+          })
+          .from(productVariants)
+          .innerJoin(products, eq(productVariants.productId, products.id))
+          .where(
+            and(
+              eq(productVariants.id, item.variantId),
+              eq(productVariants.isActive, true),
+              eq(products.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (!variant.length) {
+          logger.error('Checkout: Variante no encontrada, inactiva o producto inactivo', {
+            variantId: item.variantId,
+          });
+          return NextResponse.json(
+            { error: `Variante no disponible para producto ${item.id}` },
+            { status: 400 }
+          );
+        }
+
+        if (variant[0].stock < item.quantity) {
+          logger.error('Checkout: Stock insuficiente para variante', {
+            variantId: item.variantId,
+            availableStock: variant[0].stock,
+            requestedQuantity: item.quantity,
+          });
+          return NextResponse.json(
+            { error: `Stock insuficiente para la variante seleccionada` },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Verificar stock del producto base y si está activo
+        const product = await db
+          .select({ stock: products.stock, isActive: products.isActive })
+          .from(products)
+          .where(and(eq(products.id, item.id), eq(products.isActive, true)))
+          .limit(1);
+
+        if (!product.length) {
+          logger.error('Checkout: Producto no encontrado o inactivo', { productId: item.id });
+          return NextResponse.json(
+            { error: `Producto no disponible: ${item.id}` },
+            { status: 400 }
+          );
+        }
+
+        if (product[0].stock < item.quantity) {
+          logger.error('Checkout: Stock insuficiente para producto', {
+            productId: item.id,
+            availableStock: product[0].stock,
+            requestedQuantity: item.quantity,
+          });
+          return NextResponse.json(
+            { error: `Stock insuficiente para el producto` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    logger.info('Checkout: Verificación de stock completada exitosamente');
+
+    // Calcular subtotal con descuentos aplicados
+    const subtotal = items.reduce((acc: number, item: CheckoutItem) => {
+      const basePrice = item.price;
+      const finalPrice =
+        item.discount && item.discount > 0 ? basePrice * (1 - item.discount / 100) : basePrice;
+      return acc + finalPrice * item.quantity;
+    }, 0);
+
+    // Calcular costo de envío usando el mismo motor ME2 que /api/shipments/calculate,
+    // respetando el método seleccionado por el usuario y con fallback a métodos locales.
+
+    // 1) Obtener productos enriquecidos desde la base de datos para ME2
+    const productIds = items.map((item: CheckoutItem) => item.id);
+    const dbProducts = await getProductsByIds(productIds);
+
+    const me2Items = items.map((item: CheckoutItem) => {
+      const dbProduct = dbProducts.find((p) => p.id === item.id);
+
+      const basePrice = item.price;
+      const finalPrice =
+        item.discount && item.discount > 0 ? basePrice * (1 - item.discount / 100) : basePrice;
+
+      return {
+        id: item.id,
+        name: dbProduct?.name || item.name,
+        weight: dbProduct?.weight ?? undefined,
+        height: dbProduct?.height ?? undefined,
+        width: dbProduct?.width ?? undefined,
+        length: dbProduct?.length ?? undefined,
+        shippingMode: dbProduct?.shippingMode ?? undefined,
+        shippingAttributes: dbProduct?.shippingAttributes ?? undefined,
+        me2Compatible: dbProduct?.me2Compatible ?? false,
+        mlItemId: dbProduct?.mlItemId ?? undefined,
+        quantity: item.quantity,
+        price: finalPrice,
+      };
+    });
+
+    // Formatear dirección para Mercado Libre antes de calcular envío
+    const formattedAddress = formatAddressForMercadoLibre(shippingAddress);
+
+    const me2Response = await calculateME2ShippingCost({
+      zipcode: formattedAddress.zip_code,
+      items: me2Items.map((item) => ({
+        id: item.id.toString(),
+        quantity: item.quantity,
+        price: item.price,
+        mlItemId: item.mlItemId,
+      })),
+    });
+
+    const resolvedShippingMode =
+      me2Response.source === 'internal_shipping'
+        ? 'internal_shipping'
+        : me2Response.source === 'me2'
+          ? 'me2'
+          : 'local';
+
+    if (!me2Response.shippingOptions || me2Response.shippingOptions.length === 0) {
+      throw new Error('No shipping methods available for this zipcode');
+    }
+
+    // 2) Intentar usar exactamente el método seleccionado por el usuario (shippingMethod.id)
+    const selectedMethodFromEngine = me2Response.shippingOptions.find(
+      (opt) => String(opt.shipping_method_id) === String(shippingMethod.id)
+    );
+
+    // 3) Si no se encuentra (por cambios en ML o fallback), usar el más barato como respaldo
+    const cheapestMethod = me2Response.shippingOptions.reduce(
+      (min, curr) => ((curr.cost || 0) < (min.cost || 0) ? curr : min),
+      me2Response.shippingOptions[0]
+    );
+
+    const effectiveMethod = selectedMethodFromEngine || cheapestMethod;
+    const shippingCost = effectiveMethod?.cost ?? 0;
+
+    logger.info('Shipping cost calculated via ME2/core', {
+      zipcode: shippingAddress.codigoPostal,
+      cost: shippingCost,
+      method: effectiveMethod?.name,
+      selectedMethodId: shippingMethod.id,
+      matchedSelectedMethod: Boolean(selectedMethodFromEngine),
+      source: me2Response.source,
+      fallback: me2Response.fallback ?? false,
+    });
+
+    // Calcular total final
+    const total = subtotal + shippingCost;
+
+    const shippingMetadata = {
+      shipping_context: {
+        zipcode: formattedAddress.zip_code,
+        shipping_method_id: String(effectiveMethod?.shipping_method_id ?? shippingMethod?.id ?? ''),
+        shipping_method_name: effectiveMethod?.name ?? shippingMethod?.name ?? null,
+        logistic_type: resolvedShippingMode,
+        deliver_to: 'address',
+        carrier_id: shippingMethod?.carrier_id ?? null,
+        option_id: shippingMethod?.option_id ?? effectiveMethod?.option_id ?? null,
+        option_hash: shippingMethod?.option_hash ?? effectiveMethod?.option_hash ?? null,
+        state_id: shippingMethod?.state_id ?? effectiveMethod?.state_id ?? null,
+      },
+    };
+
+    const [newOrder] = await db
+      .insert(orders)
+      .values({
+        userId: userExists[0].id,
+        email: userExists[0].email,
+        total: total.toString(),
+        status: 'pending',
+        shippingAddress,
+        shippingMethodId: null,
+        shippingCost: shippingCost.toString(),
+        shippingMode: resolvedShippingMode,
+        source: 'local',
+        shippingAgency: null,
+        metadata: shippingMetadata,
+      })
+      .returning({ id: orders.id });
+
+    const orderId = newOrder.id;
+
+    const orderItemsData = items.map((item: CheckoutItem) => ({
+      orderId,
+      productId: item.id,
+      variantId: item.variantId || null,
+      quantity: item.quantity,
+      price: (item.discount && item.discount > 0
+        ? item.price * (1 - item.discount / 100)
+        : item.price
+      ).toString(),
+    }));
+
+    if (orderItemsData.length > 0) {
+      await db.insert(orderItems).values(orderItemsData);
+      logger.info('Items transferidos a orderItems', {
+        orderId,
+        itemsCount: orderItemsData.length,
+      });
+    }
+
+    const payerInfo = {
+      email: userExists[0].email,
+      name: userExists[0].name || '',
+    };
+
+    const preferenceMetadata = {
+      user_id: userId.toString(),
+      order_id: orderId.toString(),
+      shipping_address: shippingAddress,
+      shipping_method_id: shippingMethod.id.toString(),
+      shipping_agency: null,
+      items: JSON.stringify(
+        items.map((item: CheckoutItem) => ({
+          ...item,
+          variantId: item.variantId || null,
+        }))
+      ),
+      subtotal: subtotal.toString(),
+      shipping_cost: shippingCost.toString(),
+      total: total.toString(),
+      checkout_version: '1.0',
+      migration_applied: true,
+      me2_source: me2Response.source,
+      me2_fallback: me2Response.fallback ?? false,
+      created_at: new Date().toISOString(),
+    };
+
+    const defaultAppUrl =
+      process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://localhost:3000';
+    const notificationUrl =
+      process.env.MERCADO_PAGO_NOTIFICATION_URL || `${defaultAppUrl}/api/webhooks/mercadopago`;
+
+    const preferencePayload = {
+      items: items.map((item: CheckoutItem) => ({
+        id: item.id.toString(),
+        title: item.name,
+        description: `Producto: ${item.name} - Cantidad: ${item.quantity}${
+          item.variantId ? ` - Variante ID: ${item.variantId}` : ''
+        }`,
+        quantity: item.quantity,
+        unit_price:
+          Math.round(
+            (item.discount && item.discount > 0
+              ? item.price * (1 - item.discount / 100)
+              : item.price) * 100
+          ) / 100,
+        currency_id: 'ARS',
+        category_id: 'others',
+      })),
+      shipments: {
+        cost: Math.round(shippingCost * 100) / 100,
+        mode: 'not_specified',
+        receiver_address: {
+          zip_code: formattedAddress.zip_code,
+          street_name: shippingAddress.direccion,
+          street_number: shippingAddress.numero || '1',
+          city_name: shippingAddress.ciudad,
+          state_name: shippingAddress.provincia,
+          country_name: 'Argentina',
+        },
+        dimensions:
+          me2Items[0]?.height && me2Items[0]?.width && me2Items[0]?.length
+            ? `${me2Items[0].length} x ${me2Items[0].width} x ${me2Items[0].height}`
+            : undefined,
+      },
+      payer: {
+        email: payerInfo.email,
+        name: payerInfo.name,
+        phone: {
+          number: shippingAddress.telefono,
+        },
+        address: {
+          zip_code: shippingAddress.codigoPostal,
+          street_name: shippingAddress.direccion,
+          street_number: shippingAddress.numero || '1',
+        },
+        identification:
+          userExists[0].documentType && userExists[0].documentNumber
+            ? {
+                type: userExists[0].documentType,
+                number: userExists[0].documentNumber,
+              }
+            : undefined,
+      },
+      back_urls: {
+        success: process.env.MERCADO_PAGO_SUCCESS_URL || `${defaultAppUrl}/payment-success`,
+        failure: process.env.MERCADO_PAGO_FAILURE_URL || `${defaultAppUrl}/payment-failure`,
+        pending: process.env.MERCADO_PAGO_PENDING_URL || `${defaultAppUrl}/payment-pending`,
+      },
+      auto_return: 'approved',
+      notification_url: notificationUrl,
+      external_reference: orderId.toString(),
+      metadata: preferenceMetadata,
+      payment_methods: {
+        installments: 12,
+      },
+    };
+
+    const preference = await mpClient.createPreference(preferencePayload);
+
+    await db.insert(mercadopagoPreferences).values({
+      preferenceId: preference.id,
+      externalReference: orderId.toString(),
+      orderId,
+      userId: Number(userId),
+      initPoint: preference.init_point,
+      items: preference.items || [],
+      payer: preference.payer || {},
+      paymentMethods: preference.payment_methods || {},
+      expires: preference.expires ?? false,
+      expirationDateFrom: preference.expiration_date_from
+        ? new Date(preference.expiration_date_from)
+        : null,
+      expirationDateTo: preference.expiration_date_to
+        ? new Date(preference.expiration_date_to)
+        : null,
+      notificationUrl: preference.notification_url ?? notificationUrl,
+      status: 'pending',
+    });
+
+    const orderMetadata = {
+      ...shippingMetadata,
+      mp_preference: {
+        id: preference.id,
+        init_point: preference.init_point,
+        sandbox_init_point: preference.sandbox_init_point,
+        created_at: new Date().toISOString(),
+      },
+    };
+
+    await db
+      .update(orders)
+      .set({
+        mercadoPagoId: preference.id,
+        paymentStatus: 'pending',
+        metadata: orderMetadata,
+      })
+      .where(eq(orders.id, orderId));
+
+    logger.info('Checkout: Preferencia de MercadoPago creada exitosamente', {
+      preferenceId: preference.id,
+      initPoint: preference.init_point,
+      total,
+      itemsCount: items.length,
+      shippingCost,
+      orderId,
+    });
+
+    return NextResponse.json({
+      orderId,
+      preferenceId: preference.id,
+      initPoint: preference.init_point,
+      total,
+      subtotal,
+      shippingCost,
+      items: items.map((item: CheckoutItem) => ({
+        ...item,
+        finalPrice:
+          item.discount && item.discount > 0 ? item.price * (1 - item.discount / 100) : item.price,
+      })),
+    });
+  } catch (error) {
+    logger.error('Checkout: Error procesando checkout', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    return NextResponse.json(
+      {
+        error: 'Error procesando el pago',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
