@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   RefreshCw,
   ShieldAlert,
-  TriangleAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/Button';
